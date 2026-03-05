@@ -21,13 +21,13 @@ public enum TagSource
     Plugin = 2,
 
     /// <summary>Tag was set by an AI/ML model (classification, inference, etc.).</summary>
-    AI = 4,
+    Ai = 4,
 
     /// <summary>Tag was set by the system infrastructure (automatic tagging, replication, etc.).</summary>
     System = 8,
 
     /// <summary>All sources combined -- useful for filtering/ACL that permits any source.</summary>
-    All = User | Plugin | AI | System
+    All = User | Plugin | Ai | System
 }
 
 /// <summary>
@@ -37,7 +37,7 @@ public enum TagSource
 /// <param name="Source">The broad category of who/what created the tag.</param>
 /// <param name="SourceId">
 /// The specific identifier of the source: plugin ID for <see cref="TagSource.Plugin"/>,
-/// user principal for <see cref="TagSource.User"/>, AI model ID for <see cref="TagSource.AI"/>,
+/// user principal for <see cref="TagSource.User"/>, AI model ID for <see cref="TagSource.Ai"/>,
 /// or "system" for <see cref="TagSource.System"/>.
 /// </param>
 /// <param name="SourceName">Optional human-readable display name for the source.</param>

@@ -47,7 +47,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <summary>
         /// Success return code for CUDA Driver API operations.
         /// </summary>
-        internal const int CUDA_SUCCESS = 0;
+        internal const int CudaSuccess = 0;
 
         // --- CUDA Driver API for module/kernel loading ---
 
@@ -301,6 +301,8 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     [SdkCompatibility("5.0.0", Notes = "Phase 65: Triton accelerator (HW-05)")]
     public sealed class TritonAccelerator : IGpuAccelerator, IDisposable
     {
+        /// <summary>Platform capability registry provided at construction (finding P4-2099).</summary>
+        internal IPlatformCapabilityRegistry Registry => _registry;
         private readonly IPlatformCapabilityRegistry _registry;
         private readonly TritonKernelLoader _kernelLoader;
         private int _deviceCount;
@@ -360,7 +362,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                         if (NativeLibrary.TryLoad(cudaDriverLib, out IntPtr _))
                         {
                             int result = TritonInterop.CuInit(0);
-                            if (result == TritonInterop.CUDA_SUCCESS)
+                            if (result == TritonInterop.CudaSuccess)
                             {
                                 _cudaDriverAvailable = true;
 
@@ -437,13 +439,13 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                     fixed (byte* dataPtr = kernel.BinaryData)
                     {
                         int result = TritonInterop.CuModuleLoadData(out IntPtr module, (IntPtr)dataPtr);
-                        if (result != TritonInterop.CUDA_SUCCESS)
+                        if (result != TritonInterop.CudaSuccess)
                             return false;
 
                         try
                         {
                             result = TritonInterop.CuModuleGetFunction(out IntPtr function, module, kernel.EntryPoint);
-                            if (result != TritonInterop.CUDA_SUCCESS)
+                            if (result != TritonInterop.CudaSuccess)
                                 return false;
 
                             result = TritonInterop.CuLaunchKernel(
@@ -453,11 +455,11 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                                 (uint)kernel.SharedMemorySize, IntPtr.Zero,
                                 kernelParams, null!);
 
-                            if (result != TritonInterop.CUDA_SUCCESS)
+                            if (result != TritonInterop.CudaSuccess)
                                 return false;
 
                             result = TritonInterop.CuCtxSynchronize();
-                            return result == TritonInterop.CUDA_SUCCESS;
+                            return result == TritonInterop.CudaSuccess;
                         }
                         finally
                         {
@@ -508,25 +510,25 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(a);
             ArgumentNullException.ThrowIfNull(b);
 
-            int M = a.GetLength(0), K = a.GetLength(1);
-            int K2 = b.GetLength(0), N = b.GetLength(1);
+            int m = a.GetLength(0), k = a.GetLength(1);
+            int k2 = b.GetLength(0), n = b.GetLength(1);
 
-            if (K != K2)
+            if (k != k2)
                 throw new ArgumentException("Matrix dimensions incompatible for multiplication");
-            if (M > 4096 || N > 4096 || K > 4096)
-                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {M}x{K} * {K}x{N}. Max 4096 per dimension (finding P2-372).");
+            if (m > 4096 || n > 4096 || k > 4096)
+                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {m}x{k} * {k}x{n}. Max 4096 per dimension (finding P2-372).");
 
-            float[] result = new float[M * N];
+            float[] result = new float[m * n];
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             await Task.Run(() =>
             {
-                for (int i = 0; i < M; i++)
-                    for (int j = 0; j < N; j++)
+                for (int i = 0; i < m; i++)
+                    for (int j = 0; j < n; j++)
                     {
                         float sum = 0;
-                        for (int k = 0; k < K; k++)
-                            sum += a[i, k] * b[k, j];
-                        result[i * N + j] = sum;
+                        for (int ki = 0; ki < k; ki++)
+                            sum += a[i, ki] * b[ki, j];
+                        result[i * n + j] = sum;
                     }
             });
             Interlocked.Add(ref _totalProcessingTicks, System.Diagnostics.Stopwatch.GetTimestamp() - t0);
@@ -543,19 +545,19 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(input);
             ArgumentNullException.ThrowIfNull(weights);
 
-            int D = input.Length;
-            int D2 = weights.GetLength(0), E = weights.GetLength(1);
+            int d = input.Length;
+            int d2 = weights.GetLength(0), e = weights.GetLength(1);
 
-            if (D != D2)
+            if (d != d2)
                 throw new ArgumentException("Input dimension must match weight rows");
 
-            float[] result = new float[E];
+            float[] result = new float[e];
             await Task.Run(() =>
             {
-                for (int j = 0; j < E; j++)
+                for (int j = 0; j < e; j++)
                 {
                     float sum = 0;
-                    for (int i = 0; i < D; i++)
+                    for (int i = 0; i < d; i++)
                         sum += input[i] * weights[i, j];
                     result[j] = sum;
                 }

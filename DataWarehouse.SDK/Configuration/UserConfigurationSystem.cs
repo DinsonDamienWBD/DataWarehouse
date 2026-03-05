@@ -112,12 +112,14 @@ public sealed record ConfigurationSnapshot
 public sealed class UserConfigurationSystem
 {
     private readonly IPluginCapabilityRegistry _capabilityRegistry;
+    /// <summary>Capability registry provided at construction (finding P4-2107).</summary>
+    internal IPluginCapabilityRegistry CapabilityRegistry => _capabilityRegistry;
     private readonly ConfigurationHierarchy _hierarchy;
     private readonly IMessageBus? _messageBus;
     private readonly BoundedDictionary<string, IUserOverridable> _overridables = new BoundedDictionary<string, IUserOverridable>(1000);
     private readonly BoundedDictionary<string, ConfigurableFeature> _features = new BoundedDictionary<string, ConfigurableFeature>(1000);
 
-    private static readonly JsonSerializerOptions _jsonOptions = new()
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -394,7 +396,7 @@ public sealed class UserConfigurationSystem
             Values = new Dictionary<string, object?>(values)
         };
 
-        return JsonSerializer.Serialize(snapshot, _jsonOptions);
+        return JsonSerializer.Serialize(snapshot, JsonOptions);
     }
 
     /// <summary>
@@ -409,7 +411,7 @@ public sealed class UserConfigurationSystem
         ConfigurationSnapshot? snapshot;
         try
         {
-            snapshot = JsonSerializer.Deserialize<ConfigurationSnapshot>(json, _jsonOptions);
+            snapshot = JsonSerializer.Deserialize<ConfigurationSnapshot>(json, JsonOptions);
         }
         catch (JsonException ex)
         {

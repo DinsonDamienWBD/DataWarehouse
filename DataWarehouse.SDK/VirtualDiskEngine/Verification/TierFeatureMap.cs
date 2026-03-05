@@ -12,13 +12,13 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Verification;
 public enum TierLevel : byte
 {
     /// <summary>VDE-integrated: native region access with binary serialize/deserialize (fastest for structured data).</summary>
-    Tier1_VdeIntegrated = 1,
+    Tier1VdeIntegrated = 1,
 
     /// <summary>Plugin pipeline: feature served through plugin processing with serialization boundary overhead.</summary>
-    Tier2_PipelineOptimized = 2,
+    Tier2PipelineOptimized = 2,
 
     /// <summary>Basic fallback: in-memory, no-op, file-based, or config-driven defaults (always available).</summary>
-    Tier3_BasicFallback = 3,
+    Tier3BasicFallback = 3,
 }
 
 /// <summary>
@@ -85,204 +85,204 @@ public static class TierFeatureMap
         {
             Module = ModuleId.Security,
             FeatureName = "Security (PolicyVault + EncryptionHeader)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "PolicyVault and EncryptionHeader regions provide zero-copy binary policy and key storage directly in the DWVD format",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Compliance] = new FeatureTierAssignment
         {
             Module = ModuleId.Compliance,
             FeatureName = "Compliance (ComplianceVault + AuditLog)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "ComplianceVault region provides tamper-evident compliance passport storage with ECDSA signatures",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Intelligence] = new FeatureTierAssignment
         {
             Module = ModuleId.Intelligence,
             FeatureName = "Intelligence (IntelligenceCache)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "IntelligenceCache region provides 43-byte fixed-size entries for O(1) classification lookup",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Tags] = new FeatureTierAssignment
         {
             Module = ModuleId.Tags,
             FeatureName = "Tags (TagIndexRegion)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "TagIndexRegion provides B-tree indexed tag storage with O(log n) lookup directly in VDE",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Replication] = new FeatureTierAssignment
         {
             Module = ModuleId.Replication,
             FeatureName = "Replication (ReplicationState)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "ReplicationState region tracks version vectors, watermarks, and dirty bitmaps for efficient delta sync",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Raid] = new FeatureTierAssignment
         {
             Module = ModuleId.Raid,
             FeatureName = "RAID (RAIDMetadata)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "RAIDMetadata region stores shard descriptors and parity layout for hardware-level data protection",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Streaming] = new FeatureTierAssignment
         {
             Module = ModuleId.Streaming,
             FeatureName = "Streaming (StreamingAppend + DataWAL)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "StreamingAppend region provides WAL-backed append-only writes with configurable growth",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Compute] = new FeatureTierAssignment
         {
             Module = ModuleId.Compute,
             FeatureName = "Compute (ComputeCodeCache)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "ComputeCodeCache region stores WASM modules with SHA-256 content hashing for cached execution",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Fabric] = new FeatureTierAssignment
         {
             Module = ModuleId.Fabric,
             FeatureName = "Fabric (CrossVDEReferenceTable)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "CrossVDEReferenceTable region provides 74-byte fixed VDE references for federated namespace links",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Consensus] = new FeatureTierAssignment
         {
             Module = ModuleId.Consensus,
             FeatureName = "Consensus (ConsensusLogRegion)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "ConsensusLogRegion provides 89-byte fixed group state for distributed agreement tracking",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Compression] = new FeatureTierAssignment
         {
             Module = ModuleId.Compression,
             FeatureName = "Compression (DictionaryRegion)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "CompressionDictionary region provides O(1) dictionary lookup via flat array[256] for DictId",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Integrity] = new FeatureTierAssignment
         {
             Module = ModuleId.Integrity,
             FeatureName = "Integrity (IntegrityTree)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "IntegrityTree region provides 1-indexed heap Merkle tree with O(log n) hash verification proofs",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Snapshot] = new FeatureTierAssignment
         {
             Module = ModuleId.Snapshot,
             FeatureName = "Snapshot (SnapshotTable)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "SnapshotTable region provides fixed-size snapshot entries with parent-child chain and tombstone support",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Query] = new FeatureTierAssignment
         {
             Module = ModuleId.Query,
             FeatureName = "Query (BTreeIndexForest)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "BTreeIndexForest (TagIndexRegion) provides B-tree indexed queries with O(log n) search",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Privacy] = new FeatureTierAssignment
         {
             Module = ModuleId.Privacy,
             FeatureName = "Privacy (AnonymizationTable)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "AnonymizationTable region provides fixed-size PII mapping with subject-level erasure support",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Observability] = new FeatureTierAssignment
         {
             Module = ModuleId.Observability,
             FeatureName = "Observability (MetricsLogRegion)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "MetricsLog region provides auto-compacting metrics with 1-minute average windows",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.AuditLog] = new FeatureTierAssignment
         {
             Module = ModuleId.AuditLog,
             FeatureName = "AuditLog (AuditLogRegion)",
-            DefaultTier = TierLevel.Tier1_VdeIntegrated,
+            DefaultTier = TierLevel.Tier1VdeIntegrated,
             DefaultTierRationale = "AuditLog region provides SHA-256 chained append-only entries for tamper-evident audit trail",
             PromotionTrigger = "VDE module bit set in manifest + region populated",
             DemotionTrigger = "VDE module removed -> Tier 2; plugin unloaded -> Tier 3",
-            HighestAvailableTier = TierLevel.Tier1_VdeIntegrated,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier1VdeIntegrated,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         // ---- 2 modules WITHOUT dedicated regions: default Tier 2 ----
@@ -291,24 +291,24 @@ public static class TierFeatureMap
         {
             Module = ModuleId.Sustainability,
             FeatureName = "Sustainability (inode-only, no dedicated region)",
-            DefaultTier = TierLevel.Tier2_PipelineOptimized,
+            DefaultTier = TierLevel.Tier2PipelineOptimized,
             DefaultTierRationale = "No dedicated region — Tier 1 limited to 4-byte inode field only, full feature requires UltimateSustainability plugin pipeline",
             PromotionTrigger = "UltimateSustainability plugin loaded with metrics pipeline",
             DemotionTrigger = "Plugin unloaded -> Tier 3 (no metrics collection)",
-            HighestAvailableTier = TierLevel.Tier2_PipelineOptimized,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier2PipelineOptimized,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         map[ModuleId.Transit] = new FeatureTierAssignment
         {
             Module = ModuleId.Transit,
             FeatureName = "Transit (inode-only, no dedicated region)",
-            DefaultTier = TierLevel.Tier2_PipelineOptimized,
+            DefaultTier = TierLevel.Tier2PipelineOptimized,
             DefaultTierRationale = "No dedicated region — Tier 1 limited to 1-byte inode field only, full feature requires UltimateDataTransit plugin pipeline",
             PromotionTrigger = "UltimateDataTransit plugin loaded with transit optimization",
             DemotionTrigger = "Plugin unloaded -> Tier 3 (direct transfer only)",
-            HighestAvailableTier = TierLevel.Tier2_PipelineOptimized,
-            LowestAvailableTier = TierLevel.Tier3_BasicFallback,
+            HighestAvailableTier = TierLevel.Tier2PipelineOptimized,
+            LowestAvailableTier = TierLevel.Tier3BasicFallback,
         };
 
         return map.ToFrozenDictionary();

@@ -87,6 +87,8 @@ public sealed class TimeTravelEngine
 {
     private readonly DeltaIcebergTransactionLog _transactionLog;
     private readonly LakehouseTableOperations _tableOps;
+    /// <summary>Table operations instance provided at construction (finding P4-2084).</summary>
+    internal LakehouseTableOperations TableOps => _tableOps;
     private readonly ILogger? _logger;
     private long _queriesExecuted;
     private long _versionLookups;
@@ -174,7 +176,7 @@ public sealed class TimeTravelEngine
         if (schemaEntry?.SchemaJson is not null)
         {
             schemaAtVersion = JsonSerializer.Deserialize<TableSchema>(
-                schemaEntry.SchemaJson, _jsonOptions);
+                schemaEntry.SchemaJson, JsonOptions);
         }
 
         // Extract active files
@@ -337,7 +339,7 @@ public sealed class TimeTravelEngine
         return result;
     }
 
-    private static readonly JsonSerializerOptions _jsonOptions = new()
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = false

@@ -20,7 +20,7 @@ namespace DataWarehouse.SDK.Contracts
     public abstract class StrategyBase : IStrategy
     {
         private bool _disposed;
-        protected volatile bool _initialized;
+        protected volatile bool Initialized;
         private readonly object _lifecycleLock = new();
         private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
         private readonly SemaphoreSlim _healthCacheLock = new(1, 1);
@@ -88,11 +88,11 @@ namespace DataWarehouse.SDK.Contracts
         public async Task InitializeAsync(CancellationToken cancellationToken = default)
         {
             EnsureNotDisposed();
-            if (_initialized) return;
+            if (Initialized) return;
             lock (_lifecycleLock)
             {
-                if (_initialized) return;
-                _initialized = true;
+                if (Initialized) return;
+                Initialized = true;
             }
             try
             {
@@ -100,7 +100,7 @@ namespace DataWarehouse.SDK.Contracts
             }
             catch
             {
-                lock (_lifecycleLock) { _initialized = false; }
+                lock (_lifecycleLock) { Initialized = false; }
                 throw;
             }
         }
@@ -113,9 +113,9 @@ namespace DataWarehouse.SDK.Contracts
         /// <returns>A task representing the asynchronous shutdown operation.</returns>
         public async Task ShutdownAsync(CancellationToken cancellationToken = default)
         {
-            if (!_initialized) return;
+            if (!Initialized) return;
             await ShutdownAsyncCore(cancellationToken).ConfigureAwait(false);
-            _initialized = false;
+            Initialized = false;
         }
 
         /// <summary>
@@ -141,7 +141,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <summary>
         /// Gets whether this strategy has been initialized and is ready for use.
         /// </summary>
-        protected bool IsInitialized => _initialized;
+        protected bool IsInitialized => Initialized;
 
         /// <summary>
         /// Releases all resources used by this strategy synchronously.
@@ -206,7 +206,7 @@ namespace DataWarehouse.SDK.Contracts
         /// <exception cref="InvalidOperationException">Thrown if the strategy has not been initialized.</exception>
         protected void ThrowIfNotInitialized()
         {
-            if (!_initialized)
+            if (!Initialized)
                 throw new InvalidOperationException($"Strategy '{StrategyId}' has not been initialized. Call InitializeAsync first.");
         }
 
@@ -219,18 +219,18 @@ namespace DataWarehouse.SDK.Contracts
         /// <returns>A task representing the asynchronous operation.</returns>
         protected async Task EnsureInitializedAsync(Func<Task> initCore)
         {
-            if (_initialized) return;
+            if (Initialized) return;
             // Use a simple async-safe pattern with the lifecycle lock
             bool needsInit = false;
             lock (_lifecycleLock)
             {
-                if (!_initialized)
+                if (!Initialized)
                     needsInit = true;
             }
             if (needsInit)
             {
                 await initCore().ConfigureAwait(false);
-                _initialized = true;
+                Initialized = true;
             }
         }
 

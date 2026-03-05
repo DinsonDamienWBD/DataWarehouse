@@ -41,7 +41,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <summary>
         /// Success return code for SYCL operations.
         /// </summary>
-        internal const int SYCL_SUCCESS = 0;
+        internal const int SyclSuccess = 0;
 
         /// <summary>
         /// SYCL error codes (minimal subset for interop).
@@ -61,24 +61,24 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <summary>
         /// SYCL device types for device selection.
         /// </summary>
-        internal const int SYCL_DEVICE_TYPE_GPU = 1;
-        internal const int SYCL_DEVICE_TYPE_CPU = 2;
-        internal const int SYCL_DEVICE_TYPE_ACCELERATOR = 3;
-        internal const int SYCL_DEVICE_TYPE_ALL = 0;
+        internal const int SyclDeviceTypeGpu = 1;
+        internal const int SyclDeviceTypeCpu = 2;
+        internal const int SyclDeviceTypeAccelerator = 3;
+        internal const int SyclDeviceTypeAll = 0;
 
         /// <summary>
         /// SYCL device info query parameters.
         /// </summary>
-        internal const int SYCL_DEVICE_INFO_NAME = 1;
-        internal const int SYCL_DEVICE_INFO_VENDOR = 2;
-        internal const int SYCL_DEVICE_INFO_MAX_COMPUTE_UNITS = 3;
-        internal const int SYCL_DEVICE_INFO_GLOBAL_MEM_SIZE = 4;
+        internal const int SyclDeviceInfoName = 1;
+        internal const int SyclDeviceInfoVendor = 2;
+        internal const int SyclDeviceInfoMaxComputeUnits = 3;
+        internal const int SyclDeviceInfoGlobalMemSize = 4;
 
         /// <summary>
         /// SYCL memory copy direction.
         /// </summary>
-        internal const int SYCL_MEMCPY_HOST_TO_DEVICE = 1;
-        internal const int SYCL_MEMCPY_DEVICE_TO_HOST = 2;
+        internal const int SyclMemcpyHostToDevice = 1;
+        internal const int SyclMemcpyDeviceToHost = 2;
 
         // --- Device API ---
 
@@ -215,6 +215,8 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     [SdkCompatibility("5.0.0", Notes = "Phase 65: SYCL accelerator (HW-05)")]
     public sealed class SyclAccelerator : IGpuAccelerator, IDisposable
     {
+        /// <summary>Platform capability registry provided at construction (finding P4-1997).</summary>
+        internal IPlatformCapabilityRegistry Registry => _registry;
         private readonly IPlatformCapabilityRegistry _registry;
         private int _deviceCount;
         private bool _isAvailable;
@@ -225,6 +227,8 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         private bool _disposed;
 
         // SYCL handles
+        /// <summary>SYCL device handle (finding P4-1998).</summary>
+        internal IntPtr DeviceHandle => _device;
         private IntPtr _device;
         private IntPtr _queue;
 
@@ -275,14 +279,14 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                         }
 
                         // Query GPU device count
-                        int result = SyclInterop.DeviceGetCount(out int gpuCount, SyclInterop.SYCL_DEVICE_TYPE_GPU);
+                        int result = SyclInterop.DeviceGetCount(out int gpuCount, SyclInterop.SyclDeviceTypeGpu);
 
-                        if (result != SyclInterop.SYCL_SUCCESS || gpuCount == 0)
+                        if (result != SyclInterop.SyclSuccess || gpuCount == 0)
                         {
                             // Fall back to checking all device types (CPU, FPGA)
-                            result = SyclInterop.DeviceGetCount(out int allCount, SyclInterop.SYCL_DEVICE_TYPE_ALL);
+                            result = SyclInterop.DeviceGetCount(out int allCount, SyclInterop.SyclDeviceTypeAll);
 
-                            if (result != SyclInterop.SYCL_SUCCESS || allCount == 0)
+                            if (result != SyclInterop.SyclSuccess || allCount == 0)
                             {
                                 _isAvailable = false;
                                 _initialized = true;
@@ -297,11 +301,11 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                         }
 
                         // Get first device
-                        result = SyclInterop.DeviceGet(out IntPtr device, SyclInterop.SYCL_DEVICE_TYPE_GPU, 0);
-                        if (result != SyclInterop.SYCL_SUCCESS)
+                        result = SyclInterop.DeviceGet(out IntPtr device, SyclInterop.SyclDeviceTypeGpu, 0);
+                        if (result != SyclInterop.SyclSuccess)
                         {
-                            result = SyclInterop.DeviceGet(out device, SyclInterop.SYCL_DEVICE_TYPE_ALL, 0);
-                            if (result != SyclInterop.SYCL_SUCCESS)
+                            result = SyclInterop.DeviceGet(out device, SyclInterop.SyclDeviceTypeAll, 0);
+                            if (result != SyclInterop.SyclSuccess)
                             {
                                 _isAvailable = false;
                                 _initialized = true;
@@ -313,7 +317,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
                         // Create queue
                         result = SyclInterop.QueueCreate(out IntPtr queue, device);
-                        if (result != SyclInterop.SYCL_SUCCESS)
+                        if (result != SyclInterop.SyclSuccess)
                         {
                             _isAvailable = false;
                             _initialized = true;
@@ -366,17 +370,17 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                         int result = SyclInterop.KernelLoadSpirv(
                             out IntPtr kernel, _queue, (IntPtr)spirvPtr, (nuint)spirvBinary.Length);
 
-                        if (result != SyclInterop.SYCL_SUCCESS)
+                        if (result != SyclInterop.SyclSuccess)
                             return false;
 
                         try
                         {
                             result = SyclInterop.KernelLaunch(kernel, _queue, globalWorkSize, localWorkSize);
-                            if (result != SyclInterop.SYCL_SUCCESS)
+                            if (result != SyclInterop.SyclSuccess)
                                 return false;
 
                             result = SyclInterop.QueueWait(_queue);
-                            return result == SyclInterop.SYCL_SUCCESS;
+                            return result == SyclInterop.SyclSuccess;
                         }
                         finally
                         {
@@ -428,25 +432,25 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(a);
             ArgumentNullException.ThrowIfNull(b);
 
-            int M = a.GetLength(0), K = a.GetLength(1);
-            int K2 = b.GetLength(0), N = b.GetLength(1);
+            int m = a.GetLength(0), k = a.GetLength(1);
+            int k2 = b.GetLength(0), n = b.GetLength(1);
 
-            if (K != K2)
+            if (k != k2)
                 throw new ArgumentException("Matrix dimensions incompatible for multiplication");
-            if (M > 4096 || N > 4096 || K > 4096)
-                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {M}x{K} * {K}x{N}. Max 4096 per dimension (finding P2-372).");
+            if (m > 4096 || n > 4096 || k > 4096)
+                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {m}x{k} * {k}x{n}. Max 4096 per dimension (finding P2-372).");
 
-            float[] result = new float[M * N];
+            float[] result = new float[m * n];
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             await Task.Run(() =>
             {
-                for (int i = 0; i < M; i++)
-                    for (int j = 0; j < N; j++)
+                for (int i = 0; i < m; i++)
+                    for (int j = 0; j < n; j++)
                     {
                         float sum = 0;
-                        for (int k = 0; k < K; k++)
-                            sum += a[i, k] * b[k, j];
-                        result[i * N + j] = sum;
+                        for (int ki = 0; ki < k; ki++)
+                            sum += a[i, ki] * b[ki, j];
+                        result[i * n + j] = sum;
                     }
             });
             Interlocked.Add(ref _totalProcessingTicks, System.Diagnostics.Stopwatch.GetTimestamp() - t0);
@@ -463,19 +467,19 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(input);
             ArgumentNullException.ThrowIfNull(weights);
 
-            int D = input.Length;
-            int D2 = weights.GetLength(0), E = weights.GetLength(1);
+            int d = input.Length;
+            int d2 = weights.GetLength(0), e = weights.GetLength(1);
 
-            if (D != D2)
+            if (d != d2)
                 throw new ArgumentException("Input dimension must match weight rows");
 
-            float[] result = new float[E];
+            float[] result = new float[e];
             await Task.Run(() =>
             {
-                for (int j = 0; j < E; j++)
+                for (int j = 0; j < e; j++)
                 {
                     float sum = 0;
-                    for (int i = 0; i < D; i++)
+                    for (int i = 0; i < d; i++)
                         sum += input[i] * weights[i, j];
                     result[j] = sum;
                 }

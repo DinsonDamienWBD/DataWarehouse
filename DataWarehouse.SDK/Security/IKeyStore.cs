@@ -1027,7 +1027,7 @@ namespace DataWarehouse.SDK.Security
                 // Call derived class initialization
                 await InitializeStorage(cancellationToken).ConfigureAwait(false);
 
-                _initialized = true;
+                Initialized = true;
             }
             finally
             {

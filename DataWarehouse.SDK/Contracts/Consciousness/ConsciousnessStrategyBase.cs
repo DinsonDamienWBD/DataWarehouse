@@ -79,7 +79,7 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
     /// </summary>
     public abstract class ConsciousnessStrategyBase : StrategyBase, IConsciousnessStrategy
     {
-        // StrategyBase provides: _initialized, _counters, _healthCacheLock,
+        // StrategyBase provides: Initialized, _counters, _healthCacheLock,
         // InitializeAsync, ShutdownAsync, Dispose, IncrementCounter, GetCounter, GetAllCounters,
         // GetCachedHealthAsync, EnsureNotDisposed, ThrowIfNotInitialized.
 
@@ -108,7 +108,7 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
         public abstract string[] Tags { get; }
 
         /// <summary>Gets whether this strategy has been initialized.</summary>
-        public new bool IsInitialized => _initialized;
+        public new bool IsInitialized => Initialized;
 
         /// <summary>
         /// Gets a cached health status for this consciousness strategy, reflecting
@@ -116,7 +116,7 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
         /// </summary>
         public ConsciousnessHealthStatus GetHealth()
         {
-            return _initialized
+            return Initialized
                 ? ConsciousnessHealthStatus.Healthy
                 : ConsciousnessHealthStatus.NotInitialized;
         }

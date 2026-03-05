@@ -286,7 +286,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
                 {
                     // Create TBS context
-                    var p = new Tpm2Interop.TBS_CONTEXT_PARAMS2 { Version = 2 };
+                    var p = new Tpm2Interop.TbsContextParams2 { Version = 2 };
                     uint result = Tpm2Interop.TbsiContextCreate(ref p, out _tpmContext);
                     if (result == 0 && _tpmContext != IntPtr.Zero)
                     {

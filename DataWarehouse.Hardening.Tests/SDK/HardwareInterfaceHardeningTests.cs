@@ -127,7 +127,8 @@ public class HardwareInterfaceHardeningTests
         Assert.NotNull(type);
         var names = Enum.GetNames(type);
         Assert.Contains("I2CBus", names);
-        Assert.DoesNotContain("I2CBus", names);
+        // I2C_Bus (with underscore) should not exist
+        Assert.DoesNotContain("I2C_Bus", names);
     }
 
     // Finding 872: HardwareProbe always-false expression

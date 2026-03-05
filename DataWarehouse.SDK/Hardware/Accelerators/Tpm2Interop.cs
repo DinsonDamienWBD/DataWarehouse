@@ -47,7 +47,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <param name="context">Output: TBS context handle.</param>
         /// <returns>TBS result code (0 = success).</returns>
         [LibraryImport("Tbsi.dll", EntryPoint = "Tbsi_Context_Create")]
-        internal static partial uint TbsiContextCreate(ref TBS_CONTEXT_PARAMS2 contextParams, out IntPtr context);
+        internal static partial uint TbsiContextCreate(ref TbsContextParams2 contextParams, out IntPtr context);
 
         /// <summary>
         /// Closes a TBS context on Windows.
@@ -82,7 +82,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// TBS context parameters for TPM 2.0.
         /// </summary>
         [StructLayout(LayoutKind.Sequential)]
-        internal struct TBS_CONTEXT_PARAMS2
+        internal struct TbsContextParams2
         {
             /// <summary>TBS context version. Use 2 for TPM 2.0.</summary>
             public uint Version;
@@ -137,7 +137,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 // Try to create TBS context
-                var p = new TBS_CONTEXT_PARAMS2 { Version = 2 };
+                var p = new TbsContextParams2 { Version = 2 };
                 uint result = TbsiContextCreate(ref p, out IntPtr ctx);
                 if (result == 0 && ctx != IntPtr.Zero)
                 {

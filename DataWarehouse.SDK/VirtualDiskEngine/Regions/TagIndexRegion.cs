@@ -510,8 +510,6 @@ public sealed class TagIndexRegion
         // First, assign block indices via BFS
         var nodeQueue = new Queue<BPlusTreeNode>();
         var nodeBlockMap = new Dictionary<BPlusTreeNode, int>();
-        var leafList = new List<BPlusTreeNode>();
-
         nodeQueue.Enqueue(_root);
         int blockIndex = 1; // block 0 is header
 
@@ -519,9 +517,6 @@ public sealed class TagIndexRegion
         {
             var node = nodeQueue.Dequeue();
             nodeBlockMap[node] = blockIndex++;
-
-            if (node.IsLeaf)
-                leafList.Add(node);
 
             if (!node.IsLeaf)
             {

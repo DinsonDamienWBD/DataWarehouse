@@ -368,10 +368,10 @@ public sealed class TDigest : IProbabilisticStructure, IMergeable<TDigest>, ICon
 
         // Guard against OOM bomb from corrupt/malicious data with huge centroidCount
         // Max realistic t-digest has ~compression * 4 centroids; 100,000 is a conservative upper bound
-        const int MaxCentroidCount = 100_000;
-        if (centroidCount < 0 || centroidCount > MaxCentroidCount)
+        const int maxCentroidCount = 100_000;
+        if (centroidCount < 0 || centroidCount > maxCentroidCount)
             throw new InvalidDataException(
-                $"TDigest deserialization failed: centroidCount {centroidCount} is out of valid range [0, {MaxCentroidCount}].");
+                $"TDigest deserialization failed: centroidCount {centroidCount} is out of valid range [0, {maxCentroidCount}].");
 
         var centroids = new List<Centroid>(centroidCount);
         for (int i = 0; i < centroidCount; i++)

@@ -29,7 +29,7 @@ public class PostContractsHardeningTests
     public void Finding469_StoragePoolBaseStrategyFieldIsVolatile()
     {
         var type = SdkAssembly.GetTypes().First(t => t.Name == "StoragePoolBase");
-        var field = type.GetField("_strategy",
+        var field = type.GetField("CurrentStrategy",
             BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
         Assert.NotNull(field);
     }
@@ -76,7 +76,7 @@ public class PostContractsHardeningTests
     public void Finding474_StrategyBaseInitializedFieldIsVolatile()
     {
         var type = SdkAssembly.GetTypes().First(t => t.Name == "StrategyBase");
-        var field = type.GetField("_initialized",
+        var field = type.GetField("Initialized",
             BindingFlags.NonPublic | BindingFlags.Instance | BindingFlags.FlattenHierarchy);
         Assert.NotNull(field);
     }

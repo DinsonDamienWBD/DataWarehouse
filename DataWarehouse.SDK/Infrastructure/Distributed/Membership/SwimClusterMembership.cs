@@ -36,6 +36,11 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private Task? _probeLoopTask;
         private Task? _suspicionCheckTask;
 
+        /// <summary>Probe loop background task (finding P4-1983).</summary>
+        internal Task? ProbeLoopTask => _probeLoopTask;
+        /// <summary>Suspicion check background task (finding P4-1984).</summary>
+        internal Task? SuspicionCheckTask => _suspicionCheckTask;
+
         /// <summary>
         /// Cached member list for zero-allocation GetMembers() calls.
         /// Invalidated atomically when membership changes (join/leave/suspect/dead events).

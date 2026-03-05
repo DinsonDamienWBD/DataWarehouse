@@ -33,13 +33,13 @@ public sealed record BenchmarkResult
     /// <summary>
     /// Ratio of Tier 2 to Tier 1 nanoseconds. Values greater than 1.0 mean Tier 1 is faster.
     /// </summary>
-    public required double Tier1vsTier2Ratio { get; init; }
+    public required double Tier1VsTier2Ratio { get; init; }
 
     /// <summary>
     /// Ratio of Tier 3 to Tier 1 nanoseconds. Values greater than 1.0 mean Tier 1 is faster.
     /// Note: Tier 3 may be faster for pure reads (in-memory) but loses persistence/correctness.
     /// </summary>
-    public required double Tier1vsTier3Ratio { get; init; }
+    public required double Tier1VsTier3Ratio { get; init; }
 
     /// <summary>Human-readable analysis of the benchmark results.</summary>
     public required string Analysis { get; init; }
@@ -141,7 +141,7 @@ public static class TierPerformanceBenchmark
         memoryStore[policyId] = policy;
         long tier3Nanos = MeasureNanosPerOp(() =>
         {
-            memoryStore.TryGetValue(policyId, out _);
+            _ = memoryStore.TryGetValue(policyId, out _);
         });
 
         return BuildResult(ModuleId.Security, "Security (PolicyVault)", tier1Nanos, tier2Nanos, tier3Nanos);
@@ -252,7 +252,7 @@ public static class TierPerformanceBenchmark
         rawStore[1] = entry;
         long tier3Nanos = MeasureNanosPerOp(() =>
         {
-            rawStore.TryGetValue(1, out _);
+            _ = rawStore.TryGetValue(1, out _);
         });
 
         return BuildResult(ModuleId.Compression, "Compression (Dictionary)", tier1Nanos, tier2Nanos, tier3Nanos);
@@ -304,7 +304,7 @@ public static class TierPerformanceBenchmark
         linearStore["idx:benchmark-field"] = 1;
         long tier3Nanos = MeasureNanosPerOp(() =>
         {
-            linearStore.TryGetValue("idx:benchmark-field", out _);
+            _ = linearStore.TryGetValue("idx:benchmark-field", out _);
         });
 
         return BuildResult(ModuleId.Query, "Query (BTreeIndex)", tier1Nanos, tier2Nanos, tier3Nanos);
@@ -366,7 +366,7 @@ public static class TierPerformanceBenchmark
         memorySnapshots[snapshotId] = entry;
         long tier3Nanos = MeasureNanosPerOp(() =>
         {
-            memorySnapshots.TryGetValue(snapshotId, out _);
+            _ = memorySnapshots.TryGetValue(snapshotId, out _);
         });
 
         return BuildResult(ModuleId.Snapshot, "Snapshot (SnapshotTable)", tier1Nanos, tier2Nanos, tier3Nanos);
@@ -416,23 +416,23 @@ public static class TierPerformanceBenchmark
         ModuleId module, string featureName,
         long tier1Nanos, long tier2Nanos, long tier3Nanos)
     {
-        double tier1vs2 = tier1Nanos > 0 ? (double)tier2Nanos / tier1Nanos : 0.0;
-        double tier1vs3 = tier1Nanos > 0 ? (double)tier3Nanos / tier1Nanos : 0.0;
+        double tier1Vs2 = tier1Nanos > 0 ? (double)tier2Nanos / tier1Nanos : 0.0;
+        double tier1Vs3 = tier1Nanos > 0 ? (double)tier3Nanos / tier1Nanos : 0.0;
 
         var analysis = new StringBuilder();
         analysis.Append($"Tier1={tier1Nanos}ns, Tier2={tier2Nanos}ns, Tier3={tier3Nanos}ns. ");
 
-        if (tier1vs2 > 1.0)
-            analysis.Append($"Tier 1 is {tier1vs2:F1}x faster than Tier 2. ");
-        else if (tier1vs2 > 0.0)
-            analysis.Append($"Tier 2 is {1.0 / tier1vs2:F1}x faster than Tier 1. ");
+        if (tier1Vs2 > 1.0)
+            analysis.Append($"Tier 1 is {tier1Vs2:F1}x faster than Tier 2. ");
+        else if (tier1Vs2 > 0.0)
+            analysis.Append($"Tier 2 is {1.0 / tier1Vs2:F1}x faster than Tier 1. ");
         else
             analysis.Append("Tier 2 ratio unavailable (Tier 1 zero latency). ");
 
-        if (tier1vs3 > 1.0)
-            analysis.Append($"Tier 1 is {tier1vs3:F1}x faster than Tier 3 (Tier 3 loses persistence). ");
-        else if (tier1vs3 > 0.0)
-            analysis.Append($"Tier 3 is {1.0 / tier1vs3:F1}x faster than Tier 1 (Tier 3 trades persistence for speed). ");
+        if (tier1Vs3 > 1.0)
+            analysis.Append($"Tier 1 is {tier1Vs3:F1}x faster than Tier 3 (Tier 3 loses persistence). ");
+        else if (tier1Vs3 > 0.0)
+            analysis.Append($"Tier 3 is {1.0 / tier1Vs3:F1}x faster than Tier 1 (Tier 3 trades persistence for speed). ");
         else
             analysis.Append("Tier 3 ratio unavailable (Tier 1 zero latency). ");
 
@@ -443,8 +443,8 @@ public static class TierPerformanceBenchmark
             Tier1NanosPerOp = tier1Nanos,
             Tier2NanosPerOp = tier2Nanos,
             Tier3NanosPerOp = tier3Nanos,
-            Tier1vsTier2Ratio = Math.Round(tier1vs2, 2),
-            Tier1vsTier3Ratio = Math.Round(tier1vs3, 2),
+            Tier1VsTier2Ratio = Math.Round(tier1Vs2, 2),
+            Tier1VsTier3Ratio = Math.Round(tier1Vs3, 2),
             Analysis = analysis.ToString(),
         };
     }

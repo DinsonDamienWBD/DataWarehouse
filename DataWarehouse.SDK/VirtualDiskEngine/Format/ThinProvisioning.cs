@@ -7,7 +7,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Format;
 
 /// <summary>
 /// Provides thin provisioning support for DWVD v2.0 files via OS-native sparse file semantics.
-/// On Windows (NTFS), uses FSCTL_SET_SPARSE. On Linux (ext4/xfs/btrfs), sparse files are
+/// On Windows (NTFS), uses FsctlSetSparse. On Linux (ext4/xfs/btrfs), sparse files are
 /// created naturally via SetLength + seek-past-write. On macOS (APFS), sparse files are
 /// supported natively.
 /// </summary>
@@ -21,7 +21,7 @@ public static class ThinProvisioning
 {
     // ── Windows P/Invoke ────────────────────────────────────────────────
 
-    private const int FSCTL_SET_SPARSE = 0x000900C4;
+    private const int FsctlSetSparse = 0x000900C4;
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool DeviceIoControl(
@@ -65,7 +65,7 @@ public static class ThinProvisioning
             // Set file length (creates sparse extent on NTFS/ext4/APFS)
             stream.SetLength(logicalSize);
 
-            // On Windows, explicitly mark as sparse via FSCTL_SET_SPARSE
+            // On Windows, explicitly mark as sparse via FsctlSetSparse
             if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             {
                 SetSparseFlag(stream);
@@ -162,7 +162,7 @@ public static class ThinProvisioning
         {
             bool result = DeviceIoControl(
                 stream.SafeFileHandle,
-                FSCTL_SET_SPARSE,
+                FsctlSetSparse,
                 IntPtr.Zero, 0,
                 IntPtr.Zero, 0,
                 out _,
@@ -174,7 +174,7 @@ public static class ThinProvisioning
                 // The VDE will still work but without thin provisioning benefits.
                 var error = Marshal.GetLastWin32Error();
                 System.Diagnostics.Debug.WriteLine(
-                    $"FSCTL_SET_SPARSE failed with Win32 error {error}. " +
+                    $"FsctlSetSparse failed with Win32 error {error}. " +
                     "Thin provisioning may not be effective on this file system.");
             }
         }

@@ -50,6 +50,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         private readonly SemaphoreSlim _connectionLock = new(1, 1);
         private readonly CancellationTokenSource _shutdownCts = new();
         private Task? _listenerTask;
+        /// <summary>Listener accept loop background task (finding P4-2063).</summary>
+        internal Task? ListenerTask => _listenerTask;
         private bool _disposed;
 
         /// <summary>
