@@ -2602,171 +2602,449 @@ Plans:
 
 ---
 
-## Milestone: v7.0 Production Hardening, Full Test Coverage & Hostile Analysis
+## Milestone: v7.0 Military-Grade Production Readiness
 
-> 9 phases (96-104) | 43 requirements across 5 categories (AFIX:8, TEST:21, PERF:3, HOST:8, GATE:5) | Approach: fix audit findings top-to-bottom, generate contract tests for all 3,036 strategies, build integration/companion/adversarial test suites, establish performance baselines, perform hostile runtime analysis, fix all findings, gate on zero known issues
+> 16 phases (96-111) | 4 stages | 11,128 consolidated findings | Approach: TDD hardening (test→red→fix→green) project-by-project through consolidated findings, then audit/profile/mutate, then system-level validation, chaos engineering, and CI/CD fortress
 
-**Milestone Goal:** Fix every known audit finding (4,444 remaining), build comprehensive test coverage (~50,000+ tests), perform hostile runtime analysis across the entire codebase, and fix all findings -- achieving true production readiness with zero known issues, zero unfixed findings, and regression-gated performance baselines.
+**Milestone Goal:** Take the DataWarehouse solution to 100% military-grade production readiness. Eradicate all 11,128 consolidated audit findings via TDD methodology, validate system-level behavior under heavy load, prove resilience under chaos/adversarial conditions, and lock down the CI/CD pipeline so no future commit can degrade the hardened state.
 
-**Ordering Rationale:** Audit fixes first (Phases 96-97) because they address known code quality issues that would generate false positives in subsequent testing. Contract tests next (Phase 98) because they establish baseline correctness for all 3,036 strategies. Integration tests (Phase 99) exercise cross-cutting paths that depend on correct individual strategies. Companion tests (Phase 100) are independent of strategy correctness but benefit from stable integration paths. Adversarial tests (Phase 101) push boundaries beyond normal operation. Performance baselines (Phase 102) require a stable, correct codebase to produce meaningful numbers. Hostile analysis (Phase 103) is a separate investigative pass that generates findings. Fix pass (Phase 104) resolves all hostile findings and gates the milestone.
+**Master Execution Plan — 4 Stages:**
+- **Stage 1: Component-Level Hardening (Phases 96-104)** — Eradicate all theoretical bugs at the class/method level via TDD loop, then audit, profile, and mutation-test
+- **Stage 2: System-Level Validation (Phases 105-106)** — Ensure components don't destroy each other under heavy load (integration profiling + soak tests)
+- **Stage 3: Chaos Engineering & Resilience (Phases 107-110)** — Prove survival under plugin faults, torn writes, resource exhaustion, message bus disruption, malicious payloads, and clock skew
+- **Stage 4: CI/CD Fortress (Phase 111)** — Lock down the pipeline so no PR can degrade the hardened state
 
 **Key references:**
-- Audit findings: `Metadata/SDK-AUDIT-FINDINGS.md` (6,900 lines, 4,647 findings, 203 P0 fixed in v6.0)
-- Fix tracking: `Metadata/audit-fix-ledger-sdk.md`, `Metadata/audit-fix-ledger-kernel.md`, `Metadata/audit-fix-ledger-plugins.md`
-- Hostile findings: `Metadata/hostile-analysis-findings.md`
+- Consolidated findings: `Metadata/production-audit-2026-03-05/CONSOLIDATED-FINDINGS.md` (11,699 lines, 11,128 findings, sorted by Project → File → Line)
+- Sources: JetBrains InspectCode (5,481), SDK comprehensive audit (4,265), Agent scans (1,253), Semantic search (110), Previous audits (19)
+- Hardening tests: `DataWarehouse.Hardening.Tests/`
+
+**Per-finding workflow (Phases 96-101):**
+```
+For each finding (project by project, file by file, line by line):
+  Step 1: Write failing test in DataWarehouse.Hardening.Tests (Coyote for concurrency, xUnit for logic/memory)
+  Step 2: Run test → confirm RED (vulnerability proven)
+  Step 3: Fix the production code
+  Step 3.5: dotnet test → confirm GREEN (full solution, not just new test)
+  → next finding
+
+After batch of findings for one project (or file group if project is large):
+  → commit
+  → dotnet test (post-commit sanity)
+  → next project/batch
+```
+
+**Commit strategy:**
+- Projects with ≤150 findings: 1 commit per project
+- Projects with 151-300 findings: 2 commits (split at file boundary)
+- Projects with 301-600 findings: 3-4 commits
+- UltimateStorage (1,243 findings): ~5 commits
+- SDK (2,499 findings): ~8-10 commits
+
+**Execution rules:**
+- Reporting format: **"Stage X - Step Y - Description"** for all agent output
+- Context clear between every phase (after reporting complete, before next phase starts)
+- Max 2-3 parallel agents within a phase to avoid rate limit kills
+- Every finding referenced by: project name, file name, finding number, CONSOLIDATED-FINDINGS.md line number
+- No finding skipped regardless of severity, type, or style
+- Processing is strictly sequential through the consolidated file — no reordering
 
 ### Dependency Graph
 
 ```
-Phase 96 (SDK Audit Fixes)
-    +---> Phase 97 (Kernel & Plugin Audit Fixes) -- depends on SDK fixes
-              +---> Phase 98 (Contract Tests) -- depends on clean audit codebase
-              |         +---> Phase 99 (Integration Tests) -- depends on contract correctness
-              |         +---> Phase 100 (Companion Tests) -- independent after audit fixes
-              +---> Phase 101 (Adversarial & Fuzz Tests) -- depends on clean audit codebase
-              +---> Phase 102 (Performance Baselines) -- depends on stable codebase
-    Phase 99 + 100 + 101 + 102 ---> Phase 103 (Hostile Analysis) -- depends on full test coverage
-                                        +---> Phase 104 (Fix Hostile + Final Gate) -- depends on Phase 103
+STAGE 1: Component-Level Hardening
+  Phase 96 (SDK Part 1) → Phase 97 (SDK Part 2) → Phase 98 (Core Infrastructure)
+    → Phase 99 (Large Plugins A) → Phase 100 (Large Plugins B) → Phase 101 (Medium+Small+Companions)
+      → Phase 102 (Full Coyote + dotCover Audit)
+        → Phase 103 (dotTrace + dotMemory Profile)
+          → Phase 104 (Stryker Mutation Testing → 95%+)
+
+STAGE 2: System-Level Validation
+  Phase 104 → Phase 105 (Integration Profiling: full boot + 100GB payload)
+    → Phase 106 (Soak Test: 24-72hr continuous load + GC monitoring)
+
+STAGE 3: Chaos Engineering & Resilience
+  Phase 106 → Phase 107 (Plugin Fault Injection + Concurrent Lifecycle)
+    → Phase 108 (Torn-Write Recovery + Resource Exhaustion)
+      → Phase 109 (Message Bus Disruption + Federation Partition)
+        → Phase 110 (Malicious Payloads + Clock Skew)
+
+STAGE 4: CI/CD Fortress
+  Phase 110 → Phase 111 (Pipeline Lock-Down: Coyote 1000x, Gen2 Gate, Stryker Baseline)
 ```
 
 ### Phases
 
-- [ ] **Phase 96: Sequential Audit Fix Pass -- SDK** - Fix/resolve all 939 SDK audit findings with explicit disposition ledger
-- [ ] **Phase 97: Sequential Audit Fix Pass -- Kernel & Plugins** - Fix/resolve all 3,702 Kernel + Plugin audit findings with explicit disposition ledgers
-- [ ] **Phase 98: Contract Test Generation** - Auto-generate contract tests for all 3,036 strategies and 23 plugin base classes
-- [ ] **Phase 99: Integration Path Tests** - Message bus, pipeline, VDE chain, federation, and policy engine integration tests
-- [ ] **Phase 100: Companion Project Tests** - CLI, Dashboard, GUI, Launcher, and Shared test coverage from 0% to comprehensive
-- [ ] **Phase 101: Negative & Adversarial Tests + Fuzz Harnesses** - Boundary, corruption, exhaustion, concurrency, fuzz, and security regression tests
-- [ ] **Phase 102: Performance Baselines with Regression Gates** - Real DW benchmarks replacing generic .NET benchmarks with CI regression gates
-- [ ] **Phase 103: Cross-Cutting Hostile Analysis** - Thread safety, CancellationToken, config validation, error paths, memory leaks, deadlocks
-- [ ] **Phase 104: Fix All Hostile Analysis Findings + Final Gate** - Fix every hostile finding, verify entire suite green, gate milestone
+- [ ] **Phase 96: Stage 1 — Hardening: SDK Part 1** — TDD loop for SDK findings 1-1249 (CONSOLIDATED-FINDINGS.md lines 876-2148)
+- [ ] **Phase 97: Stage 1 — Hardening: SDK Part 2** — TDD loop for SDK findings 1250-2499 (CONSOLIDATED-FINDINGS.md lines 2149-3440)
+- [ ] **Phase 98: Stage 1 — Hardening: Core Infrastructure** — TDD loop for AedsCore (139), Kernel (148), Plugin (195), Shared (61), TamperProof (81), Tests (126) — 750 findings
+- [ ] **Phase 99: Stage 1 — Hardening: Large Plugins A** — TDD loop for UltimateStorage (1243), UltimateIntelligence (562), UltimateConnector (542) — 2,347 findings
+- [ ] **Phase 100: Stage 1 — Hardening: Large Plugins B** — TDD loop for UltimateAccessControl (409), UltimateKeyManagement (380), UltimateRAID (380), UltimateCompliance (271), UltimateDataManagement (285) — 1,725 findings
+- [ ] **Phase 101: Stage 1 — Hardening: Medium + Small Plugins + Companions** — TDD loop for remaining 47 projects — 3,557 findings
+- [ ] **Phase 102: Stage 1 — Full Audit (Coyote + dotCover)** — Run full Coyote concurrency testing + dotCover coverage on entire hardened codebase
+- [ ] **Phase 103: Stage 1 — Profile (dotTrace + dotMemory)** — Verify fixes introduced no allocation overhead or lock contention
+- [ ] **Phase 104: Stage 1 — Mutation Testing (Stryker)** — Target 95%+ mutation score, tighten assertions until achieved
+- [ ] **Phase 105: Stage 2 — Integration Profiling** — Full kernel+plugins boot, 100GB streaming payload, cross-boundary bottleneck detection
+- [ ] **Phase 106: Stage 2 — Soak Test Harness** — Parameterized continuous load (CI: 10min, manual: 24-72hr), GC event counter gates
+- [ ] **Phase 107: Stage 3 — Chaos: Plugin Faults + Concurrent Lifecycle** — Fatal exception injection, AssemblyLoadContext unload during operations
+- [ ] **Phase 108: Stage 3 — Chaos: Torn-Write + Resource Exhaustion** — Coyote-controlled crash mid-VDE chain, ThreadPool/MemoryPool/disk-full starvation
+- [ ] **Phase 109: Stage 3 — Chaos: Message Bus + Federation Partition** — Message loss/duplication/reorder injection, network partition mid-replication
+- [ ] **Phase 110: Stage 3 — Chaos: Malicious Payloads + Clock Skew** — Zip bombs, malformed IVs, path traversal, TimeProvider manipulation
+- [ ] **Phase 111: Stage 4 — CI/CD Fortress** — audit.yml lock-down, Coyote 1000 iterations/PR, BenchmarkDotNet Gen2 gate, Stryker baseline gate
 
 ### Phase Details
 
-### Phase 96: Sequential Audit Fix Pass -- SDK
-**Goal**: Every SDK audit finding has an explicit disposition -- either fixed or provably resolved by a prior fix
+### Phase 96: Stage 1, Steps 1-3 — Hardening: SDK Part 1
+**Goal**: Every SDK finding from #1 through #1249 has a failing test proving the vulnerability, followed by a production fix making it pass
 **Depends on**: Nothing (first phase of v7.0)
-**Requirements**: AFIX-01, AFIX-02, AFIX-03, PILR-01 (partial), PILR-02 (partial), PILR-03 (partial)
+**Requirements**: HARD-01, HARD-02, HARD-03
+**Findings scope**:
+  - Project: SDK
+  - CONSOLIDATED-FINDINGS.md lines: 876-2148
+  - Finding numbers: 1-1249
+  - Severity mix: portion of 42 critical, 462 high, 678 medium, 1317 low
+**Workflow**: For each finding line-by-line: write Coyote test (concurrency) or xUnit test (logic/memory) → confirm RED → fix production code → `dotnet test` → confirm GREEN → next
+**Commit strategy**: ~5 commits, batched by file groups at natural file boundaries
 **Success Criteria** (what must be TRUE):
-  1. All 939 SDK findings in `Metadata/SDK-AUDIT-FINDINGS.md` lines 9-1665 have an explicit disposition (FIXED, RESOLVED-BY with reference, or WONT-FIX with approved justification)
-  2. `Metadata/audit-fix-ledger-sdk.md` exists and tracks every finding with its disposition, grouped by audit chunk
-  3. Solution builds with 0 errors and 0 warnings after all SDK fixes
-  4. Existing test suite still passes (zero regressions from fixes)
-  5. SDK PolicyEngine contracts verified: PolicyContext accessible from every plugin base, cascade resolution produces effective policy at all 5 levels, AI autonomy levels respected
-**Plans**: TBD
+  1. Every finding #1-1249 has a corresponding test in `DataWarehouse.Hardening.Tests/SDK/`
+  2. All tests pass (GREEN) after fixes
+  3. Solution builds with 0 errors after all fixes
+  4. `dotnet test` passes after each commit (post-commit sanity check)
+**Plans**: 5 plans
+Plans:
+- [ ] 096-01-PLAN.md — Findings 1-218 (Accelerators through ColumnarRegionEngine)
+- [ ] 096-02-PLAN.md — Findings 219-467 (Post-ColumnarRegionEngine through Contracts/Spatial)
+- [ ] 096-03-PLAN.md — Findings 468-710 (Post-Contracts/Spatial through ExtentTree)
+- [ ] 096-04-PLAN.md — Findings 711-954 (FaultToleranceConfig through ICacheableStorage)
+- [ ] 096-05-PLAN.md — Findings 955-1249 (ICarbonAwareStorage through IoUringBindings)
 
-### Phase 97: Sequential Audit Fix Pass -- Kernel & Plugins
-**Goal**: Every Kernel and Plugin audit finding has an explicit disposition -- the entire audit backlog is cleared
+### Phase 97: Stage 1, Steps 1-3 — Hardening: SDK Part 2
+**Goal**: Every SDK finding from #1250 through #2499 has a failing test followed by a production fix
 **Depends on**: Phase 96
-**Requirements**: AFIX-04, AFIX-05, AFIX-06, AFIX-07, AFIX-08, PILR-01 (complete), PILR-02 (complete), PILR-03 (complete)
+**Requirements**: HARD-01, HARD-02, HARD-03
+**Findings scope**:
+  - Project: SDK
+  - CONSOLIDATED-FINDINGS.md lines: 2149-3440
+  - Finding numbers: 1250-2499
+  - Severity mix: remaining portion of SDK findings
+**Workflow**: Same TDD loop as Phase 96
+**Commit strategy**: ~5 commits, batched by file groups
 **Success Criteria** (what must be TRUE):
-  1. All 27 Kernel findings and all 3,675 Plugin findings have explicit dispositions
-  2. `Metadata/audit-fix-ledger-kernel.md` and `Metadata/audit-fix-ledger-plugins.md` exist with complete tracking
-  3. Processing was strictly sequential top-to-bottom through the audit file (no severity-based reordering)
-  4. Solution builds with 0 errors and 0 warnings after all Kernel + Plugin fixes
-  5. Existing test suite still passes (zero regressions)
-  6. All 52 plugins verified policy-aware: PolicyContext accessible, cascade resolution works at every level, no plugin operates in "dumb" one-size-fits-all mode
-  7. All 5 AI advisors verified: correct behavior at all autonomy levels, overhead throttling prevents runaway cost
+  1. Every finding #1250-2499 has a corresponding test in `DataWarehouse.Hardening.Tests/SDK/`
+  2. All tests pass (GREEN) after fixes
+  3. Solution builds with 0 errors
+  4. `dotnet test` passes after each commit
 **Plans**: TBD
 
-### Phase 98: Contract Test Generation
-**Goal**: Every strategy and plugin base class has auto-generated contract tests verifying compliance with its base class contract
+### Phase 98: Stage 1, Steps 1-3 — Hardening: Core Infrastructure
+**Goal**: All core infrastructure findings have failing tests followed by production fixes
 **Depends on**: Phase 97
-**Requirements**: TEST-01, TEST-02, TEST-03, TEST-04
+**Requirements**: HARD-01, HARD-02, HARD-03
+**Findings scope**:
+  | Project | Findings | CONSOLIDATED-FINDINGS.md Lines |
+  |---------|----------|-------------------------------|
+  | AedsCore | 139 (7 crit, 35 high, 70 med, 27 low) | 113-256 |
+  | Kernel | 148 (14 crit, 28 high, 80 med, 26 low) | 479-631 |
+  | Plugin | 195 (3 crit, 96 high, 72 med, 24 low) | 650-849 |
+  | Shared | 61 (4 crit, 18 med, 39 low) | 3470-3535 |
+  | TamperProof | 81 (2 crit, 23 high, 28 med, 28 low) | 3547-3632 |
+  | Tests | 126 (2 crit, 33 high, 51 med, 40 low) | 3633-3763 |
+  | **Total** | **750** | |
+**Workflow**: Same TDD loop. Process in order: AedsCore → Kernel → Plugin → Shared → TamperProof → Tests
+**Commit strategy**: 1 commit per project (6 commits)
 **Success Criteria** (what must be TRUE):
-  1. `DataWarehouse.Tests/Contracts/` contains generated tests for all 3,036 strategy subclasses verifying constructor, lifecycle, dispose, and required properties
-  2. All 23 plugin base classes have contract tests verifying lifecycle, dispose, capability registration, and message bus subscription patterns
-  3. All 14 domain strategy bases have domain-specific contract tests (e.g., CompressionStrategy round-trip, EncryptionStrategy encrypt/decrypt symmetry)
-  4. All generated contract tests pass with 0 failures
+  1. All 750 findings have corresponding tests in `DataWarehouse.Hardening.Tests/{ProjectName}/`
+  2. All tests pass after fixes
+  3. Solution builds with 0 errors
+  4. `dotnet test` passes after each commit
 **Plans**: TBD
 
-### Phase 99: Integration Path Tests
-**Goal**: All major cross-cutting integration paths have test coverage proving they work end-to-end
+### Phase 99: Stage 1, Steps 1-3 — Hardening: Large Plugins A
+**Goal**: All findings in the three largest plugins have failing tests followed by production fixes
 **Depends on**: Phase 98
-**Requirements**: TEST-05, TEST-06, TEST-07, TEST-08, TEST-09, TEST-10, PILR-04, PILR-05, PILR-06, PILR-07, PILR-08
+**Requirements**: HARD-01, HARD-02, HARD-03
+**Findings scope**:
+  | Project | Findings | CONSOLIDATED-FINDINGS.md Lines |
+  |---------|----------|-------------------------------|
+  | UltimateStorage | 1,243 (36 crit, 161 high, 335 med, 711 low) | 9634-10881 |
+  | UltimateIntelligence | 562 (15 crit, 95 high, 175 med, 277 low) | 7449-8015 |
+  | UltimateConnector | 542 (18 crit, 184 high, 301 med, 39 low) | 4977-5523 |
+  | **Total** | **2,347** | |
+**Workflow**: Same TDD loop. Process in order: UltimateStorage → UltimateIntelligence → UltimateConnector
+**Commit strategy**: Storage ~5 commits, Intelligence ~3 commits, Connector ~3 commits
 **Success Criteria** (what must be TRUE):
-  1. Message bus pub/sub tests cover all known cross-plugin communication paths extracted from plugin map headers
-  2. Pipeline orchestration round-trip tests verify compress-encrypt-store-retrieve-decrypt-decompress
-  3. VDE decorator chain tests verify each decorator in isolation and the full Cache-Integrity-Compression-Dedup-Encryption-WAL-RAID-File chain
-  4. VDE mount pipeline tests verify SuperblockV2 feature bits produce the correct decorator chain
-  5. Federation router tests verify hierarchical shard catalog, zero-overhead passthrough, and cross-VDE queries
-  6. VDE scale-morphing tests: structures morph correctly across KB→MB→GB→TB→PB→YB→Federation and back down
-  7. All golden-path VDE structures (superblock, allocation groups, inodes, extent trees, WAL, ARC cache, MVCC, SQL engine, tag index, defrag, dedup, heat tiering) verified at each scale level
-  8. All SMA structures (morph levels 1-7, Bw-Tree, HNSW, Masstree, ALEX, Hilbert, Clock-SI, metaslab allocator) transition smoothly between scale thresholds
-  9. Scale-down verified: VDE that grew to TB+ and shrank back operates correctly (no orphan allocations, no dead morph levels)
-  10. Federation scale-up/scale-down: adding/removing VDEs maintains shard catalog integrity and zero-overhead passthrough when dissolving to single VDE
+  1. All 2,347 findings have corresponding tests
+  2. All tests pass after fixes
+  3. Solution builds with 0 errors
+  4. `dotnet test` passes after each commit
 **Plans**: TBD
 
-### Phase 100: Companion Project Tests
-**Goal**: CLI, Dashboard, GUI, Launcher, and Shared projects go from 0% test coverage to comprehensive coverage
-**Depends on**: Phase 97
-**Requirements**: TEST-11, TEST-12, TEST-13, TEST-14, TEST-15
+### Phase 100: Stage 1, Steps 1-3 — Hardening: Large Plugins B
+**Goal**: All findings in the next tier of large plugins have failing tests followed by production fixes
+**Depends on**: Phase 99
+**Requirements**: HARD-01, HARD-02, HARD-03
+**Findings scope**:
+  | Project | Findings | CONSOLIDATED-FINDINGS.md Lines |
+  |---------|----------|-------------------------------|
+  | UltimateAccessControl | 409 (25 crit, 139 high, 109 med, 136 low) | 3865-4288 |
+  | UltimateKeyManagement | 380 (14 crit, 87 high, 114 med, 165 low) | 8285-8671 |
+  | UltimateRAID | 380 (19 crit, 21 high, 229 med, 111 low) | 8803-9219 |
+  | UltimateDataManagement | 285 (2 crit, 57 high, 107 med, 119 low) | 6202-6491 |
+  | UltimateCompliance | 271 (5 crit, 75 high, 112 med, 79 low) | 4314-4589 |
+  | **Total** | **1,725** | |
+**Workflow**: Same TDD loop. Process in order: UltimateAccessControl → UltimateKeyManagement → UltimateRAID → UltimateDataManagement → UltimateCompliance
+**Commit strategy**: 1-2 commits per project (~8 commits total)
 **Success Criteria** (what must be TRUE):
-  1. Every CLI command class has test coverage for argument parsing, kernel interaction, and output formatting
-  2. Every Dashboard controller, service, and SignalR hub method has test coverage
-  3. GUI service layer (DashboardFramework, NavigationService, ThemeManager, etc.) has test coverage
-  4. Launcher adapter pattern, plugin profile loading, host lifecycle, and HTTP server have test coverage
-  5. All 53 Shared .cs files (InstanceManager, MessageBridge, etc.) have test coverage
+  1. All 1,725 findings have corresponding tests
+  2. All tests pass after fixes
+  3. Solution builds with 0 errors
+  4. `dotnet test` passes after each commit
 **Plans**: TBD
 
-### Phase 101: Negative & Adversarial Tests + Fuzz Harnesses
-**Goal**: The codebase handles hostile inputs, corrupt data, resource exhaustion, and concurrency stress gracefully
-**Depends on**: Phase 97
-**Requirements**: TEST-16, TEST-17, TEST-18, TEST-19, TEST-20, TEST-21
+### Phase 101: Stage 1, Steps 1-3 — Hardening: Medium + Small Plugins + Companions
+**Goal**: All remaining findings across 47 projects have failing tests followed by production fixes
+**Depends on**: Phase 100
+**Requirements**: HARD-01, HARD-02, HARD-03
+**Findings scope** (47 projects, processing order matches CONSOLIDATED-FINDINGS.md):
+  | Project | Findings | CONSOLIDATED-FINDINGS.md Lines |
+  |---------|----------|-------------------------------|
+  | AiArchitectureMapper | 2 | 257-263 |
+  | Benchmarks | 6 | 264-274 |
+  | CLI | 63 | 275-342 |
+  | Dashboard | 92 | 343-441 |
+  | GUI | 21 | 442-467 |
+  | HardeningTests | 6 | 468-478 |
+  | Launcher | 13 | 632-649 |
+  | PluginMarketplace | 17 | 850-871 |
+  | SemanticSync | 24 | 3441-3469 |
+  | Systemic | 6 | 3536-3546 |
+  | Transcoding.Media | 96 | 3764-3864 |
+  | UltimateBlockchain | 20 | 4289-4313 |
+  | UltimateCompression | 234 | 4590-4828 |
+  | UltimateCompute | 143 | 4829-4976 |
+  | UltimateConsensus | 61 | 5524-5589 |
+  | UltimateDatabaseProtocol | 184 | 5590-5780 |
+  | UltimateDatabaseStorage | 104 | 5781-5889 |
+  | UltimateDataCatalog | 26 | 5890-5920 |
+  | UltimateDataFormat | 58 | 5921-5983 |
+  | UltimateDataGovernance | 64 | 5984-6052 |
+  | UltimateDataIntegration | 78 | 6053-6135 |
+  | UltimateDataIntegrity | 15 | 6136-6155 |
+  | UltimateDataLake | 4 | 6156-6164 |
+  | UltimateDataLineage | 32 | 6165-6201 |
+  | UltimateDataMesh | 35 | 6492-6531 |
+  | UltimateDataPrivacy | 38 | 6532-6574 |
+  | UltimateDataProtection | 231 | 6575-6810 |
+  | UltimateDataQuality | 53 | 6811-6868 |
+  | UltimateDataTransit | 70 | 6869-6943 |
+  | UltimateDeployment | 101 | 6944-7049 |
+  | UltimateDocGen | 21 | 7050-7075 |
+  | UltimateEdgeComputing | 63 | 7076-7143 |
+  | UltimateEncryption | 180 | 7144-7342 |
+  | UltimateFilesystem | 101 | 7343-7448 |
+  | UltimateInterface | 150 | 8016-8172 |
+  | UltimateIoTIntegration | 107 | 8173-8284 |
+  | UltimateMicroservices | 35 | 8672-8711 |
+  | UltimateMultiCloud | 86 | 8712-8802 |
+  | UltimateReplication | 139 | 9220-9363 |
+  | UltimateResilience | 91 | 9364-9459 |
+  | UltimateResourceManager | 62 | 9460-9526 |
+  | UltimateRTOSBridge | 21 | 9527-9552 |
+  | UltimateSDKPorts | 27 | 9553-9584 |
+  | UltimateServerless | 44 | 9585-9633 |
+  | UltimateStorageProcessing | 149 | 10882-11035 |
+  | UltimateStreamingData | 173 | 11036-11213 |
+  | UltimateSustainability | 182 | 11214-11400 |
+  | UltimateWorkflow | 70 | 11401-11475 |
+  | UniversalFabric | 30 | 11476-11510 |
+  | UniversalObservability | 161 | 11511-11676 |
+  | Unknown | 18 | 11677-11699 |
+  | **Total** | **3,557** | |
+**Workflow**: Same TDD loop. 1 commit per project.
 **Success Criteria** (what must be TRUE):
-  1. Null/empty/boundary input tests exist for every public SDK method
-  2. Corrupt data injection tests verify graceful handling of malformed VDE superblocks, truncated payloads, and invalid RAID parity
-  3. Resource exhaustion tests verify behavior under OOM, disk full, network timeout, and CancellationToken fire
-  4. Concurrency stress tests verify parallel strategy execution, concurrent pipeline runs, and race condition safety
-  5. Fuzz harnesses exist for config deserialization, VDE format parsing, compression round-trip, encryption key derivation, and message bus parsing
+  1. All 3,557 findings across 47 projects have corresponding tests
+  2. All tests pass after fixes
+  3. Solution builds with 0 errors
+  4. `dotnet test` passes after each commit
 **Plans**: TBD
 
-### Phase 102: Performance Baselines with Regression Gates
-**Goal**: Real DataWarehouse-specific benchmarks exist with stored baselines and CI regression gates
-**Depends on**: Phase 97
-**Requirements**: PERF-01, PERF-02, PERF-03
+### Phase 102: Stage 1, Step 2 — Full Audit (Coyote + dotCover)
+**Goal**: Prove all hardening tests execute the vulnerable code paths and Coyote confirms no remaining concurrency issues
+**Depends on**: Phase 101
+**Requirements**: AUDT-01, AUDT-02, AUDT-03
+**Workflow**: Run `/audit` skill (Coyote + dotCover) on entire solution
 **Success Criteria** (what must be TRUE):
-  1. `DataWarehouse.Benchmarks/` contains real DW benchmarks (VDE throughput, pipeline latency, strategy selection, plugin load, RAID rebuild, encryption, federation routing, message bus, index ops)
-  2. Baseline results stored in `artifacts/benchmarks/baseline.json`
-  3. CI gate defined: any benchmark regressing >10% fails the build
+  1. Coyote finds 0 new concurrency bugs across all `DataWarehouse.Hardening.Tests`
+  2. dotCover report shows hardening tests execute the vulnerable lines identified in CONSOLIDATED-FINDINGS.md
+  3. Coverage report exported to `Metadata/dotcover-hardening-report/`
+  4. Any gaps identified → loop back with additional tests until coverage confirmed
+**Report as**: "Stage 1 - Step 2 - Coyote + dotCover Audit Results"
 **Plans**: TBD
 
-### Phase 103: Cross-Cutting Hostile Analysis
-**Goal**: Systematic hostile runtime analysis identifies every thread safety, cancellation, config validation, error path, memory leak, and deadlock issue across the codebase
-**Depends on**: Phase 99, Phase 100, Phase 101, Phase 102
-**Requirements**: HOST-01, HOST-02, HOST-03, HOST-04, HOST-05, HOST-06, HOST-08
+### Phase 103: Stage 1, Step 4 — Profile (dotTrace + dotMemory)
+**Goal**: Verify fixes did not introduce allocation overhead, lock contention, or context-switching delays
+**Depends on**: Phase 102
+**Requirements**: PROF-01, PROF-02
+**Workflow**: Run `/profile` skill (dotTrace + dotMemory) on standard xUnit tests (NOT Coyote tests — Coyote adds intentional scheduler overhead that pollutes profiling)
 **Success Criteria** (what must be TRUE):
-  1. Thread safety audit of every ConcurrentDictionary, lock, Interlocked, volatile is complete with concurrent test harnesses verifying each
-  2. CancellationToken propagation is traced from top-level APIs to async leaves -- dropped tokens identified
-  3. Adversarial config values tested against every configurable option -- rejection or safe handling verified
-  4. Failures injected at every external boundary -- graceful degradation confirmed, no silent corruption
-  5. Long-running test harness with memory snapshots confirms no unbounded growth (memory leak detection)
+  1. dotTrace shows no new hot-path lock contention introduced by fixes
+  2. dotMemory shows no new large object heap allocations on formerly zero-allocation paths
+  3. No GC pressure regression compared to pre-hardening baseline
+  4. Profile reports exported to `Metadata/profile-hardening-report/`
+**Report as**: "Stage 1 - Step 4 - Performance Profile Results"
 **Plans**: TBD
 
-### Phase 104: Fix All Hostile Analysis Findings + Final Gate
-**Goal**: Every hostile analysis finding is fixed via failing-test-first methodology, and the entire test suite is green with zero known issues
+### Phase 104: Stage 1, Step 5 — Mutation Testing (Stryker)
+**Goal**: Prove test assertions are tight enough that code mutations are caught — 95%+ mutation score
 **Depends on**: Phase 103
-**Requirements**: HOST-07, GATE-01, GATE-02, GATE-03, GATE-04, GATE-05
+**Requirements**: MUTN-01, MUTN-02
+**Workflow**: Run Stryker.NET on `DataWarehouse.Hardening.Tests`. If mutants survive, tighten test assertions and re-run until 95%+ achieved.
 **Success Criteria** (what must be TRUE):
-  1. Every hostile analysis finding has a corresponding failing test that was written first, then the fix made the test pass
-  2. Entire test suite green: 0 failures across all test categories (contract, integration, companion, adversarial, hostile, E2E)
-  3. Build: 0 errors, 0 warnings
-  4. All benchmarks within established baselines (no >10% regressions)
-  5. Zero unfixed findings across both audit (4,444) and hostile analysis ledgers
+  1. Stryker mutation score ≥ 95% across all hardening test projects
+  2. Surviving mutants documented with justification (e.g., equivalent mutants)
+  3. Stryker report exported to `Metadata/stryker-hardening-report/`
+**Report as**: "Stage 1 - Step 5 - Stryker Mutation Score"
+**Plans**: TBD
+
+### Phase 105: Stage 2, Step 1 — Integration Profiling
+**Goal**: Ensure components don't destroy each other when combined under a realistic 100GB workload
+**Depends on**: Phase 104
+**Requirements**: SOAK-01, SOAK-02
+**Workflow**:
+  1. Create test harness that boots entire Kernel + all plugins via AssemblyLoadContext
+  2. Stream 100GB synthetic payload (streaming generator, not 100GB on disk) through VDE pipeline
+  3. Run dotTrace on system process to find cross-boundary bottlenecks
+  4. Run dotMemory.Unit in-test assertions for memory thresholds
+**Success Criteria** (what must be TRUE):
+  1. Test harness in `DataWarehouse.Hardening.Tests/Integration/` boots Kernel + all 52 plugins successfully
+  2. 100GB streaming read/write completes without crash, deadlock, or OOM
+  3. dotTrace identifies no cross-boundary bottleneck exceeding 5% of total execution time
+  4. dotMemory confirms working set stays within bounds (no unbounded growth during streaming)
+**Report as**: "Stage 2 - Step 1 - Integration Profiling Results"
+**Plans**: TBD
+
+### Phase 106: Stage 2, Step 2 — Soak Test Harness
+**Goal**: Prove the system handles sustained continuous load without slow memory leaks or GC degradation
+**Depends on**: Phase 105
+**Requirements**: SOAK-03, SOAK-04
+**Workflow**:
+  1. Write parameterized soak test harness with configurable `--duration` (CI: 10 minutes, manual: 24-72 hours)
+  2. Moderate continuous read/write load against running system
+  3. Monitor GC via `System.Diagnostics` event counters
+  4. Fail if Gen2 collection rate exceeds threshold or working set grows monotonically
+**Success Criteria** (what must be TRUE):
+  1. Soak harness in `DataWarehouse.Hardening.Tests/Soak/` with configurable duration
+  2. 10-minute CI run completes with stable GC metrics (no monotonic growth)
+  3. Gen2 collection rate < threshold (defined during implementation)
+  4. No event bus or telemetry sink memory leaks detected
+**Report as**: "Stage 2 - Step 2 - Soak Test Results"
+**Plans**: TBD
+
+### Phase 107: Stage 3, Steps 1-2 — Chaos: Plugin Faults + Concurrent Lifecycle
+**Goal**: Prove the Kernel survives plugin failures and concurrent load/unload without corruption
+**Depends on**: Phase 106
+**Requirements**: CHAOS-01, CHAOS-02
+**Workflow**:
+  1. Inject fatal exceptions (OutOfMemoryException, StackOverflowException) inside plugin methods mid-operation
+  2. Assert Kernel catches fault, unloads plugin's AssemblyLoadContext, other plugins continue operating
+  3. Load/unload plugins via AssemblyLoadContext while read/write operations are in-flight
+  4. Assert no torn state, no orphaned message bus subscriptions, no dangling event handlers
+**Success Criteria** (what must be TRUE):
+  1. Plugin fault injection tests in `DataWarehouse.Hardening.Tests/Chaos/PluginFault/`
+  2. Kernel isolates faulted plugin without crashing — other plugins verified operational
+  3. Concurrent lifecycle tests prove no torn state across 100+ load/unload cycles with active I/O
+  4. Message bus subscription count returns to expected value after unload
+**Report as**: "Stage 3 - Steps 1-2 - Plugin Fault + Lifecycle Chaos Results"
+**Plans**: TBD
+
+### Phase 108: Stage 3, Steps 3-4 — Chaos: Torn-Write + Resource Exhaustion
+**Goal**: Prove data integrity survives mid-write crashes and the system degrades gracefully under resource starvation
+**Depends on**: Phase 107
+**Requirements**: CHAOS-03, CHAOS-04
+**Workflow**:
+  1. Use Coyote-controlled CancellationToken injection at precise points in VDE decorator chain to simulate crash mid-write
+  2. Assert WAL or RAID parity successfully rebuilds data on next mount
+  3. Starve ThreadPool (saturate with blocking work), fill MemoryPool, simulate disk-full during VDE write
+  4. Assert graceful degradation: operations fail cleanly with appropriate exceptions, no hangs, no data corruption
+**Success Criteria** (what must be TRUE):
+  1. Torn-write tests in `DataWarehouse.Hardening.Tests/Chaos/TornWrite/`
+  2. WAL recovery verified: data matches pre-crash state after rebuild
+  3. RAID parity recovery verified where applicable
+  4. Resource exhaustion tests prove clean failure (no hang, no corruption) for ThreadPool, MemoryPool, and disk-full scenarios
+**Report as**: "Stage 3 - Steps 3-4 - Torn-Write + Resource Exhaustion Results"
+**Plans**: TBD
+
+### Phase 109: Stage 3, Steps 5-6 — Chaos: Message Bus + Federation Partition
+**Goal**: Prove message bus handles disruption without data loss and federation recovers from network partitions
+**Depends on**: Phase 108
+**Requirements**: CHAOS-05, CHAOS-06
+**Workflow**:
+  1. Inject message loss, duplication, and reordering into the message bus during active plugin operations
+  2. Assert idempotency: duplicate messages don't cause double-processing or corrupt state
+  3. Assert no data corruption from reordered or lost messages
+  4. Simulate network partition mid-replication for federated VDE and replication plugins
+  5. Assert CRDT convergence after partition heals — all replicas reach consistent state
+**Success Criteria** (what must be TRUE):
+  1. Message bus chaos tests in `DataWarehouse.Hardening.Tests/Chaos/MessageBus/`
+  2. Federation partition tests in `DataWarehouse.Hardening.Tests/Chaos/Federation/`
+  3. Idempotency verified: identical final state regardless of message duplication
+  4. CRDT convergence verified within bounded time after partition heal
+**Report as**: "Stage 3 - Steps 5-6 - Message Bus + Federation Partition Results"
+**Plans**: TBD
+
+### Phase 110: Stage 3, Steps 7-8 — Chaos: Malicious Payloads + Clock Skew
+**Goal**: Prove the system rejects hostile inputs without OOM/hang and handles time manipulation without auth bypass
+**Depends on**: Phase 109
+**Requirements**: CHAOS-07, CHAOS-08
+**Workflow**:
+  1. Feed zip bombs, highly compressed payloads, malformed encryption IVs, oversized headers, path traversal in metadata
+  2. Assert instant rejection without OutOfMemoryException, thread hang, or data corruption
+  3. Manipulate TimeProvider (or system time abstraction) during policy evaluation and token expiry
+  4. Assert no authentication bypass, no stale cache serving, no policy evaluation errors from clock skew
+**Success Criteria** (what must be TRUE):
+  1. Malicious payload tests in `DataWarehouse.Hardening.Tests/Chaos/MaliciousPayload/`
+  2. Clock skew tests in `DataWarehouse.Hardening.Tests/Chaos/ClockSkew/`
+  3. All zip bomb / malformed IV tests reject within bounded time and memory
+  4. Clock skew of ±24 hours doesn't bypass any auth, policy, or cache expiry logic
+**Report as**: "Stage 3 - Steps 7-8 - Malicious Payload + Clock Skew Results"
+**Plans**: TBD
+
+### Phase 111: Stage 4 — CI/CD Fortress
+**Goal**: Lock down the pipeline so no PR can degrade the hardened state
+**Depends on**: Phase 110
+**Requirements**: CICD-01, CICD-02, CICD-03, CICD-04
+**Workflow**:
+  1. Update `.github/workflows/audit.yml` with hardened gates
+  2. Add Coyote step: 1,000 iterations on every PR, any non-deterministic failure blocks merge
+  3. Add BenchmarkDotNet step: if a PR introduces Gen2 heap allocation on a zero-allocation path, block merge
+  4. Add Stryker step: if a PR drops overall mutation score below the v7.0 baseline, block merge
+**Success Criteria** (what must be TRUE):
+  1. `.github/workflows/audit.yml` contains Coyote, BenchmarkDotNet, and Stryker gates
+  2. Test PR that introduces a concurrency bug → pipeline blocks merge (verified)
+  3. Test PR that introduces Gen2 allocation on zero-alloc path → pipeline blocks merge (verified)
+  4. Test PR that drops mutation score → pipeline blocks merge (verified)
+**Report as**: "Stage 4 - CI/CD Fortress Lock-Down Results"
 **Plans**: TBD
 
 ### v7.0 Progress
 
-**Execution Order:** 96 -> 97 -> 98 -> 99 (+ 100, 101, 102 parallel after 97) -> 103 -> 104
+**Execution Order:** 96 → 97 → 98 → 99 → 100 → 101 → 102 → 103 → 104 → 105 → 106 → 107 → 108 → 109 → 110 → 111
 
-| Phase | Plans Complete | Status | Completed |
-|-------|----------------|--------|-----------|
-| 96. SDK Audit Fixes | 0/TBD | Not started | - |
-| 97. Kernel & Plugin Audit Fixes | 0/TBD | Not started | - |
-| 98. Contract Test Generation | 0/TBD | Not started | - |
-| 99. Integration Path Tests | 0/TBD | Not started | - |
-| 100. Companion Project Tests | 0/TBD | Not started | - |
-| 101. Adversarial & Fuzz Tests | 0/TBD | Not started | - |
-| 102. Performance Baselines | 0/TBD | Not started | - |
-| 103. Hostile Analysis | 0/TBD | Not started | - |
-| 104. Fix Hostile + Final Gate | 0/TBD | Not started | - |
+| Phase | Stage | Description | Plans | Status | Completed |
+|-------|-------|-------------|-------|--------|-----------|
+| 96 | 1 | Hardening: SDK Part 1 (1,249 findings) | 0/TBD | Not started | - |
+| 97 | 1 | Hardening: SDK Part 2 (1,250 findings) | 0/TBD | Not started | - |
+| 98 | 1 | Hardening: Core Infrastructure (750 findings) | 0/TBD | Not started | - |
+| 99 | 1 | Hardening: Large Plugins A (2,347 findings) | 0/TBD | Not started | - |
+| 100 | 1 | Hardening: Large Plugins B (1,725 findings) | 0/TBD | Not started | - |
+| 101 | 1 | Hardening: Medium+Small+Companions (3,557 findings) | 0/TBD | Not started | - |
+| 102 | 1 | Full Audit: Coyote + dotCover | 0/TBD | Not started | - |
+| 103 | 1 | Profile: dotTrace + dotMemory | 0/TBD | Not started | - |
+| 104 | 1 | Mutation Testing: Stryker 95%+ | 0/TBD | Not started | - |
+| 105 | 2 | Integration Profiling: 100GB payload | 0/TBD | Not started | - |
+| 106 | 2 | Soak Test: continuous load + GC | 0/TBD | Not started | - |
+| 107 | 3 | Chaos: Plugin Faults + Lifecycle | 0/TBD | Not started | - |
+| 108 | 3 | Chaos: Torn-Write + Exhaustion | 0/TBD | Not started | - |
+| 109 | 3 | Chaos: Message Bus + Federation | 0/TBD | Not started | - |
+| 110 | 3 | Chaos: Malicious Payloads + Clock | 0/TBD | Not started | - |
+| 111 | 4 | CI/CD Fortress | 0/TBD | Not started | - |
