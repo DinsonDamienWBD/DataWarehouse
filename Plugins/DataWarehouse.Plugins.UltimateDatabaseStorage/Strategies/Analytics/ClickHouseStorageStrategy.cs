@@ -362,8 +362,9 @@ public sealed class ClickHouseStorageStrategy : DatabaseStorageStrategyBase
         {
             throw;
         }
-        catch
+        catch (Exception ex)
         {
+            System.Diagnostics.Debug.WriteLine($"[ClickHouse] health check failed: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }

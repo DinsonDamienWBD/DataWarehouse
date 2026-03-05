@@ -109,7 +109,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
                 // Start unlock check timer (check every minute)
                 _unlockCheckTimer = new Timer(
-                    async _ => await CheckUnlockSchedulesAsync(CancellationToken.None),
+                    _ => Task.Run(async () => { try { await CheckUnlockSchedulesAsync(CancellationToken.None); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[TimeCapsule] unlock check error: {ex.Message}"); } }),
                     null,
                     TimeSpan.Zero,
                     TimeSpan.FromMinutes(1));
@@ -118,7 +118,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 if (_enableDeadManSwitch)
                 {
                     _proofOfLifeCheckTimer = new Timer(
-                        async _ => await CheckProofOfLifeAsync(CancellationToken.None),
+                        _ => Task.Run(async () => { try { await CheckProofOfLifeAsync(CancellationToken.None); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[TimeCapsule] proof-of-life check error: {ex.Message}"); } }),
                         null,
                         TimeSpan.FromHours(1),
                         TimeSpan.FromHours(1));
@@ -518,7 +518,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var temporalBytes = Encoding.UTF8.GetBytes(temporalSeed);
 
             // Apply Verifiable Delay Function (simplified - production would use proper VDF)
-            var vdfResult = ApplyVDF(temporalBytes, _vdfIterations);
+            var vdfResult = ApplyVdf(temporalBytes, _vdfIterations);
             var vdfProof = Convert.ToBase64String(vdfResult);
 
             // Derive time-lock key from VDF result — need 32-byte key + 12-byte nonce for AES-GCM
@@ -547,7 +547,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         /// Applies Verifiable Delay Function (simplified implementation).
         /// Production would use proper VDF like Wesolowski or Pietrzak.
         /// </summary>
-        private byte[] ApplyVDF(byte[] input, int iterations)
+        private byte[] ApplyVdf(byte[] input, int iterations)
         {
             var result = (byte[])input.Clone();
 
@@ -567,19 +567,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private byte[] DecryptTimeCapsule(byte[] encryptedData, string timeLockKey)
         {
             // Layout: [12-byte nonce][16-byte tag][ciphertext]
-            const int NonceSize = 12;
-            const int TagSize = 16;
-            if (encryptedData.Length < NonceSize + TagSize)
+            const int nonceSize = 12;
+            const int tagSize = 16;
+            if (encryptedData.Length < nonceSize + tagSize)
                 throw new CryptographicException("Encrypted data is too short to contain nonce and tag.");
 
-            var nonce = encryptedData.AsSpan(0, NonceSize);
-            var tag = encryptedData.AsSpan(NonceSize, TagSize);
-            var ciphertext = encryptedData.AsSpan(NonceSize + TagSize);
+            var nonce = encryptedData.AsSpan(0, nonceSize);
+            var tag = encryptedData.AsSpan(nonceSize, tagSize);
+            var ciphertext = encryptedData.AsSpan(nonceSize + tagSize);
 
             var key = Convert.FromBase64String(timeLockKey);
             var plaintext = new byte[ciphertext.Length];
 
-            using var aesGcm = new AesGcm(key, TagSize);
+            using var aesGcm = new AesGcm(key, tagSize);
             aesGcm.Decrypt(nonce, ciphertext, tag, plaintext);
             return plaintext;
         }
@@ -718,6 +718,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             public string VdfProof { get; set; } = string.Empty;
             public int VdfIterations { get; set; }
             public List<AccessAttempt> AccessAttempts { get; set; } = new();
+            internal int AccessAttemptCount => AccessAttempts.Count;
             public List<string> EmergencyOverrideKeys { get; set; } = new();
         }
 

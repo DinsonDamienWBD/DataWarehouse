@@ -22,6 +22,7 @@ public sealed class FoundationDbStorageStrategy : DatabaseStorageStrategyBase
     private IFdbDatabase? _db;
     private Slice _dataPrefix;
     private Slice _metadataPrefix;
+    private static int _fdbStarted;
     private string _clusterFile = "";
 
     private Slice DataKey(string key) => _dataPrefix + Slice.FromString(key);
@@ -55,8 +56,11 @@ public sealed class FoundationDbStorageStrategy : DatabaseStorageStrategyBase
     {
         _clusterFile = GetConfiguration("ClusterFile", "");
 
-        // Initialize FDB
-        Fdb.Start(Fdb.GetDefaultApiVersion());
+        // Initialize FDB (once per process; Fdb.Start is idempotent after first call)
+        if (Interlocked.CompareExchange(ref _fdbStarted, 1, 0) == 0)
+        {
+            Fdb.Start(Fdb.GetDefaultApiVersion());
+        }
 
         await Task.CompletedTask;
     }

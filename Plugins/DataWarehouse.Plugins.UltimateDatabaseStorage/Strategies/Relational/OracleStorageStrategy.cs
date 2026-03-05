@@ -54,6 +54,11 @@ public sealed class OracleStorageStrategy : DatabaseStorageStrategyBase
         _maxPoolSize = GetConfiguration("MaxPoolSize", 100);
         _minPoolSize = GetConfiguration("MinPoolSize", 5);
 
+        // P2-2818: Validate identifiers to prevent DDL injection
+        ValidateSqlIdentifier(_tableName, nameof(_tableName));
+        if (!string.IsNullOrEmpty(_schemaName))
+            ValidateSqlIdentifier(_schemaName, nameof(_schemaName));
+
         var baseConnectionString = GetConnectionString();
         var builder = new OracleConnectionStringBuilder(baseConnectionString)
         {
