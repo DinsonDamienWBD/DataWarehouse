@@ -202,15 +202,18 @@ public sealed class PreparedQueryCache
     // Regex patterns for fingerprinting
     private static readonly Regex NumericLiteralPattern = new(
         @"\b\d+(\.\d+)?\b",
-        RegexOptions.Compiled);
+        RegexOptions.Compiled,
+        TimeSpan.FromMilliseconds(100));
 
     private static readonly Regex StringLiteralPattern = new(
         @"'[^']*'",
-        RegexOptions.Compiled);
+        RegexOptions.Compiled,
+        TimeSpan.FromMilliseconds(100));
 
     private static readonly Regex WhitespacePattern = new(
         @"\s+",
-        RegexOptions.Compiled);
+        RegexOptions.Compiled,
+        TimeSpan.FromMilliseconds(100));
 
     /// <summary>
     /// Initializes a new prepared query cache.

@@ -321,9 +321,7 @@ public sealed class VdeFilesystemAdapter : IAsyncDisposable
             if (!hasDotDot)
             {
                 // For root inode, ".." points to itself
-                long parentInode = directoryInode == _inodeTable.RootInode.InodeNumber
-                    ? directoryInode
-                    : directoryInode; // Parent will be resolved from stored ".." entry
+                long parentInode = directoryInode; // Parent resolved from stored ".." entry or self for root
                 result.Insert(hasDot ? 1 : 0, new DirectoryEntryInfo
                 {
                     Name = "..",

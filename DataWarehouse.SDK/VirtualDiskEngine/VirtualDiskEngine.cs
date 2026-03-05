@@ -182,14 +182,14 @@ public sealed class VirtualDiskEngine : IAsyncDisposable
 
         // Step 9: Initialize snapshot manager and space reclaimer
         // Snapshot metadata is stored as extended attributes on a reserved inode (inode 2)
-        const long SnapshotMetadataInodeNumber = 2;
+        const long snapshotMetadataInodeNumber = 2;
 
         _snapshotManager = new CopyOnWrite.SnapshotManager(
             _inodeTable,
             _cowEngine,
             _allocator,
             _wal,
-            SnapshotMetadataInodeNumber);
+            snapshotMetadataInodeNumber);
 
         await _snapshotManager.LoadSnapshotTableAsync(ct);
 

@@ -46,24 +46,24 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <summary>
         /// Success return code for Vulkan operations.
         /// </summary>
-        internal const int VK_SUCCESS = 0;
+        internal const int VkSuccessCode = 0;
 
         /// <summary>
         /// Vulkan result codes (subset relevant to compute operations).
         /// </summary>
         internal enum VkResult
         {
-            VK_SUCCESS = 0,
-            VK_NOT_READY = 1,
-            VK_TIMEOUT = 2,
-            VK_ERROR_OUT_OF_HOST_MEMORY = -1,
-            VK_ERROR_OUT_OF_DEVICE_MEMORY = -2,
-            VK_ERROR_INITIALIZATION_FAILED = -3,
-            VK_ERROR_DEVICE_LOST = -4,
-            VK_ERROR_LAYER_NOT_PRESENT = -6,
-            VK_ERROR_EXTENSION_NOT_PRESENT = -7,
-            VK_ERROR_FEATURE_NOT_PRESENT = -8,
-            VK_ERROR_TOO_MANY_OBJECTS = -10,
+            VkSuccess = 0,
+            VkNotReady = 1,
+            VkTimeout = 2,
+            VkErrorOutOfHostMemory = -1,
+            VkErrorOutOfDeviceMemory = -2,
+            VkErrorInitializationFailed = -3,
+            VkErrorDeviceLost = -4,
+            VkErrorLayerNotPresent = -6,
+            VkErrorExtensionNotPresent = -7,
+            VkErrorFeatureNotPresent = -8,
+            VkErrorTooManyObjects = -10,
         }
 
         /// <summary>
@@ -72,10 +72,10 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         [Flags]
         internal enum VkQueueFlagBits : uint
         {
-            VK_QUEUE_GRAPHICS_BIT = 0x00000001,
-            VK_QUEUE_COMPUTE_BIT = 0x00000002,
-            VK_QUEUE_TRANSFER_BIT = 0x00000004,
-            VK_QUEUE_SPARSE_BINDING_BIT = 0x00000008,
+            VkQueueGraphicsBit = 0x00000001,
+            VkQueueComputeBit = 0x00000002,
+            VkQueueTransferBit = 0x00000004,
+            VkQueueSparseBindingBit = 0x00000008,
         }
 
         /// <summary>
@@ -84,9 +84,9 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         [Flags]
         internal enum VkBufferUsageFlagBits : uint
         {
-            VK_BUFFER_USAGE_TRANSFER_SRC_BIT = 0x00000001,
-            VK_BUFFER_USAGE_TRANSFER_DST_BIT = 0x00000002,
-            VK_BUFFER_USAGE_STORAGE_BUFFER_BIT = 0x00000020,
+            VkBufferUsageTransferSrcBit = 0x00000001,
+            VkBufferUsageTransferDstBit = 0x00000002,
+            VkBufferUsageStorageBufferBit = 0x00000020,
         }
 
         /// <summary>
@@ -95,9 +95,9 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         [Flags]
         internal enum VkMemoryPropertyFlagBits : uint
         {
-            VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT = 0x00000001,
-            VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT = 0x00000002,
-            VK_MEMORY_PROPERTY_HOST_COHERENT_BIT = 0x00000004,
+            VkMemoryPropertyDeviceLocalBit = 0x00000001,
+            VkMemoryPropertyHostVisibleBit = 0x00000002,
+            VkMemoryPropertyHostCoherentBit = 0x00000004,
         }
 
         /// <summary>
@@ -105,7 +105,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// </summary>
         internal enum VkDescriptorType : uint
         {
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER = 7,
+            VkDescriptorTypeStorageBuffer = 7,
         }
 
         /// <summary>
@@ -113,7 +113,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// </summary>
         internal enum VkPipelineBindPoint : uint
         {
-            VK_PIPELINE_BIND_POINT_COMPUTE = 1,
+            VkPipelineBindPointCompute = 1,
         }
 
         /// <summary>
@@ -122,7 +122,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         [Flags]
         internal enum VkShaderStageFlagBits : uint
         {
-            VK_SHADER_STAGE_COMPUTE_BIT = 0x00000020,
+            VkShaderStageComputeBit = 0x00000020,
         }
 
         // --- Instance and Physical Device ---
@@ -543,14 +543,14 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 // For now, use the P/Invoke surface to verify runtime presence
                 int result = VulkanInterop.CreateInstance(IntPtr.Zero, IntPtr.Zero, out _instance);
 
-                if (result != VulkanInterop.VK_SUCCESS || _instance == IntPtr.Zero)
+                if (result != VulkanInterop.VkSuccessCode || _instance == IntPtr.Zero)
                     return false;
 
                 // Enumerate physical devices
                 uint deviceCount = 0;
                 result = VulkanInterop.EnumeratePhysicalDevices(_instance, ref deviceCount, IntPtr.Zero);
 
-                if (result != VulkanInterop.VK_SUCCESS || deviceCount == 0)
+                if (result != VulkanInterop.VkSuccessCode || deviceCount == 0)
                 {
                     VulkanInterop.DestroyInstance(_instance, IntPtr.Zero);
                     _instance = IntPtr.Zero;
@@ -610,27 +610,27 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(a);
             ArgumentNullException.ThrowIfNull(b);
 
-            int M = a.GetLength(0), K = a.GetLength(1);
-            int K2 = b.GetLength(0), N = b.GetLength(1);
+            int m = a.GetLength(0), k = a.GetLength(1);
+            int k2 = b.GetLength(0), n = b.GetLength(1);
 
-            if (K != K2)
+            if (k != k2)
                 throw new ArgumentException("Matrix dimensions incompatible for multiplication");
 
             // Vulkan compute GEMM dispatch requires SPIR-V shader with shared memory tiling
-            // Workgroup size: (16, 16, 1), dispatch: (ceil(M/16), ceil(N/16), 1)
-            if (M > 4096 || N > 4096 || K > 4096)
-                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {M}x{K} * {K}x{N}. Max 4096 per dimension (finding P2-372).");
-            float[] result = new float[M * N];
+            // Workgroup size: (16, 16, 1), dispatch: (ceil(m/16), ceil(n/16), 1)
+            if (m > 4096 || n > 4096 || k > 4096)
+                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {m}x{k} * {k}x{n}. Max 4096 per dimension (finding P2-372).");
+            float[] result = new float[m * n];
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             await Task.Run(() =>
             {
-                for (int i = 0; i < M; i++)
-                    for (int j = 0; j < N; j++)
+                for (int i = 0; i < m; i++)
+                    for (int j = 0; j < n; j++)
                     {
                         float sum = 0;
-                        for (int k = 0; k < K; k++)
-                            sum += a[i, k] * b[k, j];
-                        result[i * N + j] = sum;
+                        for (int ki = 0; ki < k; ki++)
+                            sum += a[i, ki] * b[ki, j];
+                        result[i * n + j] = sum;
                     }
             });
             Interlocked.Add(ref _totalProcessingTicks, System.Diagnostics.Stopwatch.GetTimestamp() - t0);
@@ -647,20 +647,20 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(input);
             ArgumentNullException.ThrowIfNull(weights);
 
-            int D = input.Length;
-            int D2 = weights.GetLength(0), E = weights.GetLength(1);
+            int d = input.Length;
+            int d2 = weights.GetLength(0), e = weights.GetLength(1);
 
-            if (D != D2)
+            if (d != d2)
                 throw new ArgumentException("Input dimension must match weight rows");
 
             // Vulkan compute GEMV: y = W^T * x
-            float[] result = new float[E];
+            float[] result = new float[e];
             await Task.Run(() =>
             {
-                for (int j = 0; j < E; j++)
+                for (int j = 0; j < e; j++)
                 {
                     float sum = 0;
-                    for (int i = 0; i < D; i++)
+                    for (int i = 0; i < d; i++)
                         sum += input[i] * weights[i, j];
                     result[j] = sum;
                 }

@@ -52,7 +52,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// WebGPU buffer usage flags.
         /// </summary>
         [Flags]
-        internal enum WGPUBufferUsage : uint
+        internal enum WgpuBufferUsage : uint
         {
             None = 0x00000000,
             MapRead = 0x00000001,
@@ -70,7 +70,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <summary>
         /// WebGPU buffer map async status.
         /// </summary>
-        internal enum WGPUBufferMapAsyncStatus : uint
+        internal enum WgpuBufferMapAsyncStatus : uint
         {
             Success = 0,
             ValidationError = 1,
@@ -87,7 +87,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// WebGPU map mode flags.
         /// </summary>
         [Flags]
-        internal enum WGPUMapMode : uint
+        internal enum WgpuMapMode : uint
         {
             None = 0x00000000,
             Read = 0x00000001,
@@ -98,7 +98,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// WebGPU shader stage flags.
         /// </summary>
         [Flags]
-        internal enum WGPUShaderStage : uint
+        internal enum WgpuShaderStage : uint
         {
             None = 0x00000000,
             Vertex = 0x00000001,
@@ -109,7 +109,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <summary>
         /// WebGPU buffer binding type.
         /// </summary>
-        internal enum WGPUBufferBindingType : uint
+        internal enum WgpuBufferBindingType : uint
         {
             Undefined = 0,
             Uniform = 1,
@@ -519,26 +519,26 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(a);
             ArgumentNullException.ThrowIfNull(b);
 
-            int M = a.GetLength(0), K = a.GetLength(1);
-            int K2 = b.GetLength(0), N = b.GetLength(1);
+            int m = a.GetLength(0), k = a.GetLength(1);
+            int k2 = b.GetLength(0), n = b.GetLength(1);
 
-            if (K != K2)
+            if (k != k2)
                 throw new ArgumentException("Matrix dimensions incompatible for multiplication");
 
             // WGSL GEMM kernel with workgroup tiling for shared memory optimization
-            if (M > 4096 || N > 4096 || K > 4096)
-                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {M}x{K} * {K}x{N}. Max 4096 per dimension (finding P2-372).");
-            float[] result = new float[M * N];
+            if (m > 4096 || n > 4096 || k > 4096)
+                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {m}x{k} * {k}x{n}. Max 4096 per dimension (finding P2-372).");
+            float[] result = new float[m * n];
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             await Task.Run(() =>
             {
-                for (int i = 0; i < M; i++)
-                    for (int j = 0; j < N; j++)
+                for (int i = 0; i < m; i++)
+                    for (int j = 0; j < n; j++)
                     {
                         float sum = 0;
-                        for (int k = 0; k < K; k++)
-                            sum += a[i, k] * b[k, j];
-                        result[i * N + j] = sum;
+                        for (int ki = 0; ki < k; ki++)
+                            sum += a[i, ki] * b[ki, j];
+                        result[i * n + j] = sum;
                     }
             });
             Interlocked.Add(ref _totalProcessingTicks, System.Diagnostics.Stopwatch.GetTimestamp() - t0);
@@ -555,20 +555,20 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(input);
             ArgumentNullException.ThrowIfNull(weights);
 
-            int D = input.Length;
-            int D2 = weights.GetLength(0), E = weights.GetLength(1);
+            int d = input.Length;
+            int d2 = weights.GetLength(0), e = weights.GetLength(1);
 
-            if (D != D2)
+            if (d != d2)
                 throw new ArgumentException("Input dimension must match weight rows");
 
             // WGSL GEMV: y = W^T * x
-            float[] result = new float[E];
+            float[] result = new float[e];
             await Task.Run(() =>
             {
-                for (int j = 0; j < E; j++)
+                for (int j = 0; j < e; j++)
                 {
                     float sum = 0;
-                    for (int i = 0; i < D; i++)
+                    for (int i = 0; i < d; i++)
                         sum += input[i] * weights[i, j];
                     result[j] = sum;
                 }

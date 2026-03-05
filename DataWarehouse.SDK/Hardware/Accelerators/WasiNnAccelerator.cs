@@ -17,28 +17,28 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     public enum InferenceBackend
     {
         /// <summary>CPU execution (always available, fallback).</summary>
-        CPU = 0,
+        Cpu = 0,
 
         /// <summary>NVIDIA CUDA GPU acceleration.</summary>
-        CUDA = 1,
+        Cuda = 1,
 
         /// <summary>AMD ROCm GPU acceleration.</summary>
-        ROCm = 2,
+        RoCm = 2,
 
         /// <summary>OpenCl cross-vendor GPU/accelerator.</summary>
         OpenCl = 3,
 
         /// <summary>NVIDIA TensorRT optimized inference.</summary>
-        TensorRT = 4,
+        TensorRt = 4,
 
         /// <summary>Apple Core ML inference (macOS/iOS).</summary>
-        CoreML = 5,
+        CoreMl = 5,
 
         /// <summary>Android NNAPI hardware acceleration.</summary>
-        NNAPI = 6,
+        Nnapi = 6,
 
         /// <summary>Huawei CANN (Ascend NPU) acceleration.</summary>
-        CANN = 7,
+        Cann = 7,
 
         /// <summary>Automatic backend selection based on hardware availability.</summary>
         Auto = 255,
@@ -51,7 +51,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     public enum ModelFormat
     {
         /// <summary>ONNX format (primary, cross-platform).</summary>
-        ONNX = 0,
+        Onnx = 0,
 
         /// <summary>TensorFlow Lite format (mobile/edge).</summary>
         TensorFlowLite = 1,
@@ -60,7 +60,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         PyTorch = 2,
 
         /// <summary>OpenVINO IR format (Intel optimized).</summary>
-        OpenVINO = 3,
+        OpenVino = 3,
     }
 
     /// <summary>
@@ -218,7 +218,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         private readonly IPlatformCapabilityRegistry _registry;
         private readonly BoundedDictionary<Guid, ModelHandle> _loadedModels = new BoundedDictionary<Guid, ModelHandle>(1000);
         private readonly List<InferenceBackend> _availableBackends = new();
-        private InferenceBackend _bestBackend = InferenceBackend.CPU;
+        private InferenceBackend _bestBackend = InferenceBackend.Cpu;
         private volatile bool _initialized;
         private long _inferencesCompleted;
         private readonly object _lock = new();
@@ -260,33 +260,33 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
             // Check CUDA availability
             if (TryDetectCuda())
-                _availableBackends.Add(InferenceBackend.CUDA);
+                _availableBackends.Add(InferenceBackend.Cuda);
 
             // Check ROCm availability
             if (TryDetectRocm())
-                _availableBackends.Add(InferenceBackend.ROCm);
+                _availableBackends.Add(InferenceBackend.RoCm);
 
             // Check CoreML (macOS/iOS only)
             if (OperatingSystem.IsMacOS() || OperatingSystem.IsIOS())
-                _availableBackends.Add(InferenceBackend.CoreML);
+                _availableBackends.Add(InferenceBackend.CoreMl);
 
             // Check NNAPI (Android only)
             if (OperatingSystem.IsAndroid())
-                _availableBackends.Add(InferenceBackend.NNAPI);
+                _availableBackends.Add(InferenceBackend.Nnapi);
 
             // Check CANN (Huawei Ascend NPU)
             if (TryDetectCann())
-                _availableBackends.Add(InferenceBackend.CANN);
+                _availableBackends.Add(InferenceBackend.Cann);
 
             // Check OpenCl
-            if (TryDetectOpenCL())
+            if (TryDetectOpenCl())
                 _availableBackends.Add(InferenceBackend.OpenCl);
 
             // CPU is always available
-            _availableBackends.Add(InferenceBackend.CPU);
+            _availableBackends.Add(InferenceBackend.Cpu);
 
             // Best backend is the first in priority order
-            _bestBackend = _availableBackends.Count > 0 ? _availableBackends[0] : InferenceBackend.CPU;
+            _bestBackend = _availableBackends.Count > 0 ? _availableBackends[0] : InferenceBackend.Cpu;
         }
 
         private static bool TryDetectCuda()
@@ -319,7 +319,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             catch { return false; }
         }
 
-        private static bool TryDetectOpenCL()
+        private static bool TryDetectOpenCl()
         {
             try
             {
@@ -341,10 +341,10 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             var resolvedBackend = backend == InferenceBackend.Auto ? _bestBackend : backend;
 
             // Validate backend is available
-            if (!_availableBackends.Contains(resolvedBackend) && resolvedBackend != InferenceBackend.CPU)
+            if (!_availableBackends.Contains(resolvedBackend) && resolvedBackend != InferenceBackend.Cpu)
             {
                 // Fall back to CPU if requested backend is unavailable
-                resolvedBackend = InferenceBackend.CPU;
+                resolvedBackend = InferenceBackend.Cpu;
             }
 
             // Determine model format from extension
@@ -435,11 +435,11 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             var extension = System.IO.Path.GetExtension(modelPath).ToLowerInvariant();
             return extension switch
             {
-                ".onnx" => ModelFormat.ONNX,
+                ".onnx" => ModelFormat.Onnx,
                 ".tflite" => ModelFormat.TensorFlowLite,
                 ".pt" or ".pth" => ModelFormat.PyTorch,
-                ".xml" => ModelFormat.OpenVINO,
-                _ => ModelFormat.ONNX, // Default to ONNX
+                ".xml" => ModelFormat.OpenVino,
+                _ => ModelFormat.Onnx, // Default to ONNX
             };
         }
 
@@ -447,13 +447,13 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         {
             return backend switch
             {
-                InferenceBackend.CUDA => ExecutionProvider.Cuda,
-                InferenceBackend.TensorRT => ExecutionProvider.TensorRt,
-                InferenceBackend.ROCm => ExecutionProvider.Cpu, // ROCm uses MIGraphX provider; fall back to CPU for ONNX Runtime
-                InferenceBackend.CoreML => ExecutionProvider.Cpu, // CoreML provider requires ORT CoreML EP; fall back to CPU
-                InferenceBackend.NNAPI => ExecutionProvider.Cpu, // NNAPI provider requires ORT NNAPI EP; fall back to CPU
+                InferenceBackend.Cuda => ExecutionProvider.Cuda,
+                InferenceBackend.TensorRt => ExecutionProvider.TensorRt,
+                InferenceBackend.RoCm => ExecutionProvider.Cpu, // ROCm uses MIGraphX provider; fall back to CPU for ONNX Runtime
+                InferenceBackend.CoreMl => ExecutionProvider.Cpu, // CoreML provider requires ORT CoreML EP; fall back to CPU
+                InferenceBackend.Nnapi => ExecutionProvider.Cpu, // NNAPI provider requires ORT NNAPI EP; fall back to CPU
                 InferenceBackend.OpenCl => ExecutionProvider.Cpu, // No direct OpenCl EP in ONNX Runtime; fall back to CPU
-                InferenceBackend.CANN => ExecutionProvider.Cpu, // CANN EP requires Huawei SDK; fall back to CPU
+                InferenceBackend.Cann => ExecutionProvider.Cpu, // CANN EP requires Huawei SDK; fall back to CPU
                 _ => ExecutionProvider.Cpu,
             };
         }

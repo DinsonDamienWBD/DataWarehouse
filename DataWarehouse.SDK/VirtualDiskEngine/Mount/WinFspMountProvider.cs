@@ -20,29 +20,29 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Mount;
 [SdkCompatibility("6.0.0", Notes = "Phase 87: WinFsp NTSTATUS error codes (VOPT-84)")]
 internal static class NtStatus
 {
-    public const int STATUS_SUCCESS = 0;
-    public const int STATUS_NOT_IMPLEMENTED = unchecked((int)0xC0000002);
-    public const int STATUS_INVALID_PARAMETER = unchecked((int)0xC000000D);
-    public const int STATUS_NO_SUCH_FILE = unchecked((int)0xC000000F);
-    public const int STATUS_END_OF_FILE = unchecked((int)0xC0000011);
-    public const int STATUS_ACCESS_DENIED = unchecked((int)0xC0000022);
-    public const int STATUS_OBJECT_NAME_NOT_FOUND = unchecked((int)0xC0000034);
-    public const int STATUS_OBJECT_NAME_COLLISION = unchecked((int)0xC0000035);
-    public const int STATUS_OBJECT_PATH_NOT_FOUND = unchecked((int)0xC000003A);
-    public const int STATUS_SHARING_VIOLATION = unchecked((int)0xC0000043);
-    public const int STATUS_UNEXPECTED_IO_ERROR = unchecked((int)0xC00000E9);
-    public const int STATUS_DIRECTORY_NOT_EMPTY = unchecked((int)0xC0000101);
-    public const int STATUS_NOT_A_DIRECTORY = unchecked((int)0xC0000103);
-    public const int STATUS_CANCELLED = unchecked((int)0xC0000120);
-    public const int STATUS_DISK_FULL = unchecked((int)0xC000007F);
-    public const int STATUS_INTERNAL_ERROR = unchecked((int)0xC00000E5);
+    public const int StatusSuccess = 0;
+    public const int StatusNotImplemented = unchecked((int)0xC0000002);
+    public const int StatusInvalidParameter = unchecked((int)0xC000000D);
+    public const int StatusNoSuchFile = unchecked((int)0xC000000F);
+    public const int StatusEndOfFile = unchecked((int)0xC0000011);
+    public const int StatusAccessDenied = unchecked((int)0xC0000022);
+    public const int StatusObjectNameNotFound = unchecked((int)0xC0000034);
+    public const int StatusObjectNameCollision = unchecked((int)0xC0000035);
+    public const int StatusObjectPathNotFound = unchecked((int)0xC000003A);
+    public const int StatusSharingViolation = unchecked((int)0xC0000043);
+    public const int StatusUnexpectedIoError = unchecked((int)0xC00000E9);
+    public const int StatusDirectoryNotEmpty = unchecked((int)0xC0000101);
+    public const int StatusNotADirectory = unchecked((int)0xC0000103);
+    public const int StatusCancelled = unchecked((int)0xC0000120);
+    public const int StatusDiskFull = unchecked((int)0xC000007F);
+    public const int StatusInternalError = unchecked((int)0xC00000E5);
 }
 
 /// <summary>
 /// WinFsp volume information structure returned by GetVolumeInfo callback.
 /// </summary>
 [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-internal struct FSP_FSCTL_VOLUME_INFO
+internal struct FspFsctlVolumeInfo
 {
     public long TotalSize;
     public long FreeSize;
@@ -59,7 +59,7 @@ internal struct FSP_FSCTL_VOLUME_INFO
 /// WinFsp file information structure for file metadata callbacks.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-internal struct FSP_FSCTL_FILE_INFO
+internal struct FspFsctlFileInfo
 {
     public uint FileAttributes;
     public uint ReparseTag;
@@ -78,9 +78,9 @@ internal struct FSP_FSCTL_FILE_INFO
 /// WinFsp open file information combining file info with a normalized name.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-internal struct FSP_FSCTL_OPEN_FILE_INFO
+internal struct FspFsctlOpenFileInfo
 {
-    public FSP_FSCTL_FILE_INFO FileInfo;
+    public FspFsctlFileInfo FileInfo;
     public IntPtr NormalizedName;
     public ushort NormalizedNameSize;
 }
@@ -89,10 +89,10 @@ internal struct FSP_FSCTL_OPEN_FILE_INFO
 /// WinFsp directory entry information for directory enumeration.
 /// </summary>
 [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-internal struct FSP_FSCTL_DIR_INFO
+internal struct FspFsctlDirInfo
 {
     public ushort Size;
-    public FSP_FSCTL_FILE_INFO FileInfo;
+    public FspFsctlFileInfo FileInfo;
 
     [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)]
     public string FileName;
@@ -103,7 +103,7 @@ internal struct FSP_FSCTL_DIR_INFO
 /// Each callback delegates to VdeFilesystemAdapter through the WinFspMountProvider.
 /// </summary>
 [StructLayout(LayoutKind.Sequential)]
-internal struct FSP_FILE_SYSTEM_INTERFACE
+internal struct FspFileSystemInterface
 {
     /// <summary>GetVolumeInfo callback: reports volume size, free space, and label.</summary>
     public IntPtr GetVolumeInfo;
@@ -219,7 +219,7 @@ internal struct FSP_FILE_SYSTEM_INTERFACE
 /// WinFsp filesystem volume parameters structure.
 /// </summary>
 [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-internal struct FSP_FSCTL_VOLUME_PARAMS
+internal struct FspFsctlVolumeParams
 {
     public ushort Version;
     public ushort SectorSize;
@@ -257,8 +257,8 @@ internal static class WinFspNative
     [DllImport(DllName, CallingConvention = CallingConvention.StdCall, CharSet = CharSet.Unicode)]
     public static extern int FspFileSystemCreate(
         string devicePath,
-        ref FSP_FSCTL_VOLUME_PARAMS volumeParams,
-        ref FSP_FILE_SYSTEM_INTERFACE fsInterface,
+        ref FspFsctlVolumeParams volumeParams,
+        ref FspFileSystemInterface fsInterface,
         out IntPtr fileSystem);
 
     /// <summary>
@@ -453,7 +453,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
         try
         {
             // Configure WinFsp volume parameters
-            var volumeParams = new FSP_FSCTL_VOLUME_PARAMS
+            var volumeParams = new FspFsctlVolumeParams
             {
                 Version = 0,
                 SectorSize = 4096,
@@ -484,14 +484,14 @@ public sealed class WinFspMountProvider : IVdeMountProvider
             // Create WinFsp filesystem object
             var devicePath = UncPathPattern.IsMatch(mountPoint) ? @"\WinFsp.Net" : @"\WinFsp.Disk";
             int result = WinFspNative.FspFileSystemCreate(devicePath, ref volumeParams, ref fsInterface, out fileSystemHandle);
-            if (result != NtStatus.STATUS_SUCCESS)
+            if (result != NtStatus.StatusSuccess)
             {
                 throw new InvalidOperationException($"WinFsp filesystem creation failed with NTSTATUS 0x{result:X8}.");
             }
 
             // Set the mount point
             result = WinFspNative.FspFileSystemSetMountPoint(fileSystemHandle, mountPoint);
-            if (result != NtStatus.STATUS_SUCCESS)
+            if (result != NtStatus.StatusSuccess)
             {
                 throw new InvalidOperationException(
                     $"WinFsp failed to set mount point '{mountPoint}' with NTSTATUS 0x{result:X8}.");
@@ -647,25 +647,25 @@ public sealed class WinFspMountProvider : IVdeMountProvider
     {
         return ex switch
         {
-            FileNotFoundException => NtStatus.STATUS_OBJECT_NAME_NOT_FOUND,
-            DirectoryNotFoundException => NtStatus.STATUS_OBJECT_PATH_NOT_FOUND,
-            UnauthorizedAccessException => NtStatus.STATUS_ACCESS_DENIED,
-            OperationCanceledException => NtStatus.STATUS_CANCELLED,
+            FileNotFoundException => NtStatus.StatusObjectNameNotFound,
+            DirectoryNotFoundException => NtStatus.StatusObjectPathNotFound,
+            UnauthorizedAccessException => NtStatus.StatusAccessDenied,
+            OperationCanceledException => NtStatus.StatusCancelled,
             IOException ioEx when ioEx.Message.Contains("not empty", StringComparison.OrdinalIgnoreCase)
-                => NtStatus.STATUS_DIRECTORY_NOT_EMPTY,
+                => NtStatus.StatusDirectoryNotEmpty,
             IOException ioEx when ioEx.Message.Contains("disk full", StringComparison.OrdinalIgnoreCase)
                 || ioEx.Message.Contains("no space", StringComparison.OrdinalIgnoreCase)
-                => NtStatus.STATUS_DISK_FULL,
+                => NtStatus.StatusDiskFull,
             IOException ioEx when ioEx.Message.Contains("sharing", StringComparison.OrdinalIgnoreCase)
-                => NtStatus.STATUS_SHARING_VIOLATION,
-            IOException => NtStatus.STATUS_UNEXPECTED_IO_ERROR,
-            ArgumentException => NtStatus.STATUS_INVALID_PARAMETER,
-            NotSupportedException => NtStatus.STATUS_NOT_IMPLEMENTED,
+                => NtStatus.StatusSharingViolation,
+            IOException => NtStatus.StatusUnexpectedIoError,
+            ArgumentException => NtStatus.StatusInvalidParameter,
+            NotSupportedException => NtStatus.StatusNotImplemented,
             InvalidOperationException ioEx when ioEx.Message.Contains("not a directory", StringComparison.OrdinalIgnoreCase)
-                => NtStatus.STATUS_NOT_A_DIRECTORY,
+                => NtStatus.StatusNotADirectory,
             InvalidOperationException ioEx when ioEx.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase)
-                => NtStatus.STATUS_OBJECT_NAME_COLLISION,
-            _ => NtStatus.STATUS_INTERNAL_ERROR
+                => NtStatus.StatusObjectNameCollision,
+            _ => NtStatus.StatusInternalError
         };
     }
 
@@ -680,15 +680,15 @@ public sealed class WinFspMountProvider : IVdeMountProvider
     /// <param name="adapter">Filesystem adapter for storage operations.</param>
     /// <param name="options">Mount options controlling behavior.</param>
     /// <returns>Populated filesystem interface struct.</returns>
-    private static FSP_FILE_SYSTEM_INTERFACE BuildFilesystemInterface(VdeFilesystemAdapter adapter, MountOptions options)
+    private static FspFileSystemInterface BuildFilesystemInterface(VdeFilesystemAdapter adapter, MountOptions options)
     {
         // Define callback delegate types matching WinFsp signatures
         // Each callback marshals WinFsp parameters -> adapter calls -> NTSTATUS return
 
-        var fsInterface = new FSP_FILE_SYSTEM_INTERFACE();
+        var fsInterface = new FspFileSystemInterface();
 
         // GetVolumeInfo: reports total/free size and volume label
-        GetVolumeInfoDelegate getVolumeInfo = (IntPtr fileSystem, out FSP_FSCTL_VOLUME_INFO volumeInfo) =>
+        GetVolumeInfoDelegate getVolumeInfo = (IntPtr fileSystem, out FspFsctlVolumeInfo volumeInfo) =>
         {
             volumeInfo = default;
             try
@@ -698,7 +698,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
                 volumeInfo.FreeSize = stats.FreeBlocks * stats.BlockSize;
                 volumeInfo.VolumeLabel = "DWVD";
                 volumeInfo.VolumeLabelLength = (ushort)("DWVD".Length * 2);
-                return NtStatus.STATUS_SUCCESS;
+                return NtStatus.StatusSuccess;
             }
             catch (Exception ex)
             {
@@ -709,7 +709,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
 
         // Open: lookup + getattr, returns file context (inode number stored in IntPtr)
         OpenDelegate open = (IntPtr fileSystem, string fileName, uint createOptions, uint grantedAccess,
-                             out IntPtr fileContext, out FSP_FSCTL_FILE_INFO fileInfo) =>
+                             out IntPtr fileContext, out FspFsctlFileInfo fileInfo) =>
         {
             fileContext = IntPtr.Zero;
             fileInfo = default;
@@ -719,12 +719,12 @@ public sealed class WinFspMountProvider : IVdeMountProvider
                 long inodeNumber = ResolvePathToInode(adapter, parts);
 
                 if (inodeNumber < 0)
-                    return NtStatus.STATUS_OBJECT_NAME_NOT_FOUND;
+                    return NtStatus.StatusObjectNameNotFound;
 
                 var attrs = adapter.GetattrAsync(inodeNumber, CancellationToken.None).GetAwaiter().GetResult();
                 fileInfo = MapAttributesToFileInfo(attrs);
                 fileContext = new IntPtr(inodeNumber);
-                return NtStatus.STATUS_SUCCESS;
+                return NtStatus.StatusSuccess;
             }
             catch (Exception ex)
             {
@@ -770,10 +770,10 @@ public sealed class WinFspMountProvider : IVdeMountProvider
                 }
                 else if (bytesRead == 0)
                 {
-                    return NtStatus.STATUS_END_OF_FILE;
+                    return NtStatus.StatusEndOfFile;
                 }
 
-                return NtStatus.STATUS_SUCCESS;
+                return NtStatus.StatusSuccess;
             }
             catch (Exception ex)
             {
@@ -785,14 +785,14 @@ public sealed class WinFspMountProvider : IVdeMountProvider
         // Write: delegates to adapter.WriteAsync
         WriteDelegate write = (IntPtr fileSystem, IntPtr fileContext, IntPtr buffer, ulong offset, uint length,
                                bool writeToEndOfFile, bool constrainedIo,
-                               out uint bytesTransferred, out FSP_FSCTL_FILE_INFO fileInfo) =>
+                               out uint bytesTransferred, out FspFsctlFileInfo fileInfo) =>
         {
             bytesTransferred = 0;
             fileInfo = default;
             try
             {
                 if (options.ReadOnly)
-                    return NtStatus.STATUS_ACCESS_DENIED;
+                    return NtStatus.StatusAccessDenied;
 
                 long inodeNumber = fileContext.ToInt64();
                 var managedBuffer = new byte[length];
@@ -811,7 +811,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
                 var attrs = adapter.GetattrAsync(inodeNumber, CancellationToken.None).GetAwaiter().GetResult();
                 fileInfo = MapAttributesToFileInfo(attrs);
 
-                return NtStatus.STATUS_SUCCESS;
+                return NtStatus.StatusSuccess;
             }
             catch (Exception ex)
             {
@@ -821,7 +821,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
         fsInterface.Write = Marshal.GetFunctionPointerForDelegate(write);
 
         // Flush: delegates to adapter.FlushAsync or SyncAsync for null context
-        FlushDelegate flush = (IntPtr fileSystem, IntPtr fileContext, out FSP_FSCTL_FILE_INFO fileInfo) =>
+        FlushDelegate flush = (IntPtr fileSystem, IntPtr fileContext, out FspFsctlFileInfo fileInfo) =>
         {
             fileInfo = default;
             try
@@ -838,7 +838,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
                     adapter.SyncAsync(CancellationToken.None).GetAwaiter().GetResult();
                 }
 
-                return NtStatus.STATUS_SUCCESS;
+                return NtStatus.StatusSuccess;
             }
             catch (Exception ex)
             {
@@ -848,7 +848,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
         fsInterface.Flush = Marshal.GetFunctionPointerForDelegate(flush);
 
         // GetFileInfo: delegates to adapter.GetattrAsync
-        GetFileInfoDelegate getFileInfo = (IntPtr fileSystem, IntPtr fileContext, out FSP_FSCTL_FILE_INFO fileInfo) =>
+        GetFileInfoDelegate getFileInfo = (IntPtr fileSystem, IntPtr fileContext, out FspFsctlFileInfo fileInfo) =>
         {
             fileInfo = default;
             try
@@ -856,7 +856,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
                 long inodeNumber = fileContext.ToInt64();
                 var attrs = adapter.GetattrAsync(inodeNumber, CancellationToken.None).GetAwaiter().GetResult();
                 fileInfo = MapAttributesToFileInfo(attrs);
-                return NtStatus.STATUS_SUCCESS;
+                return NtStatus.StatusSuccess;
             }
             catch (Exception ex)
             {
@@ -868,24 +868,24 @@ public sealed class WinFspMountProvider : IVdeMountProvider
         // Create: delegates to adapter.CreateAsync or MkdirAsync
         CreateDelegate create = (IntPtr fileSystem, string fileName, uint createOptions, uint grantedAccess,
                                  uint fileAttributes, IntPtr securityDescriptor, ulong allocationSize,
-                                 out IntPtr fileContext, out FSP_FSCTL_FILE_INFO fileInfo) =>
+                                 out IntPtr fileContext, out FspFsctlFileInfo fileInfo) =>
         {
             fileContext = IntPtr.Zero;
             fileInfo = default;
             try
             {
                 if (options.ReadOnly)
-                    return NtStatus.STATUS_ACCESS_DENIED;
+                    return NtStatus.StatusAccessDenied;
 
                 var parts = ParseWinPath(fileName);
                 if (parts.Length == 0)
-                    return NtStatus.STATUS_INVALID_PARAMETER;
+                    return NtStatus.StatusInvalidParameter;
 
                 string name = parts[^1];
                 long parentInode = parts.Length > 1 ? ResolvePathToInode(adapter, parts.AsSpan()[..^1]) : 1; // root = inode 1
 
                 if (parentInode < 0)
-                    return NtStatus.STATUS_OBJECT_PATH_NOT_FOUND;
+                    return NtStatus.StatusObjectPathNotFound;
 
                 bool isDirectory = (createOptions & 0x00000001) != 0; // FILE_DIRECTORY_FILE
                 long newInode;
@@ -904,7 +904,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
                 fileContext = new IntPtr(newInode);
                 var attrs = adapter.GetattrAsync(newInode, CancellationToken.None).GetAwaiter().GetResult();
                 fileInfo = MapAttributesToFileInfo(attrs);
-                return NtStatus.STATUS_SUCCESS;
+                return NtStatus.StatusSuccess;
             }
             catch (Exception ex)
             {
@@ -947,24 +947,24 @@ public sealed class WinFspMountProvider : IVdeMountProvider
             try
             {
                 if (options.ReadOnly)
-                    return NtStatus.STATUS_ACCESS_DENIED;
+                    return NtStatus.StatusAccessDenied;
 
                 var oldParts = ParseWinPath(fileName);
                 var newParts = ParseWinPath(newFileName);
 
                 if (oldParts.Length == 0 || newParts.Length == 0)
-                    return NtStatus.STATUS_INVALID_PARAMETER;
+                    return NtStatus.StatusInvalidParameter;
 
                 long oldParent = oldParts.Length > 1 ? ResolvePathToInode(adapter, oldParts.AsSpan()[..^1]) : 1;
                 long newParent = newParts.Length > 1 ? ResolvePathToInode(adapter, newParts.AsSpan()[..^1]) : 1;
 
                 if (oldParent < 0 || newParent < 0)
-                    return NtStatus.STATUS_OBJECT_PATH_NOT_FOUND;
+                    return NtStatus.StatusObjectPathNotFound;
 
                 adapter.RenameAsync(oldParent, oldParts[^1], newParent, newParts[^1], CancellationToken.None)
                     .GetAwaiter().GetResult();
 
-                return NtStatus.STATUS_SUCCESS;
+                return NtStatus.StatusSuccess;
             }
             catch (Exception ex)
             {
@@ -976,7 +976,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
         // SetBasicInfo: sets timestamps via adapter.SetattrAsync
         SetBasicInfoDelegate setBasicInfo = (IntPtr fileSystem, IntPtr fileContext,
                                              uint fileAttributes, long creationTime, long lastAccessTime,
-                                             long lastWriteTime, long changeTime, out FSP_FSCTL_FILE_INFO fileInfo) =>
+                                             long lastWriteTime, long changeTime, out FspFsctlFileInfo fileInfo) =>
         {
             fileInfo = default;
             try
@@ -1008,7 +1008,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
 
                 var current = adapter.GetattrAsync(inodeNumber, CancellationToken.None).GetAwaiter().GetResult();
                 fileInfo = MapAttributesToFileInfo(current);
-                return NtStatus.STATUS_SUCCESS;
+                return NtStatus.StatusSuccess;
             }
             catch (Exception ex)
             {
@@ -1019,13 +1019,13 @@ public sealed class WinFspMountProvider : IVdeMountProvider
 
         // SetFileSize: truncate/extend via adapter.SetattrAsync
         SetFileSizeDelegate setFileSize = (IntPtr fileSystem, IntPtr fileContext, ulong newSize,
-                                           bool setAllocationSize, out FSP_FSCTL_FILE_INFO fileInfo) =>
+                                           bool setAllocationSize, out FspFsctlFileInfo fileInfo) =>
         {
             fileInfo = default;
             try
             {
                 if (options.ReadOnly)
-                    return NtStatus.STATUS_ACCESS_DENIED;
+                    return NtStatus.StatusAccessDenied;
 
                 long inodeNumber = fileContext.ToInt64();
                 var attrs = new InodeAttributes { Size = (long)newSize };
@@ -1034,7 +1034,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
 
                 var current = adapter.GetattrAsync(inodeNumber, CancellationToken.None).GetAwaiter().GetResult();
                 fileInfo = MapAttributesToFileInfo(current);
-                return NtStatus.STATUS_SUCCESS;
+                return NtStatus.StatusSuccess;
             }
             catch (Exception ex)
             {
@@ -1056,7 +1056,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
 
                 bool pastMarker = marker == null;
                 uint offset = 0;
-                uint entrySize = (uint)Marshal.SizeOf<FSP_FSCTL_DIR_INFO>();
+                uint entrySize = (uint)Marshal.SizeOf<FspFsctlDirInfo>();
 
                 foreach (var entry in entries)
                 {
@@ -1073,7 +1073,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
                     var entryAttrs = adapter.GetattrAsync(entry.InodeNumber, CancellationToken.None)
                         .GetAwaiter().GetResult();
 
-                    var dirInfo = new FSP_FSCTL_DIR_INFO
+                    var dirInfo = new FspFsctlDirInfo
                     {
                         Size = (ushort)entrySize,
                         FileInfo = MapAttributesToFileInfo(entryAttrs),
@@ -1085,7 +1085,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
                 }
 
                 bytesTransferred = offset;
-                return NtStatus.STATUS_SUCCESS;
+                return NtStatus.StatusSuccess;
             }
             catch (Exception ex)
             {
@@ -1097,13 +1097,13 @@ public sealed class WinFspMountProvider : IVdeMountProvider
         // Overwrite: truncate existing file
         OverwriteDelegate overwrite = (IntPtr fileSystem, IntPtr fileContext, uint fileAttributes,
                                        bool replaceFileAttributes, ulong allocationSize,
-                                       out FSP_FSCTL_FILE_INFO fileInfo) =>
+                                       out FspFsctlFileInfo fileInfo) =>
         {
             fileInfo = default;
             try
             {
                 if (options.ReadOnly)
-                    return NtStatus.STATUS_ACCESS_DENIED;
+                    return NtStatus.StatusAccessDenied;
 
                 long inodeNumber = fileContext.ToInt64();
                 var attrs = new InodeAttributes { Size = 0 };
@@ -1112,7 +1112,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
 
                 var current = adapter.GetattrAsync(inodeNumber, CancellationToken.None).GetAwaiter().GetResult();
                 fileInfo = MapAttributesToFileInfo(current);
-                return NtStatus.STATUS_SUCCESS;
+                return NtStatus.StatusSuccess;
             }
             catch (Exception ex)
             {
@@ -1133,14 +1133,14 @@ public sealed class WinFspMountProvider : IVdeMountProvider
                 long inodeNumber = ResolvePathToInode(adapter, parts);
 
                 if (inodeNumber < 0)
-                    return NtStatus.STATUS_OBJECT_NAME_NOT_FOUND;
+                    return NtStatus.StatusObjectNameNotFound;
 
                 var attrs = adapter.GetattrAsync(inodeNumber, CancellationToken.None).GetAwaiter().GetResult();
                 fileAttributes = MapInodeTypeToFileAttributes(attrs.Type);
 
                 // Return zero security descriptor size to use default security
                 securityDescriptorSize = 0;
-                return NtStatus.STATUS_SUCCESS;
+                return NtStatus.StatusSuccess;
             }
             catch (Exception ex)
             {
@@ -1175,11 +1175,11 @@ public sealed class WinFspMountProvider : IVdeMountProvider
     #region Delegate Types
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
-    private delegate int GetVolumeInfoDelegate(IntPtr fileSystem, out FSP_FSCTL_VOLUME_INFO volumeInfo);
+    private delegate int GetVolumeInfoDelegate(IntPtr fileSystem, out FspFsctlVolumeInfo volumeInfo);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
     private delegate int OpenDelegate(IntPtr fileSystem, string fileName, uint createOptions, uint grantedAccess,
-                                      out IntPtr fileContext, out FSP_FSCTL_FILE_INFO fileInfo);
+                                      out IntPtr fileContext, out FspFsctlFileInfo fileInfo);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate void CloseDelegate(IntPtr fileSystem, IntPtr fileContext);
@@ -1191,18 +1191,18 @@ public sealed class WinFspMountProvider : IVdeMountProvider
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int WriteDelegate(IntPtr fileSystem, IntPtr fileContext, IntPtr buffer, ulong offset,
                                        uint length, bool writeToEndOfFile, bool constrainedIo,
-                                       out uint bytesTransferred, out FSP_FSCTL_FILE_INFO fileInfo);
+                                       out uint bytesTransferred, out FspFsctlFileInfo fileInfo);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    private delegate int FlushDelegate(IntPtr fileSystem, IntPtr fileContext, out FSP_FSCTL_FILE_INFO fileInfo);
+    private delegate int FlushDelegate(IntPtr fileSystem, IntPtr fileContext, out FspFsctlFileInfo fileInfo);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
-    private delegate int GetFileInfoDelegate(IntPtr fileSystem, IntPtr fileContext, out FSP_FSCTL_FILE_INFO fileInfo);
+    private delegate int GetFileInfoDelegate(IntPtr fileSystem, IntPtr fileContext, out FspFsctlFileInfo fileInfo);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
     private delegate int CreateDelegate(IntPtr fileSystem, string fileName, uint createOptions, uint grantedAccess,
                                         uint fileAttributes, IntPtr securityDescriptor, ulong allocationSize,
-                                        out IntPtr fileContext, out FSP_FSCTL_FILE_INFO fileInfo);
+                                        out IntPtr fileContext, out FspFsctlFileInfo fileInfo);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
     private delegate void CleanupDelegate(IntPtr fileSystem, IntPtr fileContext, string fileName, uint flags);
@@ -1214,11 +1214,11 @@ public sealed class WinFspMountProvider : IVdeMountProvider
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int SetBasicInfoDelegate(IntPtr fileSystem, IntPtr fileContext,
                                                uint fileAttributes, long creationTime, long lastAccessTime,
-                                               long lastWriteTime, long changeTime, out FSP_FSCTL_FILE_INFO fileInfo);
+                                               long lastWriteTime, long changeTime, out FspFsctlFileInfo fileInfo);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int SetFileSizeDelegate(IntPtr fileSystem, IntPtr fileContext, ulong newSize,
-                                              bool setAllocationSize, out FSP_FSCTL_FILE_INFO fileInfo);
+                                              bool setAllocationSize, out FspFsctlFileInfo fileInfo);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
     private delegate int ReadDirectoryDelegate(IntPtr fileSystem, IntPtr fileContext, string? pattern,
@@ -1228,7 +1228,7 @@ public sealed class WinFspMountProvider : IVdeMountProvider
     [UnmanagedFunctionPointer(CallingConvention.StdCall)]
     private delegate int OverwriteDelegate(IntPtr fileSystem, IntPtr fileContext, uint fileAttributes,
                                             bool replaceFileAttributes, ulong allocationSize,
-                                            out FSP_FSCTL_FILE_INFO fileInfo);
+                                            out FspFsctlFileInfo fileInfo);
 
     [UnmanagedFunctionPointer(CallingConvention.StdCall, CharSet = CharSet.Unicode)]
     private delegate int GetSecurityByNameDelegate(IntPtr fileSystem, string fileName,
@@ -1261,12 +1261,12 @@ public sealed class WinFspMountProvider : IVdeMountProvider
     /// <returns>Inode number, or -1 if not found.</returns>
     internal static long ResolvePathToInode(VdeFilesystemAdapter adapter, ReadOnlySpan<string> parts)
     {
-        const long RootInode = 1;
+        const long rootInode = 1;
 
         if (parts.Length == 0)
-            return RootInode;
+            return rootInode;
 
-        long currentInode = RootInode;
+        long currentInode = rootInode;
         foreach (var part in parts)
         {
             var result = adapter.LookupAsync(currentInode, part, CancellationToken.None)
@@ -1290,9 +1290,9 @@ public sealed class WinFspMountProvider : IVdeMountProvider
     /// </summary>
     /// <param name="attrs">VDE inode attributes.</param>
     /// <returns>WinFsp file info structure.</returns>
-    internal static FSP_FSCTL_FILE_INFO MapAttributesToFileInfo(InodeAttributes attrs)
+    internal static FspFsctlFileInfo MapAttributesToFileInfo(InodeAttributes attrs)
     {
-        return new FSP_FSCTL_FILE_INFO
+        return new FspFsctlFileInfo
         {
             FileAttributes = MapInodeTypeToFileAttributes(attrs.Type),
             AllocationSize = attrs.AllocatedSize,
@@ -1315,15 +1315,15 @@ public sealed class WinFspMountProvider : IVdeMountProvider
     /// <returns>Windows FILE_ATTRIBUTE_* flags.</returns>
     internal static uint MapInodeTypeToFileAttributes(InodeType type)
     {
-        const uint FILE_ATTRIBUTE_NORMAL = 0x00000080;
-        const uint FILE_ATTRIBUTE_DIRECTORY = 0x00000010;
-        const uint FILE_ATTRIBUTE_REPARSE_POINT = 0x00000400;
+        const uint fileAttributeNormal = 0x00000080;
+        const uint fileAttributeDirectory = 0x00000010;
+        const uint fileAttributeReparsePoint = 0x00000400;
 
         return type switch
         {
-            InodeType.Directory => FILE_ATTRIBUTE_DIRECTORY,
-            InodeType.SymLink => FILE_ATTRIBUTE_REPARSE_POINT,
-            _ => FILE_ATTRIBUTE_NORMAL
+            InodeType.Directory => fileAttributeDirectory,
+            InodeType.SymLink => fileAttributeReparsePoint,
+            _ => fileAttributeNormal
         };
     }
 
@@ -1339,8 +1339,8 @@ public sealed class WinFspMountProvider : IVdeMountProvider
 
         // Windows epoch is 1601-01-01, Unix epoch is 1970-01-01
         // Difference: 11644473600 seconds = 116444736000000000 hundred-nanoseconds
-        const long EpochDifference = 116444736000000000L;
-        return (unixSeconds * 10_000_000L) + EpochDifference;
+        const long epochDifference = 116444736000000000L;
+        return (unixSeconds * 10_000_000L) + epochDifference;
     }
 
     /// <summary>
@@ -1353,8 +1353,8 @@ public sealed class WinFspMountProvider : IVdeMountProvider
         if (fileTime <= 0)
             return 0;
 
-        const long EpochDifference = 116444736000000000L;
-        return (fileTime - EpochDifference) / 10_000_000L;
+        const long epochDifference = 116444736000000000L;
+        return (fileTime - epochDifference) / 10_000_000L;
     }
 
     #endregion

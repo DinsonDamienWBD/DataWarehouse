@@ -339,9 +339,9 @@ public sealed class ZoneMapIndex
         if (entryCount <= 0) return;
 
         // Cap entryCount to a reasonable upper bound to prevent corrupt-disk runaway I/O
-        const int MaxEntryCount = 1_000_000;
-        if (entryCount > MaxEntryCount)
-            throw new InvalidDataException($"Zone map entry count {entryCount} exceeds maximum {MaxEntryCount}. Possible data corruption.");
+        const int maxEntryCount = 1_000_000;
+        if (entryCount > maxEntryCount)
+            throw new InvalidDataException($"Zone map entry count {entryCount} exceeds maximum {maxEntryCount}. Possible data corruption.");
 
         int entriesPerBlock = EntriesPerBlock;
         int blocksNeeded = (entryCount + entriesPerBlock - 1) / Math.Max(entriesPerBlock, 1);
