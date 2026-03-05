@@ -2038,7 +2038,7 @@ Wave 6: 86-17 (CRUSH↔Federation integration) -- depends on Wave 3 (Level 6 Dis
   8. Zone maps: selective query (WHERE timestamp > X) on 1B rows skips ≥90% of extents via min/max metadata.
   9. SIMD SQL execution: SUM/AVG on float[] column is ≥4x faster with Vector256/Avx2 vs scalar loop.
   10. Persistent roaring bitmap tag index: tag query (tag=X AND tag=Y) on 1M tagged objects returns in ≤1ms; index survives VDE close/reopen.
-  11. Per-extent encryption: encrypting 1MB extent (256 × 4KB blocks) is ≥100x faster than 256 individual block encryptions due to single IV + bulk AES-NI.
+  11. Per-extent encryption: encrypting 1MB extent (256 �— 4KB blocks) is ≥100x faster than 256 individual block encryptions due to single IV + bulk AES-NI.
   12. Hierarchical checksums: corruption in one block of a 1GB file detected and localized via Merkle tree binary search in ≤20 I/O operations.
   13. Extent-aware CoW snapshots: snapshot of 1TB VDE with 1M files creates ≤10MB of snapshot metadata (vs ~4GB with per-block tracking).
   14. Online defragmentation: background defrag compacts fragmented allocation groups while VDE serves normal read/write operations without downtime.
@@ -2114,7 +2114,7 @@ Plans:
 - [ ] 87-23-PLAN.md -- Sub-block delta extents: DELT inode module (MaxDeltaDepth:2, CurrentDepth:2, CompactionPolicy:4), DELTA extent flag type, VCDIFF/bsdiff binary patch generation on <10% block modification, delta chain read reconstruction, Background Vacuum auto-compaction when CurrentDepth > MaxDeltaDepth, DELTA_EXTENTS_ACTIVE feature flag (VOPT-36)
 - [ ] 87-24-PLAN.md -- Smart Extents (WASM predicate pushdown): CPSH inode module (WasmPredicateOffset:8, PredicateLen:4, PredicateFlags:4, InlinePredicate:32), io_uring filtered read path with WASM execution after DMA, NVMe vendor command path for computational drives, COMPUTE_PUSHDOWN_ACTIVE feature flag, integration with existing ComputeCodeCache region (VOPT-37)
 - [ ] 87-25-PLAN.md -- Polymorphic RAID (per-inode erasure coding): 3-bit RAID topology in extent Flags field (Standard/Mirror/EC_2_1/EC_4_2/EC_8_3), extended RAID inode module (Scheme:1, DataShards:1, ParityShards:1, DeviceMap:29), AVX-512 Reed-Solomon parity calculation, per-extent reconstruction path, integration with UltimateRAID plugin strategies (VOPT-38); includes radioactive parity decay policy: Background Vacuum degrades RAID level of cold extents (configurable epoch delta threshold); WORM-exempt, compliance-exempt, Policy Vault opt-in only (VOPT-60)
-- [ ] 87-26-PLAN.md -- Spatiotemporal 4D extent addressing: STEX inode module (CoordinateSystem:2, Precision:2, HilbertOrder:2), SPATIOTEMPORAL extent flag, 6×32B → 3×64B extent reinterpretation [Geohash:16][TimeStart:8][TimeEnd:8][StartBlock:8][BlockCount:4][Flags:4][ExpectedHash:16], Hilbert curve spatial clustering, io_uring bounding box query path, SPATIOTEMPORAL_ACTIVE feature flag (VOPT-39)
+- [ ] 87-26-PLAN.md -- Spatiotemporal 4D extent addressing: STEX inode module (CoordinateSystem:2, Precision:2, HilbertOrder:2), SPATIOTEMPORAL extent flag, 6�—32B → 3�—64B extent reinterpretation [Geohash:16][TimeStart:8][TimeEnd:8][StartBlock:8][BlockCount:4][Flags:4][ExpectedHash:16], Hilbert curve spatial clustering, io_uring bounding box query path, SPATIOTEMPORAL_ACTIVE feature flag (VOPT-39)
 - [ ] 87-27-PLAN.md -- GDPR Tombstone Engine: TombstonePass in Background Vacuum, TombstoneProofRecord struct (BLAKE3(zeros || timestamp) in ExpectedHash:16), auditor verification API, delta chain flattening before tombstoning (DELT interaction) (VOPT-40) [Home: SDK VirtualDiskEngine.Compliance + UltimateDataProtection plugin]
 - [ ] 87-28-PLAN.md -- Quorum-Sealed Write Path: allocation-free FROST verifier using Span<T> + stackalloc (NOT BouncyCastle), 2-round quorum collection with async timeout, QuorumDegradePolicy (REJECT/ACCEPT_UNSIGNED/QUEUE_FOR_SEALING), 79-byte overflow inode storage, ReplicationGeneration in signed message (VOPT-42) [Home: SDK VirtualDiskEngine.Federation + UltimateKeyManagement plugin]
 - [ ] 87-29-PLAN.md -- Semantic Wear-Leveling Allocator: TTL-hint-aware AllocationGroup policy, temperature classification (Hot/Warm/Cold/Frozen), gate (SWLV OFF when ZNS_AWARE set), background Vacuum group-level reclamation (VOPT-41) [Home: SDK VirtualDiskEngine.Allocation]
@@ -2122,7 +2122,7 @@ Plans:
 - [ ] 87-31-PLAN.md -- Instant Clone Engine: O(metadata) clone (inode copy + SHARED_COW flag + SNAP refcount), CoW split logic on write to cloned extent, subtree clone (directory-level) (VOPT-47) [Home: SDK VirtualDiskEngine.Clone]
 - [ ] 87-32-PLAN.md -- Epoch-Gated Lazy Deletion: retention policy → epoch boundary mapping, OldestActiveEpoch advancement API, Vacuum epoch-scan reclamation (VOPT-49) [Home: SDK VirtualDiskEngine.Retention]
 - [ ] 87-33-PLAN.md -- Heat-Driven Allocation Tiering: hot/cold Data Region shards via ShardId, background migration based on HeatScore threshold, multi-device awareness (NVMe hot shard, HDD cold shard) (VOPT-51) [Home: SDK VirtualDiskEngine.Allocation + UltimateStorage plugin]
-- [ ] 87-34-PLAN.md -- Temporal Point Query Engine: epoch-indexed extent resolver, TRLR backward walk from CurrentEpoch to target, historical extent map reconstruction, API ReadAtEpoch(inodeId, epoch) → Stream (VOPT-44); includes O(log N) binary search bisection optimization: sorted epoch-to-hash index (10M epochs × 24B = 240MB) enables finding exact tampered transaction in ~23 lookups without reading data blocks (VOPT-58) [Home: SDK VirtualDiskEngine.Query]
+- [ ] 87-34-PLAN.md -- Temporal Point Query Engine: epoch-indexed extent resolver, TRLR backward walk from CurrentEpoch to target, historical extent map reconstruction, API ReadAtEpoch(inodeId, epoch) → Stream (VOPT-44); includes O(log N) binary search bisection optimization: sorted epoch-to-hash index (10M epochs �— 24B = 240MB) enables finding exact tampered transaction in ~23 lookups without reading data blocks (VOPT-58) [Home: SDK VirtualDiskEngine.Query]
 - [ ] 87-35-PLAN.md -- Metadata-Only Cold Analytics: Inode Table sequential scanner, TRLR region aggregate statistics, Tag Index analytics, dashboard-compatible output (counts, histograms, temporal distributions) (VOPT-45) [Home: SDK VirtualDiskEngine.Analytics + UltimateIntelligence plugin]
 - [ ] 87-36-PLAN.md -- Inline Tag Predicate Scans: fixed-offset columnar scan over InlineTagArea (128B at inode offset 308), SIMD-vectorized predicate evaluation (optional AVX-512), fallback to Tag Index B+-tree for large VDEs (VOPT-54) [Home: UltimateIntelligence plugin]
 - [ ] 87-37-PLAN.md -- Probabilistic Corruption Radar: statistical TRLR sampling engine, configurable confidence level (N samples for target probability), fast health check API HealthCheck(confidence) → (clean, corrupt, probability) (VOPT-48) [Home: SDK VirtualDiskEngine.Diagnostics]
@@ -2143,7 +2143,7 @@ Plans:
 - [ ] 87-52-PLAN.md -- Format-native QoS: QoS class 3-bit field in InodeFlags bits 5-7 (8 levels: 0=Background, 1=BestEffort, 2=Normal, 3=Elevated, 4=High, 5=Critical, 6=Urgent, 7=Realtime), TenantId 2B field in inode module area (requires QOS module bit 27 in ModuleManifest), QoS Policy records 64B in Policy Vault (type tag 0x0003: PolicyVersion:2, QosClass:1, MaxIopsPerTenant:4, MaxBytesPerSecond:8, BurstBudget:4, Flags:2, Reserved:43), I/O Deadline Hints 4-bit field in extent Flags bits 12-15 (12 tiers: 0=None, 1=10μs, 2=50μs, 3=100μs, 4=500μs, 5=1ms, 6=5ms, 7=10ms, 8=50ms, 9=100ms, 10=500ms, 11=1s), I/O scheduler reads deadline tier and QoS class to prioritize I/O submission queue ordering, QOS_ACTIVE feature flag (VOPT-71, VOPT-72, VOPT-73) [Home: SDK VirtualDiskEngine.QoS + UltimateStorage plugin]
 - [ ] 87-53-PLAN.md -- Operation Journal (OPJR) region + online resize + online RAID migration: OPJR region (magic "OPJRNL\0\0", 64B header with EntryCount:8/HeadCursor:8/TailCursor:8/Flags:8/Checksum:8), 128B OPJR entry format (OperationType:1, State:1, Flags:2, OperationId:8, StartEpoch:8, TargetEpoch:8, Progress:8, Payload:92), 10 operation types (Resize/RaidMigration/EncryptionMigration/DefragSweep/TierMigration/SnapshotCompact/KeyRotation/VacuumFull/RegionReclaim/IndexRebuild), 6-state machine (Queued→InProgress→Paused→Completed/Failed/Cancelled), online resize fields in Superblock at 0x170 (PendingTotalBlocks:8B + ResizeJournalOperationId:8B), online RAID migration per-extent state (6-state machine embedded in extent flags: Pending/HashingSource/WritingParity/VerifyingParity/CommittingSwap/Done), ONLINE_OPS_ACTIVE feature flag (VOPT-74, VOPT-75) [Home: SDK VirtualDiskEngine.OnlineOps]
 - [ ] 87-54-PLAN.md -- Online encryption + online defrag + online tier migration: online encryption fields in Superblock at 0x180 (EncryptionMigrationKeySlot:4B + EncryptionMigrationProgress:4B, progress = extents encrypted / total extents), encrypted and plaintext extents coexist during migration (inode tracks per-extent encrypted flag), online defrag as OPJR operation type (DefragSweep: reads fragmented allocation groups, rewrites extents contiguously, updates extent tree, journals each move), online tier migration (TierMigration: moves extents between NVMe/SSD/HDD tiers based on HeatScore thresholds, extent moves are OPJR-journaled for crash safety), all online operations resume from OPJR after crash (VOPT-76) [Home: SDK VirtualDiskEngine.OnlineOps]
-- [ ] 87-55-PLAN.md -- Format-native disaster recovery: Recovery Point Markers as 48B WAL records (type RPMK: Epoch:8, WalSequence:8, MetadataMerkleRoot:32), Failover State 32B in Superblock at 0x188 (FailoverRole:1, Flags:1, PeerCount:2, FailoverEpoch:8, PrimaryNodeUuid:16, LastFailoverUtcTicks:8), failover state machine (Standalone/Secondary/Promoting/Primary/Demoting), SplitBrain handling via fencing epoch (any Primary claiming older epoch is rejected), Backup Manifest 128B in Block 2 (magic "BKUPMNFT": ManifestVersion:2, BackupEpoch:8, WalSequence:8, MetadataMerkleRoot:32, DataMerkleRoot:32, BackupNodeUuid:16, BackupUtcTicks:8, Checksum:8, Reserved:6), Recovery Bookmarks 8 slots × 64B in Block 2 (BookmarkEpoch:8, WalSequence:8, Label:32, Checksum:8, Reserved:8), DR_ACTIVE feature flag, `dw dr failover`, `dw dr status`, `dw dr bookmark save/restore` CLI commands (VOPT-77, VOPT-78) [Home: SDK VirtualDiskEngine.DR]
+- [ ] 87-55-PLAN.md -- Format-native disaster recovery: Recovery Point Markers as 48B WAL records (type RPMK: Epoch:8, WalSequence:8, MetadataMerkleRoot:32), Failover State 32B in Superblock at 0x188 (FailoverRole:1, Flags:1, PeerCount:2, FailoverEpoch:8, PrimaryNodeUuid:16, LastFailoverUtcTicks:8), failover state machine (Standalone/Secondary/Promoting/Primary/Demoting), SplitBrain handling via fencing epoch (any Primary claiming older epoch is rejected), Backup Manifest 128B in Block 2 (magic "BKUPMNFT": ManifestVersion:2, BackupEpoch:8, WalSequence:8, MetadataMerkleRoot:32, DataMerkleRoot:32, BackupNodeUuid:16, BackupUtcTicks:8, Checksum:8, Reserved:6), Recovery Bookmarks 8 slots �— 64B in Block 2 (BookmarkEpoch:8, WalSequence:8, Label:32, Checksum:8, Reserved:8), DR_ACTIVE feature flag, `dw dr failover`, `dw dr status`, `dw dr bookmark save/restore` CLI commands (VOPT-77, VOPT-78) [Home: SDK VirtualDiskEngine.DR]
 - [ ] 87-56-PLAN.md -- DirectFileBlockDevice + BlockDeviceFactory (P0 — all platforms): IBlockDevice interface (ReadAsync/WriteAsync/FlushAsync/GetLength/BlockSize/Dispose), IBatchBlockDevice (ReadBatchAsync/WriteBatchAsync for scatter-gather), IDirectBlockDevice (O_DIRECT/FILE_FLAG_NO_BUFFERING bypass), FileBlockDevice (buffered reference impl, all platforms), DirectFileBlockDevice (O_DIRECT on Linux/macOS, FILE_FLAG_NO_BUFFERING on Windows, AlignedMemoryAllocator for 4KB-aligned buffers), BlockDeviceFactory 7-step auto-detection cascade (SPDK→IoRing→IoUring→kqueue→IOCP→DirectFile→File), factory registered in DI container, unit + integration tests on all three OS (VOPT-79) [Home: SDK VirtualDiskEngine.IO]
 - [ ] 87-57-PLAN.md -- WindowsOverlappedBlockDevice + IoRingBlockDevice (P0/P1 — Windows): WindowsOverlappedBlockDevice (IOCP, FILE_FLAG_OVERLAPPED + FILE_FLAG_NO_BUFFERING, manual OVERLAPPED structs, completion port polling thread pool, batch coalescing), IoRingBlockDevice (Windows 11+ IoRing API via P/Invoke to ntdll IoRingCreateIoRing/IoRingPostIoCompletion, fixed-buffer registration, SQE/CQE model mirrors io_uring), both implement IBatchBlockDevice, fallback detection (IoRing unavailable → IOCP → DirectFile), benchmarks: IOCP ≥2x FileStream, IoRing ≥20% over IOCP (VOPT-80) [Home: SDK VirtualDiskEngine.IO.Windows]
 - [ ] 87-58-PLAN.md -- KqueueBlockDevice for macOS + FreeBSD (P1): KqueueBlockDevice implementing IBatchBlockDevice via kqueue + kevent (EVFILT_AIO), aio_read/aio_write POSIX AIO submission, completion via kevent batch poll, F_NOCACHE fcntl for O_DIRECT equivalent on macOS, aligned buffer requirement (4KB), fallback to DirectFileBlockDevice when kqueue unavailable, tested on macOS 14+ and FreeBSD 14+, latency target ≤5μs for 4KB reads on NVMe (VOPT-81) [Home: SDK VirtualDiskEngine.IO.Unix]
@@ -2734,7 +2734,13 @@ Plans:
   2. All tests pass (GREEN) after fixes
   3. Solution builds with 0 errors
   4. `dotnet test` passes after each commit
-**Plans**: TBD
+**Plans**: 5 plans
+Plans:
+- [ ] 097-01-PLAN.md — Findings 1253-1499 (IoUringBindings through OpenClInterop)
+- [ ] 097-02-PLAN.md — Findings 1500-1742 (OpenClInterop through RaftConsensusEngine)
+- [ ] 097-03-PLAN.md — Findings 1743-1974 (RaftLogEntry through StorageProcessingStrategy)
+- [ ] 097-04-PLAN.md — Findings 1975-2256 (StrategyBase through VDE/Identity)
+- [ ] 097-05-PLAN.md — Findings 2257-2499 (VDE/Identity/VdeNesting through ZoneMapIndex)
 
 ### Phase 98: Stage 1, Steps 1-3 — Hardening: Core Infrastructure
 **Goal**: All core infrastructure findings have failing tests followed by production fixes
@@ -3010,19 +3016,45 @@ Plans:
 **Plans**: TBD
 
 ### Phase 111: Stage 4 — CI/CD Fortress
-**Goal**: Lock down the pipeline so no PR can degrade the hardened state
+**Goal**: Lock down the pipeline so no PR can degrade the hardened state. Leverage full JetBrains dotUltimate suite and GitHub Actions runners for expensive operations.
 **Depends on**: Phase 110
 **Requirements**: CICD-01, CICD-02, CICD-03, CICD-04
+**JetBrains dotUltimate tools integrated**:
+  - **dotCover**: code coverage reports per PR (filter +DataWarehouse.*, -Tests, -Benchmarks)
+  - **dotTrace**: profiling integration (local dev; CI uses BenchmarkDotNet for regression gates)
+  - **dotMemory**: memory profiling integration (local dev; CI uses BenchmarkDotNet Gen2 gate)
+  - **InspectCode**: static analysis gate (production-relevant severity >= WARNING)
+  - **dupFinder**: code duplication gate (discard cost >= 100)
+  - **CleanupCode**: automated code style enforcement (can auto-fix naming issues from InspectCode)
+**GitHub Actions workflow** (`.github/workflows/audit.yml` — baseline already created):
+  - Triggers: push to main/master + pull_request to main/master + workflow_dispatch
+  - Concurrency: cancel-in-progress for same ref (saves runner minutes)
+  - **Stage 1** (fast gate): Build with TreatWarningsAsErrors + dotnet test → blocks everything if fails
+  - **Stage 2a** (parallel): Coyote 1000 iterations (60min timeout) → blocks merge on any bug
+  - **Stage 2b** (parallel): InspectCode + dupFinder (30min timeout) → advisory/gate
+  - **Stage 2c** (parallel): dotCover coverage report → uploaded as PR artifact
+  - **Stage 2d** (parallel): BenchmarkDotNet → Gen2 gate on zero-alloc paths
+  - **Stage 3** (after 2a-2d): Stryker mutation testing break-at 95% (120min timeout) → blocks merge
+  - **Final**: Summary job aggregating all results with pass/fail status
+  - All stages upload artifacts (TRX, coverage HTML, stryker HTML, benchmark JSON) — 30-day retention
+  - Timeout guards on every job prevent infinite hangs on throttled runners
 **Workflow**:
-  1. Update `.github/workflows/audit.yml` with hardened gates
-  2. Add Coyote step: 1,000 iterations on every PR, any non-deterministic failure blocks merge
-  3. Add BenchmarkDotNet step: if a PR introduces Gen2 heap allocation on a zero-allocation path, block merge
-  4. Add Stryker step: if a PR drops overall mutation score below the v7.0 baseline, block merge
+  1. Finalize audit.yml gates (baseline already created with all jobs)
+  2. Verify Coyote gate: test PR with intentional concurrency bug → blocks merge
+  3. Verify BenchmarkDotNet gate: test PR with Gen2 allocation → blocks merge
+  4. Verify Stryker gate: test PR dropping mutation score → blocks merge
+  5. Verify InspectCode + dupFinder: establish baselines, set thresholds
+  6. Verify dotCover: coverage report auto-publishes as PR artifact with threshold gate
+  7. Add branch protection rules: require `audit-summary` job to pass before merge
 **Success Criteria** (what must be TRUE):
-  1. `.github/workflows/audit.yml` contains Coyote, BenchmarkDotNet, and Stryker gates
-  2. Test PR that introduces a concurrency bug → pipeline blocks merge (verified)
-  3. Test PR that introduces Gen2 allocation on zero-alloc path → pipeline blocks merge (verified)
-  4. Test PR that drops mutation score → pipeline blocks merge (verified)
+  1. `.github/workflows/audit.yml` on main/master with all gates active
+  2. Test PR with concurrency bug → Coyote gate blocks merge (verified)
+  3. Test PR with Gen2 allocation on zero-alloc path → performance gate blocks merge (verified)
+  4. Test PR dropping mutation score → Stryker gate blocks merge (verified)
+  5. InspectCode baseline established — new warnings above threshold block merge
+  6. dotCover coverage report auto-publishes as PR artifact
+  7. Branch protection rules require `audit-summary` job to pass
+  8. All jobs have timeout guards — no infinite hangs on throttled runners
 **Report as**: "Stage 4 - CI/CD Fortress Lock-Down Results"
 **Plans**: TBD
 
