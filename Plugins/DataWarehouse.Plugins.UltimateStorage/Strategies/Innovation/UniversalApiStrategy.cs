@@ -103,7 +103,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 BackendType.FileSystem => new FileSystemAdapter(path, name),
                 BackendType.S3 => new S3Adapter(path, name),
                 BackendType.Azure => new AzureAdapter(path, name),
-                BackendType.GCS => new GCSAdapter(path, name),
+                BackendType.Gcs => new GcsAdapter(path, name),
                 _ => new FileSystemAdapter(path, name)
             };
         }
@@ -430,7 +430,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             FileSystem,
             S3,
             Azure,
-            GCS
+            Gcs
         }
 
         private abstract class BackendAdapter : IAsyncDisposable
@@ -589,9 +589,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             // Production: implement actual Azure Blob SDK calls
         }
 
-        private class GCSAdapter : FileSystemAdapter
+        private class GcsAdapter : FileSystemAdapter
         {
-            public GCSAdapter(string basePath, string name) : base(basePath, name) { }
+            public GcsAdapter(string basePath, string name) : base(basePath, name) { }
             // Production: implement actual GCS SDK calls
         }
 

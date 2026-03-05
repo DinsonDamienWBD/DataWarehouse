@@ -70,7 +70,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
     public override string Name => "Ultimate Storage";
 
     /// <inheritdoc/>
-    public override string Version => "1.0.0";
+    public override string Version => "6.0.0";
 
     /// <summary>Sub-category for discovery.</summary>
     public string SubCategory => "Storage";
@@ -130,7 +130,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
         var options = BuildStorageOptionsFromContext(context);
 
         // Write to storage
-        await strategy.WriteAsync(context.StoragePath, data, options);
+        await strategy.WriteAsync(context.StoragePath, data, options, ct);
 
         // Update statistics
         Interlocked.Increment(ref _totalWrites);
@@ -161,7 +161,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
             throw new InvalidOperationException($"No storage strategy available for '{strategyId}'");
 
         var options = BuildStorageOptionsFromContext(context);
-        var data = await strategy.ReadAsync(context.StoragePath, options);
+        var data = await strategy.ReadAsync(context.StoragePath, options, ct);
 
         // Update statistics
         Interlocked.Increment(ref _totalReads);
@@ -195,7 +195,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
         try
         {
             var options = BuildStorageOptionsFromContext(context);
-            await strategy.DeleteAsync(context.StoragePath, options);
+            await strategy.DeleteAsync(context.StoragePath, options, ct);
 
             Interlocked.Increment(ref _totalDeletes);
 
@@ -230,7 +230,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
             return false;
 
         var options = BuildStorageOptionsFromContext(context);
-        return await strategy.ExistsAsync(context.StoragePath, options);
+        return await strategy.ExistsAsync(context.StoragePath, options, ct);
     }
 
     #endregion
@@ -1247,7 +1247,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
     }
 
     /// <inheritdoc/>
-    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct)
+    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct = default)
     {
         await SaveStateAsync("defaultStrategy",
             System.Text.Encoding.UTF8.GetBytes(_defaultStrategyId), ct);

@@ -42,6 +42,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private string _password = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private WebDavAuthType _authType = WebDavAuthType.Basic;
         private bool _useHttps = true;
+        internal bool UseHttps => _useHttps;
         private int _timeoutSeconds = 60;
         private bool _useLocking = true;
         private int _lockTimeoutSeconds = 300; // 5 minutes default
@@ -100,7 +101,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             {
                 "basic" => WebDavAuthType.Basic,
                 "digest" => WebDavAuthType.Digest,
-                "ntlm" => WebDavAuthType.NTLM,
+                "ntlm" => WebDavAuthType.Ntlm,
                 "none" => WebDavAuthType.None,
                 _ => WebDavAuthType.Basic
             };
@@ -173,7 +174,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                     handler.Credentials = credentials;
 
-                    if (_authType == WebDavAuthType.NTLM)
+                    if (_authType == WebDavAuthType.Ntlm)
                     {
                         handler.UseDefaultCredentials = false;
                     }
@@ -1258,7 +1259,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         Digest,
 
         /// <summary>NTLM authentication (Windows).</summary>
-        NTLM
+        Ntlm
     }
 
     /// <summary>

@@ -45,23 +45,36 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         private bool _useS3Protocol = false;
         private string? _s3Endpoint = null;
         private string? _s3AccessKey = null;
+        internal string? S3AccessKey => _s3AccessKey;
         private string? _s3SecretKey = null;
+        internal string? S3SecretKey => _s3SecretKey;
         private string? _s3Bucket = null;
+        internal string? S3Bucket => _s3Bucket;
         private bool _enableSnapshots = false;
         private string? _snapshotSchedule = null;
+        internal string? SnapshotSchedule => _snapshotSchedule;
         private bool _enableCloudTiering = false;
         private string? _cloudTierTarget = null;
+        internal string? CloudTierTarget => _cloudTierTarget;
         private string? _tieringPolicy = null; // auto, opportunistic, static
+        internal string? TieringPolicy => _tieringPolicy;
         private string _protectionScheme = "N+2"; // N+2, N+4
+        internal string ProtectionScheme => _protectionScheme;
         private bool _enableEncryption = true;
         private string? _encryptionKeyId = null;
+        internal string? EncryptionKeyId => _encryptionKeyId;
         private bool _enableSnapToObject = false;
         private string? _snapToObjectTarget = null;
         private string? _organizationId = null;
+        internal string? OrganizationId => _organizationId;
         private string? _clusterId = null;
+        internal string? ClusterId => _clusterId;
         private bool _enableQuotas = false;
+        internal bool EnableQuotas => _enableQuotas;
         private long? _directoryQuotaBytes = null;
+        internal long? DirectoryQuotaBytes => _directoryQuotaBytes;
         private int _stripeWidth = 6;
+        internal int StripeWidth => _stripeWidth;
         private int _timeoutSeconds = 300;
         private bool _validateCertificate = true;
         private string _apiVersion = "v2";
@@ -760,7 +773,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                         ? uidElement.GetString() ?? string.Empty
                         : string.Empty;
                     var created = snapshot.TryGetProperty("created_time", out var createElement)
-                        ? DateTime.Parse(createElement.GetString() ?? DateTime.UtcNow.ToString())
+                        ? DateTime.Parse(createElement.GetString() ?? DateTime.UtcNow.ToString("O"), System.Globalization.CultureInfo.InvariantCulture)
                         : DateTime.UtcNow;
 
                     snapshots.Add(new WekaSnapshot

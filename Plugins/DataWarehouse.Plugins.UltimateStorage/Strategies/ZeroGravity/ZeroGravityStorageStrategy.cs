@@ -479,7 +479,7 @@ public sealed class ZeroGravityStorageStrategy : UltimateStorageStrategyBase
     /// <summary>
     /// Gracefully shuts down all zero-gravity subsystems.
     /// </summary>
-    protected override async Task ShutdownAsyncCore(CancellationToken ct = default)
+    protected override async Task ShutdownAsyncCore(CancellationToken ct)
     {
         // Dispose rebalancer (stops monitoring timer)
         if (_rebalancer is IAsyncDisposable asyncDisposable)
@@ -504,7 +504,7 @@ public sealed class ZeroGravityStorageStrategy : UltimateStorageStrategyBase
 
         try
         {
-            await ShutdownAsyncCore();
+            await ShutdownAsyncCore(CancellationToken.None);
         }
         catch
         {

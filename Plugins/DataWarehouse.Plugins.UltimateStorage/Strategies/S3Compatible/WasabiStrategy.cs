@@ -90,6 +90,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         private string _secretKey = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private bool _enableServerSideEncryption = true; // Wasabi supports SSE-S3 (AES-256)
         private bool _enableVersioning = false;
+        internal bool EnableVersioning => _enableVersioning;
         private bool _enableObjectLock = false;
         private int _timeoutSeconds = 300;
         private long _multipartThresholdBytes = 100 * 1024 * 1024; // 100MB
@@ -579,9 +580,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             {
                 // P2-4140: Re-throw auth and network errors so callers see real failures instead
                 // of a misleading false (object-not-found) result for auth/connectivity problems.
-                if (ex is AmazonS3Exception s3ex &&
-                    (s3ex.StatusCode == System.Net.HttpStatusCode.Forbidden ||
-                     s3ex.StatusCode == System.Net.HttpStatusCode.Unauthorized))
+                if (ex is AmazonS3Exception s3Ex &&
+                    (s3Ex.StatusCode == System.Net.HttpStatusCode.Forbidden ||
+                     s3Ex.StatusCode == System.Net.HttpStatusCode.Unauthorized))
                     throw;
                 IncrementOperationCounter(StorageOperationType.Exists);
 

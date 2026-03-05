@@ -37,6 +37,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private long _l1CacheMaxBytes = 1_000_000_000L; // 1GB
         private long _l2CacheMaxBytes = 10_000_000_000L; // 10GB
         private int _prefetchQueueSize = 100;
+        internal int PrefetchQueueSize => _prefetchQueueSize;
         private double _prefetchConfidenceThreshold = 0.7;
         private bool _enablePredictivePrefetch = true;
         private bool _enableAccessPatternLearning = true;

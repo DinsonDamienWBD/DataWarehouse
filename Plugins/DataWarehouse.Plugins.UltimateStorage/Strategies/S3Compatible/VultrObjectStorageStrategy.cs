@@ -123,7 +123,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         private int _retryDelayMs = 1000;
         private S3CannedACL _defaultAcl = S3CannedACL.Private;
         private bool _enableCors = false;
+        internal bool EnableCors => _enableCors;
         private bool _enableVersioning = false;
+        internal bool EnableVersioning => _enableVersioning;
 
         public override string StrategyId => "vultr-object-storage";
         public override string Name => "Vultr Object Storage";
@@ -577,9 +579,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             {
                 // P2-4140: Re-throw auth and network errors so callers see real failures instead
                 // of a misleading false (object-not-found) result for auth/connectivity problems.
-                if (ex is AmazonS3Exception s3ex &&
-                    (s3ex.StatusCode == System.Net.HttpStatusCode.Forbidden ||
-                     s3ex.StatusCode == System.Net.HttpStatusCode.Unauthorized))
+                if (ex is AmazonS3Exception s3Ex &&
+                    (s3Ex.StatusCode == System.Net.HttpStatusCode.Forbidden ||
+                     s3Ex.StatusCode == System.Net.HttpStatusCode.Unauthorized))
                     throw;
                 IncrementOperationCounter(StorageOperationType.Exists);
 
@@ -857,7 +859,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         {
             EnsureInitialized();
 
-            if (rules == null || !rules.Any())
+            var rulesList = rules?.ToList() ?? [];
+            if (rulesList.Count == 0)
             {
                 throw new ArgumentException("At least one CORS rule is required", nameof(rules));
             }
@@ -867,7 +870,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 BucketName = _bucket,
                 Configuration = new CORSConfiguration
                 {
-                    Rules = rules.ToList()
+                    Rules = rulesList
                 }
             };
 

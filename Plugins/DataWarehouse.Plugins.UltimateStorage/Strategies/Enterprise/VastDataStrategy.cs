@@ -50,23 +50,33 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         private string? _viewName = null;
         private bool _useS3Protocol = true;
         private bool _useNfsProtocol = false;
+        internal bool UseNfsProtocol => _useNfsProtocol;
         private string? _nfsExportPath = null;
+        internal string? NfsExportPath => _nfsExportPath;
         private string _nfsMountPath = string.Empty;
         private bool _enableSnapshots = false;
         private string? _protectionPolicyId = null;
+        internal string? ProtectionPolicyId => _protectionPolicyId;
         private int _snapshotRetentionDays = 30;
         private bool _enableQuotas = false;
         private long _softQuotaBytes = 0;
         private long _hardQuotaBytes = 0;
         private bool _enableQos = false;
+        internal bool EnableQos => _enableQos;
         private string? _qosPolicyId = null;
+        internal string? QosPolicyId => _qosPolicyId;
         private long _qosBandwidthLimitMbps = 0;
+        internal long QosBandwidthLimitMbps => _qosBandwidthLimitMbps;
         private long _qosIopsLimit = 0;
+        internal long QosIopsLimit => _qosIopsLimit;
         private bool _enableDeduplication = true;
+        internal bool EnableDeduplication => _enableDeduplication;
         private bool _enableCompression = true;
         private bool _enableSimilarityBasedReduction = true;
+        internal bool EnableSimilarityBasedReduction => _enableSimilarityBasedReduction;
         private bool _enableEncryption = true;
         private string _encryptionMode = "AES256"; // AES256, AES256-GCM
+        internal string EncryptionMode => _encryptionMode;
         private bool _enableWorm = false;
         private int _wormRetentionDays = 365;
         private string? _wormMode = null; // compliance, enterprise
@@ -961,7 +971,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 WriteOps = root.GetProperty("write_ops").GetInt64(),
                 ReadBytesPerSecond = root.GetProperty("read_bytes_per_sec").GetInt64(),
                 WriteBytesPerSecond = root.GetProperty("write_bytes_per_sec").GetInt64(),
-                Latency95thPercentileMs = root.GetProperty("latency_p95_ms").GetDouble(),
+                Latency95ThPercentileMs = root.GetProperty("latency_p95_ms").GetDouble(),
                 DeduplicationRatio = root.GetProperty("dedup_ratio").GetDouble(),
                 CompressionRatio = root.GetProperty("compression_ratio").GetDouble()
             };
@@ -1131,7 +1141,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         public long WriteBytesPerSecond { get; init; }
 
         /// <summary>95th percentile latency in milliseconds.</summary>
-        public double Latency95thPercentileMs { get; init; }
+        public double Latency95ThPercentileMs { get; init; }
 
         /// <summary>Deduplication ratio (logical to physical).</summary>
         public double DeduplicationRatio { get; init; }

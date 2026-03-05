@@ -209,7 +209,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             if (_blockDevice != null)
             {
                 await _blockDevice.FlushAsync();
-                _blockDevice.Dispose();
+                await _blockDevice.DisposeAsync();
                 _blockDevice = null;
             }
 
