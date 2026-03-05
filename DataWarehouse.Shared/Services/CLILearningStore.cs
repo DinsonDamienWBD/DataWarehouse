@@ -125,7 +125,7 @@ public sealed class CLILearningStore : IDisposable, IAsyncDisposable
         if (!string.IsNullOrEmpty(_persistencePath))
         {
             _persistenceTimer = new Timer(
-                _ => { if (_isDirty) _ = SaveAsync(); },
+                state => { if (_isDirty) _ = SaveAsync(); },
                 null,
                 TimeSpan.FromMinutes(5),
                 TimeSpan.FromMinutes(5));

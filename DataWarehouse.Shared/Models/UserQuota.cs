@@ -192,6 +192,8 @@ public sealed class UsageLimits
 /// </summary>
 public sealed class UserQuota
 {
+    private readonly object _usageLock = new();
+
     /// <summary>
     /// User identifier.
     /// </summary>
@@ -302,11 +304,21 @@ public sealed class UserQuota
     /// <param name="costUsd">Estimated cost in USD.</param>
     public void RecordUsage(int inputTokens, int outputTokens, decimal costUsd)
     {
+        if (inputTokens < 0)
+            throw new ArgumentOutOfRangeException(nameof(inputTokens), "Input tokens cannot be negative.");
+        if (outputTokens < 0)
+            throw new ArgumentOutOfRangeException(nameof(outputTokens), "Output tokens cannot be negative.");
+        if (costUsd < 0)
+            throw new ArgumentOutOfRangeException(nameof(costUsd), "Cost cannot be negative.");
+
         ResetPeriodIfNeeded();
 
-        RequestsToday++;
-        TokensToday += inputTokens + outputTokens;
-        SpentThisMonth += costUsd;
+        lock (_usageLock)
+        {
+            RequestsToday++;
+            TokensToday += inputTokens + outputTokens;
+            SpentThisMonth += costUsd;
+        }
     }
 
     /// <summary>

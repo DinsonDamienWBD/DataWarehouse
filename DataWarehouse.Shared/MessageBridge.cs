@@ -19,7 +19,7 @@ public class MessageBridge
     private ConnectionTarget? _currentTarget;
     private TcpClient? _tcpClient;
     private NetworkStream? _networkStream;
-    private bool _isConnected;
+    private volatile bool _isConnected;
 
     // In-process Channel-based messaging fields
     private Channel<(Message request, TaskCompletionSource<Message?> response)>? _inProcessChannel;

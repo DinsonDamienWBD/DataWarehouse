@@ -28,7 +28,7 @@ public sealed record CommandIntent
     public string? Explanation { get; init; }
 
     /// <summary>Whether this was processed by AI (vs pattern matching).</summary>
-    public bool ProcessedByAI { get; init; }
+    public bool ProcessedByAi { get; init; }
 
     /// <summary>Session ID for conversational context.</summary>
     public string? SessionId { get; init; }
@@ -37,7 +37,7 @@ public sealed record CommandIntent
 /// <summary>
 /// Result of AI-powered help query.
 /// </summary>
-public sealed record AIHelpResult
+public sealed record AiHelpResult
 {
     /// <summary>The answer to the help query.</summary>
     public required string Answer { get; init; }
@@ -52,7 +52,7 @@ public sealed record AIHelpResult
     public List<string> RelatedTopics { get; init; } = new();
 
     /// <summary>Whether AI was used for this response.</summary>
-    public bool UsedAI { get; init; }
+    public bool UsedAi { get; init; }
 }
 
 /// <summary>
@@ -61,7 +61,7 @@ public sealed record AIHelpResult
 /// </summary>
 public sealed class NaturalLanguageProcessor : IDisposable
 {
-    private static readonly List<IntentPattern> _patterns = new()
+    private static readonly List<IntentPattern> Patterns = new()
     {
         // Storage commands
         new IntentPattern(@"(?:list|show|get)\s+(?:all\s+)?(?:storage\s+)?pools?", "storage.list"),
@@ -133,7 +133,7 @@ public sealed class NaturalLanguageProcessor : IDisposable
     };
 
     // Available commands for AI context
-    private static readonly Dictionary<string, string> _commandDescriptions = new()
+    private static readonly Dictionary<string, string> CommandDescriptions = new()
     {
         ["storage.list"] = "List all storage pools",
         ["storage.create"] = "Create a new storage pool with name",
@@ -267,7 +267,7 @@ public sealed class NaturalLanguageProcessor : IDisposable
         }
 
         // Try each pattern
-        foreach (var pattern in _patterns)
+        foreach (var pattern in Patterns)
         {
             var match = pattern.Regex.Match(normalizedInput);
             if (match.Success)
@@ -333,7 +333,7 @@ public sealed class NaturalLanguageProcessor : IDisposable
     /// <param name="input">Natural language input.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Parsed command intent, possibly AI-enhanced.</returns>
-    public async Task<CommandIntent> ProcessWithAIFallbackAsync(string input, CancellationToken ct = default)
+    public async Task<CommandIntent> ProcessWithAiFallbackAsync(string input, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -380,7 +380,7 @@ public sealed class NaturalLanguageProcessor : IDisposable
         // Fall back to local AI interpretation
         try
         {
-            return await ProcessWithAIAsync(input, provider, ct);
+            return await ProcessWithAiAsync(input, provider, ct);
         }
         catch
         {
@@ -391,7 +391,7 @@ public sealed class NaturalLanguageProcessor : IDisposable
 
     /// <summary>
     /// Processes input always through the message bus, bypassing pattern matching.
-    /// Falls back to ProcessWithAIFallbackAsync if the router is unavailable.
+    /// Falls back to ProcessWithAiFallbackAsync if the router is unavailable.
     /// </summary>
     /// <param name="input">Natural language input.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -410,13 +410,13 @@ public sealed class NaturalLanguageProcessor : IDisposable
         }
 
         // Fall back to standard processing
-        return await ProcessWithAIFallbackAsync(input, ct);
+        return await ProcessWithAiFallbackAsync(input, ct);
     }
 
     /// <summary>
     /// Processes input using AI interpretation.
     /// </summary>
-    private async Task<CommandIntent> ProcessWithAIAsync(
+    private async Task<CommandIntent> ProcessWithAiAsync(
         string input,
         IAiProvider provider,
         CancellationToken ct)
@@ -442,14 +442,14 @@ public sealed class NaturalLanguageProcessor : IDisposable
                 OriginalInput = input,
                 Confidence = 0.1,
                 Explanation = "AI interpretation failed",
-                ProcessedByAI = true
+                ProcessedByAi = true
             };
         }
 
         // Parse AI response
         try
         {
-            var parsed = ParseAIResponse(response.Content, input);
+            var parsed = ParseAiResponse(response.Content, input);
             if (parsed != null)
             {
                 // Record for learning
@@ -468,13 +468,13 @@ public sealed class NaturalLanguageProcessor : IDisposable
             OriginalInput = input,
             Confidence = 0.2,
             Explanation = "Could not parse AI response",
-            ProcessedByAI = true
+            ProcessedByAi = true
         };
     }
 
     private string BuildSystemPrompt()
     {
-        var commands = string.Join("\n", _commandDescriptions.Select(kvp => $"- {kvp.Key}: {kvp.Value}"));
+        var commands = string.Join("\n", CommandDescriptions.Select(kvp => $"- {kvp.Key}: {kvp.Value}"));
 
         return $@"You are a CLI command parser for DataWarehouse. Parse natural language into structured commands.
 
@@ -496,7 +496,7 @@ Rules:
 4. If unsure, use ""help"" command with lower confidence";
     }
 
-    private CommandIntent? ParseAIResponse(string response, string originalInput)
+    private CommandIntent? ParseAiResponse(string response, string originalInput)
     {
         // Try to extract JSON from response
         var jsonStart = response.IndexOf('{');
@@ -542,7 +542,7 @@ Rules:
             OriginalInput = originalInput,
             Confidence = confidence,
             Explanation = explanation ?? $"AI interpreted as: {command}",
-            ProcessedByAI = true
+            ProcessedByAi = true
         };
     }
 
@@ -595,7 +595,7 @@ Rules:
         CommandIntent result;
         if (_aiRegistry != null)
         {
-            result = await ProcessWithAIFallbackAsync(enrichedInput, ct);
+            result = await ProcessWithAiFallbackAsync(enrichedInput, ct);
         }
         else
         {
@@ -673,7 +673,7 @@ Rules:
     /// <param name="query">The help query (e.g., "How do I backup to S3?").</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>AI-generated help response.</returns>
-    public async Task<AIHelpResult> GetAIHelpAsync(string query, CancellationToken ct = default)
+    public async Task<AiHelpResult> GetAiHelpAsync(string query, CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -688,14 +688,14 @@ Rules:
                 var knowledgeResult = await _messageBusRouter.RouteKnowledgeQueryAsync(query, ct);
                 if (knowledgeResult != null)
                 {
-                    return new AIHelpResult
+                    return new AiHelpResult
                     {
                         Answer = knowledgeResult.Answer,
                         SuggestedCommands = knowledgeResult.RelatedCapabilities.Count > 0
                             ? knowledgeResult.RelatedCapabilities
                             : suggestedCommands,
                         Examples = GenerateExamples(suggestedCommands),
-                        UsedAI = true
+                        UsedAi = true
                     };
                 }
 
@@ -715,24 +715,24 @@ Rules:
         // If no AI, return pattern-based suggestions
         if (_aiRegistry == null)
         {
-            return new AIHelpResult
+            return new AiHelpResult
             {
                 Answer = GenerateBasicHelp(query, suggestedCommands),
                 SuggestedCommands = suggestedCommands,
                 Examples = GenerateExamples(suggestedCommands),
-                UsedAI = false
+                UsedAi = false
             };
         }
 
         var provider = _aiRegistry.GetDefaultProvider();
         if (provider == null || !provider.IsAvailable)
         {
-            return new AIHelpResult
+            return new AiHelpResult
             {
                 Answer = GenerateBasicHelp(query, suggestedCommands),
                 SuggestedCommands = suggestedCommands,
                 Examples = GenerateExamples(suggestedCommands),
-                UsedAI = false
+                UsedAi = false
             };
         }
 
@@ -758,18 +758,18 @@ Rules:
             // AI failed - return basic help
         }
 
-        return new AIHelpResult
+        return new AiHelpResult
         {
             Answer = GenerateBasicHelp(query, suggestedCommands),
             SuggestedCommands = suggestedCommands,
             Examples = GenerateExamples(suggestedCommands),
-            UsedAI = false
+            UsedAi = false
         };
     }
 
     private string BuildHelpSystemPrompt()
     {
-        var commands = string.Join("\n", _commandDescriptions.Select(kvp => $"- {kvp.Key}: {kvp.Value}"));
+        var commands = string.Join("\n", CommandDescriptions.Select(kvp => $"- {kvp.Key}: {kvp.Value}"));
 
         return $@"You are a helpful assistant for the DataWarehouse CLI.
 
@@ -789,7 +789,7 @@ Format your response as:
         var keywords = query.ToLowerInvariant().Split(' ', StringSplitOptions.RemoveEmptyEntries);
         var matches = new List<(string Command, int Score)>();
 
-        foreach (var (command, description) in _commandDescriptions)
+        foreach (var (command, description) in CommandDescriptions)
         {
             var score = 0;
             var combined = $"{command} {description}".ToLowerInvariant();
@@ -823,8 +823,8 @@ Format your response as:
         }
 
         var descriptions = suggestedCommands
-            .Where(c => _commandDescriptions.ContainsKey(c))
-            .Select(c => $"- {c}: {_commandDescriptions[c]}");
+            .Where(c => CommandDescriptions.ContainsKey(c))
+            .Select(c => $"- {c}: {CommandDescriptions[c]}");
 
         return $"Based on your query, you might want to use:\n{string.Join("\n", descriptions)}";
     }
@@ -856,7 +856,7 @@ Format your response as:
         return examples;
     }
 
-    private AIHelpResult ParseHelpResponse(string response, string query, List<string> suggestedCommands)
+    private AiHelpResult ParseHelpResponse(string response, string query, List<string> suggestedCommands)
     {
         // Extract examples from response
         var examples = new List<string>();
@@ -866,13 +866,13 @@ Format your response as:
             examples.Add($"dw \"{match.Groups[1].Value}\"");
         }
 
-        return new AIHelpResult
+        return new AiHelpResult
         {
             Answer = response,
             SuggestedCommands = suggestedCommands,
             Examples = examples.Count > 0 ? examples : GenerateExamples(suggestedCommands),
             RelatedTopics = ExtractRelatedTopics(response),
-            UsedAI = true
+            UsedAi = true
         };
     }
 

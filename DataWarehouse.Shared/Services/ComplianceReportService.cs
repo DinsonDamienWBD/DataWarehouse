@@ -46,7 +46,7 @@ public interface IComplianceReportService
 /// </summary>
 public class ComplianceReportService : IComplianceReportService
 {
-    private static readonly JsonSerializerOptions s_jsonOptions = new()
+    private static readonly JsonSerializerOptions SJsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
         WriteIndented = false
@@ -81,7 +81,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("report"))
         {
             var reportJson = JsonSerializer.Serialize(response.Data["report"]);
-            return JsonSerializer.Deserialize<GdprComplianceReport>(reportJson, s_jsonOptions) ?? new GdprComplianceReport();
+            return JsonSerializer.Deserialize<GdprComplianceReport>(reportJson, SJsonOptions) ?? new GdprComplianceReport();
         }
 
         // Return mock data for development mode
@@ -102,7 +102,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("requests"))
         {
             var requestsJson = JsonSerializer.Serialize(response.Data["requests"]);
-            return JsonSerializer.Deserialize<List<DataSubjectRequest>>(requestsJson, s_jsonOptions) ?? new List<DataSubjectRequest>();
+            return JsonSerializer.Deserialize<List<DataSubjectRequest>>(requestsJson, SJsonOptions) ?? new List<DataSubjectRequest>();
         }
 
         return new List<DataSubjectRequest>();
@@ -122,7 +122,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("consents"))
         {
             var consentsJson = JsonSerializer.Serialize(response.Data["consents"]);
-            return JsonSerializer.Deserialize<List<ConsentRecord>>(consentsJson, s_jsonOptions) ?? new List<ConsentRecord>();
+            return JsonSerializer.Deserialize<List<ConsentRecord>>(consentsJson, SJsonOptions) ?? new List<ConsentRecord>();
         }
 
         return new List<ConsentRecord>();
@@ -145,7 +145,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("breaches"))
         {
             var breachesJson = JsonSerializer.Serialize(response.Data["breaches"]);
-            return JsonSerializer.Deserialize<List<DataBreachIncident>>(breachesJson, s_jsonOptions) ?? new List<DataBreachIncident>();
+            return JsonSerializer.Deserialize<List<DataBreachIncident>>(breachesJson, SJsonOptions) ?? new List<DataBreachIncident>();
         }
 
         return new List<DataBreachIncident>();
@@ -158,7 +158,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("inventory"))
         {
             var inventoryJson = JsonSerializer.Serialize(response.Data["inventory"]);
-            return JsonSerializer.Deserialize<PersonalDataInventory>(inventoryJson, s_jsonOptions) ?? new PersonalDataInventory();
+            return JsonSerializer.Deserialize<PersonalDataInventory>(inventoryJson, SJsonOptions) ?? new PersonalDataInventory();
         }
 
         return new PersonalDataInventory();
@@ -188,7 +188,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("report"))
         {
             var reportJson = JsonSerializer.Serialize(response.Data["report"]);
-            return JsonSerializer.Deserialize<HipaaAuditReport>(reportJson, s_jsonOptions) ?? new HipaaAuditReport();
+            return JsonSerializer.Deserialize<HipaaAuditReport>(reportJson, SJsonOptions) ?? new HipaaAuditReport();
         }
 
         // Return mock data for development mode
@@ -213,7 +213,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("logs"))
         {
             var logsJson = JsonSerializer.Serialize(response.Data["logs"]);
-            return JsonSerializer.Deserialize<List<PhiAccessLog>>(logsJson, s_jsonOptions) ?? new List<PhiAccessLog>();
+            return JsonSerializer.Deserialize<List<PhiAccessLog>>(logsJson, SJsonOptions) ?? new List<PhiAccessLog>();
         }
 
         return new List<PhiAccessLog>();
@@ -233,7 +233,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("baas"))
         {
             var baasJson = JsonSerializer.Serialize(response.Data["baas"]);
-            return JsonSerializer.Deserialize<List<BusinessAssociateAgreement>>(baasJson, s_jsonOptions) ?? new List<BusinessAssociateAgreement>();
+            return JsonSerializer.Deserialize<List<BusinessAssociateAgreement>>(baasJson, SJsonOptions) ?? new List<BusinessAssociateAgreement>();
         }
 
         return new List<BusinessAssociateAgreement>();
@@ -246,7 +246,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("encryption"))
         {
             var encryptionJson = JsonSerializer.Serialize(response.Data["encryption"]);
-            return JsonSerializer.Deserialize<EncryptionStatus>(encryptionJson, s_jsonOptions) ?? new EncryptionStatus();
+            return JsonSerializer.Deserialize<EncryptionStatus>(encryptionJson, SJsonOptions) ?? new EncryptionStatus();
         }
 
         return new EncryptionStatus
@@ -266,7 +266,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("assessments"))
         {
             var assessmentsJson = JsonSerializer.Serialize(response.Data["assessments"]);
-            return JsonSerializer.Deserialize<List<SecurityRiskAssessment>>(assessmentsJson, s_jsonOptions) ?? new List<SecurityRiskAssessment>();
+            return JsonSerializer.Deserialize<List<SecurityRiskAssessment>>(assessmentsJson, SJsonOptions) ?? new List<SecurityRiskAssessment>();
         }
 
         return new List<SecurityRiskAssessment>();
@@ -296,7 +296,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("report"))
         {
             var reportJson = JsonSerializer.Serialize(response.Data["report"]);
-            return JsonSerializer.Deserialize<Soc2ComplianceReport>(reportJson, s_jsonOptions) ?? new Soc2ComplianceReport();
+            return JsonSerializer.Deserialize<Soc2ComplianceReport>(reportJson, SJsonOptions) ?? new Soc2ComplianceReport();
         }
 
         // Return mock data for development mode
@@ -317,7 +317,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("criteria"))
         {
             var criteriaJson = JsonSerializer.Serialize(response.Data["criteria"]);
-            return JsonSerializer.Deserialize<List<TrustServiceCriteria>>(criteriaJson, s_jsonOptions) ?? new List<TrustServiceCriteria>();
+            return JsonSerializer.Deserialize<List<TrustServiceCriteria>>(criteriaJson, SJsonOptions) ?? new List<TrustServiceCriteria>();
         }
 
         return new List<TrustServiceCriteria>();
@@ -337,7 +337,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("evidence"))
         {
             var evidenceJson = JsonSerializer.Serialize(response.Data["evidence"]);
-            return JsonSerializer.Deserialize<List<ControlEvidence>>(evidenceJson, s_jsonOptions) ?? new List<ControlEvidence>();
+            return JsonSerializer.Deserialize<List<ControlEvidence>>(evidenceJson, SJsonOptions) ?? new List<ControlEvidence>();
         }
 
         return new List<ControlEvidence>();
@@ -355,7 +355,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("events"))
         {
             var eventsJson = JsonSerializer.Serialize(response.Data["events"]);
-            return JsonSerializer.Deserialize<List<AuditEvent>>(eventsJson, s_jsonOptions) ?? new List<AuditEvent>();
+            return JsonSerializer.Deserialize<List<AuditEvent>>(eventsJson, SJsonOptions) ?? new List<AuditEvent>();
         }
 
         return new List<AuditEvent>();
@@ -368,7 +368,7 @@ public class ComplianceReportService : IComplianceReportService
         if (response?.Data != null && response.Data.ContainsKey("readiness"))
         {
             var readinessJson = JsonSerializer.Serialize(response.Data["readiness"]);
-            return JsonSerializer.Deserialize<AuditReadinessScore>(readinessJson, s_jsonOptions) ?? new AuditReadinessScore();
+            return JsonSerializer.Deserialize<AuditReadinessScore>(readinessJson, SJsonOptions) ?? new AuditReadinessScore();
         }
 
         return new AuditReadinessScore

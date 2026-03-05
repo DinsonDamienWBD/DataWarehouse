@@ -137,9 +137,9 @@ public static class Program
     /// </summary>
     private static async Task<int> HandleAIHelpAsync(string query)
     {
-        var result = await _nlp!.GetAIHelpAsync(query);
+        var result = await _nlp!.GetAiHelpAsync(query);
 
-        if (result.UsedAI)
+        if (result.UsedAi)
         {
             AnsiConsole.MarkupLine("[cyan]AI-Powered Help:[/]");
         }
@@ -189,7 +189,7 @@ public static class Program
         else if (_aiRegistry != null)
         {
             // Use AI fallback if available
-            intent = await _nlp!.ProcessWithAIFallbackAsync(input);
+            intent = await _nlp!.ProcessWithAiFallbackAsync(input);
         }
         else
         {
@@ -223,7 +223,7 @@ public static class Program
         }
 
         // Show interpretation with AI indicator if applicable
-        var aiIndicator = intent.ProcessedByAI ? " [dim](AI)[/]" : "";
+        var aiIndicator = intent.ProcessedByAi ? " [dim](AI)[/]" : "";
         var sessionIndicator = !string.IsNullOrEmpty(intent.SessionId) ? $" [dim](session: {intent.SessionId})[/]" : "";
         AnsiConsole.MarkupLine($"[grey]{intent.Explanation}{aiIndicator}{sessionIndicator}[/]");
 

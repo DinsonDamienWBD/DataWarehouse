@@ -148,7 +148,7 @@ public sealed class BackupListCommand : ICommand
             new Dictionary<string, object>(), cancellationToken);
 
         // Backup list is populated from the DataProtection plugin bus reply
-        var backups = new List<BackupInfo>();
+        IReadOnlyList<BackupInfo> backups = Array.Empty<BackupInfo>();
 
         return CommandResult.Table(backups, "No backups found. Ensure DataProtection plugin is active and backup.list topic is registered.");
     }

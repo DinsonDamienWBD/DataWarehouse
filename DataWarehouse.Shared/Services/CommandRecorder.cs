@@ -94,7 +94,7 @@ public sealed class ReplayOptions
     public Func<RecordedCommand, bool>? CommandFilter { get; set; }
 
     /// <summary>Gets or sets parameter overrides to apply during replay.</summary>
-    public Dictionary<string, object?> ParameterOverrides { get; set; } = new();
+    public IReadOnlyDictionary<string, object?> ParameterOverrides { get; set; } = new Dictionary<string, object?>();
 }
 
 /// <summary>

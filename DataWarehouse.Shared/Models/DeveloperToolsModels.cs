@@ -119,7 +119,7 @@ public class SchemaValidation
 public class SchemaIndex
 {
     public string Name { get; set; } = string.Empty;
-    public List<string> Fields { get; set; } = new();
+    public IReadOnlyList<string> Fields { get; set; } = Array.Empty<string>();
     public bool Unique { get; set; }
     public string Type { get; set; } = "btree"; // btree, hash, fulltext, etc.
 }
@@ -145,10 +145,10 @@ public class QueryDefinition
     public string Name { get; set; } = string.Empty;
     public string Collection { get; set; } = string.Empty;
     public QueryOperation Operation { get; set; } = QueryOperation.Select;
-    public List<string> SelectFields { get; set; } = new();
-    public List<QueryFilter> Filters { get; set; } = new();
-    public List<QuerySort> Sorting { get; set; } = new();
-    public List<QueryJoin> Joins { get; set; } = new();
+    public IReadOnlyList<string> SelectFields { get; set; } = Array.Empty<string>();
+    public IReadOnlyList<QueryFilter> Filters { get; set; } = Array.Empty<QueryFilter>();
+    public IReadOnlyList<QuerySort> Sorting { get; set; } = Array.Empty<QuerySort>();
+    public IReadOnlyList<QueryJoin> Joins { get; set; } = Array.Empty<QueryJoin>();
     public QueryAggregation? Aggregation { get; set; }
     public int? Limit { get; set; }
     public int? Offset { get; set; }
@@ -259,7 +259,7 @@ public enum JoinType
 /// </summary>
 public class QueryAggregation
 {
-    public List<string> GroupBy { get; set; } = new();
+    public IReadOnlyList<string> GroupBy { get; set; } = Array.Empty<string>();
     public List<AggregateFunction> Functions { get; set; } = new();
     public List<QueryFilter> Having { get; set; } = new();
 }

@@ -25,7 +25,7 @@ public class InstanceManager
     private readonly CapabilityManager _capabilityManager;
     private readonly MessageBridge _messageBridge;
     private ConnectionTarget? _currentConnection;
-    private bool _isConnected;
+    private volatile bool _isConnected;
 
     public event EventHandler<ConnectionTarget>? ConnectionChanged;
     public event EventHandler<bool>? ConnectionStatusChanged;

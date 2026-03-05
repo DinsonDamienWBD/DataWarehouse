@@ -93,12 +93,16 @@ public sealed class UserSession
     /// </summary>
     public bool IsValid => ExpiresAt == null || ExpiresAt > DateTime.UtcNow;
 
+    // Lazy-initialized HashSet for O(1) role lookups instead of O(n) linear search
+    private HashSet<string>? _roleSet;
+    private HashSet<string> RoleSet => _roleSet ??= new HashSet<string>(Roles, StringComparer.OrdinalIgnoreCase);
+
     /// <summary>
     /// Whether the user has a specific role.
     /// </summary>
     /// <param name="role">Role to check.</param>
     /// <returns>True if user has the role.</returns>
-    public bool HasRole(string role) => Roles.Contains(role, StringComparer.OrdinalIgnoreCase);
+    public bool HasRole(string role) => RoleSet.Contains(role);
 
     /// <summary>
     /// Whether the user is in an organization.

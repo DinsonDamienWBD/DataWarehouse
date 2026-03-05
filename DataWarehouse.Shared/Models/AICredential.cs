@@ -98,6 +98,7 @@ public sealed class AICredential
     /// API key for BYOK (Bring Your Own Key) authentication.
     /// This should be stored encrypted - never log or expose this value.
     /// </summary>
+    [JsonIgnore]
     public string? ApiKey { get; set; }
 
     /// <summary>

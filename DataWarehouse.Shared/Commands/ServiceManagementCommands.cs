@@ -62,7 +62,7 @@ public sealed class ServiceStatusCommand : ICommand
             ["installed"] = status.IsInstalled,
             ["running"] = status.IsRunning,
             ["state"] = status.State,
-            ["pid"] = status.PID,
+            ["pid"] = status.Pid,
             ["platform"] = GetPlatformName()
         };
 
@@ -73,7 +73,7 @@ public sealed class ServiceStatusCommand : ICommand
 
         return CommandResult.Ok(data,
             $"DataWarehouse service '{serviceName}': {status.State}" +
-            (status.PID.HasValue ? $" (PID: {status.PID})" : ""));
+            (status.Pid.HasValue ? $" (PID: {status.Pid})" : ""));
     }
 
     private static string GetPlatformName()

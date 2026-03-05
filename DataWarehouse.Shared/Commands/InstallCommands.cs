@@ -180,7 +180,7 @@ public sealed class InstallStatusCommand : ICommand
         var pluginCount = Directory.Exists(pluginPath)
             ? Directory.GetDirectories(pluginPath).Length
             : 0;
-        checks.Add(new VerificationCheck("Plugins", pluginCount >= 0, $"{pluginCount} plugins installed"));
+        checks.Add(new VerificationCheck("Plugins", pluginCount > 0, $"{pluginCount} plugins installed"));
 
         // Check security config
         var securityPath = Path.Combine(path, "config", "security.json");

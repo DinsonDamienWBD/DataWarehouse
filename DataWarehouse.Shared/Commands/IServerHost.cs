@@ -112,10 +112,11 @@ public static class ServerHostRegistry
 
     /// <summary>
     /// Gets or sets the current IServerHost instance.
+    /// Thread-safe via Volatile read/write.
     /// </summary>
     public static IServerHost? Current
     {
-        get => _current;
-        set => _current = value;
+        get => Volatile.Read(ref _current);
+        set => Volatile.Write(ref _current, value);
     }
 }

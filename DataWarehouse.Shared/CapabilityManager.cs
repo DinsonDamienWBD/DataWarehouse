@@ -13,7 +13,10 @@ public class CapabilityManager
     private readonly InstanceManager? _instanceManager;
     private InstanceCapabilities? _capabilities;
     private readonly HashSet<string> _dynamicFeatures = new(StringComparer.OrdinalIgnoreCase);
-    private DynamicCommandRegistry? _dynamicRegistry;
+    /// <summary>
+    /// Gets or sets the dynamic command registry for runtime capability registration.
+    /// </summary>
+    internal DynamicCommandRegistry? DynamicRegistry { get; set; }
 
     /// <summary>
     /// Event raised when the capabilities change (e.g., when switching instances)
@@ -48,7 +51,7 @@ public class CapabilityManager
     /// <param name="registry">The dynamic command registry to link.</param>
     public void SetDynamicRegistry(DynamicCommandRegistry registry)
     {
-        _dynamicRegistry = registry;
+        DynamicRegistry = registry;
     }
 
     /// <summary>

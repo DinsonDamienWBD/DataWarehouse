@@ -259,9 +259,9 @@ public sealed class InteractiveMode
 
     private async Task HandleAIHelpAsync(string query)
     {
-        var result = await _nlp.GetAIHelpAsync(query, _cts.Token);
+        var result = await _nlp.GetAiHelpAsync(query, _cts.Token);
 
-        if (result.UsedAI)
+        if (result.UsedAi)
         {
             AnsiConsole.MarkupLine("[cyan]AI-Powered Help:[/]");
         }
@@ -367,7 +367,7 @@ public sealed class InteractiveMode
         }
         else if (_aiRegistry != null)
         {
-            intent = await _nlp.ProcessWithAIFallbackAsync(input, _cts.Token);
+            intent = await _nlp.ProcessWithAiFallbackAsync(input, _cts.Token);
         }
         else
         {
@@ -421,7 +421,7 @@ public sealed class InteractiveMode
 
         // Show interpretation with indicators
         var indicators = new List<string>();
-        if (intent.ProcessedByAI) indicators.Add("[dim](AI)[/]");
+        if (intent.ProcessedByAi) indicators.Add("[dim](AI)[/]");
         if (!string.IsNullOrEmpty(intent.SessionId)) indicators.Add($"[dim](session)[/]");
         var indicatorStr = indicators.Count > 0 ? " " + string.Join(" ", indicators) : "";
 

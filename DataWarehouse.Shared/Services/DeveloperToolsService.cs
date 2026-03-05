@@ -39,13 +39,13 @@ public interface IDeveloperToolsService
 /// </summary>
 public class DeveloperToolsService : IDeveloperToolsService
 {
-    private static readonly JsonSerializerOptions s_jsonOptions = new()
+    private static readonly JsonSerializerOptions SJsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
         WriteIndented = false
     };
 
-    private static readonly JsonSerializerOptions s_indentedJsonOptions = new()
+    private static readonly JsonSerializerOptions SIndentedJsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
         WriteIndented = true
@@ -78,7 +78,7 @@ public class DeveloperToolsService : IDeveloperToolsService
         if (response?.Data != null && response.Data.ContainsKey("endpoints"))
         {
             var json = JsonSerializer.Serialize(response.Data["endpoints"]);
-            return JsonSerializer.Deserialize<List<ApiEndpoint>>(json, s_jsonOptions) ?? new List<ApiEndpoint>();
+            return JsonSerializer.Deserialize<List<ApiEndpoint>>(json, SJsonOptions) ?? new List<ApiEndpoint>();
         }
 
         return new List<ApiEndpoint>();
@@ -116,7 +116,7 @@ public class DeveloperToolsService : IDeveloperToolsService
                         : "OK",
                     Headers = response.Data.ContainsKey("headers")
                         ? JsonSerializer.Deserialize<Dictionary<string, string>>(
-                            JsonSerializer.Serialize(response.Data["headers"]), s_jsonOptions) ?? new()
+                            JsonSerializer.Serialize(response.Data["headers"]), SJsonOptions) ?? new()
                         : new(),
                     Body = response.Data.ContainsKey("body") ? response.Data["body"] : null,
                     DurationMs = duration,
@@ -239,7 +239,7 @@ public class DeveloperToolsService : IDeveloperToolsService
         if (response?.Data != null && response.Data.ContainsKey("schemas"))
         {
             var json = JsonSerializer.Serialize(response.Data["schemas"]);
-            return JsonSerializer.Deserialize<List<SchemaDefinition>>(json, s_jsonOptions) ?? new List<SchemaDefinition>();
+            return JsonSerializer.Deserialize<List<SchemaDefinition>>(json, SJsonOptions) ?? new List<SchemaDefinition>();
         }
 
         return new List<SchemaDefinition>();
@@ -255,7 +255,7 @@ public class DeveloperToolsService : IDeveloperToolsService
         if (response?.Data != null && response.Data.ContainsKey("schema"))
         {
             var json = JsonSerializer.Serialize(response.Data["schema"]);
-            var schema = JsonSerializer.Deserialize<SchemaDefinition>(json, s_jsonOptions);
+            var schema = JsonSerializer.Deserialize<SchemaDefinition>(json, SJsonOptions);
             if (schema != null)
                 return schema;
         }
@@ -278,7 +278,7 @@ public class DeveloperToolsService : IDeveloperToolsService
         if (response?.Data != null && response.Data.ContainsKey("schema"))
         {
             var json = JsonSerializer.Serialize(response.Data["schema"]);
-            var createdSchema = JsonSerializer.Deserialize<SchemaDefinition>(json, s_jsonOptions);
+            var createdSchema = JsonSerializer.Deserialize<SchemaDefinition>(json, SJsonOptions);
             if (createdSchema != null)
                 return createdSchema;
         }
@@ -305,7 +305,7 @@ public class DeveloperToolsService : IDeveloperToolsService
         if (response?.Data != null && response.Data.ContainsKey("schema"))
         {
             var json = JsonSerializer.Serialize(response.Data["schema"]);
-            var updatedSchema = JsonSerializer.Deserialize<SchemaDefinition>(json, s_jsonOptions);
+            var updatedSchema = JsonSerializer.Deserialize<SchemaDefinition>(json, SJsonOptions);
             if (updatedSchema != null)
                 return updatedSchema;
         }
@@ -330,7 +330,7 @@ public class DeveloperToolsService : IDeveloperToolsService
 
         return format.ToLower() switch
         {
-            "json" => JsonSerializer.Serialize(schema, s_indentedJsonOptions),
+            "json" => JsonSerializer.Serialize(schema, SIndentedJsonOptions),
             "yaml" => ConvertSchemaToYaml(schema),
             "sql" => ConvertSchemaToSql(schema),
             _ => throw new ArgumentException($"Unsupported format: {format}")
@@ -344,7 +344,7 @@ public class DeveloperToolsService : IDeveloperToolsService
     {
         SchemaDefinition? schema = format.ToLower() switch
         {
-            "json" => JsonSerializer.Deserialize<SchemaDefinition>(content, s_jsonOptions),
+            "json" => JsonSerializer.Deserialize<SchemaDefinition>(content, SJsonOptions),
             "yaml" => ConvertYamlToSchema(content),
             _ => throw new ArgumentException($"Unsupported format: {format}")
         };
@@ -465,7 +465,7 @@ public class DeveloperToolsService : IDeveloperToolsService
         if (response?.Data != null && response.Data.ContainsKey("collections"))
         {
             var json = JsonSerializer.Serialize(response.Data["collections"]);
-            return JsonSerializer.Deserialize<List<string>>(json, s_jsonOptions) ?? new List<string>();
+            return JsonSerializer.Deserialize<List<string>>(json, SJsonOptions) ?? new List<string>();
         }
 
         return new List<string>();
@@ -481,7 +481,7 @@ public class DeveloperToolsService : IDeveloperToolsService
         if (response?.Data != null && response.Data.ContainsKey("fields"))
         {
             var json = JsonSerializer.Serialize(response.Data["fields"]);
-            return JsonSerializer.Deserialize<List<string>>(json, s_jsonOptions) ?? new List<string>();
+            return JsonSerializer.Deserialize<List<string>>(json, SJsonOptions) ?? new List<string>();
         }
 
         return new List<string>();
@@ -506,7 +506,7 @@ public class DeveloperToolsService : IDeveloperToolsService
                 if (response.Data.ContainsKey("rows"))
                 {
                     var json = JsonSerializer.Serialize(response.Data["rows"]);
-                    rows = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(json, s_jsonOptions)
+                    rows = JsonSerializer.Deserialize<List<Dictionary<string, object>>>(json, SJsonOptions)
                         ?? new List<Dictionary<string, object>>();
                 }
 
@@ -518,7 +518,7 @@ public class DeveloperToolsService : IDeveloperToolsService
                     DurationMs = duration,
                     Metadata = response.Data.ContainsKey("metadata")
                         ? JsonSerializer.Deserialize<Dictionary<string, object>>(
-                            JsonSerializer.Serialize(response.Data["metadata"]), s_jsonOptions) ?? new()
+                            JsonSerializer.Serialize(response.Data["metadata"]), SJsonOptions) ?? new()
                         : new()
                 };
             }
@@ -555,8 +555,8 @@ public class DeveloperToolsService : IDeveloperToolsService
         {
             try
             {
-                var json = File.ReadAllText(file);
-                var template = JsonSerializer.Deserialize<QueryTemplate>(json, s_jsonOptions);
+                var json = await File.ReadAllTextAsync(file, ct);
+                var template = JsonSerializer.Deserialize<QueryTemplate>(json, SJsonOptions);
                 if (template != null)
                     templates.Add(template);
             }
@@ -573,13 +573,11 @@ public class DeveloperToolsService : IDeveloperToolsService
         QueryTemplate template,
         CancellationToken ct = default)
     {
-        await Task.CompletedTask; // Suppress async warning
-
         template.UpdatedAt = DateTime.UtcNow;
 
         var filePath = Path.Combine(_templatesDir, $"{template.Id}.json");
-        var json = JsonSerializer.Serialize(template, s_indentedJsonOptions);
-        File.WriteAllText(filePath, json);
+        var json = JsonSerializer.Serialize(template, SIndentedJsonOptions);
+        await File.WriteAllTextAsync(filePath, json, ct);
 
         return template;
     }

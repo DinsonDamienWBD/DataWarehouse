@@ -14,9 +14,10 @@ namespace DataWarehouse.CLI.Commands;
 /// </summary>
 public static class ServerCommands
 {
-    private static DataWarehouseKernel? _runningKernel;
-    private static CancellationTokenSource? _serverCts;
+    private static volatile DataWarehouseKernel? _runningKernel;
+    private static volatile CancellationTokenSource? _serverCts;
     private static DateTime? _startTime;
+    private static readonly object SyncLock = new();
     private static int _lastPort = 8080;
 
     public static async Task StartServerAsync(int port, string mode)

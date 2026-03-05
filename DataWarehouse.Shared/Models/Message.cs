@@ -16,10 +16,17 @@ public enum MessageType
 /// </summary>
 public class Message
 {
+    private string _id = Guid.NewGuid().ToString();
+    private string _command = string.Empty;
+
     /// <summary>
     /// Unique message identifier
     /// </summary>
-    public string Id { get; set; } = Guid.NewGuid().ToString();
+    public string Id
+    {
+        get => _id;
+        set => _id = value ?? throw new ArgumentNullException(nameof(value), "Message Id cannot be null.");
+    }
 
     /// <summary>
     /// Message type
@@ -34,7 +41,11 @@ public class Message
     /// <summary>
     /// Command to execute (e.g., "storage.list", "encryption.enable")
     /// </summary>
-    public string Command { get; set; } = string.Empty;
+    public string Command
+    {
+        get => _command;
+        set => _command = value ?? throw new ArgumentNullException(nameof(value), "Message Command cannot be null.");
+    }
 
     /// <summary>
     /// Message data payload

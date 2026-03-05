@@ -11,6 +11,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="DataWarehouse.Hardening.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\DataWarehouse.SDK\DataWarehouse.SDK.csproj" />
   </ItemGroup>
 

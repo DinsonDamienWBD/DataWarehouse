@@ -13,7 +13,11 @@ namespace DataWarehouse.Shared.Services;
 public sealed class NlpMessageBusRouter
 {
     private readonly MessageBridge _bridge;
-    private readonly InstanceManager? _instanceManager;
+
+    /// <summary>
+    /// Gets the optional instance manager for connection state checks.
+    /// </summary>
+    internal InstanceManager? InstanceManager { get; }
 
     /// <summary>
     /// Creates a new NlpMessageBusRouter.
@@ -24,7 +28,7 @@ public sealed class NlpMessageBusRouter
     {
         ArgumentNullException.ThrowIfNull(bridge);
         _bridge = bridge;
-        _instanceManager = instanceManager;
+        InstanceManager = instanceManager;
     }
 
     /// <summary>
@@ -39,7 +43,7 @@ public sealed class NlpMessageBusRouter
     /// <param name="query">The natural language query to parse.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>
-    /// A CommandIntent with ProcessedByAI=true if the server parsed successfully,
+    /// A CommandIntent with ProcessedByAi=true if the server parsed successfully,
     /// or null if the router is unavailable or the server failed to parse.
     /// </returns>
     public async Task<CommandIntent?> RouteQueryAsync(string query, CancellationToken ct = default)
@@ -98,7 +102,7 @@ public sealed class NlpMessageBusRouter
                 OriginalInput = query,
                 Confidence = confidence,
                 Explanation = explanation ?? $"Server-side NLP: {command}",
-                ProcessedByAI = true
+                ProcessedByAi = true
             };
         }
         catch

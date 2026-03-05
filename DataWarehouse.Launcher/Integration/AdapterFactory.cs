@@ -15,7 +15,7 @@ namespace DataWarehouse.Launcher.Integration;
 /// </summary>
 public static class AdapterFactory
 {
-    private static readonly Dictionary<string, Func<IKernelAdapter>> _adapters = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, Func<IKernelAdapter>> _adapters = new(StringComparer.OrdinalIgnoreCase);
     private static string _defaultAdapterType = "DataWarehouse";
 
     /// <summary>

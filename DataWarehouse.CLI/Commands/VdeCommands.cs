@@ -91,7 +91,7 @@ public static class VdeCommands
                 ProfileType = VdeProfileType.Custom,
                 Name = "Custom",
                 Description = $"Custom VDE with modules: {modules}",
-                ModuleManifest = (uint)manifest.Value, // cast ulong to uint for VdeCreationProfile (on-disk compat)
+                ModuleManifest = checked((uint)manifest.Value), // checked cast to detect truncation of 64-bit values
                 ModuleConfigLevels = parsedModules.ToDictionary(m => m, _ => (byte)1),
                 BlockSize = blockSize,
                 TotalBlocks = totalBlocks,

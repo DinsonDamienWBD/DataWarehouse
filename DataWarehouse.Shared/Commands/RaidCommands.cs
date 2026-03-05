@@ -21,7 +21,7 @@ public sealed record RaidConfigInfo
     public int DiskCount { get; init; }
 
     /// <summary>Stripe size in KB.</summary>
-    public int StripeSizeKB { get; init; }
+    public int StripeSizeKb { get; init; }
 
     /// <summary>Total capacity in bytes.</summary>
     public long Capacity { get; init; }
@@ -93,9 +93,9 @@ public sealed class RaidListCommand : ICommand
 
         var configs = new List<RaidConfigInfo>
         {
-            new() { Id = "raid-001", Name = "Primary RAID", Level = "5", DiskCount = 4, StripeSizeKB = 64, Capacity = 3L * 1024 * 1024 * 1024 * 1024, Status = "Healthy", CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
-            new() { Id = "raid-002", Name = "Archive RAID", Level = "6", DiskCount = 6, StripeSizeKB = 128, Capacity = 8L * 1024 * 1024 * 1024 * 1024, Status = "Healthy", CreatedAt = new DateTime(2026, 1, 5, 0, 0, 0, DateTimeKind.Utc) },
-            new() { Id = "raid-003", Name = "Cache RAID", Level = "10", DiskCount = 4, StripeSizeKB = 32, Capacity = 500L * 1024 * 1024 * 1024, Status = "Healthy", CreatedAt = new DateTime(2026, 1, 10, 0, 0, 0, DateTimeKind.Utc) },
+            new() { Id = "raid-001", Name = "Primary RAID", Level = "5", DiskCount = 4, StripeSizeKb = 64, Capacity = 3L * 1024 * 1024 * 1024 * 1024, Status = "Healthy", CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc) },
+            new() { Id = "raid-002", Name = "Archive RAID", Level = "6", DiskCount = 6, StripeSizeKb = 128, Capacity = 8L * 1024 * 1024 * 1024 * 1024, Status = "Healthy", CreatedAt = new DateTime(2026, 1, 5, 0, 0, 0, DateTimeKind.Utc) },
+            new() { Id = "raid-003", Name = "Cache RAID", Level = "10", DiskCount = 4, StripeSizeKb = 32, Capacity = 500L * 1024 * 1024 * 1024, Status = "Healthy", CreatedAt = new DateTime(2026, 1, 10, 0, 0, 0, DateTimeKind.Utc) },
         };
 
         return CommandResult.Table(configs, $"Found {configs.Count} RAID configuration(s)");
@@ -166,7 +166,7 @@ public sealed class RaidCreateCommand : ICommand
             Name = name,
             Level = level,
             DiskCount = disks,
-            StripeSizeKB = stripeSize,
+            StripeSizeKb = stripeSize,
             Capacity = CalculateCapacity(level, disks, 1L * 1024 * 1024 * 1024 * 1024),
             Status = "Initializing",
             CreatedAt = DateTime.UtcNow
@@ -243,7 +243,7 @@ public sealed class RaidStatusCommand : ICommand
             Name = "Primary RAID",
             Level = "5",
             DiskCount = 4,
-            StripeSizeKB = 64,
+            StripeSizeKb = 64,
             Capacity = 3L * 1024 * 1024 * 1024 * 1024,
             Status = "Healthy",
             CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc)

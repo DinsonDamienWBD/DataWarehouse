@@ -74,7 +74,6 @@ public sealed class EndpointChangeEvent
 public sealed class DynamicEndpointGenerator : IDisposable
 {
     private readonly BoundedDictionary<string, EndpointDescriptor> _endpoints = new BoundedDictionary<string, EndpointDescriptor>(1000);
-    private readonly IPluginCapabilityRegistry? _capabilityRegistry;
     private readonly IDisposable? _registeredSubscription;
     private readonly IDisposable? _unregisteredSubscription;
     private readonly IDisposable? _availabilitySubscription;
@@ -91,17 +90,15 @@ public sealed class DynamicEndpointGenerator : IDisposable
     /// <param name="capabilityRegistry">Optional capability registry to subscribe to.</param>
     public DynamicEndpointGenerator(IPluginCapabilityRegistry? capabilityRegistry = null)
     {
-        _capabilityRegistry = capabilityRegistry;
-
-        if (_capabilityRegistry != null)
+        if (capabilityRegistry != null)
         {
             // Subscribe to capability events for live updates
-            _registeredSubscription = _capabilityRegistry.OnCapabilityRegistered(HandleCapabilityRegistered);
-            _unregisteredSubscription = _capabilityRegistry.OnCapabilityUnregistered(HandleCapabilityUnregistered);
-            _availabilitySubscription = _capabilityRegistry.OnAvailabilityChanged(HandleAvailabilityChanged);
+            _registeredSubscription = capabilityRegistry.OnCapabilityRegistered(HandleCapabilityRegistered);
+            _unregisteredSubscription = capabilityRegistry.OnCapabilityUnregistered(HandleCapabilityUnregistered);
+            _availabilitySubscription = capabilityRegistry.OnAvailabilityChanged(HandleAvailabilityChanged);
 
             // Initial load from registry
-            RefreshFromCapabilities(_capabilityRegistry.GetAll());
+            RefreshFromCapabilities(capabilityRegistry.GetAll());
         }
     }
 

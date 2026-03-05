@@ -46,10 +46,8 @@ public static class PortableMediaDetector
     {
         portsToCheck ??= [8080, 8081, 9090];
 
-        using var client = new HttpClient
-        {
-            Timeout = TimeSpan.FromSeconds(2)
-        };
+        using var client = new HttpClient();
+        client.Timeout = TimeSpan.FromSeconds(2);
 
         foreach (var port in portsToCheck)
         {

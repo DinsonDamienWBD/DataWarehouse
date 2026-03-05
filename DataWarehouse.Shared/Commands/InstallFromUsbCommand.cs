@@ -78,8 +78,8 @@ public sealed class InstallFromUsbCommand : ICommand
         };
 
         var progressMessages = new List<string>();
-        var progress = new Progress<UsbInstallProgress>(p =>
-            progressMessages.Add($"[{p.PercentComplete}%] {p.Message}"));
+        var progress = new Progress<UsbInstallProgress>(prog =>
+            progressMessages.Add($"[{prog.PercentComplete}%] {prog.Message}"));
 
         var result = await installer.InstallFromUsbAsync(config, progress, cancellationToken);
 

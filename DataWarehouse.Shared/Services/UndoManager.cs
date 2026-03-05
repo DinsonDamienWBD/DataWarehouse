@@ -91,7 +91,7 @@ public sealed class UndoableOperation
     public string? ResourceType { get; set; }
 
     /// <summary>Gets or sets custom undo data.</summary>
-    public Dictionary<string, object?> UndoData { get; set; } = new();
+    public IReadOnlyDictionary<string, object?> UndoData { get; set; } = new Dictionary<string, object?>();
 
     /// <summary>Gets or sets additional metadata.</summary>
     public Dictionary<string, string> Metadata { get; set; } = new();
@@ -526,7 +526,7 @@ public sealed class UndoManager : IDisposable
                     operation.IsRolledBack = true;
                 }
 
-                _ = Task.Run(async () => await SaveOperationsAsync());
+                _ = Task.Run(async () => await SaveOperationsAsync(), cancellationToken);
                 OperationUndone?.Invoke(this, operation);
 
                 return UndoResult.Ok(operation, $"Undone: {operation.Description ?? operation.Command}");

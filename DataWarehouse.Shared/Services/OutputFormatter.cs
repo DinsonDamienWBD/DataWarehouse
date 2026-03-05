@@ -15,13 +15,13 @@ namespace DataWarehouse.Shared.Services;
 /// </summary>
 public sealed class OutputFormatter
 {
-    private static readonly JsonSerializerOptions _jsonOptions = new()
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    private static readonly ISerializer _yamlSerializer = new SerializerBuilder()
+    private static readonly ISerializer YamlSerializer = new SerializerBuilder()
         .WithNamingConvention(CamelCaseNamingConvention.Instance)
         .Build();
 
@@ -61,7 +61,7 @@ public sealed class OutputFormatter
             data = result.Data
         };
 
-        return JsonSerializer.Serialize(output, _jsonOptions);
+        return JsonSerializer.Serialize(output, JsonOptions);
     }
 
     /// <summary>
@@ -77,7 +77,7 @@ public sealed class OutputFormatter
             ["data"] = result.Data
         };
 
-        return _yamlSerializer.Serialize(output);
+        return YamlSerializer.Serialize(output);
     }
 
     /// <summary>
@@ -125,7 +125,7 @@ public sealed class OutputFormatter
         if (result.Data != null)
         {
             // Use JSON for plain text output (readable)
-            sb.Append(JsonSerializer.Serialize(result.Data, _jsonOptions));
+            sb.Append(JsonSerializer.Serialize(result.Data, JsonOptions));
         }
 
         return sb.ToString();

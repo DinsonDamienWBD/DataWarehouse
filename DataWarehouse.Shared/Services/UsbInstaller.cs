@@ -24,7 +24,6 @@ public sealed class UsbInstaller
     {
         var errors = new List<string>();
         var pluginCount = 0;
-        var hasData = false;
         long totalSize = 0;
         string? version = null;
 
@@ -94,7 +93,7 @@ public sealed class UsbInstaller
 
         // Check for data directory
         var dataDir = Path.Combine(sourcePath, "data");
-        hasData = Directory.Exists(dataDir) && Directory.EnumerateFileSystemEntries(dataDir).Any();
+        var hasData = Directory.Exists(dataDir) && Directory.EnumerateFileSystemEntries(dataDir).Any();
 
         // Calculate total size
         try

@@ -13,6 +13,29 @@ namespace DataWarehouse.Shared.Services;
 public static class PlatformServiceManager
 {
     private const string BaseServiceName = "DataWarehouse";
+    private static readonly char[] InvalidServiceNameChars = { ';', '&', '|', '`', '$', '(', ')', '{', '}', '<', '>', '\n', '\r', '"', '\'', '\\', '/' };
+
+    /// <summary>
+    /// Validates and sanitizes a service name to prevent command injection.
+    /// </summary>
+    /// <param name="serviceName">Service name to validate.</param>
+    /// <returns>Sanitized service name.</returns>
+    /// <exception cref="ArgumentException">Thrown if the name contains shell metacharacters.</exception>
+    public static string SanitizeServiceName(string serviceName)
+    {
+        ArgumentNullException.ThrowIfNull(serviceName);
+        if (string.IsNullOrWhiteSpace(serviceName))
+            throw new ArgumentException("Service name cannot be empty.", nameof(serviceName));
+
+        if (serviceName.IndexOfAny(InvalidServiceNameChars) >= 0)
+            throw new ArgumentException($"Service name contains invalid characters: {serviceName}", nameof(serviceName));
+
+        // Additional length check
+        if (serviceName.Length > 256)
+            throw new ArgumentException("Service name exceeds maximum length of 256 characters.", nameof(serviceName));
+
+        return serviceName;
+    }
 
     /// <summary>
     /// Gets the platform-appropriate service name for the given profile.
@@ -110,6 +133,7 @@ public static class PlatformServiceManager
     /// <returns>Status information about the service.</returns>
     public static async Task<ServiceStatus> GetServiceStatusAsync(string serviceName, CancellationToken ct = default)
     {
+        serviceName = SanitizeServiceName(serviceName);
         if (OperatingSystem.IsWindows())
         {
             var (exitCode, stdout, _) = await RunProcessAsync("sc", $"query {serviceName}", ct);
@@ -150,7 +174,7 @@ public static class PlatformServiceManager
                 IsInstalled = true,
                 IsRunning = isRunning,
                 State = state,
-                PID = pid
+                Pid = pid
             };
         }
         else if (OperatingSystem.IsLinux())
@@ -181,7 +205,7 @@ public static class PlatformServiceManager
                 IsInstalled = isInstalled,
                 IsRunning = isActive,
                 State = isActive ? "Running" : (isInstalled ? "Stopped" : "NotInstalled"),
-                PID = pid
+                Pid = pid
             };
         }
         else if (OperatingSystem.IsMacOS())
@@ -215,7 +239,7 @@ public static class PlatformServiceManager
                 IsInstalled = isInstalled,
                 IsRunning = isRunning,
                 State = isRunning ? "Running" : (isInstalled ? "Stopped" : "NotInstalled"),
-                PID = pid
+                Pid = pid
             };
         }
 
@@ -229,6 +253,7 @@ public static class PlatformServiceManager
     /// <param name="ct">Cancellation token.</param>
     public static async Task StartServiceAsync(string serviceName, CancellationToken ct = default)
     {
+        serviceName = SanitizeServiceName(serviceName);
         if (OperatingSystem.IsWindows())
         {
             await RunProcessCheckedAsync("sc", $"start {serviceName}", ct);
@@ -254,6 +279,7 @@ public static class PlatformServiceManager
     /// <param name="ct">Cancellation token.</param>
     public static async Task StopServiceAsync(string serviceName, CancellationToken ct = default)
     {
+        serviceName = SanitizeServiceName(serviceName);
         if (OperatingSystem.IsWindows())
         {
             await RunProcessCheckedAsync("sc", $"stop {serviceName}", ct);
@@ -279,6 +305,7 @@ public static class PlatformServiceManager
     /// <param name="ct">Cancellation token.</param>
     public static async Task RestartServiceAsync(string serviceName, CancellationToken ct = default)
     {
+        serviceName = SanitizeServiceName(serviceName);
         if (OperatingSystem.IsLinux())
         {
             await RunProcessCheckedAsync("systemctl", $"restart {serviceName}", ct);
@@ -304,6 +331,7 @@ public static class PlatformServiceManager
     /// <param name="ct">Cancellation token.</param>
     public static async Task RegisterServiceAsync(ServiceRegistration registration, CancellationToken ct = default)
     {
+        SanitizeServiceName(registration.Name);
         if (OperatingSystem.IsWindows())
         {
             var startType = registration.AutoStart ? "auto" : "demand";
@@ -380,6 +408,7 @@ WantedBy=multi-user.target
     /// <param name="ct">Cancellation token.</param>
     public static async Task UnregisterServiceAsync(string serviceName, CancellationToken ct = default)
     {
+        serviceName = SanitizeServiceName(serviceName);
         // Stop service first if running
         var status = await GetServiceStatusAsync(serviceName, ct);
         if (status.IsRunning)
@@ -503,7 +532,7 @@ public sealed record ServiceStatus
     public required string State { get; init; }
 
     /// <summary>Process ID if running.</summary>
-    public int? PID { get; init; }
+    public int? Pid { get; init; }
 }
 
 /// <summary>
