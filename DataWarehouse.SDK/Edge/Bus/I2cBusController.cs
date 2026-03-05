@@ -40,11 +40,11 @@ public sealed class I2cBusController : II2cBusController
             throw new ArgumentOutOfRangeException(nameof(busId), busId, "Bus ID must be non-negative");
         }
 
-        if (deviceAddress < 0 || deviceAddress > EdgeConstants.MaxI2cDeviceAddress)
+        if (deviceAddress < 0 || deviceAddress > EdgeConstants.MaxI2CDeviceAddress)
         {
             throw new ArgumentOutOfRangeException(
                 nameof(deviceAddress), deviceAddress,
-                $"Device address must be between 0 and {EdgeConstants.MaxI2cDeviceAddress}");
+                $"Device address must be between 0 and {EdgeConstants.MaxI2CDeviceAddress}");
         }
 
         try

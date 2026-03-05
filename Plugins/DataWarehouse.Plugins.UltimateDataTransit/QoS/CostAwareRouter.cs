@@ -258,7 +258,7 @@ internal sealed class CostAwareRouter
     private static decimal ComputeRouteCost(TransitCostProfile profile, long sizeBytes)
     {
         var dataSizeGB = sizeBytes / BytesPerGB;
-        return profile.FixedCostPerTransfer + (profile.CostPerGB * dataSizeGB);
+        return profile.FixedCostPerTransfer + (profile.CostPerGb * dataSizeGB);
     }
 
     /// <summary>

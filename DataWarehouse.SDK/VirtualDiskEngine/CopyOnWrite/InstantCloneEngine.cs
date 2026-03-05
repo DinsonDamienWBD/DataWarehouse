@@ -200,7 +200,7 @@ public sealed class InstantCloneEngine
             LinkCount = 1, // New clone starts with a single link
             // Extended attributes (inline area)
             CompressionDictionaryRef = sourceInode.CompressionDictionaryRef,
-            PerObjectEncryptionIV = new byte[ExtendedInode512.EncryptionIVSize],
+            PerObjectEncryptionIv = new byte[ExtendedInode512.EncryptionIvSize],
             ReplicationVector = new byte[ExtendedInode512.ReplicationVectorSize],
         };
 

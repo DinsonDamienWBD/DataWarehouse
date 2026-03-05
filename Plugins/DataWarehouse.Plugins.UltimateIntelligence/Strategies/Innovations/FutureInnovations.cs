@@ -31,14 +31,14 @@ public sealed class ConsciousStorageStrategy : FeatureStrategyBase
 
     public async Task<ContentUnderstanding> AnalyzeContentAsync(string fileId, byte[] content, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         return await ExecuteWithTrackingAsync(async () =>
         {
             var textContent = System.Text.Encoding.UTF8.GetString(content);
             var prompt = $"Analyze this content and provide: summary, topics, entities, sentiment, intent.\n\nContent:\n{textContent[..Math.Min(2000, textContent.Length)]}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
+            var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
 
             var understanding = new ContentUnderstanding
             {
@@ -54,12 +54,12 @@ public sealed class ConsciousStorageStrategy : FeatureStrategyBase
 
     public async Task<string> AskAboutContentAsync(string fileId, string question, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
         if (!_contentMap.TryGetValue(fileId, out var understanding))
             return "Content not analyzed yet.";
 
         var prompt = $"Based on this understanding:\n{understanding.Summary}\n\nAnswer: {question}";
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 300 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 300 }, ct);
         return response.Content;
     }
 }
@@ -93,13 +93,13 @@ public sealed class PrecognitiveStorageStrategy : FeatureStrategyBase
 
     public async Task<List<string>> PredictNextNeedsAsync(string userId, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
         if (!_userModels.TryGetValue(userId, out var model)) return new List<string>();
 
         var recentActions = model.Actions.TakeLast(10).Select(a => $"{a.Action}: {a.Context}");
         var prompt = $"Based on recent actions:\n{string.Join("\n", recentActions)}\n\nPredict next 3 likely needs:";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 200 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 200 }, ct);
         return response.Content.Split('\n').Where(s => !string.IsNullOrWhiteSpace(s)).Take(3).ToList();
     }
 }
@@ -193,19 +193,19 @@ public sealed class CollaborativeIntelligenceStrategy : FeatureStrategyBase
 
     public async Task<CollaborationResult> CollaborateAsync(string task, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var contributions = new List<AgentContribution>();
         foreach (var agent in _agents)
         {
             var prompt = $"{agent.SystemPrompt}\n\nTask: {task}\n\nProvide your specialized contribution:";
-            var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 400 }, ct);
+            var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 400 }, ct);
             contributions.Add(new AgentContribution { AgentId = agent.AgentId, Specialty = agent.Specialty, Content = response.Content });
         }
 
         // Synthesize contributions
         var synthesisPrompt = $"Synthesize these agent contributions:\n{string.Join("\n---\n", contributions.Select(c => $"{c.Specialty}: {c.Content}"))}\n\nFinal synthesis:";
-        var synthesis = await AIProvider.CompleteAsync(new AIRequest { Prompt = synthesisPrompt, MaxTokens = 500 }, ct);
+        var synthesis = await AiProvider.CompleteAsync(new AIRequest { Prompt = synthesisPrompt, MaxTokens = 500 }, ct);
 
         return new CollaborationResult { Task = task, Contributions = contributions, Synthesis = synthesis.Content };
     }
@@ -234,10 +234,10 @@ public sealed class SelfDocumentingStorageStrategy : FeatureStrategyBase
 
     public async Task<GeneratedDocumentation> GenerateDocumentationAsync(string fileId, string content, string fileType, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var prompt = $"Generate comprehensive documentation for this {fileType} content:\n\n{content[..Math.Min(3000, content.Length)]}\n\nInclude: overview, structure, usage, examples.";
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 800 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 800 }, ct);
 
         var doc = new GeneratedDocumentation { FileId = fileId, FileType = fileType, Content = response.Content, GeneratedAt = DateTime.UtcNow };
         _docs[fileId] = doc;
@@ -272,9 +272,9 @@ public sealed class ThoughtSearchStrategy : FeatureStrategyBase
 
     public async Task<List<ThoughtMatch>> SearchByThoughtAsync(string thought, IEnumerable<IndexedContent> corpus, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
-        var thoughtEmbedding = await AIProvider.GetEmbeddingsAsync(thought, ct);
+        var thoughtEmbedding = await AiProvider.GetEmbeddingsAsync(thought, ct);
         var matches = new List<ThoughtMatch>();
 
         foreach (var content in corpus)
@@ -363,11 +363,11 @@ public sealed class TemporalSearchStrategy : FeatureStrategyBase
 
     public async Task<List<TemporalActivity>> SearchByTimeAsync(string userId, string temporalQuery, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
         if (!_activityLog.TryGetValue(userId, out var activities)) return new List<TemporalActivity>();
 
         var prompt = $"Parse this temporal query into a date range: '{temporalQuery}'. Return JSON: {{\"start\": \"ISO8601\", \"end\": \"ISO8601\"}}";
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 100 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 100 }, ct);
 
         // Simplified parsing - in production use proper date parsing
         var now = DateTime.UtcNow;
@@ -457,9 +457,9 @@ public sealed class NegativeSearchStrategy : FeatureStrategyBase
 
     public async Task<List<string>> SearchExcludingAsync(IEnumerable<IndexedContent> corpus, string excludeTopic, float threshold = 0.5f, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
-        var excludeEmbedding = await AIProvider.GetEmbeddingsAsync(excludeTopic, ct);
+        var excludeEmbedding = await AiProvider.GetEmbeddingsAsync(excludeTopic, ct);
         var results = new List<string>();
 
         foreach (var content in corpus)
@@ -501,9 +501,9 @@ public sealed class MultimodalSearchStrategy : FeatureStrategyBase
 
     public async Task<List<MultimodalMatch>> SearchImagesWithTextAsync(string textQuery, IEnumerable<ImageIndex> images, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
-        var queryEmbedding = await AIProvider.GetEmbeddingsAsync(textQuery, ct);
+        var queryEmbedding = await AiProvider.GetEmbeddingsAsync(textQuery, ct);
         return images
             .Select(img => new MultimodalMatch { Id = img.Id, Score = CosineSimilarity(queryEmbedding, img.Embedding), Type = "image" })
             .OrderByDescending(m => m.Score)
@@ -553,12 +553,12 @@ public sealed class SelfOrganizingStorageStrategy : FeatureStrategyBase
 
     public async Task<OrganizationPlan> GenerateOrganizationPlanAsync(IEnumerable<FileInfo> files, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var fileList = string.Join("\n", files.Take(50).Select(f => $"- {f.Name}: {f.Type}"));
         var prompt = $"Suggest optimal folder organization for these files:\n{fileList}\n\nReturn JSON with folder structure and file assignments.";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 800 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 800 }, ct);
         return new OrganizationPlan { Suggestion = response.Content, GeneratedAt = DateTime.UtcNow };
     }
 }
@@ -584,12 +584,12 @@ public sealed class SelfHealingDataStrategy : FeatureStrategyBase
 
     public async Task<HealingReport> AnalyzeAndHealAsync(string datasetId, object data, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var dataStr = JsonSerializer.Serialize(data);
         var prompt = $"Analyze this data for inconsistencies and suggest repairs:\n{dataStr[..Math.Min(2000, dataStr.Length)]}\n\nReturn issues found and fixes.";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
         return new HealingReport { DatasetId = datasetId, Analysis = response.Content, AnalyzedAt = DateTime.UtcNow };
     }
 }
@@ -623,14 +623,14 @@ public sealed class SelfOptimizingStrategy : FeatureStrategyBase
 
     public async Task<OptimizationRecommendation> GetOptimizationsAsync(CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var recentMetrics = _metrics.TakeLast(100).ToList();
         var avgLatency = recentMetrics.Average(m => m.LatencyMs);
         var summary = $"Avg latency: {avgLatency}ms, Operations: {recentMetrics.Count}";
 
         var prompt = $"Based on these metrics:\n{summary}\n\nSuggest performance optimizations:";
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 300 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 300 }, ct);
 
         return new OptimizationRecommendation { Recommendations = response.Content, GeneratedAt = DateTime.UtcNow };
     }
@@ -664,12 +664,12 @@ public sealed class SelfSecuringStrategy : FeatureStrategyBase
 
     public async Task<ThreatAssessment> AssessThreatsAsync(CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var recentEvents = _events.TakeLast(50).Select(e => $"{e.EventType}: {e.Details} from {e.SourceIp}");
         var prompt = $"Analyze these security events for threats:\n{string.Join("\n", recentEvents)}\n\nIdentify threats and suggest mitigations:";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 400 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 400 }, ct);
         return new ThreatAssessment { Analysis = response.Content, AssessedAt = DateTime.UtcNow };
     }
 }
@@ -702,12 +702,12 @@ public sealed class SelfComplyingStrategy : FeatureStrategyBase
 
     public async Task<ComplianceReport> CheckComplianceAsync(string dataDescription, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var rulesStr = string.Join("\n", _rules.Select(r => $"{r.Regulation}: {r.Rule}"));
         var prompt = $"Check this data against compliance rules:\n\nData: {dataDescription}\n\nRules:\n{rulesStr}\n\nIdentify violations and required actions:";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
         return new ComplianceReport { Analysis = response.Content, CheckedAt = DateTime.UtcNow };
     }
 }
@@ -737,10 +737,10 @@ public sealed class InsightGenerationStrategy : FeatureStrategyBase
 
     public async Task<List<Insight>> GenerateInsightsAsync(string dataDescription, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var prompt = $"Analyze this data and generate actionable insights:\n{dataDescription}\n\nProvide 5 key insights with impact levels.";
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 600 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 600 }, ct);
 
         return new List<Insight> { new Insight { Content = response.Content, GeneratedAt = DateTime.UtcNow } };
     }
@@ -767,12 +767,12 @@ public sealed class TrendDetectionStrategy : FeatureStrategyBase
 
     public async Task<List<Trend>> DetectTrendsAsync(IEnumerable<(DateTime Time, double Value)> timeSeries, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var dataPoints = string.Join(", ", timeSeries.Take(50).Select(t => $"{t.Time:d}: {t.Value:F2}"));
         var prompt = $"Analyze this time series for trends:\n{dataPoints}\n\nIdentify trends, direction, and significance.";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 400 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 400 }, ct);
         return new List<Trend> { new Trend { Description = response.Content, DetectedAt = DateTime.UtcNow } };
     }
 }
@@ -798,10 +798,10 @@ public sealed class AnomalyNarrativeStrategy : FeatureStrategyBase
 
     public async Task<string> ExplainAnomalyAsync(string anomalyData, string context, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var prompt = $"Explain this anomaly in plain language:\n\nAnomaly: {anomalyData}\nContext: {context}\n\nProvide: what happened, why it matters, what to do.";
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 400 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 400 }, ct);
         return response.Content;
     }
 }
@@ -827,10 +827,10 @@ public sealed class PredictiveAnalyticsStrategy : FeatureStrategyBase
 
     public async Task<Forecast> GenerateForecastAsync(string historicalData, int periodsAhead, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var prompt = $"Based on historical data:\n{historicalData}\n\nForecast the next {periodsAhead} periods with confidence intervals.";
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
 
         return new Forecast { Prediction = response.Content, GeneratedAt = DateTime.UtcNow };
     }
@@ -857,12 +857,12 @@ public sealed class KnowledgeSynthesisStrategy : FeatureStrategyBase
 
     public async Task<SynthesizedKnowledge> SynthesizeAsync(IEnumerable<string> sources, string topic, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var sourcesText = string.Join("\n---\n", sources.Take(5));
         var prompt = $"Synthesize knowledge about '{topic}' from these sources:\n{sourcesText}\n\nCreate a unified, comprehensive summary.";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 800 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 800 }, ct);
         return new SynthesizedKnowledge { Topic = topic, Synthesis = response.Content, SourceCount = sources.Count(), GeneratedAt = DateTime.UtcNow };
     }
 }
@@ -894,13 +894,13 @@ public sealed class ConversationalStorageStrategy : FeatureStrategyBase
 
     public async Task<string> ContinueConversationAsync(string sessionId, string userMessage, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var history = _conversations.GetOrAdd(sessionId, _ => new List<ConversationTurn>());
         var contextStr = string.Join("\n", history.TakeLast(10).Select(t => $"{t.Role}: {t.Content}"));
 
         var prompt = $"Conversation history:\n{contextStr}\n\nUser: {userMessage}\n\nAssistant:";
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
 
         lock (history)
         {
@@ -933,19 +933,19 @@ public sealed class MultilingualStorageStrategy : FeatureStrategyBase
 
     public async Task<string> TranslateAsync(string text, string targetLanguage, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var prompt = $"Translate to {targetLanguage}:\n\n{text}";
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = text.Length * 2 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = text.Length * 2 }, ct);
         return response.Content;
     }
 
     public async Task<string> DetectLanguageAsync(string text, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var prompt = $"Detect the language of this text (return ISO code only):\n\n{text}";
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 10 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 10 }, ct);
         return response.Content.Trim();
     }
 }
@@ -971,10 +971,10 @@ public sealed class VoiceStorageStrategy : FeatureStrategyBase
 
     public async Task<VoiceCommand> ParseVoiceCommandAsync(string transcription, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var prompt = $"Parse this voice command into action and parameters:\n\"{transcription}\"\n\nReturn JSON: {{\"action\": \"\", \"params\": {{}}}}";
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 200 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 200 }, ct);
 
         return new VoiceCommand { Transcription = transcription, ParsedAction = response.Content };
     }
@@ -1001,10 +1001,10 @@ public sealed class CodeUnderstandingStrategy : FeatureStrategyBase
 
     public async Task<CodeAnalysis> AnalyzeCodeAsync(string code, string language, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var prompt = $"Analyze this {language} code:\n```{language}\n{code}\n```\n\nProvide: purpose, structure, complexity, dependencies, suggestions.";
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 600 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 600 }, ct);
 
         return new CodeAnalysis { Language = language, Analysis = response.Content, AnalyzedAt = DateTime.UtcNow };
     }
@@ -1031,10 +1031,10 @@ public sealed class LegalDocumentStrategy : FeatureStrategyBase
 
     public async Task<LegalAnalysis> AnalyzeLegalDocumentAsync(string document, CancellationToken ct = default)
     {
-        if (AIProvider == null) throw new InvalidOperationException("AI provider required");
+        if (AiProvider == null) throw new InvalidOperationException("AI provider required");
 
         var prompt = $"Analyze this legal document:\n{document[..Math.Min(4000, document.Length)]}\n\nIdentify: document type, key clauses, obligations, risks, important dates.";
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 800 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 800 }, ct);
 
         return new LegalAnalysis { Analysis = response.Content, AnalyzedAt = DateTime.UtcNow };
     }

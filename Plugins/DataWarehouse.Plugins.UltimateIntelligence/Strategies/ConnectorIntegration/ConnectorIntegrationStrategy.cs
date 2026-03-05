@@ -652,7 +652,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
         private async Task<Dictionary<string, object>> TransformPayloadWithAIAsync(TransformRequest request)
         {
             // M10: AI payload transformation with intelligent request analysis
-            if (AIProvider == null)
+            if (AiProvider == null)
             {
                 _logger?.LogDebug("AI provider not available for payload transformation, returning original");
                 return new Dictionary<string, object>(request.RequestPayload);
@@ -687,7 +687,7 @@ Provide only the optimized JSON payload in your response, no explanations.";
                     Temperature = 0.3f // Low temperature for consistent transformations
                 };
 
-                var aiResponse = await AIProvider.CompleteAsync(aiRequest);
+                var aiResponse = await AiProvider.CompleteAsync(aiRequest);
                 RecordTokens(aiResponse.Usage?.TotalTokens ?? 0);
 
                 if (string.IsNullOrWhiteSpace(aiResponse.Content))
@@ -725,7 +725,7 @@ Provide only the optimized JSON payload in your response, no explanations.";
         private async Task<string> OptimizeQueryWithAIAsync(OptimizeQueryRequest request)
         {
             // M11: Query optimization with AI-powered analysis
-            if (AIProvider == null)
+            if (AiProvider == null)
             {
                 _logger?.LogDebug("AI provider not available for query optimization, returning original");
                 return request.QueryText;
@@ -770,7 +770,7 @@ Return ONLY the optimized query text. Do not include explanations or markdown fo
                     Temperature = 0.2f // Very low temperature for consistent query optimization
                 };
 
-                var aiResponse = await AIProvider.CompleteAsync(aiRequest);
+                var aiResponse = await AiProvider.CompleteAsync(aiRequest);
                 RecordTokens(aiResponse.Usage?.TotalTokens ?? 0);
 
                 if (string.IsNullOrWhiteSpace(aiResponse.Content))
@@ -813,7 +813,7 @@ Return ONLY the optimized query text. Do not include explanations or markdown fo
                 ["analysis_timestamp"] = DateTimeOffset.UtcNow.ToString("o")
             };
 
-            if (AIProvider == null)
+            if (AiProvider == null)
             {
                 _logger?.LogDebug("AI provider not available for schema enrichment, using basic metadata");
                 return enrichedMetadata;
@@ -854,7 +854,7 @@ Return only valid JSON, no explanations.";
                     Temperature = 0.4f // Moderate temperature for creative but consistent analysis
                 };
 
-                var aiResponse = await AIProvider.CompleteAsync(aiRequest);
+                var aiResponse = await AiProvider.CompleteAsync(aiRequest);
                 RecordTokens(aiResponse.Usage?.TotalTokens ?? 0);
 
                 if (!string.IsNullOrWhiteSpace(aiResponse.Content))
@@ -918,7 +918,7 @@ Return only valid JSON, no explanations.";
                 });
             }
 
-            if (AIProvider == null)
+            if (AiProvider == null)
             {
                 _logger?.LogDebug("AI provider not available for anomaly detection, using statistical methods only");
                 return anomalies;
@@ -966,7 +966,7 @@ Return only the JSON array, or [] if no anomalies detected.";
                     Temperature = 0.3f // Low temperature for consistent detection
                 };
 
-                var aiResponse = await AIProvider.CompleteAsync(aiRequest);
+                var aiResponse = await AiProvider.CompleteAsync(aiRequest);
                 RecordTokens(aiResponse.Usage?.TotalTokens ?? 0);
 
                 if (!string.IsNullOrWhiteSpace(aiResponse.Content))
@@ -1037,7 +1037,7 @@ Return only the JSON array, or [] if no anomalies detected.";
                 baseProbability = Math.Min(0.8, baseProbability + 0.2);
             }
 
-            if (AIProvider == null)
+            if (AiProvider == null)
             {
                 _logger?.LogDebug("AI provider not available for failure prediction, using heuristic: {Probability:P1}",
                     baseProbability);
@@ -1094,7 +1094,7 @@ Return only valid JSON.";
                     Temperature = 0.2f // Low temperature for consistent predictions
                 };
 
-                var aiResponse = await AIProvider.CompleteAsync(aiRequest);
+                var aiResponse = await AiProvider.CompleteAsync(aiRequest);
                 RecordTokens(aiResponse.Usage?.TotalTokens ?? 0);
 
                 if (!string.IsNullOrWhiteSpace(aiResponse.Content))

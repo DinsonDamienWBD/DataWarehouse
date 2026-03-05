@@ -102,7 +102,7 @@ public sealed class MlIoSchedulerStrategy : FeatureStrategyBase
         IoQueueState queueState,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for queue optimization");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -137,7 +137,7 @@ Return JSON:
   ""reasoning"": ""explanation""
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 400,
@@ -492,7 +492,7 @@ public sealed class AiPredictivePrefetchStrategy : FeatureStrategyBase
         IEnumerable<PrefetchOutcome> outcomes,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for model updates");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -528,7 +528,7 @@ Return JSON:
   ""recommendations"": [""rec1"", ""rec2""]
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 300,
@@ -549,7 +549,7 @@ Return JSON:
         IEnumerable<AccessRecord> history,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for random access prediction");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -579,7 +579,7 @@ Return JSON:
   ""confidence"": 0.6
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 400,
@@ -826,7 +826,7 @@ public sealed class LatencyOptimizerStrategy : FeatureStrategyBase
         IEnumerable<double> latencyMeasurements,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for latency optimization");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -867,7 +867,7 @@ Return JSON:
   ""implementation_priority"": ""immediate|high|medium|low""
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 400,

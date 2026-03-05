@@ -138,7 +138,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 // Query device count
                 int result = CudaInterop.GetDeviceCount(out int count);
 
-                if (result == CudaInterop.CUDA_SUCCESS && count > 0)
+                if (result == CudaInterop.CudaSuccess && count > 0)
                 {
                     _runtime = GpuRuntime.Cuda;
                     _deviceCount = count;

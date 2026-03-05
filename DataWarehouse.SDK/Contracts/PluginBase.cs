@@ -547,7 +547,7 @@ namespace DataWarehouse.SDK.Contracts
                 PluginCategory.SecurityProvider => CapabilityCategory.Security,
                 PluginCategory.DataTransformationProvider => CapabilityCategory.Pipeline,
                 PluginCategory.MetadataIndexingProvider => CapabilityCategory.Metadata,
-                PluginCategory.AIProvider => CapabilityCategory.AI,
+                PluginCategory.AiProvider => CapabilityCategory.AI,
                 PluginCategory.GovernanceProvider => CapabilityCategory.Governance,
                 _ => CapabilityCategory.Custom
             };
@@ -1167,7 +1167,7 @@ namespace DataWarehouse.SDK.Contracts
                 PluginCategory.SecurityProvider => CapabilityCategory.Security,
                 PluginCategory.DataTransformationProvider => CapabilityCategory.Pipeline,
                 PluginCategory.MetadataIndexingProvider => CapabilityCategory.Metadata,
-                PluginCategory.AIProvider => CapabilityCategory.AI,
+                PluginCategory.AiProvider => CapabilityCategory.AI,
                 PluginCategory.GovernanceProvider => CapabilityCategory.Governance,
                 _ => CapabilityCategory.Custom
             };

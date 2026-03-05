@@ -53,7 +53,7 @@ public sealed class PredictiveSnapshotStrategy : FeatureStrategyBase
         IEnumerable<DataChangeEvent> recentChanges,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for predictive snapshot analysis");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -92,7 +92,7 @@ Return JSON:
   ""recommended_interval_minutes"": 30
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 400,
@@ -113,7 +113,7 @@ Return JSON:
         IEnumerable<DataChangeEvent> recentChanges,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for anomaly detection");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -412,7 +412,7 @@ public sealed class TimeTravelQueryStrategy : FeatureStrategyBase
         DateTime asOfTime,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for temporal query parsing");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -430,7 +430,7 @@ Return JSON:
   ""comparison_time"": null
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 200,
@@ -535,7 +535,7 @@ Return JSON:
         DateTime? endTime,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for historical search");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -559,7 +559,7 @@ Return JSON:
   ""time_constraints"": ""last_modified_within_7_days""
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 300,
@@ -767,7 +767,7 @@ public sealed class SnapshotFederationStrategy : FeatureStrategyBase
         DateTime targetTime,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for recovery recommendations");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -814,7 +814,7 @@ Return JSON:
   ""alternative_snapshot"": ""snapshot_id_or_null""
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 300,

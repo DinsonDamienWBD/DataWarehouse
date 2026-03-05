@@ -170,7 +170,7 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
             {
                 var id when id.Contains("http", StringComparison.OrdinalIgnoreCase) => new TransitCostProfile
                 {
-                    CostPerGB = 0.00m,
+                    CostPerGb = 0.00m,
                     FixedCostPerTransfer = 0.00m,
                     Tier = TransitCostTier.Free,
                     IsMetered = false
@@ -178,14 +178,14 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
                 var id when id.Contains("ftp", StringComparison.OrdinalIgnoreCase) ||
                             id.Contains("sftp", StringComparison.OrdinalIgnoreCase) => new TransitCostProfile
                 {
-                    CostPerGB = 0.01m,
+                    CostPerGb = 0.01m,
                     FixedCostPerTransfer = 0.001m,
                     Tier = TransitCostTier.Metered,
                     IsMetered = true
                 },
                 var id when id.Contains("grpc", StringComparison.OrdinalIgnoreCase) => new TransitCostProfile
                 {
-                    CostPerGB = 0.00m,
+                    CostPerGb = 0.00m,
                     FixedCostPerTransfer = 0.00m,
                     Tier = TransitCostTier.Free,
                     IsMetered = false
@@ -193,7 +193,7 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
                 var id when id.Contains("p2p", StringComparison.OrdinalIgnoreCase) ||
                             id.Contains("swarm", StringComparison.OrdinalIgnoreCase) => new TransitCostProfile
                 {
-                    CostPerGB = 0.00m,
+                    CostPerGb = 0.00m,
                     FixedCostPerTransfer = 0.00m,
                     Tier = TransitCostTier.Free,
                     IsMetered = false
@@ -201,14 +201,14 @@ public sealed class UltimateDataTransitPlugin : DataTransitPluginBase, ITransitO
                 var id when id.Contains("store-and-forward", StringComparison.OrdinalIgnoreCase) ||
                             id.Contains("offline", StringComparison.OrdinalIgnoreCase) => new TransitCostProfile
                 {
-                    CostPerGB = 0.00m,
+                    CostPerGb = 0.00m,
                     FixedCostPerTransfer = 0.05m,
                     Tier = TransitCostTier.Free,
                     IsMetered = false
                 },
                 _ => new TransitCostProfile
                 {
-                    CostPerGB = 0.005m,
+                    CostPerGb = 0.005m,
                     FixedCostPerTransfer = 0.001m,
                     Tier = TransitCostTier.Metered,
                     IsMetered = true

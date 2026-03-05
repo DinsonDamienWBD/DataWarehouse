@@ -46,7 +46,7 @@ namespace DataWarehouse.SDK.Primitives
         /// <summary>
         /// AI/ML providers (OpenAI, Claude, Ollama, Copilot, embeddings).
         /// </summary>
-        AIProvider,
+        AiProvider,
 
         /// <summary>
         /// Federation and replication for distributed deployments.

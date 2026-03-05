@@ -423,7 +423,7 @@ public sealed class PluginNewCommand : ICliCommand
         {
             "storage" => GenerateStorageImplementation(),
             "pipeline" => GeneratePipelineImplementation(),
-            "ai" => GenerateAIImplementation(),
+            "ai" => GenerateAiImplementation(),
             _ => GenerateFeatureImplementation()
         };
 
@@ -509,7 +509,7 @@ public sealed class {pluginName}Plugin : {baseClass}
     }";
     }
 
-    private string GenerateAIImplementation()
+    private string GenerateAiImplementation()
     {
         return @"
     public Task<string> GenerateAsync(string prompt, CancellationToken cancellationToken = default)
@@ -1081,19 +1081,19 @@ public sealed class ConfigCommand : ICliCommand
 /// GraphQL federation gateway for unified API access.
 /// Provides modern API experience for developers.
 /// </summary>
-public sealed class GraphQLGateway : IAsyncDisposable
+public sealed class GraphQlGateway : IAsyncDisposable
 {
-    private readonly BoundedDictionary<string, GraphQLService> _services = new BoundedDictionary<string, GraphQLService>(1000);
-    private readonly BoundedDictionary<string, GraphQLType> _types = new BoundedDictionary<string, GraphQLType>(1000);
-    private readonly GraphQLGatewayOptions _options;
-    private readonly IGraphQLMetrics? _metrics;
+    private readonly BoundedDictionary<string, GraphQlService> _services = new BoundedDictionary<string, GraphQlService>(1000);
+    private readonly BoundedDictionary<string, GraphQlType> _types = new BoundedDictionary<string, GraphQlType>(1000);
+    private readonly GraphQlGatewayOptions _options;
+    private readonly IGraphQlMetrics? _metrics;
     private volatile bool _disposed;
 
-    public GraphQLGateway(
-        GraphQLGatewayOptions? options = null,
-        IGraphQLMetrics? metrics = null)
+    public GraphQlGateway(
+        GraphQlGatewayOptions? options = null,
+        IGraphQlMetrics? metrics = null)
     {
-        _options = options ?? new GraphQLGatewayOptions();
+        _options = options ?? new GraphQlGatewayOptions();
         _metrics = metrics;
 
         RegisterBuiltInTypes();
@@ -1102,7 +1102,7 @@ public sealed class GraphQLGateway : IAsyncDisposable
     /// <summary>
     /// Registers a federated service.
     /// </summary>
-    public void RegisterService(GraphQLService service)
+    public void RegisterService(GraphQlService service)
     {
         _services[service.Name] = service;
 
@@ -1116,8 +1116,8 @@ public sealed class GraphQLGateway : IAsyncDisposable
     /// <summary>
     /// Executes a GraphQL query.
     /// </summary>
-    public async Task<GraphQLResult> ExecuteAsync(
-        GraphQLRequest request,
+    public async Task<GraphQlResult> ExecuteAsync(
+        GraphQlRequest request,
         CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
@@ -1133,14 +1133,14 @@ public sealed class GraphQLGateway : IAsyncDisposable
             var validationErrors = ValidateDocument(document);
             if (validationErrors.Count > 0)
             {
-                return new GraphQLResult
+                return new GraphQlResult
                 {
-                    Errors = validationErrors.Select(e => new GraphQLError { Message = e }).ToList()
+                    Errors = validationErrors.Select(e => new GraphQlError { Message = e }).ToList()
                 };
             }
 
             // Create execution context
-            var context = new GraphQLExecutionContext
+            var context = new GraphQlExecutionContext
             {
                 Document = document,
                 Variables = request.Variables ?? new Dictionary<string, object>(),
@@ -1153,7 +1153,7 @@ public sealed class GraphQLGateway : IAsyncDisposable
             stopwatch.Stop();
             _metrics?.RecordQuery(request.OperationName ?? "anonymous", stopwatch.Elapsed);
 
-            return new GraphQLResult
+            return new GraphQlResult
             {
                 Data = data,
                 Extensions = _options.IncludeExecutionMetrics
@@ -1169,9 +1169,9 @@ public sealed class GraphQLGateway : IAsyncDisposable
             stopwatch.Stop();
             _metrics?.RecordError(ex);
 
-            return new GraphQLResult
+            return new GraphQlResult
             {
-                Errors = new List<GraphQLError>
+                Errors = new List<GraphQlError>
                 {
                     new() { Message = ex.Message }
                 }
@@ -1233,15 +1233,15 @@ public sealed class GraphQLGateway : IAsyncDisposable
     /// </summary>
     public void RegisterDataWarehouseSchema()
     {
-        var dwService = new GraphQLService
+        var dwService = new GraphQlService
         {
             Name = "DataWarehouse",
-            Types = new List<GraphQLType>
+            Types = new List<GraphQlType>
             {
                 new()
                 {
                     Name = "StorageItem",
-                    Fields = new List<GraphQLField>
+                    Fields = new List<GraphQlField>
                     {
                         new() { Name = "key", Type = "String!" },
                         new() { Name = "size", Type = "Int!" },
@@ -1254,7 +1254,7 @@ public sealed class GraphQLGateway : IAsyncDisposable
                 new()
                 {
                     Name = "Plugin",
-                    Fields = new List<GraphQLField>
+                    Fields = new List<GraphQlField>
                     {
                         new() { Name = "id", Type = "ID!" },
                         new() { Name = "name", Type = "String!" },
@@ -1267,7 +1267,7 @@ public sealed class GraphQLGateway : IAsyncDisposable
                 new()
                 {
                     Name = "HealthStatus",
-                    Fields = new List<GraphQLField>
+                    Fields = new List<GraphQlField>
                     {
                         new() { Name = "status", Type = "String!" },
                         new() { Name = "components", Type = "[ComponentHealth!]!" },
@@ -1278,7 +1278,7 @@ public sealed class GraphQLGateway : IAsyncDisposable
                 new()
                 {
                     Name = "ComponentHealth",
-                    Fields = new List<GraphQLField>
+                    Fields = new List<GraphQlField>
                     {
                         new() { Name = "name", Type = "String!" },
                         new() { Name = "status", Type = "String!" },
@@ -1288,7 +1288,7 @@ public sealed class GraphQLGateway : IAsyncDisposable
                 new()
                 {
                     Name = "PipelineResult",
-                    Fields = new List<GraphQLField>
+                    Fields = new List<GraphQlField>
                     {
                         new() { Name = "success", Type = "Boolean!" },
                         new() { Name = "stages", Type = "[StageResult!]!" },
@@ -1298,7 +1298,7 @@ public sealed class GraphQLGateway : IAsyncDisposable
                 new()
                 {
                     Name = "StageResult",
-                    Fields = new List<GraphQLField>
+                    Fields = new List<GraphQlField>
                     {
                         new() { Name = "name", Type = "String!" },
                         new() { Name = "success", Type = "Boolean!" },
@@ -1308,22 +1308,22 @@ public sealed class GraphQLGateway : IAsyncDisposable
                     }
                 }
             },
-            Queries = new List<GraphQLOperation>
+            Queries = new List<GraphQlOperation>
             {
-                new() { Name = "storage", Arguments = new List<GraphQLArgument> { new() { Name = "key", Type = "String!" } }, ReturnType = "StorageItem" },
-                new() { Name = "storageList", Arguments = new List<GraphQLArgument> { new() { Name = "prefix", Type = "String" }, new() { Name = "limit", Type = "Int" } }, ReturnType = "[StorageItem!]!" },
-                new() { Name = "plugins", Arguments = new List<GraphQLArgument>(), ReturnType = "[Plugin!]!" },
-                new() { Name = "plugin", Arguments = new List<GraphQLArgument> { new() { Name = "id", Type = "ID!" } }, ReturnType = "Plugin" },
-                new() { Name = "health", Arguments = new List<GraphQLArgument>(), ReturnType = "HealthStatus!" },
-                new() { Name = "pipelineConfig", Arguments = new List<GraphQLArgument>(), ReturnType = "JSON!" }
+                new() { Name = "storage", Arguments = new List<GraphQlArgument> { new() { Name = "key", Type = "String!" } }, ReturnType = "StorageItem" },
+                new() { Name = "storageList", Arguments = new List<GraphQlArgument> { new() { Name = "prefix", Type = "String" }, new() { Name = "limit", Type = "Int" } }, ReturnType = "[StorageItem!]!" },
+                new() { Name = "plugins", Arguments = new List<GraphQlArgument>(), ReturnType = "[Plugin!]!" },
+                new() { Name = "plugin", Arguments = new List<GraphQlArgument> { new() { Name = "id", Type = "ID!" } }, ReturnType = "Plugin" },
+                new() { Name = "health", Arguments = new List<GraphQlArgument>(), ReturnType = "HealthStatus!" },
+                new() { Name = "pipelineConfig", Arguments = new List<GraphQlArgument>(), ReturnType = "JSON!" }
             },
-            Mutations = new List<GraphQLOperation>
+            Mutations = new List<GraphQlOperation>
             {
-                new() { Name = "storageWrite", Arguments = new List<GraphQLArgument> { new() { Name = "key", Type = "String!" }, new() { Name = "data", Type = "String!" }, new() { Name = "contentType", Type = "String" } }, ReturnType = "StorageItem!" },
-                new() { Name = "storageDelete", Arguments = new List<GraphQLArgument> { new() { Name = "key", Type = "String!" } }, ReturnType = "Boolean!" },
-                new() { Name = "pluginStart", Arguments = new List<GraphQLArgument> { new() { Name = "id", Type = "ID!" } }, ReturnType = "Plugin!" },
-                new() { Name = "pluginStop", Arguments = new List<GraphQLArgument> { new() { Name = "id", Type = "ID!" } }, ReturnType = "Plugin!" },
-                new() { Name = "pipelineExecute", Arguments = new List<GraphQLArgument> { new() { Name = "data", Type = "String!" }, new() { Name = "stages", Type = "[String!]" } }, ReturnType = "PipelineResult!" }
+                new() { Name = "storageWrite", Arguments = new List<GraphQlArgument> { new() { Name = "key", Type = "String!" }, new() { Name = "data", Type = "String!" }, new() { Name = "contentType", Type = "String" } }, ReturnType = "StorageItem!" },
+                new() { Name = "storageDelete", Arguments = new List<GraphQlArgument> { new() { Name = "key", Type = "String!" } }, ReturnType = "Boolean!" },
+                new() { Name = "pluginStart", Arguments = new List<GraphQlArgument> { new() { Name = "id", Type = "ID!" } }, ReturnType = "Plugin!" },
+                new() { Name = "pluginStop", Arguments = new List<GraphQlArgument> { new() { Name = "id", Type = "ID!" } }, ReturnType = "Plugin!" },
+                new() { Name = "pipelineExecute", Arguments = new List<GraphQlArgument> { new() { Name = "data", Type = "String!" }, new() { Name = "stages", Type = "[String!]" } }, ReturnType = "PipelineResult!" }
             }
         };
 
@@ -1332,16 +1332,16 @@ public sealed class GraphQLGateway : IAsyncDisposable
 
     private void RegisterBuiltInTypes()
     {
-        _types["String"] = new GraphQLType { Name = "String", IsBuiltIn = true };
-        _types["Int"] = new GraphQLType { Name = "Int", IsBuiltIn = true };
-        _types["Float"] = new GraphQLType { Name = "Float", IsBuiltIn = true };
-        _types["Boolean"] = new GraphQLType { Name = "Boolean", IsBuiltIn = true };
-        _types["ID"] = new GraphQLType { Name = "ID", IsBuiltIn = true };
-        _types["DateTime"] = new GraphQLType { Name = "DateTime", IsBuiltIn = true };
-        _types["JSON"] = new GraphQLType { Name = "JSON", IsBuiltIn = true };
+        _types["String"] = new GraphQlType { Name = "String", IsBuiltIn = true };
+        _types["Int"] = new GraphQlType { Name = "Int", IsBuiltIn = true };
+        _types["Float"] = new GraphQlType { Name = "Float", IsBuiltIn = true };
+        _types["Boolean"] = new GraphQlType { Name = "Boolean", IsBuiltIn = true };
+        _types["ID"] = new GraphQlType { Name = "ID", IsBuiltIn = true };
+        _types["DateTime"] = new GraphQlType { Name = "DateTime", IsBuiltIn = true };
+        _types["JSON"] = new GraphQlType { Name = "JSON", IsBuiltIn = true };
     }
 
-    private GraphQLDocument ParseQuery(string query)
+    private GraphQlDocument ParseQuery(string query)
     {
         // WARNING: Simplified parser for development/prototyping only.
         // Production deployments MUST replace this with a proper GraphQL parser
@@ -1349,9 +1349,9 @@ public sealed class GraphQLGateway : IAsyncDisposable
         // - Nested selections, aliases, fragments, directives, variables
         // - Proper error recovery and source location tracking
         // - Query validation against schema
-        var document = new GraphQLDocument
+        var document = new GraphQlDocument
         {
-            Operations = new List<GraphQLOperationDefinition>()
+            Operations = new List<GraphQlOperationDefinition>()
         };
 
         // Very simplified parsing - just extract operation type and selections
@@ -1363,7 +1363,7 @@ public sealed class GraphQLGateway : IAsyncDisposable
             operationType = "mutation";
         }
 
-        document.Operations.Add(new GraphQLOperationDefinition
+        document.Operations.Add(new GraphQlOperationDefinition
         {
             OperationType = operationType,
             Selections = ExtractSelections(query)
@@ -1372,9 +1372,9 @@ public sealed class GraphQLGateway : IAsyncDisposable
         return document;
     }
 
-    private List<GraphQLSelection> ExtractSelections(string query)
+    private List<GraphQlSelection> ExtractSelections(string query)
     {
-        var selections = new List<GraphQLSelection>();
+        var selections = new List<GraphQlSelection>();
 
         // Simple regex-free extraction
         var braceStart = query.IndexOf('{');
@@ -1390,7 +1390,7 @@ public sealed class GraphQLGateway : IAsyncDisposable
                 var fieldName = field.Trim().Split(new[] { ' ', '(', '{' })[0];
                 if (!string.IsNullOrEmpty(fieldName))
                 {
-                    selections.Add(new GraphQLSelection { FieldName = fieldName });
+                    selections.Add(new GraphQlSelection { FieldName = fieldName });
                 }
             }
         }
@@ -1398,7 +1398,7 @@ public sealed class GraphQLGateway : IAsyncDisposable
         return selections;
     }
 
-    private List<string> ValidateDocument(GraphQLDocument document)
+    private List<string> ValidateDocument(GraphQlDocument document)
     {
         var errors = new List<string>();
 
@@ -1411,7 +1411,7 @@ public sealed class GraphQLGateway : IAsyncDisposable
     }
 
     private async Task<Dictionary<string, object?>> ExecuteDocumentAsync(
-        GraphQLExecutionContext context,
+        GraphQlExecutionContext context,
         CancellationToken cancellationToken)
     {
         var result = new Dictionary<string, object?>();
@@ -1437,7 +1437,7 @@ public sealed class GraphQLGateway : IAsyncDisposable
         return result;
     }
 
-    private Func<GraphQLExecutionContext, CancellationToken, Task<object?>>? FindResolver(
+    private Func<GraphQlExecutionContext, CancellationToken, Task<object?>>? FindResolver(
         string operationType,
         string fieldName)
     {
@@ -1463,7 +1463,7 @@ public sealed class GraphQLGateway : IAsyncDisposable
         };
     }
 
-    private string FormatArguments(IReadOnlyList<GraphQLArgument> arguments)
+    private string FormatArguments(IReadOnlyList<GraphQlArgument> arguments)
     {
         if (arguments.Count == 0)
         {
@@ -1480,104 +1480,104 @@ public sealed class GraphQLGateway : IAsyncDisposable
     }
 }
 
-public sealed class GraphQLRequest
+public sealed class GraphQlRequest
 {
     public required string Query { get; init; }
     public string? OperationName { get; init; }
     public Dictionary<string, object>? Variables { get; init; }
 }
 
-public sealed class GraphQLResult
+public sealed class GraphQlResult
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, object?>? Data { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
-    public List<GraphQLError>? Errors { get; init; }
+    public List<GraphQlError>? Errors { get; init; }
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public Dictionary<string, object>? Extensions { get; init; }
 }
 
-public sealed class GraphQLError
+public sealed class GraphQlError
 {
     public required string Message { get; init; }
     public string? Path { get; init; }
-    public List<GraphQLLocation>? Locations { get; init; }
+    public List<GraphQlLocation>? Locations { get; init; }
 }
 
-public sealed class GraphQLLocation
+public sealed class GraphQlLocation
 {
     public int Line { get; init; }
     public int Column { get; init; }
 }
 
-public sealed class GraphQLService
+public sealed class GraphQlService
 {
     public required string Name { get; init; }
     public string? Url { get; init; }
-    public List<GraphQLType> Types { get; init; } = new();
-    public List<GraphQLOperation> Queries { get; init; } = new();
-    public List<GraphQLOperation> Mutations { get; init; } = new();
+    public List<GraphQlType> Types { get; init; } = new();
+    public List<GraphQlOperation> Queries { get; init; } = new();
+    public List<GraphQlOperation> Mutations { get; init; } = new();
 }
 
-public sealed class GraphQLType
+public sealed class GraphQlType
 {
     public required string Name { get; init; }
-    public List<GraphQLField> Fields { get; init; } = new();
+    public List<GraphQlField> Fields { get; init; } = new();
     public bool IsBuiltIn { get; init; }
 }
 
-public sealed class GraphQLField
+public sealed class GraphQlField
 {
     public required string Name { get; init; }
     public required string Type { get; init; }
     public string? Description { get; init; }
 }
 
-public sealed class GraphQLOperation
+public sealed class GraphQlOperation
 {
     public required string Name { get; init; }
-    public List<GraphQLArgument> Arguments { get; init; } = new();
+    public List<GraphQlArgument> Arguments { get; init; } = new();
     public required string ReturnType { get; init; }
-    public Func<GraphQLExecutionContext, CancellationToken, Task<object?>>? Resolver { get; init; }
+    public Func<GraphQlExecutionContext, CancellationToken, Task<object?>>? Resolver { get; init; }
 }
 
-public sealed class GraphQLArgument
+public sealed class GraphQlArgument
 {
     public required string Name { get; init; }
     public required string Type { get; init; }
     public object? DefaultValue { get; init; }
 }
 
-public sealed class GraphQLDocument
+public sealed class GraphQlDocument
 {
-    public List<GraphQLOperationDefinition> Operations { get; init; } = new();
+    public List<GraphQlOperationDefinition> Operations { get; init; } = new();
 }
 
-public sealed class GraphQLOperationDefinition
+public sealed class GraphQlOperationDefinition
 {
     public required string OperationType { get; init; }
     public string? Name { get; init; }
-    public List<GraphQLSelection> Selections { get; init; } = new();
+    public List<GraphQlSelection> Selections { get; init; } = new();
 }
 
-public sealed class GraphQLSelection
+public sealed class GraphQlSelection
 {
     public required string FieldName { get; init; }
     public string? Alias { get; init; }
     public Dictionary<string, object>? Arguments { get; init; }
-    public List<GraphQLSelection>? SubSelections { get; init; }
+    public List<GraphQlSelection>? SubSelections { get; init; }
 }
 
-public sealed class GraphQLExecutionContext
+public sealed class GraphQlExecutionContext
 {
-    public required GraphQLDocument Document { get; init; }
+    public required GraphQlDocument Document { get; init; }
     public Dictionary<string, object> Variables { get; init; } = new();
     public string? OperationName { get; init; }
 }
 
-public sealed class GraphQLGatewayOptions
+public sealed class GraphQlGatewayOptions
 {
     public bool IncludeExecutionMetrics { get; set; } = true;
     public int MaxDepth { get; set; } = 10;
@@ -1585,7 +1585,7 @@ public sealed class GraphQLGatewayOptions
     public TimeSpan Timeout { get; set; } = TimeSpan.FromSeconds(30);
 }
 
-public interface IGraphQLMetrics
+public interface IGraphQlMetrics
 {
     void RecordQuery(string operationName, TimeSpan duration);
     void RecordError(Exception ex);

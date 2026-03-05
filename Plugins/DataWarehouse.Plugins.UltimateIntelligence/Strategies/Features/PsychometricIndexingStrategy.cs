@@ -46,7 +46,7 @@ public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
         string content,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for psychometric analysis");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -58,7 +58,7 @@ public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
 
             var prompt = BuildAnalysisPrompt(content, depth, emotionModel, enablePersonality, enableDeception);
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 800,
@@ -74,7 +74,7 @@ public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
             // Store in vector store for searchability
             if (VectorStore != null)
             {
-                var embedding = await AIProvider.GetEmbeddingsAsync(content, ct);
+                var embedding = await AiProvider.GetEmbeddingsAsync(content, ct);
                 RecordEmbeddings(1);
 
                 await VectorStore.StoreAsync(
@@ -125,14 +125,14 @@ public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
     {
         if (VectorStore == null)
             throw new InvalidOperationException("Vector store required for psychometric search");
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for psychometric search");
 
         return await ExecuteWithTrackingAsync(async () =>
         {
             // Create query embedding based on emotion
             var emotionQuery = $"Content expressing {targetEmotion} emotion with high intensity";
-            var queryEmbedding = await AIProvider.GetEmbeddingsAsync(emotionQuery, ct);
+            var queryEmbedding = await AiProvider.GetEmbeddingsAsync(emotionQuery, ct);
             RecordEmbeddings(1);
 
             var matches = await VectorStore.SearchAsync(
@@ -164,7 +164,7 @@ public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
         string profileId,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -207,7 +207,7 @@ Return JSON:
   ""neuroticism"": 0.0-1.0
 }}";
 
-                var response = await AIProvider.CompleteAsync(new AIRequest
+                var response = await AiProvider.CompleteAsync(new AIRequest
                 {
                     Prompt = prompt,
                     MaxTokens = 200,

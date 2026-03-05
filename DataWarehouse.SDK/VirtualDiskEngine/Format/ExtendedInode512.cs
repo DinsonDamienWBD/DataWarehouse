@@ -18,7 +18,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Format;
 ///   [320..328)  AccessedNs                  (long, nanosecond timestamp)
 ///   [328..392)  InlineXattrArea             (64 bytes, inline extended attributes)
 ///   [392..400)  CompressionDictionaryRef    (long, block number of compression dict)
-///   [400..416)  PerObjectEncryptionIV       (16 bytes, AES-256 initialization vector)
+///   [400..416)  PerObjectEncryptionIv       (16 bytes, AES-256 initialization vector)
 ///   [416..424)  MvccVersionChainHead        (long, block number of version chain head)
 ///   [424..432)  MvccTransactionId           (long, current transaction ID)
 ///   [432..436)  SnapshotRefCount            (int, number of snapshots referencing this inode)
@@ -43,7 +43,7 @@ public sealed class ExtendedInode512
     public const int MaxInlineXattrSize = 64;
 
     /// <summary>Size of the per-object encryption IV in bytes.</summary>
-    public const int EncryptionIVSize = 16;
+    public const int EncryptionIvSize = 16;
 
     /// <summary>Size of the replication vector clock in bytes.</summary>
     public const int ReplicationVectorSize = 16;
@@ -122,7 +122,7 @@ public sealed class ExtendedInode512
     public long CompressionDictionaryRef { get; set; }
 
     /// <summary>Per-object encryption initialization vector (16 bytes, AES-256).</summary>
-    public byte[] PerObjectEncryptionIV { get; set; } = new byte[EncryptionIVSize];
+    public byte[] PerObjectEncryptionIv { get; set; } = new byte[EncryptionIvSize];
 
     /// <summary>Block number of the MVCC version chain head (0 if none).</summary>
     public long MvccVersionChainHead { get; set; }
@@ -266,7 +266,7 @@ public sealed class ExtendedInode512
         BinaryPrimitives.WriteInt64LittleEndian(buffer[(o + 88)..(o + 96)], inode.CompressionDictionaryRef);
 
         // Per-object encryption IV (16 bytes at offset 400)
-        inode.PerObjectEncryptionIV.AsSpan(0, EncryptionIVSize).CopyTo(buffer[(o + 96)..(o + 112)]);
+        inode.PerObjectEncryptionIv.AsSpan(0, EncryptionIvSize).CopyTo(buffer[(o + 96)..(o + 112)]);
 
         // MVCC version chain head (8 bytes at offset 416)
         BinaryPrimitives.WriteInt64LittleEndian(buffer[(o + 112)..(o + 120)], inode.MvccVersionChainHead);
@@ -327,7 +327,7 @@ public sealed class ExtendedInode512
 
         buffer.Slice(o + 24, MaxInlineXattrSize).CopyTo(inode.InlineXattrArea);
         inode.CompressionDictionaryRef = BinaryPrimitives.ReadInt64LittleEndian(buffer[(o + 88)..(o + 96)]);
-        buffer.Slice(o + 96, EncryptionIVSize).CopyTo(inode.PerObjectEncryptionIV);
+        buffer.Slice(o + 96, EncryptionIvSize).CopyTo(inode.PerObjectEncryptionIv);
         inode.MvccVersionChainHead = BinaryPrimitives.ReadInt64LittleEndian(buffer[(o + 112)..(o + 120)]);
         inode.MvccTransactionId = BinaryPrimitives.ReadInt64LittleEndian(buffer[(o + 120)..(o + 128)]);
         inode.SnapshotRefCount = BinaryPrimitives.ReadInt32LittleEndian(buffer[(o + 128)..(o + 132)]);

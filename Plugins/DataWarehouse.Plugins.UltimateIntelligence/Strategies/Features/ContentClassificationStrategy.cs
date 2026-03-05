@@ -45,7 +45,7 @@ public sealed class ContentClassificationStrategy : FeatureStrategyBase
         string[]? categories = null,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider not configured for classification");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -84,7 +84,7 @@ Return your classification as JSON with format:
 }}";
             }
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 500,
@@ -130,7 +130,7 @@ Return your classification as JSON with format:
     {
         if (VectorStore == null)
             throw new InvalidOperationException("Vector store required for training custom classifier");
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for training custom classifier");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -141,7 +141,7 @@ Return your classification as JSON with format:
             // Create embeddings for all examples
             foreach (var (content, category) in exampleList)
             {
-                var embedding = await AIProvider.GetEmbeddingsAsync(content, ct);
+                var embedding = await AiProvider.GetEmbeddingsAsync(content, ct);
                 await VectorStore.StoreAsync(
                     $"{classifierId}-{Guid.NewGuid():N}",
                     embedding,
@@ -178,12 +178,12 @@ Return your classification as JSON with format:
         int topK = 5,
         CancellationToken ct = default)
     {
-        if (VectorStore == null || AIProvider == null)
+        if (VectorStore == null || AiProvider == null)
             throw new InvalidOperationException("Vector store and AI provider required");
 
         return await ExecuteWithTrackingAsync(async () =>
         {
-            var embedding = await AIProvider.GetEmbeddingsAsync(content, ct);
+            var embedding = await AiProvider.GetEmbeddingsAsync(content, ct);
             RecordEmbeddings(1);
 
             var matches = await VectorStore.SearchAsync(

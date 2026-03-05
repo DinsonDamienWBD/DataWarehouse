@@ -270,7 +270,7 @@ namespace DataWarehouse.SDK.Contracts.Transit
         /// <summary>
         /// Cost per gigabyte transferred.
         /// </summary>
-        public decimal CostPerGB { get; init; }
+        public decimal CostPerGb { get; init; }
 
         /// <summary>
         /// Fixed cost per transfer operation.

@@ -30,7 +30,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Recovery;
 ///   +0x13C 64 bytes  VolumeLabel    (UTF-8, null-padded)
 ///   +0x17C 32 bytes  NamespacePrefix (UTF-8, null-padded)
 ///   +0x19C 256 bytes RecoveryNotes  (UTF-8, null-padded)
-///   +0x29C 32 bytes  RecoveryHMAC   (HMAC-BLAKE3; BCL stand-in: HMACSHA256)
+///   +0x29C 32 bytes  RecoveryHmac   (HMAC-BLAKE3; BCL stand-in: HMACSHA256)
 ///   (remainder zeroed)
 ///
 /// HMAC covers bytes [0x00..0x29B] (everything before the HMAC field).
@@ -112,7 +112,7 @@ public sealed class EmergencyRecoveryBlock
     public string RecoveryNotes { get; set; } = string.Empty;
 
     /// <summary>HMAC integrity seal (32 bytes, HMAC-BLAKE3 in production / HMACSHA256 stand-in).</summary>
-    public byte[] RecoveryHMAC { get; set; } = new byte[RecoveryHmacSize];
+    public byte[] RecoveryHmac { get; set; } = new byte[RecoveryHmacSize];
 
     // ── Serialization ────────────────────────────────────────────────────
 
@@ -187,8 +187,8 @@ public sealed class EmergencyRecoveryBlock
         // +0x19C: RecoveryNotes (256 bytes, UTF-8 null-padded)
         WriteFixedString(buffer.Slice(RecoveryNotesOffset), RecoveryNotes, RecoveryNotesSize);
 
-        // +0x29C: RecoveryHMAC (32 bytes)
-        var hmac = RecoveryHMAC ?? Array.Empty<byte>();
+        // +0x29C: RecoveryHmac (32 bytes)
+        var hmac = RecoveryHmac ?? Array.Empty<byte>();
         var hmacLen = Math.Min(hmac.Length, RecoveryHmacSize);
         hmac.AsSpan(0, hmacLen).CopyTo(buffer.Slice(RecoveryHmacOffset));
 
@@ -262,7 +262,7 @@ public sealed class EmergencyRecoveryBlock
             VolumeLabel = volumeLabel,
             NamespacePrefix = namespacePrefix,
             RecoveryNotes = recoveryNotes,
-            RecoveryHMAC = hmac,
+            RecoveryHmac = hmac,
         };
     }
 
@@ -281,15 +281,15 @@ public sealed class EmergencyRecoveryBlock
         int blockSize = (int)BlockSize > 0 ? (int)BlockSize : FormatConstants.DefaultBlockSize;
         var temp = new byte[blockSize];
         // Temporarily clear HMAC field, serialize, then compute over [0..0x29B]
-        var savedHmac = RecoveryHMAC;
-        RecoveryHMAC = new byte[RecoveryHmacSize];
+        var savedHmac = RecoveryHmac;
+        RecoveryHmac = new byte[RecoveryHmacSize];
         try
         {
             Serialize(temp, blockSize);
         }
         finally
         {
-            RecoveryHMAC = savedHmac;
+            RecoveryHmac = savedHmac;
         }
 
         // HMAC covers bytes [0x00..0x29B] (668 bytes)
@@ -298,13 +298,13 @@ public sealed class EmergencyRecoveryBlock
     }
 
     /// <summary>
-    /// Verifies the stored <see cref="RecoveryHMAC"/> by recomputing it from the current
+    /// Verifies the stored <see cref="RecoveryHmac"/> by recomputing it from the current
     /// field values and performing a constant-time comparison.
     /// </summary>
     public bool VerifyHmac(byte[] hmacKey)
     {
         var expected = ComputeHmac(hmacKey);
-        return CryptographicOperations.FixedTimeEquals(expected, RecoveryHMAC);
+        return CryptographicOperations.FixedTimeEquals(expected, RecoveryHmac);
     }
 
     // ── String Helpers ────────────────────────────────────────────────────

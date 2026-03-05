@@ -38,9 +38,10 @@ public sealed class VisualFeatureSignature
     public required float ConfidenceScore { get; init; }
 
     /// <summary>
-    /// Gets the timestamp when the visual features were captured.
+    /// Gets the timestamp when the visual features were captured (UTC).
+    /// Uses DateTimeOffset for unambiguous timezone representation.
     /// </summary>
-    public required DateTime CapturedAt { get; init; }
+    public required DateTimeOffset CapturedAt { get; init; }
 
     /// <summary>
     /// Gets optional metadata about the capture environment.
@@ -59,6 +60,6 @@ public sealed class VisualFeatureSignature
         return FeatureDescriptors.Length > 0 &&
                !string.IsNullOrWhiteSpace(SignatureAlgorithm) &&
                ConfidenceScore >= 0.0f && ConfidenceScore <= 1.0f &&
-               CapturedAt <= DateTime.UtcNow;
+               CapturedAt <= DateTimeOffset.UtcNow;
     }
 }

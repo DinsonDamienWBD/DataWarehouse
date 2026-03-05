@@ -38,27 +38,27 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <summary>
         /// Success return code for CUDA operations.
         /// </summary>
-        internal const int CUDA_SUCCESS = 0;
+        internal const int CudaSuccess = 0;
 
         /// <summary>
         /// CUDA error codes (minimal subset).
         /// </summary>
-        internal enum cudaError
+        internal enum CudaError
         {
-            cudaSuccess = 0,
-            cudaErrorInvalidValue = 1,
-            cudaErrorMemoryAllocation = 2,
-            cudaErrorInitializationError = 3,
-            cudaErrorInvalidDevice = 10,
-            cudaErrorNoDevice = 100,
+            CudaSuccess = 0,
+            CudaErrorInvalidValue = 1,
+            CudaErrorMemoryAllocation = 2,
+            CudaErrorInitializationError = 3,
+            CudaErrorInvalidDevice = 10,
+            CudaErrorNoDevice = 100,
         }
 
         /// <summary>
         /// Memory copy direction constants.
         /// </summary>
-        internal const int cudaMemcpyHostToDevice = 1;
-        internal const int cudaMemcpyDeviceToHost = 2;
-        internal const int cudaMemcpyDeviceToDevice = 3;
+        internal const int CudaMemcpyHostToDevice = 1;
+        internal const int CudaMemcpyDeviceToHost = 2;
+        internal const int CudaMemcpyDeviceToDevice = 3;
 
         /// <summary>
         /// Gets the number of CUDA-capable devices.

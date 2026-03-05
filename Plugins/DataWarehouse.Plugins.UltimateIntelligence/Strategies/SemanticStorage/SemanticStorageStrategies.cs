@@ -264,7 +264,7 @@ public sealed class OntologyBasedOrganizationStrategy : FeatureStrategyBase
             }
 
             // Use AI for enhanced classification if available
-            if (AIProvider != null && results.Count == 0)
+            if (AiProvider != null && results.Count == 0)
             {
                 var aiClassification = await ClassifyWithAIAsync(content, ct);
                 results.AddRange(aiClassification);
@@ -476,13 +476,13 @@ public sealed class OntologyBasedOrganizationStrategy : FeatureStrategyBase
 
     private async Task<List<OntologyClassMatch>> ClassifyWithAIAsync(string content, CancellationToken ct)
     {
-        if (AIProvider == null || _classes.Count == 0)
+        if (AiProvider == null || _classes.Count == 0)
             return new List<OntologyClassMatch>();
 
         var classLabels = _classes.Values.Select(c => c.Label).Take(20).ToList();
         var prompt = $"Classify the following content into one of these categories: {string.Join(", ", classLabels)}\n\nContent: {content.Substring(0, Math.Min(500, content.Length))}\n\nRespond with only the category name.";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 50 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 50 }, ct);
 
         var matchedClass = _classes.Values.FirstOrDefault(c =>
             c.Label.Equals(response.Content?.Trim(), StringComparison.OrdinalIgnoreCase));
@@ -620,9 +620,9 @@ public sealed class SemanticDataLinkingStrategy : FeatureStrategyBase
         return ExecuteWithTrackingAsync(async () =>
         {
             // Generate embedding if not provided and AI is available
-            if (embedding == null && AIProvider != null && content.Length > 0)
+            if (embedding == null && AiProvider != null && content.Length > 0)
             {
-                embedding = await AIProvider.GetEmbeddingsAsync(content, ct);
+                embedding = await AiProvider.GetEmbeddingsAsync(content, ct);
                 RecordEmbeddings(1);
             }
 
@@ -1033,9 +1033,9 @@ public sealed class DataMeaningPreservationStrategy : FeatureStrategyBase
 
             // Generate embedding if AI is available
             float[]? embedding = null;
-            if (AIProvider != null)
+            if (AiProvider != null)
             {
-                embedding = await AIProvider.GetEmbeddingsAsync(content, ct);
+                embedding = await AiProvider.GetEmbeddingsAsync(content, ct);
                 RecordEmbeddings(1);
             }
 
@@ -1134,10 +1134,10 @@ public sealed class DataMeaningPreservationStrategy : FeatureStrategyBase
             var sharedConcepts = originalConcepts.Intersect(modifiedConcepts).ToList();
 
             float embeddingSimilarity = 0;
-            if (AIProvider != null)
+            if (AiProvider != null)
             {
-                var origEmb = await AIProvider.GetEmbeddingsAsync(original, ct);
-                var modEmb = await AIProvider.GetEmbeddingsAsync(modified, ct);
+                var origEmb = await AiProvider.GetEmbeddingsAsync(original, ct);
+                var modEmb = await AiProvider.GetEmbeddingsAsync(modified, ct);
                 embeddingSimilarity = CosineSimilarity(origEmb, modEmb);
                 RecordEmbeddings(2);
             }
@@ -1413,7 +1413,7 @@ public sealed class ContextAwareStorageStrategy : FeatureStrategyBase
             string? semanticSummary = null;
             float[]? embedding = null;
 
-            if (AIProvider != null)
+            if (AiProvider != null)
             {
                 var content = Encoding.UTF8.GetString(data);
                 if (content.Length > 0 && content.Length < 10000)
@@ -1423,10 +1423,10 @@ public sealed class ContextAwareStorageStrategy : FeatureStrategyBase
                         Prompt = $"Summarize in one sentence: {content.Substring(0, Math.Min(2000, content.Length))}",
                         MaxTokens = 100
                     };
-                    var response = await AIProvider.CompleteAsync(summaryRequest, ct);
+                    var response = await AiProvider.CompleteAsync(summaryRequest, ct);
                     semanticSummary = response.Content;
 
-                    embedding = await AIProvider.GetEmbeddingsAsync(content, ct);
+                    embedding = await AiProvider.GetEmbeddingsAsync(content, ct);
                     RecordEmbeddings(1);
                 }
             }
@@ -1845,7 +1845,7 @@ public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
             }
 
             // AI-enhanced validation
-            if (GetConfigBool("EnableAIValidation", true) && AIProvider != null)
+            if (GetConfigBool("EnableAIValidation", true) && AiProvider != null)
             {
                 var aiIssues = await ValidateWithAIAsync(content, schema, ct);
                 issues.AddRange(aiIssues);
@@ -1937,7 +1937,7 @@ public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
                 inferences.Add(new SemanticTypeMatch { Type = "Contains-URL", Confidence = 0.95f });
 
             // AI-enhanced inference
-            if (AIProvider != null && inferences.Count == 0)
+            if (AiProvider != null && inferences.Count == 0)
             {
                 var aiType = await InferTypeWithAIAsync(content, ct);
                 if (aiType != null)
@@ -2020,12 +2020,12 @@ public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
 
     private async Task<List<SemanticValidationIssue>> ValidateWithAIAsync(string content, SemanticSchema schema, CancellationToken ct)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             return new List<SemanticValidationIssue>();
 
         var prompt = $"Validate this content against schema '{schema.SchemaId}' with fields: {string.Join(", ", schema.Fields.Select(f => f.Name))}. List any semantic issues found.\n\nContent:\n{content.Substring(0, Math.Min(1000, content.Length))}";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 200 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 200 }, ct);
 
         var issues = new List<SemanticValidationIssue>();
         if (response.Content?.Contains("issue", StringComparison.OrdinalIgnoreCase) == true ||
@@ -2045,12 +2045,12 @@ public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
 
     private async Task<SemanticTypeMatch?> InferTypeWithAIAsync(string content, CancellationToken ct)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             return null;
 
         var prompt = $"What type of data is this? Reply with one word (JSON, XML, CSV, Markdown, PlainText, Code, or Other):\n\n{content.Substring(0, Math.Min(500, content.Length))}";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 20 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 20 }, ct);
 
         if (!string.IsNullOrWhiteSpace(response.Content))
         {
@@ -2221,7 +2221,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
 
             // Verify meaning preservation
             float preservationScore = 0;
-            if (AIProvider != null)
+            if (AiProvider != null)
             {
                 preservationScore = await VerifyMeaningPreservationAsync(content, outputData, ct);
             }
@@ -2275,7 +2275,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
             }
 
             // Use AI for additional alignments
-            if (AIProvider != null)
+            if (AiProvider != null)
             {
                 var aiMappings = await DiscoverAlignmentsWithAIAsync(vocab1, vocab2, ct);
                 termMappings.AddRange(aiMappings.Where(m => !termMappings.Any(t =>
@@ -2373,7 +2373,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
             }
 
             // AI-enhanced annotation
-            if (AIProvider != null)
+            if (AiProvider != null)
             {
                 var aiAnnotations = await AnnotateWithAIAsync(content, vocabulary, ct);
                 annotations.AddRange(aiAnnotations);
@@ -2491,11 +2491,11 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
 
     private async Task<float> VerifyMeaningPreservationAsync(string source, string target, CancellationToken ct)
     {
-        if (AIProvider == null) return 0.5f;
+        if (AiProvider == null) return 0.5f;
 
         var prompt = $"Rate the semantic similarity between these two texts from 0 to 1:\n\nText 1: {source.Substring(0, Math.Min(500, source.Length))}\n\nText 2: {target.Substring(0, Math.Min(500, target.Length))}\n\nRespond with just a number.";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 10 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 10 }, ct);
 
         if (float.TryParse(response.Content?.Trim(), out var score))
             return Math.Clamp(score, 0, 1);
@@ -2505,7 +2505,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
 
     private async Task<List<TermMapping>> DiscoverAlignmentsWithAIAsync(StandardVocabulary vocab1, StandardVocabulary vocab2, CancellationToken ct)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             return new List<TermMapping>();
 
         var terms1 = string.Join(", ", vocab1.Terms.Values.Take(10).Select(t => t.Label));
@@ -2513,7 +2513,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
 
         var prompt = $"Find matching terms between these vocabularies. Format: term1=term2, one per line.\n\nVocabulary 1: {terms1}\nVocabulary 2: {terms2}";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 200 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 200 }, ct);
 
         var mappings = new List<TermMapping>();
         if (response.Content != null)
@@ -2540,13 +2540,13 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
 
     private async Task<List<SemanticAnnotationItem>> AnnotateWithAIAsync(string content, StandardVocabulary vocabulary, CancellationToken ct)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             return new List<SemanticAnnotationItem>();
 
         var termList = string.Join(", ", vocabulary.Terms.Values.Take(20).Select(t => t.Label));
         var prompt = $"Which of these terms apply to this content? List applicable terms.\n\nTerms: {termList}\n\nContent: {content.Substring(0, Math.Min(500, content.Length))}";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 100 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 100 }, ct);
 
         var annotations = new List<SemanticAnnotationItem>();
         if (response.Content != null)

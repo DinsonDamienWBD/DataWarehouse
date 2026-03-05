@@ -590,7 +590,7 @@ public sealed class SelfDescribingExporter
         src.InlineXattrArea.AsSpan().CopyTo(dst.InlineXattrArea.AsSpan());
 
         // Copy encryption IV
-        src.PerObjectEncryptionIV.AsSpan().CopyTo(dst.PerObjectEncryptionIV.AsSpan());
+        src.PerObjectEncryptionIv.AsSpan().CopyTo(dst.PerObjectEncryptionIv.AsSpan());
 
         // Copy replication vector
         src.ReplicationVector.AsSpan().CopyTo(dst.ReplicationVector.AsSpan());

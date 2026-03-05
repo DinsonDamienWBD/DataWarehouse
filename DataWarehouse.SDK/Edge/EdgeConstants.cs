@@ -19,7 +19,7 @@ public static class EdgeConstants
     /// On most Raspberry Pi and similar boards, /dev/i2c-1 is the default user-accessible I2C bus.
     /// /dev/i2c-0 is often reserved for HAT EEPROM or internal use.
     /// </remarks>
-    public const int DefaultI2cBusId = 1;
+    public const int DefaultI2CBusId = 1;
 
     /// <summary>
     /// Default SPI bus ID on Linux (/dev/spidev0.0).
@@ -59,7 +59,7 @@ public static class EdgeConstants
     /// I2C uses 7-bit addressing, providing 128 possible addresses (0-127).
     /// Some addresses are reserved (0x00-0x07, 0x78-0x7F) for special purposes.
     /// </remarks>
-    public const int MaxI2cDeviceAddress = 127;
+    public const int MaxI2CDeviceAddress = 127;
 
     /// <summary>
     /// Maximum SPI chip select line number.

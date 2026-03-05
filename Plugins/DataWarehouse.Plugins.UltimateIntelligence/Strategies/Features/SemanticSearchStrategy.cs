@@ -48,7 +48,7 @@ public sealed class SemanticSearchStrategy : FeatureStrategyBase
         Dictionary<string, object>? filter = null,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider not configured for semantic search");
         if (VectorStore == null)
             throw new InvalidOperationException("Vector store not configured for semantic search");
@@ -56,7 +56,7 @@ public sealed class SemanticSearchStrategy : FeatureStrategyBase
         return await ExecuteWithTrackingAsync(async () =>
         {
             // Get embedding for query
-            var queryEmbedding = await AIProvider.GetEmbeddingsAsync(query, ct);
+            var queryEmbedding = await AiProvider.GetEmbeddingsAsync(query, ct);
             RecordEmbeddings(1);
 
             // Search vector store
@@ -94,14 +94,14 @@ public sealed class SemanticSearchStrategy : FeatureStrategyBase
         Dictionary<string, object>? metadata = null,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider not configured");
         if (VectorStore == null)
             throw new InvalidOperationException("Vector store not configured");
 
         await ExecuteWithTrackingAsync(async () =>
         {
-            var embedding = await AIProvider.GetEmbeddingsAsync(content, ct);
+            var embedding = await AiProvider.GetEmbeddingsAsync(content, ct);
             RecordEmbeddings(1);
 
             var docMetadata = metadata ?? new Dictionary<string, object>();
@@ -120,7 +120,7 @@ public sealed class SemanticSearchStrategy : FeatureStrategyBase
         IEnumerable<(string Id, string Content, Dictionary<string, object>? Metadata)> documents,
         CancellationToken ct = default)
     {
-        if (AIProvider == null || VectorStore == null)
+        if (AiProvider == null || VectorStore == null)
             throw new InvalidOperationException("AI provider and vector store must be configured");
 
         await ExecuteWithTrackingAsync(async () =>
@@ -128,7 +128,7 @@ public sealed class SemanticSearchStrategy : FeatureStrategyBase
             var docList = documents.ToList();
             var contents = docList.Select(d => d.Content).ToArray();
 
-            var embeddings = await AIProvider.GetEmbeddingsBatchAsync(contents, ct);
+            var embeddings = await AiProvider.GetEmbeddingsBatchAsync(contents, ct);
             RecordEmbeddings(embeddings.Length);
 
             var entries = docList.Select((doc, i) =>
@@ -155,7 +155,7 @@ public sealed class SemanticSearchStrategy : FeatureStrategyBase
         List<SemanticSearchResult> results,
         CancellationToken ct)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             return results;
 
         // Use AI to rerank results based on relevance
@@ -166,7 +166,7 @@ public sealed class SemanticSearchStrategy : FeatureStrategyBase
         }
         prompt += "\nReturn the numbers in order of relevance, comma-separated.";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 100 }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 100 }, ct);
 
         // Parse reranking - simplified
         return results;

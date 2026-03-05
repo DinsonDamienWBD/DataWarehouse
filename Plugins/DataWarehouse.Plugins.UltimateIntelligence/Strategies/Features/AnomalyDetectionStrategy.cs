@@ -43,7 +43,7 @@ public sealed class AnomalyDetectionStrategy : FeatureStrategyBase
         IEnumerable<string> normalSamples,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for baseline establishment");
 
         await ExecuteWithTrackingAsync(async () =>
@@ -52,7 +52,7 @@ public sealed class AnomalyDetectionStrategy : FeatureStrategyBase
 
             foreach (var sample in normalSamples)
             {
-                var embedding = await AIProvider.GetEmbeddingsAsync(sample, ct);
+                var embedding = await AiProvider.GetEmbeddingsAsync(sample, ct);
                 _baselineEmbeddings.Add(embedding);
                 RecordEmbeddings(1);
             }
@@ -82,7 +82,7 @@ public sealed class AnomalyDetectionStrategy : FeatureStrategyBase
         string sample,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for anomaly detection");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -90,7 +90,7 @@ public sealed class AnomalyDetectionStrategy : FeatureStrategyBase
             var method = GetConfig("Method") ?? "hybrid";
             var threshold = GetConfigFloat("SensitivityThreshold", 0.95f);
 
-            var embedding = await AIProvider.GetEmbeddingsAsync(sample, ct);
+            var embedding = await AiProvider.GetEmbeddingsAsync(sample, ct);
             RecordEmbeddings(1);
 
             var isAnomaly = false;
@@ -111,7 +111,7 @@ public sealed class AnomalyDetectionStrategy : FeatureStrategyBase
             }
 
             // AI-based detection for hybrid mode
-            if (method is "hybrid" && AIProvider != null)
+            if (method is "hybrid" && AiProvider != null)
             {
                 var prompt = $@"Analyze this data sample for anomalies or unusual patterns:
 
@@ -130,7 +130,7 @@ Return JSON:
   ""reasons"": [""reason1"", ""reason2""]
 }}";
 
-                var response = await AIProvider.CompleteAsync(new AIRequest
+                var response = await AiProvider.CompleteAsync(new AIRequest
                 {
                     Prompt = prompt,
                     MaxTokens = 300,
@@ -214,7 +214,7 @@ Return JSON:
             }
 
             // Optional AI analysis for complex patterns
-            if (AIProvider != null && anomalies.Count > 0)
+            if (AiProvider != null && anomalies.Count > 0)
             {
                 var prompt = $@"Analyze these time series anomalies:
 
@@ -223,7 +223,7 @@ Data points flagged as anomalous:
 
 Provide insights on possible causes and patterns.";
 
-                var response = await AIProvider.CompleteAsync(new AIRequest
+                var response = await AiProvider.CompleteAsync(new AIRequest
                 {
                     Prompt = prompt,
                     MaxTokens = 200

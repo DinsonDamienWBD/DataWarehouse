@@ -480,7 +480,7 @@ public sealed class MetadataHarvestingStrategy : FeatureStrategyBase
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
-            if (AIProvider == null)
+            if (AiProvider == null)
                 throw new InvalidOperationException("AI provider not configured for metadata harvesting");
 
             var request = new AIRequest
@@ -494,7 +494,7 @@ public sealed class MetadataHarvestingStrategy : FeatureStrategyBase
                 Temperature = 0.1f
             };
 
-            var response = await AIProvider.CompleteAsync(request, ct);
+            var response = await AiProvider.CompleteAsync(request, ct);
 
             try
             {
@@ -582,10 +582,10 @@ public sealed class SentimentAnalysisStrategy : FeatureStrategyBase
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
-            if (AIProvider == null)
+            if (AiProvider == null)
                 return new SentimentResult { Sentiment = "neutral", Confidence = 0.5f };
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 SystemMessage = "Analyze the sentiment of the text. Respond with JSON: {\"sentiment\": \"positive|negative|neutral|mixed\", \"confidence\": 0.0-1.0, \"emotions\": [\"joy\", ...]}",
                 Prompt = text, MaxTokens = 100, Temperature = 0.0f
@@ -631,11 +631,11 @@ public sealed class TextClassificationStrategy : FeatureStrategyBase
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
-            if (AIProvider == null)
+            if (AiProvider == null)
                 return new TextClassificationResult { Category = "unknown", Confidence = 0 };
 
             var categoryHint = categories != null ? $" Categories: {string.Join(", ", categories)}." : "";
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 SystemMessage = $"Classify the text.{categoryHint} JSON: {{\"category\": \"...\", \"confidence\": 0.0-1.0, \"subcategories\": [...]}}",
                 Prompt = text, MaxTokens = 100, Temperature = 0.0f
@@ -681,10 +681,10 @@ public sealed class NamedEntityRecognitionStrategy : FeatureStrategyBase
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
-            if (AIProvider == null)
+            if (AiProvider == null)
                 return new NerResult();
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 SystemMessage = "Extract named entities. JSON: {\"entities\": [{\"text\": \"...\", \"type\": \"PERSON|ORG|LOCATION|DATE|MONEY|PRODUCT\", \"start\": 0, \"end\": 5}]}",
                 Prompt = text, MaxTokens = 500, Temperature = 0.0f
@@ -737,9 +737,9 @@ public sealed class SummarizationStrategy : FeatureStrategyBase
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
-            if (AIProvider == null) return text.Length > 200 ? text[..200] + "..." : text;
+            if (AiProvider == null) return text.Length > 200 ? text[..200] + "..." : text;
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 SystemMessage = $"Summarize the text in at most {maxSentences} sentences. Be concise and accurate.",
                 Prompt = text, MaxTokens = maxSentences * 50, Temperature = 0.3f
@@ -776,11 +776,11 @@ public sealed class TranslationStrategy : FeatureStrategyBase
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
-            if (AIProvider == null)
+            if (AiProvider == null)
                 return new TranslationResult { TranslatedText = text, SourceLanguage = sourceLanguage ?? "unknown", TargetLanguage = targetLanguage };
 
             var sourceLang = sourceLanguage != null ? $" from {sourceLanguage}" : "";
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 SystemMessage = $"Translate the text{sourceLang} to {targetLanguage}. Return only the translation, no explanations.",
                 Prompt = text, MaxTokens = text.Length * 2, Temperature = 0.1f
@@ -830,10 +830,10 @@ public sealed class QuestionAnsweringStrategy : FeatureStrategyBase
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
-            if (AIProvider == null)
+            if (AiProvider == null)
                 return new QaResult { Answer = "AI provider not configured", Confidence = 0 };
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 SystemMessage = "Answer the question based on the context. JSON: {\"answer\": \"...\", \"confidence\": 0.0-1.0, \"source_passages\": [\"...\"]}. " +
                     "If the context doesn't contain the answer, say so with low confidence.",
@@ -881,12 +881,12 @@ public sealed class ImageAnalysisStrategy : FeatureStrategyBase
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
-            if (AIProvider == null)
+            if (AiProvider == null)
                 return new ImageAnalysisResult { Description = "AI provider not configured for image analysis" };
 
             // Encode image as base64 for multimodal models
             var base64Image = Convert.ToBase64String(imageData);
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 SystemMessage = "Analyze this image. JSON: {\"description\": \"...\", \"objects\": [\"...\"], \"text\": \"...\", \"tags\": [...]}",
                 Prompt = $"[Image data: {imageData.Length} bytes, type: {mimeType ?? "image/unknown"}]",

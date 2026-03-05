@@ -84,13 +84,13 @@ public sealed record SpotStorageRecommendation
     public string StorageClass { get; init; } = "";
 
     /// <summary>Amount of data eligible for spot storage (GB).</summary>
-    public long DataSizeGB { get; init; }
+    public long DataSizeGb { get; init; }
 
     /// <summary>Current on-demand cost per GB per month.</summary>
-    public decimal CurrentCostPerGBMonth { get; init; }
+    public decimal CurrentCostPerGbMonth { get; init; }
 
     /// <summary>Spot price per GB per month.</summary>
-    public decimal SpotCostPerGBMonth { get; init; }
+    public decimal SpotCostPerGbMonth { get; init; }
 
     /// <summary>Estimated monthly savings from switching to spot.</summary>
     public decimal MonthlySavings { get; init; }
@@ -122,16 +122,16 @@ public sealed record ReservedCapacityRecommendation
     public string StorageClass { get; init; } = "";
 
     /// <summary>Amount of capacity to commit (GB).</summary>
-    public long CommitGB { get; init; }
+    public long CommitGb { get; init; }
 
     /// <summary>Duration of the commitment in months.</summary>
     public int TermMonths { get; init; }
 
     /// <summary>Current on-demand cost per GB per month.</summary>
-    public decimal OnDemandCostPerGBMonth { get; init; }
+    public decimal OnDemandCostPerGbMonth { get; init; }
 
     /// <summary>Reserved cost per GB per month.</summary>
-    public decimal ReservedCostPerGBMonth { get; init; }
+    public decimal ReservedCostPerGbMonth { get; init; }
 
     /// <summary>Estimated monthly savings from reserved pricing.</summary>
     public decimal MonthlySavings { get; init; }
@@ -157,7 +157,7 @@ public sealed record TierTransitionRecommendation
     public long AffectedObjectCount { get; init; }
 
     /// <summary>Total size of affected objects (GB).</summary>
-    public long AffectedSizeGB { get; init; }
+    public long AffectedSizeGb { get; init; }
 
     /// <summary>Current storage tier name.</summary>
     public string CurrentTier { get; init; } = "";
@@ -172,10 +172,10 @@ public sealed record TierTransitionRecommendation
     public int DaysSinceLastAccess { get; init; }
 
     /// <summary>Current cost per GB per month in the current tier.</summary>
-    public decimal CurrentCostPerGBMonth { get; init; }
+    public decimal CurrentCostPerGbMonth { get; init; }
 
     /// <summary>Cost per GB per month in the recommended tier.</summary>
-    public decimal RecommendedCostPerGBMonth { get; init; }
+    public decimal RecommendedCostPerGbMonth { get; init; }
 
     /// <summary>One-time cost to transition data between tiers.</summary>
     public decimal TransitionCost { get; init; }
@@ -204,13 +204,13 @@ public sealed record CrossProviderArbitrageRecommendation
     public string DataCategory { get; init; } = "";
 
     /// <summary>Amount of data to migrate (GB).</summary>
-    public long DataSizeGB { get; init; }
+    public long DataSizeGb { get; init; }
 
     /// <summary>Cost per GB per month at the source provider.</summary>
-    public decimal SourceCostPerGBMonth { get; init; }
+    public decimal SourceCostPerGbMonth { get; init; }
 
     /// <summary>Cost per GB per month at the target provider.</summary>
-    public decimal TargetCostPerGBMonth { get; init; }
+    public decimal TargetCostPerGbMonth { get; init; }
 
     /// <summary>One-time egress cost to transfer data out of source provider.</summary>
     public decimal EgressCost { get; init; }

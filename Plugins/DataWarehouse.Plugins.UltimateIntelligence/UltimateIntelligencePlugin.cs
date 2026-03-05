@@ -177,7 +177,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
     public void SetActiveAIProvider(string strategyId)
     {
         var strategy = GetStrategy(strategyId);
-        if (strategy?.Category != IntelligenceStrategyCategory.AIProvider)
+        if (strategy?.Category != IntelligenceStrategyCategory.AiProvider)
             throw new ArgumentException($"Strategy '{strategyId}' is not an AI provider");
         _activeAIProvider = strategy;
     }
@@ -250,7 +250,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         bool preferLowCost = false,
         bool preferLowLatency = false)
     {
-        var providers = GetStrategiesByCategory(IntelligenceStrategyCategory.AIProvider)
+        var providers = GetStrategiesByCategory(IntelligenceStrategyCategory.AiProvider)
             .Where(s => s.IsAvailable && (s.Info.Capabilities & capabilities) == capabilities);
 
         if (preferLowCost)
@@ -432,7 +432,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         var knowledge = new List<KnowledgeObject>(base.GetStaticKnowledge());
 
         // Add strategy summary knowledge
-        var providers = GetStrategiesByCategory(IntelligenceStrategyCategory.AIProvider).ToList();
+        var providers = GetStrategiesByCategory(IntelligenceStrategyCategory.AiProvider).ToList();
         var vectorStores = GetStrategiesByCategory(IntelligenceStrategyCategory.VectorStore).ToList();
         var graphs = GetStrategiesByCategory(IntelligenceStrategyCategory.KnowledgeGraph).ToList();
         var features = GetStrategiesByCategory(IntelligenceStrategyCategory.Feature).ToList();
@@ -1033,7 +1033,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
             AverageLatencyMs = allStats.Where(s => s.TotalOperations > 0).Select(s => s.AverageLatencyMs).DefaultIfEmpty(0).Average(),
             StrategiesByCategory = new Dictionary<IntelligenceStrategyCategory, int>
             {
-                [IntelligenceStrategyCategory.AIProvider] = GetStrategiesByCategory(IntelligenceStrategyCategory.AIProvider).Count,
+                [IntelligenceStrategyCategory.AiProvider] = GetStrategiesByCategory(IntelligenceStrategyCategory.AiProvider).Count,
                 [IntelligenceStrategyCategory.VectorStore] = GetStrategiesByCategory(IntelligenceStrategyCategory.VectorStore).Count,
                 [IntelligenceStrategyCategory.KnowledgeGraph] = GetStrategiesByCategory(IntelligenceStrategyCategory.KnowledgeGraph).Count,
                 [IntelligenceStrategyCategory.Feature] = GetStrategiesByCategory(IntelligenceStrategyCategory.Feature).Count

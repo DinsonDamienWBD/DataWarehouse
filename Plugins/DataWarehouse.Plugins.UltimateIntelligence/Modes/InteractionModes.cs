@@ -565,7 +565,7 @@ public sealed class ChatHandler : FeatureStrategyBase
         var session = GetSession(sessionId)
             ?? throw new InvalidOperationException($"Session {sessionId} not found");
 
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider not configured");
 
         // Add user message
@@ -581,7 +581,7 @@ public sealed class ChatHandler : FeatureStrategyBase
         var prompt = $"{context}\n\nAssistant:";
 
         // Get AI response
-        var response = await AIProvider.CompleteAsync(new AIRequest
+        var response = await AiProvider.CompleteAsync(new AIRequest
         {
             Prompt = prompt,
             MaxTokens = 2000,
@@ -1745,7 +1745,7 @@ public sealed class ReportGenerator : FeatureStrategyBase
         }
 
         // AI summary if provider available
-        if (AIProvider != null && definition.IncludeAISummary)
+        if (AiProvider != null && definition.IncludeAISummary)
         {
             try
             {
@@ -1800,7 +1800,7 @@ public sealed class ReportGenerator : FeatureStrategyBase
         var content = string.Join("\n\n", report.Sections.Select(s => $"## {s.Title}\n{s.Content}"));
         var prompt = $"Summarize this report in 2-3 sentences:\n\n{content}";
 
-        var response = await AIProvider!.CompleteAsync(new AIRequest
+        var response = await AiProvider!.CompleteAsync(new AIRequest
         {
             Prompt = prompt,
             MaxTokens = 200

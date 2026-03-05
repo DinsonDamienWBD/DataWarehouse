@@ -25,6 +25,13 @@ namespace DataWarehouse.SDK.Contracts
         private readonly Func<TStrategy, string> _keySelector;
         private volatile string? _defaultStrategyId;
         private readonly object _defaultLock = new();
+        private readonly List<(Type Type, Exception Error)> _discoveryFailures = new();
+
+        /// <summary>
+        /// Gets any failures that occurred during assembly discovery.
+        /// Callers can inspect this to detect instantiation issues.
+        /// </summary>
+        public IReadOnlyList<(Type Type, Exception Error)> DiscoveryFailures => _discoveryFailures;
 
         // -------------------------------------------------------------------------
         // Constructors
@@ -222,9 +229,12 @@ namespace DataWarehouse.SDK.Contracts
                         Register(instance);
                         discovered++;
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        // Silent skip on instantiation failures (matching existing pattern)
+                        // Log instantiation failures so callers can detect discovery problems
+                        System.Diagnostics.Trace.TraceWarning(
+                            $"StrategyRegistry: Failed to instantiate {type.FullName}: {ex.Message}");
+                        _discoveryFailures.Add((type, ex));
                     }
                 }
             }

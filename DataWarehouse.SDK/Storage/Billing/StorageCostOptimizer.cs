@@ -128,9 +128,9 @@ public sealed class StorageCostOptimizer
                 Provider = spot.Provider,
                 Region = spot.Region,
                 StorageClass = spot.StorageClass,
-                DataSizeGB = spot.AvailableCapacityGb,
-                CurrentCostPerGBMonth = spot.CurrentPricePerGbMonth,
-                SpotCostPerGBMonth = spot.SpotPricePerGbMonth,
+                DataSizeGb = spot.AvailableCapacityGb,
+                CurrentCostPerGbMonth = spot.CurrentPricePerGbMonth,
+                SpotCostPerGbMonth = spot.SpotPricePerGbMonth,
                 MonthlySavings = monthlySavings,
                 InterruptionRisk = spot.InterruptionProbability,
                 ConfidenceScore = 1.0 - spot.InterruptionProbability
@@ -178,10 +178,10 @@ public sealed class StorageCostOptimizer
                     Provider = report.Provider,
                     Region = cost.Region ?? "unknown",
                     StorageClass = cost.ServiceName,
-                    CommitGB = (long)estimatedGB,
+                    CommitGb = (long)estimatedGB,
                     TermMonths = 12,
-                    OnDemandCostPerGBMonth = estimatedGB > 0 ? onDemandMonthly / estimatedGB : 0,
-                    ReservedCostPerGBMonth = estimatedGB > 0 ? reservedMonthly / estimatedGB : 0,
+                    OnDemandCostPerGbMonth = estimatedGB > 0 ? onDemandMonthly / estimatedGB : 0,
+                    ReservedCostPerGbMonth = estimatedGB > 0 ? reservedMonthly / estimatedGB : 0,
                     MonthlySavings = monthlySavings,
                     BreakEvenMonths = 0, // reserved pricing saves immediately vs on-demand
                     UtilizationConfidence = 0.85 // 30 days of stable usage indicates high confidence
@@ -226,12 +226,12 @@ public sealed class StorageCostOptimizer
                 recs.Add(new TierTransitionRecommendation
                 {
                     ObjectKeyPattern = $"{storage.Region}/{storage.ServiceName}/*",
-                    AffectedSizeGB = sizeGB,
+                    AffectedSizeGb = sizeGB,
                     CurrentTier = "Standard",
                     RecommendedTier = "Cold/Archive",
                     AccessFrequencyPerDay = opsPerDay,
-                    CurrentCostPerGBMonth = sizeGB > 0 ? storage.Amount / (decimal)sizeGB : 0,
-                    RecommendedCostPerGBMonth = sizeGB > 0 ? coldTierCost / (decimal)sizeGB : 0,
+                    CurrentCostPerGbMonth = sizeGB > 0 ? storage.Amount / (decimal)sizeGB : 0,
+                    RecommendedCostPerGbMonth = sizeGB > 0 ? coldTierCost / (decimal)sizeGB : 0,
                     TransitionCost = transitionCost,
                     MonthlySavings = monthlySavings,
                     BreakEvenDays = monthlySavings > 0
@@ -279,9 +279,9 @@ public sealed class StorageCostOptimizer
                     SourceProvider = expensive.Provider,
                     TargetProvider = cheaper.Provider,
                     DataCategory = "Storage",
-                    DataSizeGB = (long)totalGB,
-                    SourceCostPerGBMonth = totalGB > 0 ? expensive.TotalCost / totalGB : 0,
-                    TargetCostPerGBMonth = totalGB > 0 ? cheaper.TotalCost / totalGB : 0,
+                    DataSizeGb = (long)totalGB,
+                    SourceCostPerGbMonth = totalGB > 0 ? expensive.TotalCost / totalGB : 0,
+                    TargetCostPerGbMonth = totalGB > 0 ? cheaper.TotalCost / totalGB : 0,
                     EgressCost = egressCost,
                     MonthlySavings = priceDiff,
                     BreakEvenDays = priceDiff > 0

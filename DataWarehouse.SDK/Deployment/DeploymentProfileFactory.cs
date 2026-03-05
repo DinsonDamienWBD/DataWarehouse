@@ -134,7 +134,7 @@ public static class DeploymentProfileFactory
             // Generic edge: conservative defaults (512MB, essential plugins, 20MB/s)
             edgeProfile = new CustomEdgeProfileBuilder()
                 .WithName("generic-edge")
-                .WithMemoryCeilingMB(512)
+                .WithMemoryCeilingMb(512)
                 .AllowPlugins("UltimateStorage", "TamperProof", "EdgeSensorMesh")
                 .WithMaxConnections(25)
                 .WithBandwidthCeilingMBps(20)

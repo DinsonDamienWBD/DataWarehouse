@@ -360,7 +360,7 @@ public abstract class IntelligenceStrategyBase : StrategyBase, IIntelligenceStra
 public abstract class AIProviderStrategyBase : IntelligenceStrategyBase, IAIProvider
 {
     /// <inheritdoc/>
-    public override IntelligenceStrategyCategory Category => IntelligenceStrategyCategory.AIProvider;
+    public override IntelligenceStrategyCategory Category => IntelligenceStrategyCategory.AiProvider;
 
     /// <inheritdoc/>
     public abstract string ProviderId { get; }
@@ -472,7 +472,7 @@ public abstract class FeatureStrategyBase : IntelligenceStrategyBase
     /// <summary>
     /// Gets the AI provider to use for this feature.
     /// </summary>
-    protected IAIProvider? AIProvider { get; private set; }
+    protected IAIProvider? AiProvider { get; private set; }
 
     /// <summary>
     /// Gets the vector store to use for this feature.
@@ -489,7 +489,7 @@ public abstract class FeatureStrategyBase : IntelligenceStrategyBase
     /// </summary>
     public void SetAIProvider(IAIProvider provider)
     {
-        AIProvider = provider;
+        AiProvider = provider;
     }
 
     /// <summary>

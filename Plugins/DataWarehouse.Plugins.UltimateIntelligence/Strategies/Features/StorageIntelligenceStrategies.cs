@@ -52,7 +52,7 @@ public sealed class WorkloadDnaStrategy : FeatureStrategyBase
         IEnumerable<IoEvent> ioEvents,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for workload profiling");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -108,7 +108,7 @@ Return JSON:
   ""optimization_hints"": [""hint1"", ""hint2""]
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 500,
@@ -184,7 +184,7 @@ Return JSON:
         int horizonHours,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for workload prediction");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -226,7 +226,7 @@ Return JSON:
   ""confidence"": 0.8
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 400,
@@ -473,7 +473,7 @@ public sealed class AiTierMigrationStrategy : FeatureStrategyBase
         IEnumerable<TierAccessEvent> accessHistory,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for tier recommendations");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -529,7 +529,7 @@ Return JSON:
   ""cost_savings_estimate"": 0.15
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 300,
@@ -549,7 +549,7 @@ Return JSON:
         string objectId,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for access prediction");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -587,7 +587,7 @@ Return JSON:
   ""change_timing"": ""immediate|within_24h|within_week""
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 300,

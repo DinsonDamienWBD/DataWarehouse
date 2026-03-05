@@ -368,7 +368,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                                 try
                                 {
                                     int rtResult = CudaInterop.GetDeviceCount(out int count);
-                                    if (rtResult == CudaInterop.CUDA_SUCCESS && count > 0)
+                                    if (rtResult == CudaInterop.CudaSuccess && count > 0)
                                     {
                                         _deviceCount = count;
                                     }

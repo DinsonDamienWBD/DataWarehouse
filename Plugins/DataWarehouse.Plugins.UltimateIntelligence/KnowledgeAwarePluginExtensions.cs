@@ -449,7 +449,7 @@ public static class KnowledgeAwarePluginExtensions
         }
 
         // Check for common capability interfaces
-        if (plugin.Category == PluginCategory.AIProvider)
+        if (plugin.Category == PluginCategory.AiProvider)
         {
             capabilities |= IntelligenceCapabilities.TextCompletion;
         }

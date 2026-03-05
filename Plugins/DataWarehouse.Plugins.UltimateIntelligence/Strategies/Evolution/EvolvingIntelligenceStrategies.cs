@@ -229,9 +229,9 @@ public sealed class EvolvingExpertStrategy : FeatureStrategyBase
         await ExecuteWithTrackingAsync(async () =>
         {
             // Store experience in LTM if available
-            if (VectorStore != null && AIProvider != null)
+            if (VectorStore != null && AiProvider != null)
             {
-                var embedding = await AIProvider.GetEmbeddingsAsync($"{query} {response}", ct);
+                var embedding = await AiProvider.GetEmbeddingsAsync($"{query} {response}", ct);
                 var metadata = new Dictionary<string, object>
                 {
                     ["domain"] = domain,
@@ -301,13 +301,13 @@ public sealed class EvolvingExpertStrategy : FeatureStrategyBase
         int topK = 5,
         CancellationToken ct = default)
     {
-        if (VectorStore == null || AIProvider == null)
+        if (VectorStore == null || AiProvider == null)
             return Array.Empty<(string, string, double)>();
 
         return await ExecuteWithTrackingAsync(async () =>
         {
             // Get query embedding
-            var queryEmbedding = await AIProvider.GetEmbeddingsAsync(query, ct);
+            var queryEmbedding = await AiProvider.GetEmbeddingsAsync(query, ct);
 
             // Search for similar experiences
             var filter = new Dictionary<string, object> { ["domain"] = domain };
@@ -478,9 +478,9 @@ public sealed class AdaptiveModelStrategy : FeatureStrategyBase
             _userProfiles[userId] = updatedProfile;
 
             // Store in LTM
-            if (VectorStore != null && AIProvider != null)
+            if (VectorStore != null && AiProvider != null)
             {
-                var embedding = await AIProvider.GetEmbeddingsAsync(query, ct);
+                var embedding = await AiProvider.GetEmbeddingsAsync(query, ct);
                 var metadata = new Dictionary<string, object>
                 {
                     ["user_id"] = userId,
@@ -517,7 +517,7 @@ public sealed class AdaptiveModelStrategy : FeatureStrategyBase
         string userId,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             return baseResponse;
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -537,7 +537,7 @@ public sealed class AdaptiveModelStrategy : FeatureStrategyBase
                         $"Base response: {baseResponse}\n\n" +
                         $"Personalized response:";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
+            var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
             return response.Content;
         });
     }
@@ -772,9 +772,9 @@ public sealed class CollectiveIntelligenceStrategy : FeatureStrategyBase
             await File.WriteAllTextAsync(filePath, json, ct);
 
             // Store in vector database for semantic search
-            if (VectorStore != null && AIProvider != null)
+            if (VectorStore != null && AiProvider != null)
             {
-                var embedding = await AIProvider.GetEmbeddingsAsync(
+                var embedding = await AiProvider.GetEmbeddingsAsync(
                     $"{knowledgePackage.Domain} {knowledgePackage.KnowledgeType}", ct);
 
                 await VectorStore.StoreAsync(
@@ -838,13 +838,13 @@ public sealed class CollectiveIntelligenceStrategy : FeatureStrategyBase
         int topK = 10,
         CancellationToken ct = default)
     {
-        if (VectorStore == null || AIProvider == null)
+        if (VectorStore == null || AiProvider == null)
             return Array.Empty<KnowledgePackage>();
 
         return await ExecuteWithTrackingAsync(async () =>
         {
             // Search for relevant knowledge
-            var embedding = await AIProvider.GetEmbeddingsAsync(topic, ct);
+            var embedding = await AiProvider.GetEmbeddingsAsync(topic, ct);
             var matches = await VectorStore.SearchAsync(embedding, topK, 0.6f, null, ct);
 
             // Retrieve knowledge packages

@@ -14,7 +14,7 @@ namespace DataWarehouse.SDK.Deployment.EdgeProfiles;
 /// <code>
 /// var profile = new CustomEdgeProfileBuilder()
 ///     .WithName("custom-iot")
-///     .WithMemoryCeilingMB(384)
+///     .WithMemoryCeilingMb(384)
 ///     .AllowPlugins("UltimateStorage", "TamperProof", "EdgeSensorMesh")
 ///     .WithMaxConnections(25)
 ///     .WithBandwidthCeilingMBps(15)
@@ -59,7 +59,7 @@ public sealed class CustomEdgeProfileBuilder
     /// <summary>
     /// Sets the memory ceiling in megabytes (convenience method).
     /// </summary>
-    public CustomEdgeProfileBuilder WithMemoryCeilingMB(int megabytes)
+    public CustomEdgeProfileBuilder WithMemoryCeilingMb(int megabytes)
     {
         _maxMemoryBytes = megabytes * 1024L * 1024L;
         return this;

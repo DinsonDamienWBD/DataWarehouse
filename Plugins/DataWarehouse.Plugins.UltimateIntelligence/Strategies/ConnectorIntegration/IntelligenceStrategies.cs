@@ -204,7 +204,7 @@ public sealed class ZeroDayConnectorGeneratorStrategy : FeatureStrategyBase
     /// <returns>Generated connector result with code and optionally compiled strategy.</returns>
     public async Task<GeneratedConnectorResult> GenerateConnectorAsync(DocumentationSource source, CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
         {
             return new GeneratedConnectorResult
             {
@@ -545,7 +545,7 @@ public sealed class ZeroDayConnectorGeneratorStrategy : FeatureStrategyBase
 
     private async Task<List<DiscoveredEndpoint>> ParseWithAIAsync(string content, DocumentationSourceType sourceType, CancellationToken ct)
     {
-        if (AIProvider == null) return new List<DiscoveredEndpoint>();
+        if (AiProvider == null) return new List<DiscoveredEndpoint>();
 
         var prompt = $@"Parse this {sourceType} API documentation and extract all API endpoints.
 
@@ -567,7 +567,7 @@ Return a JSON array of endpoints with this structure:
 
 Return ONLY the JSON array, no other text.";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest
+        var response = await AiProvider.CompleteAsync(new AIRequest
         {
             Prompt = prompt,
             MaxTokens = 4000,
@@ -720,7 +720,7 @@ Return ONLY the JSON array, no other text.";
 
     private async Task<string> GenerateConnectorCodeAsync(DocumentationSource source, List<DiscoveredEndpoint> endpoints, string authMethod, CancellationToken ct)
     {
-        if (AIProvider == null) return string.Empty;
+        if (AiProvider == null) return string.Empty;
 
         var endpointSummary = string.Join("\n", endpoints.Take(20).Select(e => $"  - {e.Method} {e.Path}: {e.Description ?? "No description"}"));
 
@@ -741,7 +741,7 @@ Requirements:
 
 Generate ONLY the C# class code, no markdown formatting.";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest
+        var response = await AiProvider.CompleteAsync(new AIRequest
         {
             Prompt = prompt,
             MaxTokens = 4000,
@@ -1009,7 +1009,7 @@ public sealed class SemanticSchemaAlignmentStrategy : FeatureStrategyBase
     /// <returns>Entity mapping with unified schema.</returns>
     public async Task<EntityMapping> AlignSchemasAsync(SchemaSource[] schemas, CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
         {
             return new EntityMapping
             {
@@ -1082,7 +1082,7 @@ public sealed class SemanticSchemaAlignmentStrategy : FeatureStrategyBase
 
                 // Create rich text representation for embedding
                 var fieldText = BuildFieldTextRepresentation(schema, field);
-                var embedding = await AIProvider!.GetEmbeddingsAsync(fieldText, ct);
+                var embedding = await AiProvider!.GetEmbeddingsAsync(fieldText, ct);
                 RecordEmbeddings(1);
 
                 embeddings[key] = embedding;
@@ -1144,7 +1144,7 @@ public sealed class SemanticSchemaAlignmentStrategy : FeatureStrategyBase
         List<(string Field1, string Field2, float Similarity)> matches,
         CancellationToken ct)
     {
-        if (AIProvider == null || matches.Count == 0)
+        if (AiProvider == null || matches.Count == 0)
             return new List<(string, string, List<(string, string, string)>, double)>();
 
         var schemaContext = string.Join("\n", schemas.Select(s =>
@@ -1184,7 +1184,7 @@ Return JSON array:
   }}
 ]";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest
+        var response = await AiProvider.CompleteAsync(new AIRequest
         {
             Prompt = prompt,
             MaxTokens = 3000,
@@ -1245,7 +1245,7 @@ Return JSON array:
         List<(string UnifiedName, string SemanticType, List<(string SourceId, string FieldName, string DataType)> Sources, double Confidence)> mappings,
         CancellationToken ct)
     {
-        if (AIProvider == null || mappings.Count == 0)
+        if (AiProvider == null || mappings.Count == 0)
             return new List<SemanticEntity>();
 
         var mappingsSummary = string.Join("\n", mappings.Select(m =>
@@ -1273,7 +1273,7 @@ Return JSON:
   }}
 ]";
 
-        var response = await AIProvider.CompleteAsync(new AIRequest
+        var response = await AiProvider.CompleteAsync(new AIRequest
         {
             Prompt = prompt,
             MaxTokens = 2000,
@@ -1556,7 +1556,7 @@ public sealed class UniversalQueryTranspilationStrategy : FeatureStrategyBase
     /// <returns>Transpilation result.</returns>
     public async Task<TranspilationResult> TranspileAsync(string sql, TargetDialect target, CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
         {
             return new TranspilationResult
             {
@@ -1640,7 +1640,7 @@ SQL Query:
 
 Return ONLY the transpiled query, no explanation or markdown formatting.";
 
-        var response = await AIProvider!.CompleteAsync(new AIRequest
+        var response = await AiProvider!.CompleteAsync(new AIRequest
         {
             Prompt = prompt,
             MaxTokens = 2000,
@@ -1660,7 +1660,7 @@ Return ONLY the transpiled query, no explanation or markdown formatting.";
 Query: {query}
 Return JSON: {{""isValid"": true/false, ""syntaxErrors"": [], ""semanticWarnings"": [], ""securityConcerns"": []}}";
 
-        var response = await AIProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.1f }, ct);
+        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.1f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
         return ParseValidationResult(response.Content ?? "{}");
     }
@@ -1670,7 +1670,7 @@ Return JSON: {{""isValid"": true/false, ""syntaxErrors"": [], ""semanticWarnings
         var prompt = $@"Generate explain plan for this {dialect} query: {query}
 Return JSON: {{""estimatedCost"": 0, ""estimatedRows"": 0, ""operations"": [], ""usedIndexes"": [], ""suggestions"": []}}";
 
-        var response = await AIProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1500, Temperature = 0.2f }, ct);
+        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1500, Temperature = 0.2f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
         return ParseExplainPlan(response.Content ?? "{}");
     }
@@ -1979,7 +1979,7 @@ public sealed class LegacyBehavioralModelingStrategy : FeatureStrategyBase
     /// <returns>Behavioral model.</returns>
     public async Task<BehavioralModel> LearnBehaviorAsync(TrafficSamples samples, CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             return new BehavioralModel { Success = false, ErrorMessage = "AI provider not configured." };
 
         var minSamples = GetConfigInt("MinSamplesForLearning", 100);
@@ -2036,11 +2036,11 @@ public sealed class LegacyBehavioralModelingStrategy : FeatureStrategyBase
     /// <returns>Parsed screen data.</returns>
     public async Task<Dictionary<string, object>> ParseGreenScreenAsync(byte[] screenCapture, CancellationToken ct = default)
     {
-        if (AIProvider == null || !GetConfigBool("EnableVisionParsing", true))
+        if (AiProvider == null || !GetConfigBool("EnableVisionParsing", true))
             return new Dictionary<string, object> { ["error"] = "Vision parsing not available" };
 
         var prompt = "Analyze this terminal screen and extract: menu options, data fields, status messages, cursor position, errors. Return structured JSON.";
-        var response = await AIProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 2000, Temperature = 0.1f }, ct);
+        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 2000, Temperature = 0.1f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
 
         try
@@ -2084,7 +2084,7 @@ public sealed class LegacyBehavioralModelingStrategy : FeatureStrategyBase
 {sampleJson}
 Return JSON: {{""operationName"": ""X"", ""httpMethod"": ""GET"", ""suggestedPath"": ""/api/x"", ""inputParameters"": [{{""name"": ""id"", ""dataType"": ""string"", ""required"": true}}]}}";
 
-        var response = await AIProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.2f }, ct);
+        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.2f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
 
         try
@@ -2127,7 +2127,7 @@ Return JSON: {{""operationName"": ""X"", ""httpMethod"": ""GET"", ""suggestedPat
         var opsSummary = string.Join(", ", ops.Select(o => o.OperationName));
         var prompt = $"For a {systemType} system with operations [{opsSummary}], identify states and transitions. Return JSON: {{\"states\": [{{\"name\": \"X\"}}], \"transitions\": [{{\"fromState\": \"A\", \"toState\": \"B\", \"trigger\": \"op\"}}], \"initialState\": \"X\"}}";
 
-        var response = await AIProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1500, Temperature = 0.2f }, ct);
+        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1500, Temperature = 0.2f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
 
         try
@@ -2174,7 +2174,7 @@ Return JSON: {{""operationName"": ""X"", ""httpMethod"": ""GET"", ""suggestedPat
 
         var prompt = $"Traffic stats: {samples.Samples.Count} samples, avg duration {avgDuration:F0}ms, failure rate {failureRate:P1}. Identify anomaly patterns. Return JSON array: [{{\"patternName\": \"X\", \"description\": \"Y\", \"severity\": \"medium\", \"detectionCondition\": \"Z\"}}]";
 
-        var response = await AIProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.2f }, ct);
+        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.2f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
 
         var patterns = new List<BehavioralAnomalyPattern>();
@@ -2379,7 +2379,7 @@ public sealed class SmartQuotaTradingStrategy : FeatureStrategyBase
     /// <returns>Schedule recommendation.</returns>
     public async Task<ScheduleRecommendation> OptimizeScheduleAsync(RequestBatch requests, CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             return new ScheduleRecommendation { Success = false, ErrorMessage = "AI provider not configured." };
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -2500,7 +2500,7 @@ public sealed class SmartQuotaTradingStrategy : FeatureStrategyBase
 
         var prompt = $"Analyze usage patterns for {quota.ConnectorId}: {JsonSerializer.Serialize(patterns)}. Suggest optimal scheduling windows. Return JSON array of insights: [\"insight1\", \"insight2\"]";
 
-        var response = await AIProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500, Temperature = 0.3f }, ct);
+        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500, Temperature = 0.3f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
 
         try
@@ -2711,7 +2711,7 @@ public sealed class ApiArchaeologistStrategy : FeatureStrategyBase
     /// <returns>Discovered capabilities.</returns>
     public async Task<DiscoveredCapabilities> DiscoverAsync(string baseUrl, DiscoveryOptions options, CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             return new DiscoveredCapabilities { Success = false, ErrorMessage = "AI provider not configured." };
 
         // Enforce safe mode
@@ -2869,7 +2869,7 @@ public sealed class ApiArchaeologistStrategy : FeatureStrategyBase
 
                 // Use AI to identify potentially undocumented fields
                 var prompt = $"Analyze these API response fields and identify which might be undocumented/internal: {string.Join(", ", fieldNames.Take(50))}. Return JSON: [{{\"field\": \"name\", \"reason\": \"why\"}}]";
-                var aiResp = await AIProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500, Temperature = 0.2f }, ct);
+                var aiResp = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500, Temperature = 0.2f }, ct);
                 RecordTokens(aiResp.Usage?.TotalTokens ?? 0);
 
                 try
@@ -3075,7 +3075,7 @@ public sealed class ProbabilisticDataBufferingStrategy : FeatureStrategyBase
     /// <returns>Predicted data with confidence intervals.</returns>
     public async Task<PredictedData> PredictAsync(string dataPath, PredictionContext context, CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             return new PredictedData { Success = false, ErrorMessage = "AI provider not configured." };
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -3238,7 +3238,7 @@ Prediction horizon: {context.PredictionHorizon.TotalMinutes} minutes
 Return JSON array with predictions and confidence:
 [{{""timestamp"": ""ISO8601"", ""value"": X, ""confidence"": 0.8, ""lowerBound"": X-Y, ""upperBound"": X+Y}}]";
 
-        var response = await AIProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.2f }, ct);
+        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.2f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
 
         var predictions = new List<PredictedValue>();

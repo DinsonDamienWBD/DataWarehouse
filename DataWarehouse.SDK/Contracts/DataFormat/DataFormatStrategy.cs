@@ -347,7 +347,7 @@ namespace DataWarehouse.SDK.Contracts.DataFormat
         /// <summary>
         /// Non-destructive testing formats (DICONDE, PAUT).
         /// </summary>
-        NDT
+        Ndt
     }
 
     /// <summary>

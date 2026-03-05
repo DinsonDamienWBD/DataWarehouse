@@ -193,7 +193,7 @@ public sealed class IntelligenceDiscoveryHandler : IDisposable
         var capabilities = GetAggregateCapabilities();
 
         // Get active strategy names
-        var providers = _plugin.GetStrategiesByCategory(IntelligenceStrategyCategory.AIProvider)
+        var providers = _plugin.GetStrategiesByCategory(IntelligenceStrategyCategory.AiProvider)
             .Where(s => s.IsAvailable)
             .Select(s => s.Info.ProviderName)
             .ToArray();

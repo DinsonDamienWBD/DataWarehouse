@@ -377,7 +377,7 @@ public sealed class HybridSearchStrategy : FeatureStrategyBase
             await _fullTextSearch.IndexDocumentAsync(documentId, content, metadata, ct);
 
             // Index for semantic search (if AI provider available)
-            if (AIProvider != null && VectorStore != null)
+            if (AiProvider != null && VectorStore != null)
             {
                 await _semanticSearch.IndexDocumentAsync(documentId, content, metadata, ct);
             }
@@ -411,7 +411,7 @@ public sealed class HybridSearchStrategy : FeatureStrategyBase
             var fullTextResults = (await _fullTextSearch.SearchAsync(query, fetchK, filter, ct)).ToList();
 
             List<SemanticSearchResult> semanticResults = new();
-            if (AIProvider != null && VectorStore != null)
+            if (AiProvider != null && VectorStore != null)
             {
                 semanticResults = (await _semanticSearch.SearchAsync(query, fetchK, null, filter, ct)).ToList();
             }

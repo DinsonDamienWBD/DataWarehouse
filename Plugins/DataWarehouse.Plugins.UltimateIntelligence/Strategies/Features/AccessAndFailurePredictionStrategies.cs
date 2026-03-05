@@ -40,7 +40,7 @@ public sealed class AccessPredictionStrategy : FeatureStrategyBase
         IEnumerable<AccessLogEntry> history,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for access prediction");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -80,7 +80,7 @@ Return JSON with predicted files:
   ]
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 500,
@@ -210,7 +210,7 @@ public sealed class FailurePredictionStrategy : FeatureStrategyBase
         SystemMetrics metrics,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required for failure prediction");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -239,7 +239,7 @@ Return JSON:
   ""overall_health_score"": 0.7
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 500,
@@ -267,7 +267,7 @@ Return JSON:
         IEnumerable<string> logEntries,
         CancellationToken ct = default)
     {
-        if (AIProvider == null)
+        if (AiProvider == null)
             throw new InvalidOperationException("AI provider required");
 
         return await ExecuteWithTrackingAsync(async () =>
@@ -294,7 +294,7 @@ Return JSON:
   ]
 }}";
 
-            var response = await AIProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AIRequest
             {
                 Prompt = prompt,
                 MaxTokens = 500,

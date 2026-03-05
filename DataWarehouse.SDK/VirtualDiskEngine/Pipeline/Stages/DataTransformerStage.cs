@@ -37,7 +37,7 @@ public sealed class DataTransformerStage : IVdeWriteStage
     public const string DeltaBaseKey = "DeltaBase";
 
     /// <summary>Property key for the encryption initialization vector.</summary>
-    public const string EncryptionIVKey = "EncryptionIV";
+    public const string EncryptionIvKey = "EncryptionIV";
 
     /// <summary>Property key for the compression algorithm name (informational).</summary>
     public const string CompressionAlgorithmKey = "CompressionAlgorithm";
@@ -71,7 +71,7 @@ public sealed class DataTransformerStage : IVdeWriteStage
             context.TryGetProperty<Func<ReadOnlyMemory<byte>, ReadOnlyMemory<byte>, Memory<byte>>>(EncryptionDelegateKey, out var encryptor))
         {
             ReadOnlyMemory<byte> iv = default;
-            if (context.TryGetProperty<byte[]>(EncryptionIVKey, out var ivBytes))
+            if (context.TryGetProperty<byte[]>(EncryptionIvKey, out var ivBytes))
             {
                 iv = ivBytes;
             }

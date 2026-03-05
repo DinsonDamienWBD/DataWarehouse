@@ -149,13 +149,13 @@ public sealed class InodeLookupStage : IVdeReadStage
         System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(buffer.Slice(offset, 8), inode.CompressionDictionaryRef);
         offset += 8;
 
-        // PerObjectEncryptionIV (16 bytes)
-        if (inode.PerObjectEncryptionIV is not null)
+        // PerObjectEncryptionIv (16 bytes)
+        if (inode.PerObjectEncryptionIv is not null)
         {
-            inode.PerObjectEncryptionIV.AsSpan(0, Math.Min(inode.PerObjectEncryptionIV.Length, ExtendedInode512.EncryptionIVSize))
+            inode.PerObjectEncryptionIv.AsSpan(0, Math.Min(inode.PerObjectEncryptionIv.Length, ExtendedInode512.EncryptionIvSize))
                 .CopyTo(buffer.Slice(offset));
         }
-        offset += ExtendedInode512.EncryptionIVSize;
+        offset += ExtendedInode512.EncryptionIvSize;
 
         // MvccVersionChainHead (8 bytes)
         System.Buffers.Binary.BinaryPrimitives.WriteInt64LittleEndian(buffer.Slice(offset, 8), inode.MvccVersionChainHead);
