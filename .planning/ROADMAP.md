@@ -2944,7 +2944,10 @@ Plans:
   3. No GC pressure regression compared to pre-hardening baseline
   4. Profile reports exported to `Metadata/profile-hardening-report/`
 **Report as**: "Stage 1 - Step 4 - Performance Profile Results"
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 103-01-PLAN.md — dotTrace performance profiling (lock contention, hot-path analysis)
+- [ ] 103-02-PLAN.md — dotMemory memory profiling (LOH allocations, GC pressure)
 
 ### Phase 104: Stage 1, Step 5 â€” Mutation Testing (Stryker)
 **Goal**: Prove test assertions are tight enough that code mutations are caught â€” 95%+ mutation score
@@ -2956,7 +2959,10 @@ Plans:
   2. Surviving mutants documented with justification (e.g., equivalent mutants)
   3. Stryker report exported to `Metadata/stryker-hardening-report/`
 **Report as**: "Stage 1 - Step 5 - Stryker Mutation Score"
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 104-01-PLAN.md — Stryker initial mutation analysis run
+- [ ] 104-02-PLAN.md — Tighten assertions for surviving mutants, re-run Stryker
 
 ### Phase 105: Stage 2, Step 1 â€” Integration Profiling
 **Goal**: Ensure components don't destroy each other when combined under a realistic 100GB workload
@@ -2973,7 +2979,10 @@ Plans:
   3. dotTrace identifies no cross-boundary bottleneck exceeding 5% of total execution time
   4. dotMemory confirms working set stays within bounds (no unbounded growth during streaming)
 **Report as**: "Stage 2 - Step 1 - Integration Profiling Results"
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 105-01-PLAN.md — Integration harness setup (Kernel + 52 plugins + 100GB streaming)
+- [ ] 105-02-PLAN.md — Integration profiling (cross-boundary bottleneck + memory analysis)
 
 ### Phase 106: Stage 2, Step 2 â€” Soak Test Harness
 **Goal**: Prove the system handles sustained continuous load without slow memory leaks or GC degradation
@@ -2990,7 +2999,10 @@ Plans:
   3. Gen2 collection rate < threshold (defined during implementation)
   4. No event bus or telemetry sink memory leaks detected
 **Report as**: "Stage 2 - Step 2 - Soak Test Results"
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 106-01-PLAN.md — Soak harness implementation (configurable duration + GC monitoring)
+- [ ] 106-02-PLAN.md — Soak test execution (10-min CI run + results report)
 
 ### Phase 107: Stage 3, Steps 1-2 â€” Chaos: Plugin Faults + Concurrent Lifecycle
 **Goal**: Prove the Kernel survives plugin failures and concurrent load/unload without corruption
