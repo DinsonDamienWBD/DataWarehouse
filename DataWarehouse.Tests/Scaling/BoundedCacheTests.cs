@@ -226,7 +226,7 @@ namespace DataWarehouse.Tests.Scaling
         {
             using var cache = new BoundedCache<string, string>(TtlOptions(TimeSpan.FromMilliseconds(100)));
 
-            cache.Put("key", "value");
+            await cache.PutAsync("key", "value");
             Assert.Equal("value", cache.GetOrDefault("key"));
 
             // Wait for TTL to expire
@@ -243,8 +243,8 @@ namespace DataWarehouse.Tests.Scaling
             // Timer fires at 1s minimum, so we need to wait for cleanup
             using var cache = new BoundedCache<string, string>(TtlOptions(TimeSpan.FromMilliseconds(100)));
 
-            cache.Put("expired1", "val1");
-            cache.Put("expired2", "val2");
+            await cache.PutAsync("expired1", "val1");
+            await cache.PutAsync("expired2", "val2");
             Assert.Equal(2, cache.Count);
 
             // Wait for expiry + cleanup timer interval (1s min)
@@ -366,60 +366,73 @@ namespace DataWarehouse.Tests.Scaling
         [Fact]
         public async Task ThreadSafety_ConcurrentGetPutRemoveNoExceptions()
         {
-            using var cache = new BoundedCache<string, string>(LruOptions(100));
-            var random = new Random(42);
-            var exceptions = new ConcurrentBag<Exception>();
-
-            var tasks = Enumerable.Range(0, 100).Select(i => Task.Run(() =>
+            var cache = new BoundedCache<string, string>(LruOptions(100));
+            try
             {
-                try
+                var exceptions = new ConcurrentBag<Exception>();
+
+                var tasks = Enumerable.Range(0, 100).Select(i => Task.Run(() =>
                 {
-                    var key = $"key{i % 20}";
-                    var value = $"value{i}";
+                    try
+                    {
+                        var key = $"key{i % 20}";
+                        var value = $"value{i}";
 
-                    cache.Put(key, value);
-                    _ = cache.GetOrDefault(key);
-                    cache.TryRemove($"key{(i + 5) % 20}", out _);
-                    _ = cache.ContainsKey(key);
-                }
-                catch (Exception ex)
-                {
-                    exceptions.Add(ex);
-                }
-            })).ToArray();
+                        cache.Put(key, value);
+                        _ = cache.GetOrDefault(key);
+                        cache.TryRemove($"key{(i + 5) % 20}", out _);
+                        _ = cache.ContainsKey(key);
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                })).ToArray();
 
-            await Task.WhenAll(tasks);
+                await Task.WhenAll(tasks);
 
-            Assert.Empty(exceptions);
-            // Cache should be in consistent state
-            Assert.True(cache.Count >= 0 && cache.Count <= 100);
+                Assert.Empty(exceptions);
+                // Cache should be in consistent state
+                Assert.True(cache.Count >= 0 && cache.Count <= 100);
+            }
+            finally
+            {
+                cache.Dispose();
+            }
         }
 
         [Fact]
         public async Task ThreadSafety_ARC_ConcurrentAccessNoExceptions()
         {
-            using var cache = new BoundedCache<string, string>(ArcOptions(50));
-            var exceptions = new ConcurrentBag<Exception>();
-
-            var tasks = Enumerable.Range(0, 100).Select(i => Task.Run(() =>
+            var cache = new BoundedCache<string, string>(ArcOptions(50));
+            try
             {
-                try
-                {
-                    var key = $"key{i % 30}";
-                    cache.Put(key, $"value{i}");
-                    _ = cache.GetOrDefault(key);
-                    _ = cache.ContainsKey($"key{(i + 10) % 30}");
-                }
-                catch (Exception ex)
-                {
-                    exceptions.Add(ex);
-                }
-            })).ToArray();
+                var exceptions = new ConcurrentBag<Exception>();
 
-            await Task.WhenAll(tasks);
+                var tasks = Enumerable.Range(0, 100).Select(i => Task.Run(() =>
+                {
+                    try
+                    {
+                        var key = $"key{i % 30}";
+                        cache.Put(key, $"value{i}");
+                        _ = cache.GetOrDefault(key);
+                        _ = cache.ContainsKey($"key{(i + 10) % 30}");
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                })).ToArray();
 
-            Assert.Empty(exceptions);
-            Assert.True(cache.Count >= 0 && cache.Count <= 50);
+                await Task.WhenAll(tasks);
+
+                Assert.Empty(exceptions);
+                Assert.True(cache.Count >= 0 && cache.Count <= 50);
+            }
+            finally
+            {
+                cache.Dispose();
+            }
         }
 
         // ----------------------------------------------------------------
@@ -574,7 +587,7 @@ namespace DataWarehouse.Tests.Scaling
         public async Task DisposeAsync_Works()
         {
             var cache = new BoundedCache<string, string>(TtlOptions(TimeSpan.FromSeconds(5)));
-            cache.Put("key", "val");
+            await cache.PutAsync("key", "val");
             Assert.Equal(1, cache.Count);
             await cache.DisposeAsync();
             Assert.True(true); // Verify no exception on async dispose

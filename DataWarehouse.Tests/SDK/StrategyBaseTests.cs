@@ -134,9 +134,16 @@ public class StrategyBaseTests
     [Fact]
     public void EnsureNotDisposed_ShouldNotThrowWhenAlive()
     {
-        using var strategy = new TestStrategy();
-        var act = () => strategy.TestEnsureNotDisposed();
-        act.Should().NotThrow();
+        var strategy = new TestStrategy();
+        try
+        {
+            var act = () => strategy.TestEnsureNotDisposed();
+            act.Should().NotThrow();
+        }
+        finally
+        {
+            strategy.Dispose();
+        }
     }
 
     [Fact]
@@ -152,7 +159,7 @@ public class StrategyBaseTests
     public async Task InitializeAsync_AfterDispose_ShouldThrow()
     {
         var strategy = new TestStrategy();
-        strategy.Dispose();
+        await strategy.DisposeAsync();
         var act = async () => await strategy.InitializeAsync();
         await act.Should().ThrowAsync<ObjectDisposedException>();
     }
@@ -160,18 +167,32 @@ public class StrategyBaseTests
     [Fact]
     public void ThrowIfNotInitialized_ShouldThrowWhenNotInitialized()
     {
-        using var strategy = new TestStrategy();
-        var act = () => strategy.TestThrowIfNotInitialized();
-        act.Should().Throw<InvalidOperationException>();
+        var strategy = new TestStrategy();
+        try
+        {
+            var act = () => strategy.TestThrowIfNotInitialized();
+            act.Should().Throw<InvalidOperationException>();
+        }
+        finally
+        {
+            strategy.Dispose();
+        }
     }
 
     [Fact]
     public async Task ThrowIfNotInitialized_ShouldNotThrowAfterInit()
     {
-        using var strategy = new TestStrategy();
-        await strategy.InitializeAsync();
-        var act = () => strategy.TestThrowIfNotInitialized();
-        act.Should().NotThrow();
+        var strategy = new TestStrategy();
+        try
+        {
+            await strategy.InitializeAsync();
+            var act = () => strategy.TestThrowIfNotInitialized();
+            act.Should().NotThrow();
+        }
+        finally
+        {
+            strategy.Dispose();
+        }
     }
 
     [Fact]

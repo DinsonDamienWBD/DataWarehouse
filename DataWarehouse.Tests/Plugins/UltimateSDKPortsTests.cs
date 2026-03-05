@@ -5,7 +5,7 @@ using DataWarehouse.SDK.Primitives;
 namespace DataWarehouse.Tests.Plugins;
 
 [Trait("Category", "Unit")]
-public class UltimateSDKPortsTests
+public class UltimateSdkPortsTests
 {
     [Fact]
     public void Plugin_HasCorrectIdentity()

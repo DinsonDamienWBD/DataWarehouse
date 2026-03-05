@@ -238,7 +238,7 @@ public sealed class VdeComposerTests : IDisposable
         // Read back and verify active modules match
         using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
         var firstBlock = new byte[FormatConstants.MaxBlockSize];
-        stream.ReadExactly(firstBlock, 0, Math.Min((int)stream.Length, FormatConstants.MaxBlockSize));
+        await stream.ReadExactlyAsync(firstBlock.AsMemory(0, Math.Min((int)stream.Length, FormatConstants.MaxBlockSize)));
 
         var magic = MagicSignature.Deserialize(firstBlock);
         Assert.True(magic.Validate(), "Magic signature should be valid");

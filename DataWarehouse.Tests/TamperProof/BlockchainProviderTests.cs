@@ -174,11 +174,11 @@ public class BlockchainProviderTests
         };
 
         // Level 1: hash(leaf0+leaf1), hash(leaf2+leaf3)
-        var level1_0 = ComputeSha256Hex(leaves[0] + leaves[1]);
-        var level1_1 = ComputeSha256Hex(leaves[2] + leaves[3]);
+        var levelOneLeft = ComputeSha256Hex(leaves[0] + leaves[1]);
+        var levelOneRight = ComputeSha256Hex(leaves[2] + leaves[3]);
 
-        // Root: hash(level1_0 + level1_1)
-        var expectedRoot = ComputeSha256Hex(level1_0 + level1_1);
+        // Root: hash(levelOneLeft + levelOneRight)
+        var expectedRoot = ComputeSha256Hex(levelOneLeft + levelOneRight);
 
         var computedRoot = ComputeMerkleRoot(leaves);
 
@@ -196,11 +196,11 @@ public class BlockchainProviderTests
         };
 
         // Level 1: hash(leaf0+leaf1), leaf2 promoted
-        var level1_0 = ComputeSha256Hex(leaves[0] + leaves[1]);
-        var level1_1 = leaves[2]; // promoted
+        var levelOneLeft = ComputeSha256Hex(leaves[0] + leaves[1]);
+        var levelOneRight = leaves[2]; // promoted
 
-        // Root: hash(level1_0 + level1_1)
-        var expectedRoot = ComputeSha256Hex(level1_0 + level1_1);
+        // Root: hash(levelOneLeft + levelOneRight)
+        var expectedRoot = ComputeSha256Hex(levelOneLeft + levelOneRight);
 
         var computedRoot = ComputeMerkleRoot(leaves);
 

@@ -717,7 +717,7 @@ public class PolicyCascadeEdgeCaseTests
             }
         };
 
-        var policies = new Dictionary<string, FeaturePolicy>();
+        IReadOnlyDictionary<string, FeaturePolicy> policies = new Dictionary<string, FeaturePolicy>();
         var scorer = new PolicyComplianceScorer(policies);
         var report = scorer.ScoreAgainst(template);
 
@@ -728,7 +728,7 @@ public class PolicyCascadeEdgeCaseTests
     [Fact]
     public void ComplianceScorer_MissingFeature_FailsRequirement()
     {
-        var policies = new Dictionary<string, FeaturePolicy>();
+        IReadOnlyDictionary<string, FeaturePolicy> policies = new Dictionary<string, FeaturePolicy>();
         var scorer = new PolicyComplianceScorer(policies);
         var report = scorer.ScoreAgainst(RegulatoryTemplate.Hipaa());
 
@@ -752,7 +752,7 @@ public class PolicyCascadeEdgeCaseTests
     [Fact]
     public void ComplianceScorer_RemediationMessagesProduced()
     {
-        var policies = new Dictionary<string, FeaturePolicy>();
+        IReadOnlyDictionary<string, FeaturePolicy> policies = new Dictionary<string, FeaturePolicy>();
         var scorer = new PolicyComplianceScorer(policies);
         var report = scorer.ScoreAgainst(RegulatoryTemplate.Hipaa());
 

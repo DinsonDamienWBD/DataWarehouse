@@ -259,9 +259,16 @@ public class GuardsTests
     [Fact]
     public void MaxSize_StreamExceedsLimit_ShouldThrow()
     {
-        using var stream = new MemoryStream(new byte[1000]);
-        var act = () => Guards.MaxSize(stream, 100);
-        act.Should().Throw<ArgumentException>().WithMessage("*exceeds maximum*");
+        var stream = new MemoryStream(new byte[1000]);
+        try
+        {
+            var act = () => Guards.MaxSize(stream, 100);
+            act.Should().Throw<ArgumentException>().WithMessage("*exceeds maximum*");
+        }
+        finally
+        {
+            stream.Dispose();
+        }
     }
 
     [Fact]

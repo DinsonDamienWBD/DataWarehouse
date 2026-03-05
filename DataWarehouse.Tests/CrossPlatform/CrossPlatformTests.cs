@@ -42,7 +42,7 @@ public class CrossPlatformTests
 
         // Act
         await registry.InitializeAsync();
-        var capabilities = registry.GetCapabilities();
+        var capabilities = await registry.GetCapabilitiesAsync();
 
         // Assert
         capabilities.Should().NotBeNull();
@@ -59,7 +59,7 @@ public class CrossPlatformTests
 
         // Act
         await registry.InitializeAsync();
-        var allDevices = registry.GetAllDevices();
+        var allDevices = await registry.GetAllDevicesAsync();
 
         // Assert
         allDevices.Should().NotBeNull();
@@ -245,7 +245,7 @@ public class CrossPlatformTests
     public void EnvironmentVariables_ShouldBeAccessible()
     {
         // Test that environment variable access works
-        var pathVar = RuntimeInformation.IsOSPlatform(OSPlatform.Windows) ? "PATH" : "PATH";
+        var pathVar = "PATH";
         var pathValue = Environment.GetEnvironmentVariable(pathVar);
 
         // PATH should exist on all platforms
@@ -274,7 +274,7 @@ public class CrossPlatformTests
         await registry.InitializeAsync();
 
         // Act - query a capability that might or might not exist
-        var hasNvme = registry.HasCapability("nvme");
+        var hasNvme = await registry.HasCapabilityAsync("nvme");
 
         // Assert - should return true or false, not throw
         (hasNvme == true || hasNvme == false).Should().BeTrue();

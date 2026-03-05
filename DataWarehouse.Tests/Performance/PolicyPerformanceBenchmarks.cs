@@ -817,12 +817,12 @@ public class PolicyPerformanceBenchmarks
     {
         var cache = new VersionedPolicyCache();
         var exceptions = new ConcurrentBag<Exception>();
-        var running = true;
+        var runFlag = 1; // 1 = running, 0 = stopped
 
         // Parallel readers
         var readerTasks = Enumerable.Range(0, 20).Select(_ => Task.Run(() =>
         {
-            while (running)
+            while (Interlocked.CompareExchange(ref runFlag, 1, 1) == 1)
             {
                 try
                 {
@@ -847,7 +847,7 @@ public class PolicyPerformanceBenchmarks
             cache.Update(policies);
         }
 
-        running = false;
+        Interlocked.Exchange(ref runFlag, 0);
         Task.WaitAll(readerTasks);
 
         exceptions.Should().BeEmpty(

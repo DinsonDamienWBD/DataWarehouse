@@ -36,7 +36,7 @@ public sealed class StripedWriteLockTests
     [Fact]
     public async Task AcquireAsync_SameKey_Serialized()
     {
-        await using var stripedLock = new StripedWriteLock(16);
+        var stripedLock = new StripedWriteLock(16);
         bool secondAcquired = false;
 
         // Acquire the first lock
@@ -60,6 +60,8 @@ public sealed class StripedWriteLockTests
         // Now the second acquire should complete
         await acquireTask.WaitAsync(TimeSpan.FromSeconds(5));
         Assert.True(secondAcquired, "Second acquire should have succeeded after first was released");
+
+        await stripedLock.DisposeAsync();
     }
 
     [Fact]

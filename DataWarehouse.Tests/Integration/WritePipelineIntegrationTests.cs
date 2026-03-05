@@ -39,9 +39,7 @@ public class WritePipelineIntegrationTests
         // Act - Read Pipeline
         var loadedStream = await storage.LoadAsync(uri);
         var loadedData = new byte[loadedStream.Length];
-#pragma warning disable CA2022 // Intentional full read in test
-        await loadedStream.ReadAsync(loadedData);
-#pragma warning restore CA2022
+        await loadedStream.ReadExactlyAsync(loadedData);
         var decrypted = await encryptionStrategy.DecryptAsync(loadedData, _encryptionKey);
         var decompressed = await compressionStrategy.DecompressAsync(decrypted);
 
@@ -68,9 +66,7 @@ public class WritePipelineIntegrationTests
         // Act - Read Pipeline
         var loadedStream = await storage.LoadAsync(uri);
         var loadedData = new byte[loadedStream.Length];
-#pragma warning disable CA2022 // Intentional full read in test
-        await loadedStream.ReadAsync(loadedData);
-#pragma warning restore CA2022
+        await loadedStream.ReadExactlyAsync(loadedData);
         var decrypted = await encryptionStrategy.DecryptAsync(loadedData, _encryptionKey);
         var decompressed = await compressionStrategy.DecompressAsync(decrypted);
 
@@ -109,9 +105,7 @@ public class WritePipelineIntegrationTests
         // Act - Read Pipeline
         var loadedStream = await storage.LoadAsync(uri);
         var loadedData = new byte[loadedStream.Length];
-#pragma warning disable CA2022 // Intentional full read in test
-        await loadedStream.ReadAsync(loadedData);
-#pragma warning restore CA2022
+        await loadedStream.ReadExactlyAsync(loadedData);
         var decrypted = await encryptionStrategy.DecryptAsync(loadedData, _encryptionKey);
         var decompressed = await compressionStrategy.DecompressAsync(decrypted);
 
@@ -139,9 +133,7 @@ public class WritePipelineIntegrationTests
         // Act - Read Pipeline
         var loadedStream = await storage.LoadAsync(uri);
         var loadedData = new byte[loadedStream.Length];
-#pragma warning disable CA2022 // Intentional full read in test
-        await loadedStream.ReadAsync(loadedData);
-#pragma warning restore CA2022
+        await loadedStream.ReadExactlyAsync(loadedData);
         var decrypted = await encryptionStrategy.DecryptAsync(loadedData, _encryptionKey);
         var decompressed = await compressionStrategy.DecompressAsync(decrypted);
 
@@ -176,9 +168,7 @@ public class WritePipelineIntegrationTests
         // Act - Read file 2
         var loadedStream = await storage.LoadAsync(uri2);
         var loadedData = new byte[loadedStream.Length];
-#pragma warning disable CA2022 // Intentional full read in test
-        await loadedStream.ReadAsync(loadedData);
-#pragma warning restore CA2022
+        await loadedStream.ReadExactlyAsync(loadedData);
         var decrypted = await encryptionStrategy.DecryptAsync(loadedData, _encryptionKey);
         var decompressed = await compressionStrategy.DecompressAsync(decrypted);
 
@@ -223,9 +213,7 @@ public class WritePipelineIntegrationTests
         // Act - Try to decrypt with wrong key
         var loadedStream = await storage.LoadAsync(uri);
         var loadedData = new byte[loadedStream.Length];
-#pragma warning disable CA2022 // Intentional full read in test
-        await loadedStream.ReadAsync(loadedData);
-#pragma warning restore CA2022
+        await loadedStream.ReadExactlyAsync(loadedData);
 
         // Assert - Decryption should fail
         var decryptAction = async () => await encryptionStrategy.DecryptAsync(loadedData, wrongKey);

@@ -137,7 +137,7 @@ public sealed class GravityOptimizerTests
 
         // Compliance region = 1.0 * 0.60 weight = 0.60 contribution
         // With default values for other dimensions, should be significant
-        Assert.True(score.ComplianceWeight == 1.0,
+        Assert.True(Math.Abs(score.ComplianceWeight - 1.0) < 1e-10,
             $"Expected compliance weight 1.0, got {score.ComplianceWeight}");
     }
 

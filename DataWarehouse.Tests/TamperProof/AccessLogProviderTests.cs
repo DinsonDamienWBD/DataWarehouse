@@ -166,6 +166,7 @@ public class AccessLogProviderTests
 
         // Verify all hashes are unique (different entries should produce different hashes)
         entryHashes.Should().OnlyHaveUniqueItems("each unique entry should produce a unique hash");
+        entries.Should().HaveCount(5, "all entries should have been recorded");
     }
 
     [Fact]

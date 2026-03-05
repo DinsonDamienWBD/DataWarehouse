@@ -110,7 +110,7 @@ public sealed class InMemoryWriteAheadLog : IWriteAheadLog
     private bool _abortNextFlush;
 
     public long CurrentSequenceNumber => Interlocked.Read(ref _seqNum);
-    public long WalSizeBlocks => _entries.Count;
+    public long WalSizeBlocks { get { lock (_entries) return _entries.Count; } }
     public double WalUtilization => 0.1;
     public bool NeedsRecovery => false;
 
@@ -432,32 +432,38 @@ public sealed class MorphSpectrumTests
     [Fact]
     public async Task ZeroDowntime_ReadsWorkDuringMorph()
     {
-        await using var engine = CreateEngine(level0Max: 1, level1Max: 50, level2Max: 1_000_000);
-
-        // Insert 10 entries at Level 1
-        for (int i = 0; i < 10; i++)
-            await engine.InsertAsync(MakeKey(i), i);
-
-        // Start concurrent reads while triggering morph
-        var readResults = new ConcurrentBag<long?>();
-        var readTask = Task.Run(async () =>
+        var engine = CreateEngine(level0Max: 1, level1Max: 50, level2Max: 1_000_000);
+        try
         {
-            for (int r = 0; r < 100; r++)
+            // Insert 10 entries at Level 1
+            for (int i = 0; i < 10; i++)
+                await engine.InsertAsync(MakeKey(i), i);
+
+            // Start concurrent reads while triggering morph
+            var readResults = new ConcurrentBag<long?>();
+            var readTask = Task.Run(async () =>
             {
-                var result = await engine.LookupAsync(MakeKey(r % 10));
-                readResults.Add(result);
-                await Task.Yield();
-            }
-        });
+                for (int r = 0; r < 100; r++)
+                {
+                    var result = await engine.LookupAsync(MakeKey(r % 10));
+                    readResults.Add(result);
+                    await Task.Yield();
+                }
+            });
 
-        // Trigger morph to Level 2 by inserting past threshold
-        for (int i = 10; i <= 51; i++)
-            await engine.InsertAsync(MakeKey(i), i);
+            // Trigger morph to Level 2 by inserting past threshold
+            for (int i = 10; i <= 51; i++)
+                await engine.InsertAsync(MakeKey(i), i);
 
-        await readTask;
+            await readTask;
 
-        // All reads should have succeeded (no nulls for existing keys)
-        Assert.All(readResults, r => Assert.NotNull(r));
+            // All reads should have succeeded (no nulls for existing keys)
+            Assert.All(readResults, r => Assert.NotNull(r));
+        }
+        finally
+        {
+            await engine.DisposeAsync();
+        }
     }
 
     [Fact]

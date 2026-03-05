@@ -29,7 +29,7 @@ public sealed class MigrationEngineTests : IDisposable
     public void Dispose()
     {
         _forwardingTable.Dispose();
-        try { Directory.Delete(_checkpointDir, recursive: true); } catch { }
+        try { Directory.Delete(_checkpointDir, recursive: true); } catch (IOException) { }
     }
 
     #region Helpers

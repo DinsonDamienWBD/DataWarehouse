@@ -714,7 +714,6 @@ public class EndToEndLifecycleTests : IDisposable
 
     private void VerifyWiringPathExists(string description, string[] searchTerms, string[] searchDirectories)
     {
-        var found = false;
         var checkedDirs = new List<string>();
 
         foreach (var dirName in searchDirectories)
@@ -737,7 +736,6 @@ public class EndToEndLifecycleTests : IDisposable
                 {
                     if (content.Contains(term, StringComparison.OrdinalIgnoreCase))
                     {
-                        found = true;
                         _output.WriteLine($"  Wiring verified: '{term}' found in {Path.GetFileName(file)} ({description})");
                         return;
                     }
@@ -745,12 +743,8 @@ public class EndToEndLifecycleTests : IDisposable
             }
         }
 
-        if (!found)
-        {
-            _output.WriteLine($"  WARNING: No wiring found for '{description}' (searched: {string.Join(", ", checkedDirs)})");
-        }
-
-        found.Should().BeTrue($"wiring path should exist: {description}");
+        _output.WriteLine($"  WARNING: No wiring found for '{description}' (searched: {string.Join(", ", checkedDirs)})");
+        true.Should().BeFalse($"wiring path should exist: {description}");
     }
 
     private static string[] GetCsFiles(string directory)

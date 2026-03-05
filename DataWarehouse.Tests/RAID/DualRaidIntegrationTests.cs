@@ -8,7 +8,7 @@ using DataWarehouse.Plugins.UltimateRAID.Strategies.DeviceLevel;
 using DataWarehouse.SDK.VirtualDiskEngine.PhysicalDevice;
 using Xunit;
 
-namespace DataWarehouse.Plugins.UltimateRAID.Strategies.DeviceLevel;
+namespace DataWarehouse.Tests.RAID;
 
 /// <summary>
 /// Integration tests for the dual-level RAID architecture: device-level CompoundBlockDevice
@@ -448,6 +448,9 @@ public sealed class DualRaidIntegrationTests
 
         // Verify spare now has data
         Assert.True(spare.StoredBlockCount > 0, "Spare should have rebuilt data.");
+
+        // Verify all blocks were tracked during write
+        Assert.Equal(testBlockCount, writtenData.Count);
     }
 
     #endregion

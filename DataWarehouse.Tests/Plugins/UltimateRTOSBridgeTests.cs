@@ -5,7 +5,7 @@ using DataWarehouse.SDK.Primitives;
 namespace DataWarehouse.Tests.Plugins;
 
 [Trait("Category", "Unit")]
-public class UltimateRTOSBridgeTests
+public class UltimateRtosBridgeTests
 {
     [Fact]
     public void Plugin_HasCorrectIdentity()

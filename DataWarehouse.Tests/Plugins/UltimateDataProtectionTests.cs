@@ -38,7 +38,7 @@ public class UltimateDataProtectionTests
     public void DataProtectionStrategyRegistry_ShouldFilterByCategory()
     {
         var registry = new DataProtectionStrategyRegistry();
-        var fullBackup = registry.GetByCategory(DataProtectionCategory.FullBackup);
+        var fullBackup = registry.GetByCategory(DataProtectionCategory.FullBackup).ToList();
         fullBackup.Should().NotBeNull();
         fullBackup.Should().BeEmpty("empty registry has no strategies");
     }

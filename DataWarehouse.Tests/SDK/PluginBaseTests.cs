@@ -144,9 +144,16 @@ public class PluginBaseTests
     [Fact]
     public void ThrowIfDisposed_ShouldNotThrowWhenAlive()
     {
-        using var plugin = new TestPlugin();
-        var act = () => plugin.TestThrowIfDisposed();
-        act.Should().NotThrow();
+        var plugin = new TestPlugin();
+        try
+        {
+            var act = () => plugin.TestThrowIfDisposed();
+            act.Should().NotThrow();
+        }
+        finally
+        {
+            plugin.Dispose();
+        }
     }
 
     [Fact]
@@ -169,21 +176,35 @@ public class PluginBaseTests
     [Fact]
     public async Task InitializeAsync_WithCancelledToken_ShouldThrow()
     {
-        using var plugin = new TestPlugin();
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
-        var act = async () => await plugin.InitializeAsync(cts.Token);
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        var plugin = new TestPlugin();
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+            var act = async () => await plugin.InitializeAsync(cts.Token);
+            await act.Should().ThrowAsync<OperationCanceledException>();
+        }
+        finally
+        {
+            plugin.Dispose();
+        }
     }
 
     [Fact]
     public async Task ExecuteAsync_WithCancelledToken_ShouldThrow()
     {
-        using var plugin = new TestPlugin();
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
-        var act = async () => await plugin.ExecuteAsync(cts.Token);
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        var plugin = new TestPlugin();
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+            var act = async () => await plugin.ExecuteAsync(cts.Token);
+            await act.Should().ThrowAsync<OperationCanceledException>();
+        }
+        finally
+        {
+            plugin.Dispose();
+        }
     }
 
     [Fact]
@@ -197,11 +218,18 @@ public class PluginBaseTests
     [Fact]
     public async Task ActivateAsync_WithCancelledToken_ShouldThrow()
     {
-        using var plugin = new TestPlugin();
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
-        var act = async () => await plugin.ActivateAsync(cts.Token);
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        var plugin = new TestPlugin();
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+            var act = async () => await plugin.ActivateAsync(cts.Token);
+            await act.Should().ThrowAsync<OperationCanceledException>();
+        }
+        finally
+        {
+            plugin.Dispose();
+        }
     }
 
     [Fact]
@@ -232,9 +260,16 @@ public class PluginBaseTests
     [Fact]
     public void InjectConfiguration_ShouldThrowOnNull()
     {
-        using var plugin = new TestPlugin();
-        var act = () => plugin.InjectConfiguration(null!);
-        act.Should().Throw<ArgumentNullException>();
+        var plugin = new TestPlugin();
+        try
+        {
+            var act = () => plugin.InjectConfiguration(null!);
+            act.Should().Throw<ArgumentNullException>();
+        }
+        finally
+        {
+            plugin.Dispose();
+        }
     }
 
     [Fact]
@@ -272,11 +307,18 @@ public class PluginBaseTests
     [Fact]
     public async Task CheckHealthAsync_WithCancelledToken_ShouldThrow()
     {
-        using var plugin = new TestPlugin();
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
-        var act = async () => await plugin.CheckHealthAsync(cts.Token);
-        await act.Should().ThrowAsync<OperationCanceledException>();
+        var plugin = new TestPlugin();
+        try
+        {
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+            var act = async () => await plugin.CheckHealthAsync(cts.Token);
+            await act.Should().ThrowAsync<OperationCanceledException>();
+        }
+        finally
+        {
+            plugin.Dispose();
+        }
     }
 
     [Fact]

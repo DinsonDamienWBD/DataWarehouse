@@ -85,8 +85,8 @@ public class PerformanceBenchmarkTests
         }
         sw.Stop();
 
-        var totalMB = (double)(10 * iterations);
-        var throughputMBps = totalMB / (sw.Elapsed.TotalSeconds);
+        var totalMb = (double)(10 * iterations);
+        var throughputMBps = totalMb / (sw.Elapsed.TotalSeconds);
 
         throughputMBps.Should().BeGreaterThan(100,
             "SHA-256 throughput should exceed 100 MB/s on modern hardware");

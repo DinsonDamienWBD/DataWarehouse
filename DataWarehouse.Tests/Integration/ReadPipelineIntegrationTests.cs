@@ -35,9 +35,7 @@ public class ReadPipelineIntegrationTests
         // Act - Read Pipeline
         var retrieved = await storage.LoadAsync(uri);
         var retrievedBytes = new byte[retrieved.Length];
-#pragma warning disable CA2022 // Intentional full read in test
-        await retrieved.ReadAsync(retrievedBytes);
-#pragma warning restore CA2022
+        await retrieved.ReadExactlyAsync(retrievedBytes);
         var decrypted = await encryptionStrategy.DecryptAsync(retrievedBytes, _encryptionKey);
         var decompressed = await compressionStrategy.DecompressAsync(decrypted);
 
@@ -66,9 +64,7 @@ public class ReadPipelineIntegrationTests
         {
             var stream = await storage.LoadAsync(uri);
             var bytes = new byte[stream.Length];
-#pragma warning disable CA2022 // Intentional full read in test
-            await stream.ReadAsync(bytes);
-#pragma warning restore CA2022
+            await stream.ReadExactlyAsync(bytes);
             var decrypted = await encryptionStrategy.DecryptAsync(bytes, _encryptionKey);
             var decompressed = await compressionStrategy.DecompressAsync(decrypted);
             results.Add(decompressed);
@@ -115,9 +111,7 @@ public class ReadPipelineIntegrationTests
         // Act - Try to decrypt corrupted data
         var stream = await storage.LoadAsync(uri);
         var bytes = new byte[stream.Length];
-#pragma warning disable CA2022 // Intentional full read in test
-        await stream.ReadAsync(bytes);
-#pragma warning restore CA2022
+        await stream.ReadExactlyAsync(bytes);
 
         var decryptAction = async () => await encryptionStrategy.DecryptAsync(bytes, _encryptionKey);
 

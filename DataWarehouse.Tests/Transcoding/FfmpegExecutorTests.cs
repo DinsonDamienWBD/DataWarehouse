@@ -207,7 +207,7 @@ namespace DataWarehouse.Tests.Transcoding
             }
 
             // Create minimal valid BMP image (1x1 pixel black)
-            var bmpData = CreateMinimalBMP();
+            var bmpData = CreateMinimalBmp();
 
             // Convert BMP to PNG via stdin/stdout piping
             var result = await executor.ExecuteAsync(
@@ -299,7 +299,7 @@ namespace DataWarehouse.Tests.Transcoding
 
         #region Helper Methods
 
-        private static byte[] CreateMinimalBMP()
+        private static byte[] CreateMinimalBmp()
         {
             // BMP file header + DIB header + 1x1 black pixel
             var bmp = new byte[70];

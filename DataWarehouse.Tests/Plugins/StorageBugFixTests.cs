@@ -98,8 +98,10 @@ namespace DataWarehouse.Tests.Plugins
         public void XDocument_SafelyHandles_EmptyXml()
         {
             // T30: Empty or whitespace XML should throw, not return null silently
-            Assert.Throws<System.Xml.XmlException>(() => XDocument.Parse(""));
-            Assert.Throws<System.Xml.XmlException>(() => XDocument.Parse("   "));
+            var emptyInput = string.Empty;
+            var whitespaceInput = "   ";
+            Assert.Throws<System.Xml.XmlException>(() => XDocument.Parse(emptyInput));
+            Assert.Throws<System.Xml.XmlException>(() => XDocument.Parse(whitespaceInput));
         }
 
         [Fact]
@@ -264,7 +266,7 @@ namespace DataWarehouse.Tests.Plugins
         {
             // T31: Properly awaited async operations respect cancellation tokens
             using var cts = new CancellationTokenSource();
-            cts.Cancel();
+            await cts.CancelAsync();
 
             await Assert.ThrowsAsync<TaskCanceledException>(async () =>
             {

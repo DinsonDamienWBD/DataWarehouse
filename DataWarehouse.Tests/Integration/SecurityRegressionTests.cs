@@ -168,6 +168,8 @@ public class SecurityRegressionTests
         // Pass -- this is a warning-only test; coverage is tracked for reporting
         total.Should().BeGreaterThan(0, "should find async methods in plugin code");
         coverage.Should().BeGreaterThan(0, "at least some async methods should have CancellationToken");
+        // Track warnings count for reporting purposes
+        warnings.Count.Should().BeGreaterThanOrEqualTo(0, "warning count tracked for coverage report");
     }
 
     // -----------------------------------------------------------------------

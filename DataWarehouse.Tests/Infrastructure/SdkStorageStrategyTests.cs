@@ -54,7 +54,7 @@ namespace DataWarehouse.Tests.Infrastructure
         [Fact]
         public void IStorageStrategy_DefinesStoreAsyncMethod()
         {
-            var methods = typeof(IStorageStrategy).GetMethods().Where(m => m.Name == "StoreAsync");
+            var methods = typeof(IStorageStrategy).GetMethods().Where(m => m.Name == "StoreAsync").ToArray();
             Assert.NotEmpty(methods);
             Assert.Contains(methods, m => m.ReturnType == typeof(Task<StorageObjectMetadata>));
         }
@@ -62,7 +62,7 @@ namespace DataWarehouse.Tests.Infrastructure
         [Fact]
         public void IStorageStrategy_DefinesRetrieveAsyncMethod()
         {
-            var methods = typeof(IStorageStrategy).GetMethods().Where(m => m.Name == "RetrieveAsync");
+            var methods = typeof(IStorageStrategy).GetMethods().Where(m => m.Name == "RetrieveAsync").ToArray();
             Assert.NotEmpty(methods);
             Assert.Contains(methods, m => m.ReturnType == typeof(Task<System.IO.Stream>));
         }
@@ -70,7 +70,7 @@ namespace DataWarehouse.Tests.Infrastructure
         [Fact]
         public void IStorageStrategy_DefinesDeleteAsyncMethod()
         {
-            var methods = typeof(IStorageStrategy).GetMethods().Where(m => m.Name == "DeleteAsync");
+            var methods = typeof(IStorageStrategy).GetMethods().Where(m => m.Name == "DeleteAsync").ToArray();
             Assert.NotEmpty(methods);
             Assert.Contains(methods, m => m.ReturnType == typeof(Task));
         }
@@ -78,7 +78,7 @@ namespace DataWarehouse.Tests.Infrastructure
         [Fact]
         public void IStorageStrategy_DefinesExistsAsyncMethod()
         {
-            var methods = typeof(IStorageStrategy).GetMethods().Where(m => m.Name == "ExistsAsync");
+            var methods = typeof(IStorageStrategy).GetMethods().Where(m => m.Name == "ExistsAsync").ToArray();
             Assert.NotEmpty(methods);
             Assert.Contains(methods, m => m.ReturnType == typeof(Task<bool>));
         }

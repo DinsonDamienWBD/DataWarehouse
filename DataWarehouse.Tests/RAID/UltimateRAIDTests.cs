@@ -12,7 +12,7 @@ namespace DataWarehouse.Tests.RAID;
 /// Validates RAID level metadata, stripe calculation, and data distribution.
 /// </summary>
 [Trait("Category", "Unit")]
-public class UltimateRAIDTests
+public class UltimateRaidTests
 {
     #region RAID 0 Strategy
 

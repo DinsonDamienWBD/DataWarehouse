@@ -24,7 +24,7 @@ namespace DataWarehouse.Tests.Transcoding
                 return;
             }
 
-            var sourceBytes = CreateMinimalBMP();
+            var sourceBytes = CreateMinimalBmp();
             var packageWriterCalled = false;
 
             var result = await FfmpegTranscodeHelper.ExecuteOrPackageAsync(
@@ -171,7 +171,7 @@ namespace DataWarehouse.Tests.Transcoding
             }
         }
 
-        private static byte[] CreateMinimalBMP()
+        private static byte[] CreateMinimalBmp()
         {
             var bmp = new byte[70];
             bmp[0] = 0x42; bmp[1] = 0x4D; // "BM"

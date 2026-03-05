@@ -490,7 +490,7 @@ public class AiBehaviorTests
     }
 
     [Fact]
-    public void RingBuffer_ReadDuringWrite_ConsistentData()
+    public async Task RingBuffer_ReadDuringWrite_ConsistentData()
     {
         var buffer = new AiObservationRingBuffer(256);
         var readEvents = new ConcurrentBag<ObservationEvent>();
@@ -499,7 +499,7 @@ public class AiBehaviorTests
         {
             for (int i = 0; i < 100 && !cts.Token.IsCancellationRequested; i++)
                 buffer.TryWrite(MakeObs(metric: $"m{i}"));
-        });
+        }, cts.Token);
         var reader = Task.Run(() =>
         {
             while (!cts.Token.IsCancellationRequested)
@@ -507,11 +507,11 @@ public class AiBehaviorTests
                 if (buffer.TryRead(out var evt) && evt is not null)
                     readEvents.Add(evt);
             }
-        });
-        writer.Wait();
+        }, cts.Token);
+        await writer;
         SpinWait.SpinUntil(() => false, 100);
         cts.Cancel();
-        reader.Wait();
+        try { await reader; } catch (OperationCanceledException) { }
         foreach (var evt in readEvents)
             evt.MetricName.Should().StartWith("m");
     }

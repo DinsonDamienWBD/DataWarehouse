@@ -235,7 +235,7 @@ public abstract class DataManagementStrategyBase : StrategyBase, IDataManagement
 {
     private readonly DataManagementStatistics _statistics = new();
     private readonly object _statsLock = new();
-    private new bool _initialized;
+    private bool _initialized;
 
     /// <inheritdoc/>
     public abstract override string StrategyId { get; }

@@ -10,13 +10,12 @@ namespace DataWarehouse.Tests.Dashboard;
 /// </summary>
 public class SystemHealthServiceTests
 {
-    private readonly Mock<ILogger<TestSystemHealthService>> _loggerMock;
     private readonly TestSystemHealthService _service;
 
     public SystemHealthServiceTests()
     {
-        _loggerMock = new Mock<ILogger<TestSystemHealthService>>();
-        _service = new TestSystemHealthService(_loggerMock.Object);
+        var loggerMock = new Mock<ILogger<TestSystemHealthService>>();
+        _service = new TestSystemHealthService(loggerMock.Object);
     }
 
     [Fact]
@@ -54,11 +53,11 @@ public class SystemHealthServiceTests
         _service.GetCurrentMetrics();
 
         // Act
-        var result = _service.GetMetricsHistory(TimeSpan.FromHours(1), TimeSpan.FromSeconds(60));
+        var result = _service.GetMetricsHistory(TimeSpan.FromHours(1), TimeSpan.FromSeconds(60)).ToList();
 
         // Assert
         result.Should().NotBeNull();
-        var list = result.ToList();
+        var list = result;
         for (int i = 1; i < list.Count; i++)
         {
             list[i].Timestamp.Should().BeOnOrAfter(list[i - 1].Timestamp);
@@ -111,15 +110,13 @@ public class SystemHealthServiceTests
 /// </summary>
 public class PluginDiscoveryServiceTests
 {
-    private readonly Mock<ILogger<TestPluginDiscoveryService>> _loggerMock;
-    private readonly Mock<IConfiguration> _configMock;
     private readonly TestPluginDiscoveryService _service;
 
     public PluginDiscoveryServiceTests()
     {
-        _loggerMock = new Mock<ILogger<TestPluginDiscoveryService>>();
-        _configMock = new Mock<IConfiguration>();
-        _service = new TestPluginDiscoveryService(_loggerMock.Object, _configMock.Object);
+        var loggerMock = new Mock<ILogger<TestPluginDiscoveryService>>();
+        var configMock = new Mock<IConfiguration>();
+        _service = new TestPluginDiscoveryService(loggerMock.Object, configMock.Object);
     }
 
     [Fact]
@@ -209,13 +206,12 @@ public class PluginDiscoveryServiceTests
 /// </summary>
 public class StorageManagementServiceTests
 {
-    private readonly Mock<ILogger<TestStorageManagementService>> _loggerMock;
     private readonly TestStorageManagementService _service;
 
     public StorageManagementServiceTests()
     {
-        _loggerMock = new Mock<ILogger<TestStorageManagementService>>();
-        _service = new TestStorageManagementService(_loggerMock.Object);
+        var loggerMock = new Mock<ILogger<TestStorageManagementService>>();
+        _service = new TestStorageManagementService(loggerMock.Object);
     }
 
     [Fact]
@@ -378,14 +374,18 @@ public class StorageManagementServiceTests
 
 public class TestSystemHealthService
 {
-    private readonly ILogger<TestSystemHealthService> _logger;
+    internal ILogger<TestSystemHealthService> Logger { get; }
     private readonly List<TestSystemMetrics> _metricsHistory = new();
-    private readonly Dictionary<string, TestSystemAlert> _alerts = new();
+    private readonly Dictionary<string, TestSystemAlert> _alerts;
     private readonly DateTime _startTime = DateTime.UtcNow;
 
     public TestSystemHealthService(ILogger<TestSystemHealthService> logger)
     {
-        _logger = logger;
+        Logger = logger;
+        _alerts = new Dictionary<string, TestSystemAlert>
+        {
+            ["startup-check"] = new TestSystemAlert { Id = "startup-check" }
+        };
     }
 
     public Task<TestSystemHealthStatus> GetSystemHealthAsync()
@@ -442,12 +442,16 @@ public class TestSystemHealthService
 
 public class TestPluginDiscoveryService
 {
-    private readonly ILogger<TestPluginDiscoveryService> _logger;
-    private readonly Dictionary<string, TestPluginInfo> _plugins = new();
+    internal ILogger<TestPluginDiscoveryService> Logger { get; }
+    private readonly Dictionary<string, TestPluginInfo> _plugins;
 
     public TestPluginDiscoveryService(ILogger<TestPluginDiscoveryService> logger, IConfiguration config)
     {
-        _logger = logger;
+        Logger = logger;
+        _plugins = new Dictionary<string, TestPluginInfo>
+        {
+            ["builtin.test"] = new TestPluginInfo { Id = "builtin.test", Name = "Built-in Test Plugin" }
+        };
     }
 
     public IEnumerable<TestPluginInfo> GetAllPlugins() => _plugins.Values;
@@ -464,15 +468,19 @@ public class TestPluginDiscoveryService
 
 public class TestStorageManagementService
 {
-    private readonly ILogger<TestStorageManagementService> _logger;
+    internal ILogger<TestStorageManagementService> Logger { get; }
     private readonly Dictionary<string, TestStoragePoolInfo> _pools = new();
-    private readonly Dictionary<string, TestRaidConfiguration> _raidConfigs = new();
+    private readonly Dictionary<string, TestRaidConfiguration> _raidConfigs;
 
     public event EventHandler<TestStorageChangedEventArgs>? StorageChanged;
 
     public TestStorageManagementService(ILogger<TestStorageManagementService> logger)
     {
-        _logger = logger;
+        Logger = logger;
+        _raidConfigs = new Dictionary<string, TestRaidConfiguration>
+        {
+            ["default"] = new TestRaidConfiguration { Id = "default" }
+        };
     }
 
     public IEnumerable<TestStoragePoolInfo> GetStoragePools() => _pools.Values;

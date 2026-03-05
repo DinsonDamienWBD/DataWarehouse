@@ -220,7 +220,7 @@ namespace DataWarehouse.Tests.Scaling
 
             // Insert 200 items -- 100 will be evicted (cache holds max 100)
             for (int i = 0; i < 200; i++)
-                subsystem.Put($"key{i}", $"value{i}");
+                await subsystem.PutAsync($"key{i}", $"value{i}");
 
             Assert.Equal(100, subsystem.CacheCount);
 
@@ -232,7 +232,7 @@ namespace DataWarehouse.Tests.Scaling
 
             // Insert 300 more -- cache should now hold up to 500
             for (int i = 200; i < 500; i++)
-                subsystem.Put($"key{i}", $"value{i}");
+                await subsystem.PutAsync($"key{i}", $"value{i}");
 
             // Cache should hold up to 500 entries
             Assert.True(subsystem.CacheCount <= 500);
@@ -247,7 +247,7 @@ namespace DataWarehouse.Tests.Scaling
 
             // Fill to 200
             for (int i = 0; i < 200; i++)
-                subsystem.Put($"key{i}", $"value{i}");
+                await subsystem.PutAsync($"key{i}", $"value{i}");
 
             Assert.Equal(200, subsystem.CacheCount);
 
@@ -397,46 +397,53 @@ namespace DataWarehouse.Tests.Scaling
         [Fact]
         public async Task ConcurrentReconfiguration_NoExceptionsNoCorruption()
         {
-            using var subsystem = new TestScalableSubsystem(
+            var subsystem = new TestScalableSubsystem(
                 new ScalingLimits(MaxCacheEntries: 100));
-            var exceptions = new ConcurrentBag<Exception>();
-
-            // Start 10 concurrent writers
-            var writerTasks = Enumerable.Range(0, 10).Select(w => Task.Run(() =>
+            try
             {
-                try
-                {
-                    for (int i = 0; i < 100; i++)
-                        subsystem.Put($"w{w}_key{i}", $"w{w}_val{i}");
-                }
-                catch (Exception ex)
-                {
-                    exceptions.Add(ex);
-                }
-            })).ToArray();
+                var exceptions = new ConcurrentBag<Exception>();
 
-            // Simultaneously reconfigure limits 5 times
-            var reconfTasks = Enumerable.Range(0, 5).Select(r => Task.Run(async () =>
+                // Start 10 concurrent writers
+                var writerTasks = Enumerable.Range(0, 10).Select(w => Task.Run(() =>
+                {
+                    try
+                    {
+                        for (int i = 0; i < 100; i++)
+                            subsystem.Put($"w{w}_key{i}", $"w{w}_val{i}");
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                })).ToArray();
+
+                // Simultaneously reconfigure limits 5 times
+                var reconfTasks = Enumerable.Range(0, 5).Select(r => Task.Run(async () =>
+                {
+                    try
+                    {
+                        var newMax = 50 + (r * 50); // 50, 100, 150, 200, 250
+                        await subsystem.ReconfigureLimitsAsync(
+                            new ScalingLimits(MaxCacheEntries: newMax));
+                    }
+                    catch (Exception ex)
+                    {
+                        exceptions.Add(ex);
+                    }
+                })).ToArray();
+
+                await Task.WhenAll(writerTasks.Concat(reconfTasks));
+
+                Assert.Empty(exceptions);
+
+                // Cache should be in consistent state
+                Assert.True(subsystem.CacheCount >= 0);
+                Assert.True(subsystem.CacheCount <= subsystem.CurrentLimits.MaxCacheEntries);
+            }
+            finally
             {
-                try
-                {
-                    var newMax = 50 + (r * 50); // 50, 100, 150, 200, 250
-                    await subsystem.ReconfigureLimitsAsync(
-                        new ScalingLimits(MaxCacheEntries: newMax));
-                }
-                catch (Exception ex)
-                {
-                    exceptions.Add(ex);
-                }
-            })).ToArray();
-
-            await Task.WhenAll(writerTasks.Concat(reconfTasks));
-
-            Assert.Empty(exceptions);
-
-            // Cache should be in consistent state
-            Assert.True(subsystem.CacheCount >= 0);
-            Assert.True(subsystem.CacheCount <= subsystem.CurrentLimits.MaxCacheEntries);
+                subsystem.Dispose();
+            }
         }
 
         [Fact]
@@ -454,7 +461,7 @@ namespace DataWarehouse.Tests.Scaling
 
             // Insert items up to new limit
             for (int i = 0; i < 300; i++)
-                subsystem.Put($"key{i}", $"value{i}");
+                await subsystem.PutAsync($"key{i}", $"value{i}");
 
             Assert.Equal(300, subsystem.CacheCount);
         }

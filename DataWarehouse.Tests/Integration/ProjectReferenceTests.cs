@@ -180,7 +180,7 @@ public class ProjectReferenceTests
         {
             try
             {
-                XDocument.Load(csprojFile);
+                _ = XDocument.Load(csprojFile);
             }
             catch (Exception ex)
             {

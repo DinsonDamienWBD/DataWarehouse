@@ -216,13 +216,13 @@ public class PerformanceRegressionTests
 
         var afterLoadMemory = GC.GetTotalMemory(false);
         var memoryDeltaBytes = afterLoadMemory - baselineMemory;
-        var memoryDeltaMB = memoryDeltaBytes / (1024.0 * 1024.0);
+        var memoryDeltaMb = memoryDeltaBytes / (1024.0 * 1024.0);
 
         // Threshold: 500MB delta. Loading source metadata for ~3000 types should use
         // well under 100MB. 500MB catches pathological memory retention.
-        memoryDeltaMB.Should().BeLessThan(500,
+        memoryDeltaMb.Should().BeLessThan(500,
             "memory delta after loading plugin metadata should be <500MB (actual: {0:F1}MB for {1} types across {2} plugins)",
-            memoryDeltaMB, allPluginTypes.Count, pluginDirs.Length);
+            memoryDeltaMb, allPluginTypes.Count, pluginDirs.Length);
 
         // Verify linear scaling: memory per type should be < 100KB
         // (generous -- actual should be <1KB per type name string)

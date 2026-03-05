@@ -254,17 +254,24 @@ public class StoragePoolBaseTests
         var provider = new InMemoryStoragePlugin();
         pool.AddProvider(provider);
 
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
+        var cts = new CancellationTokenSource();
+        try
+        {
+            await cts.CancelAsync();
 
-        // Act & Assert
-        var act = async () => await pool.SaveAsync(
-            new Uri("memory:///cancelled.txt"),
-            new MemoryStream(new byte[10]),
-            null,
-            cts.Token);
+            // Act & Assert
+            var act = async () => await pool.SaveAsync(
+                new Uri("memory:///cancelled.txt"),
+                new MemoryStream(new byte[10]),
+                null,
+                cts.Token);
 
-        await act.Should().ThrowAsync<OperationCanceledException>();
+            await act.Should().ThrowAsync<OperationCanceledException>();
+        }
+        finally
+        {
+            cts.Dispose();
+        }
     }
 
     #endregion

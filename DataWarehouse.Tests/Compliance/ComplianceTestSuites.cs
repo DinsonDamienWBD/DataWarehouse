@@ -84,9 +84,9 @@ namespace DataWarehouse.Tests.Compliance
                 UserAgent = "DataWarehouse/1.0"
             });
 
-            var entries = auditLog.GetEntries("patient456");
+            var entries = auditLog.GetEntries("patient456").ToList();
             Assert.Single(entries);
-            Assert.Equal("provider123", entries.First().UserId);
+            Assert.Equal("provider123", entries[0].UserId);
         }
 
         [Fact]
@@ -1142,7 +1142,7 @@ namespace DataWarehouse.Tests.Compliance
         public void StoreKey(string keyId, byte[] material) =>
             _keys[keyId] = ProtectedData(material);
 
-        public bool IsKeyEncrypted(string keyId) => true;
+        public bool IsKeyEncrypted(string keyId) => _keys.ContainsKey(keyId);
 
         private byte[] ProtectedData(byte[] data)
         {
@@ -1323,6 +1323,9 @@ namespace DataWarehouse.Tests.Compliance
             return id;
         }
 
+        public FedRampAuditEntry? Get(string entryId) =>
+            _entries.GetValueOrDefault(entryId);
+
         public void Modify(string entryId, string userId) =>
             throw new UnauthorizedAccessException("Audit logs cannot be modified");
 
@@ -1438,13 +1441,14 @@ namespace DataWarehouse.Tests.Compliance
 
     internal class ExponentialBackoffRetry
     {
-        private readonly int _maxRetries;
         private readonly TimeSpan _baseDelay;
         private readonly TimeSpan _maxDelay;
 
+        public int MaxRetries { get; }
+
         public ExponentialBackoffRetry(int maxRetries, TimeSpan baseDelay, TimeSpan maxDelay)
         {
-            _maxRetries = maxRetries;
+            MaxRetries = maxRetries;
             _baseDelay = baseDelay;
             _maxDelay = maxDelay;
         }

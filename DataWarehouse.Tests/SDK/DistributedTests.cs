@@ -264,20 +264,27 @@ public class DistributedTests
     [Fact]
     public void ConcurrentAccess_ShouldNotThrow()
     {
-        using var ring = new ConsistentHashRing(50);
-        ring.AddNode("node-1");
-        ring.AddNode("node-2");
-
-        var tasks = Enumerable.Range(0, 10).Select(i => Task.Run(() =>
+        var ring = new ConsistentHashRing(50);
+        try
         {
-            for (int j = 0; j < 100; j++)
-            {
-                var node = ring.GetNode($"key-{i}-{j}");
-                node.Should().NotBeNullOrEmpty();
-            }
-        })).ToArray();
+            ring.AddNode("node-1");
+            ring.AddNode("node-2");
 
-        Task.WaitAll(tasks);
+            var tasks = Enumerable.Range(0, 10).Select(i => Task.Run(() =>
+            {
+                for (int j = 0; j < 100; j++)
+                {
+                    var node = ring.GetNode($"key-{i}-{j}");
+                    node.Should().NotBeNullOrEmpty();
+                }
+            })).ToArray();
+
+            Task.WaitAll(tasks);
+        }
+        finally
+        {
+            ring.Dispose();
+        }
     }
 
     #endregion
