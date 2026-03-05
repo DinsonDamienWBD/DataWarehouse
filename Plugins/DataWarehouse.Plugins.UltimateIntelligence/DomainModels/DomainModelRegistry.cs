@@ -413,13 +413,13 @@ public sealed class ModelConnectionConfig
 public enum ModelType
 {
     /// <summary>ONNX Runtime model (.onnx file).</summary>
-    ONNX,
+    Onnx,
 
     /// <summary>Hugging Face model (via API or local).</summary>
     HuggingFace,
 
     /// <summary>OpenAI-compatible API.</summary>
-    OpenAICompatible,
+    OpenAiCompatible,
 
     /// <summary>TensorFlow SavedModel.</summary>
     TensorFlow,
@@ -573,7 +573,7 @@ public sealed class DiscoveredCapabilities
 public abstract class DomainModelStrategyBase : StrategyBase, IDomainModelStrategy
 {
     /// <summary>Message bus for external model communication. Set via constructor or ConfigureIntelligence.</summary>
-    protected IMessageBus? _messageBus;
+    protected new IMessageBus? MessageBus;
 
     /// <inheritdoc/>
     public abstract string Domain { get; }
@@ -600,16 +600,16 @@ public abstract class DomainModelStrategyBase : StrategyBase, IDomainModelStrate
     /// <param name="messageBus">Optional message bus for external model communication.</param>
     protected DomainModelStrategyBase(IMessageBus? messageBus = null)
     {
-        _messageBus = messageBus;
+        MessageBus = messageBus;
     }
 
     /// <summary>
     /// Configures the message bus for this domain model strategy.
-    /// Updates both the StrategyBase MessageBus and the local _messageBus field.
+    /// Updates both the StrategyBase MessageBus and the local MessageBus field.
     /// </summary>
     public override void ConfigureIntelligence(IMessageBus? messageBus)
     {
-        _messageBus = messageBus;
+        MessageBus = messageBus;
         base.ConfigureIntelligence(messageBus);
     }
 

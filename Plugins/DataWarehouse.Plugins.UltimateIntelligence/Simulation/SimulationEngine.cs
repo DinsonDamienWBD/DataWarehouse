@@ -1750,9 +1750,9 @@ public sealed class SimulationEngine : FeatureStrategyBase
     /// Sets the AI provider for enhanced analysis.
     /// </summary>
     /// <param name="provider">AI provider to use.</param>
-    public void SetAIProviderForAnalysis(IAiProvider provider)
+    public void SetAiProviderForAnalysis(IAiProvider provider)
     {
-        SetAIProvider(provider);
+        SetAiProvider(provider);
     }
 }
 

@@ -12,7 +12,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Providers;
 /// AWS Bedrock provider strategy.
 /// Supports Claude, Llama, Titan, and other foundation models on AWS.
 /// </summary>
-public sealed class AwsBedrockProviderStrategy : AIProviderStrategyBase
+public sealed class AwsBedrockProviderStrategy : AiProviderStrategyBase
 {
     private const string DefaultRegion = "us-east-1";
     private const string DefaultModel = "anthropic.claude-3-sonnet-20240229-v1:0";
@@ -42,7 +42,7 @@ public sealed class AwsBedrockProviderStrategy : AIProviderStrategyBase
     {
         ProviderName = "AWS Bedrock",
         Description = "AWS-hosted foundation models including Claude, Llama, Titan with enterprise security",
-        Capabilities = IntelligenceCapabilities.AllAIProvider | IntelligenceCapabilities.ImageGeneration,
+        Capabilities = IntelligenceCapabilities.AllAiProvider | IntelligenceCapabilities.ImageGeneration,
         ConfigurationRequirements = new[]
         {
             new ConfigurationRequirement { Key = "AccessKeyId", Description = "AWS Access Key ID", Required = true, IsSecret = true },

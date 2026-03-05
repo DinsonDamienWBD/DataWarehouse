@@ -9,7 +9,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Providers;
 /// Azure OpenAI Service provider strategy.
 /// Provides enterprise-grade OpenAI models with Azure compliance and security.
 /// </summary>
-public sealed class AzureOpenAiProviderStrategy : AIProviderStrategyBase
+public sealed class AzureOpenAiProviderStrategy : AiProviderStrategyBase
 {
     private const string DefaultApiVersion = "2024-02-15-preview";
 
@@ -38,7 +38,7 @@ public sealed class AzureOpenAiProviderStrategy : AIProviderStrategyBase
     {
         ProviderName = "Azure OpenAI",
         Description = "Azure-hosted OpenAI models with enterprise compliance, security, and SLA guarantees",
-        Capabilities = IntelligenceCapabilities.AllAIProvider | IntelligenceCapabilities.ImageGeneration,
+        Capabilities = IntelligenceCapabilities.AllAiProvider | IntelligenceCapabilities.ImageGeneration,
         ConfigurationRequirements = new[]
         {
             new ConfigurationRequirement { Key = "ApiKey", Description = "Azure OpenAI API key", Required = true, IsSecret = true },

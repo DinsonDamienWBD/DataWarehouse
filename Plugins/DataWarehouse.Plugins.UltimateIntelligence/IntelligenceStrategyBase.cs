@@ -357,7 +357,7 @@ public abstract class IntelligenceStrategyBase : StrategyBase, IIntelligenceStra
 /// <summary>
 /// Base class for AI provider strategies that implement IAiProvider.
 /// </summary>
-public abstract class AIProviderStrategyBase : IntelligenceStrategyBase, IAiProvider
+public abstract class AiProviderStrategyBase : IntelligenceStrategyBase, IAiProvider
 {
     /// <inheritdoc/>
     public override IntelligenceStrategyCategory Category => IntelligenceStrategyCategory.AiProvider;
@@ -487,7 +487,7 @@ public abstract class FeatureStrategyBase : IntelligenceStrategyBase
     /// <summary>
     /// Sets the AI provider for this feature.
     /// </summary>
-    public void SetAIProvider(IAiProvider provider)
+    public void SetAiProvider(IAiProvider provider)
     {
         AiProvider = provider;
     }

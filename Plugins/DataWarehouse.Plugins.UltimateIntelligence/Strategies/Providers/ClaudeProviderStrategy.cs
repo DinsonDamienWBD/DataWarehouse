@@ -9,7 +9,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Providers;
 /// Anthropic Claude API provider strategy.
 /// Supports Claude 3 Opus, Claude 3 Sonnet, Claude 3 Haiku, and legacy Claude 2 models.
 /// </summary>
-public sealed class ClaudeProviderStrategy : AIProviderStrategyBase
+public sealed class ClaudeProviderStrategy : AiProviderStrategyBase
 {
     private const string DefaultApiBase = "https://api.anthropic.com/v1";
     private const string DefaultModel = "claude-3-5-sonnet-20241022";

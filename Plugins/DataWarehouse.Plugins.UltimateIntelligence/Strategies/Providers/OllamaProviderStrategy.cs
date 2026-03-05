@@ -9,7 +9,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Providers;
 /// Ollama local LLM provider strategy.
 /// Supports running local models like Llama 2, Mistral, CodeLlama, and many others.
 /// </summary>
-public sealed class OllamaProviderStrategy : AIProviderStrategyBase
+public sealed class OllamaProviderStrategy : AiProviderStrategyBase
 {
     private const string DefaultApiBase = "http://localhost:11434";
     private const string DefaultModel = "llama3.2";

@@ -215,8 +215,8 @@ public sealed class VectorStoreRegistry
         {
             StoreId = "azure-ai-search",
             DisplayName = "Azure AI Search",
-            StoreType = typeof(AzureAISearchVectorStore),
-            OptionsType = typeof(AzureAISearchOptions),
+            StoreType = typeof(AzureAiSearchVectorStore),
+            OptionsType = typeof(AzureAiSearchOptions),
             Description = "Azure AI Search with vector and semantic ranking",
             ProviderName = "Microsoft Azure",
             SupportedMetrics = new[] { DistanceMetric.Cosine, DistanceMetric.Euclidean, DistanceMetric.DotProduct },

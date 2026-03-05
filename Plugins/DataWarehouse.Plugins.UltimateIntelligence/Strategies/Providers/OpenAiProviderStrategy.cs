@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Providers;
 /// OpenAI API provider strategy.
 /// Supports GPT-4, GPT-3.5-turbo, text-embedding-ada-002, and DALL-E models.
 /// </summary>
-public sealed class OpenAiProviderStrategy : AIProviderStrategyBase
+public sealed class OpenAiProviderStrategy : AiProviderStrategyBase
 {
     private const string DefaultApiBase = "https://api.openai.com/v1";
     private const string DefaultModel = "gpt-4-turbo-preview";
@@ -41,7 +41,7 @@ public sealed class OpenAiProviderStrategy : AIProviderStrategyBase
     {
         ProviderName = "OpenAI",
         Description = "OpenAI GPT models for text completion, chat, embeddings, and image generation",
-        Capabilities = IntelligenceCapabilities.AllAIProvider | IntelligenceCapabilities.ImageGeneration,
+        Capabilities = IntelligenceCapabilities.AllAiProvider | IntelligenceCapabilities.ImageGeneration,
         ConfigurationRequirements = new[]
         {
             new ConfigurationRequirement { Key = "ApiKey", Description = "OpenAI API key", Required = true, IsSecret = true },

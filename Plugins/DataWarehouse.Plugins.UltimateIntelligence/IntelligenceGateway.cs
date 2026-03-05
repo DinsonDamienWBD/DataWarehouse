@@ -642,13 +642,13 @@ public sealed class ConversationTurn
 public enum ChannelType
 {
     /// <summary>Command-line interface channel.</summary>
-    CLI,
+    Cli,
 
     /// <summary>Graphical user interface channel.</summary>
-    GUI,
+    Gui,
 
     /// <summary>REST API channel.</summary>
-    API,
+    Api,
 
     /// <summary>WebSocket bidirectional channel.</summary>
     WebSocket,
@@ -1064,7 +1064,7 @@ public abstract class IntelligenceGatewayBase : IIntelligenceGateway, IProviderR
     public virtual GatewayCapabilities Capabilities => new()
     {
         SupportedCapabilities = GetAggregatedCapabilities(),
-        SupportedChannels = new[] { ChannelType.API },
+        SupportedChannels = new[] { ChannelType.Api },
         SupportsStreaming = true,
         SupportsSessions = true,
         MaxConcurrentSessions = 1000,

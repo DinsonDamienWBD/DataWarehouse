@@ -64,7 +64,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
         return providerId.ToLowerInvariant() switch
         {
             "openai" => new OpenAIEmbeddingProvider(config, _sharedHttpClient),
-            "azure-openai" or "azureopenai" => CreateAzureOpenAI(config),
+            "azure-openai" or "azureopenai" => CreateAzureOpenAi(config),
             "cohere" => new CohereEmbeddingProvider(config, _sharedHttpClient),
             "huggingface" or "hf" => new HuggingFaceEmbeddingProvider(config, _sharedHttpClient),
             "ollama" => new OllamaEmbeddingProvider(config, _sharedHttpClient),
@@ -142,7 +142,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
     /// <param name="model">Model name (default: text-embedding-3-small).</param>
     /// <param name="organization">Optional organization ID.</param>
     /// <returns>The created provider instance.</returns>
-    public OpenAIEmbeddingProvider CreateOpenAI(
+    public OpenAIEmbeddingProvider CreateOpenAi(
         string apiKey,
         string? model = null,
         string? organization = null)
@@ -166,7 +166,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
     /// <param name="deploymentName">Deployment name.</param>
     /// <param name="model">Model name for cost estimation.</param>
     /// <returns>The created provider instance.</returns>
-    public AzureOpenAIEmbeddingProvider CreateAzureOpenAI(
+    public AzureOpenAiEmbeddingProvider CreateAzureOpenAi(
         string endpoint,
         string apiKey,
         string deploymentName,
@@ -178,7 +178,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
             Endpoint = endpoint,
             Model = model
         };
-        return new AzureOpenAIEmbeddingProvider(config, deploymentName, _sharedHttpClient);
+        return new AzureOpenAiEmbeddingProvider(config, deploymentName, _sharedHttpClient);
     }
 
     /// <summary>
@@ -267,7 +267,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
     /// <param name="model">Model name (default: voyage-large-2).</param>
     /// <param name="inputType">Input type for optimization.</param>
     /// <returns>The created provider instance.</returns>
-    public VoyageAIEmbeddingProvider CreateVoyageAI(
+    public VoyageAIEmbeddingProvider CreateVoyageAi(
         string apiKey,
         string? model = null,
         VoyageInputType inputType = VoyageInputType.Document)
@@ -329,13 +329,13 @@ public sealed class EmbeddingProviderFactory : IDisposable
         return provider;
     }
 
-    private AzureOpenAIEmbeddingProvider CreateAzureOpenAI(EmbeddingProviderConfig config)
+    private AzureOpenAiEmbeddingProvider CreateAzureOpenAi(EmbeddingProviderConfig config)
     {
         var deploymentName = config.AdditionalConfig.TryGetValue("DeploymentName", out var dn)
             ? dn?.ToString() ?? throw new ArgumentException("DeploymentName is required for Azure OpenAI")
             : throw new ArgumentException("DeploymentName is required for Azure OpenAI");
 
-        return new AzureOpenAIEmbeddingProvider(config, deploymentName, _sharedHttpClient);
+        return new AzureOpenAiEmbeddingProvider(config, deploymentName, _sharedHttpClient);
     }
 
     private ONNXEmbeddingProvider CreateOnnx(EmbeddingProviderConfig config)

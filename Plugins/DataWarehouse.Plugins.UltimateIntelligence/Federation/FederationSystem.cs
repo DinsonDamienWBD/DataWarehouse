@@ -661,7 +661,11 @@ public sealed class InstanceRegistry : IAsyncDisposable
     private void StartHealthCheckTimer(string instanceId, int intervalSeconds)
     {
         var timer = new Timer(
-            async _ => await PerformHealthCheckAsync(instanceId),
+            async _ =>
+            {
+                try { await PerformHealthCheckAsync(instanceId); }
+                catch (Exception ex) { Debug.WriteLine($"Health check failed for {instanceId}: {ex.Message}"); }
+            },
             null,
             TimeSpan.FromSeconds(intervalSeconds),
             TimeSpan.FromSeconds(intervalSeconds));
@@ -1370,8 +1374,8 @@ public sealed class QueryFanOut
         var sw = Stopwatch.StartNew();
 
         // Determine target instances
-        var targetInstances = GetTargetInstances(request);
-        if (!targetInstances.Any())
+        var targetInstances = GetTargetInstances(request).ToList();
+        if (targetInstances.Count == 0)
         {
             return new FederatedQueryResponse
             {
@@ -1434,7 +1438,7 @@ public sealed class QueryFanOut
             QueryId = request.QueryId,
             Results = mergedResults,
             TotalMatches = instanceResponses.Values.Sum(r => r.TotalMatches),
-            InstancesQueried = targetInstances.Count(),
+            InstancesQueried = targetInstances.Count,
             InstancesResponded = instanceResponses.Count,
             ExecutionTimeMs = sw.Elapsed.TotalMilliseconds,
             InstanceErrors = new Dictionary<string, string>(instanceErrors),
@@ -2451,10 +2455,10 @@ internal sealed record AuthenticationEntry
 /// Access control for federated knowledge sharing.
 /// Defines what knowledge can be shared with which instances.
 /// </summary>
-public sealed class KnowledgeACL
+public sealed class KnowledgeAcl
 {
-    private readonly BoundedDictionary<string, InstanceACL> _instanceAcls = new BoundedDictionary<string, InstanceACL>(1000);
-    private readonly BoundedDictionary<string, DomainACL> _domainAcls = new BoundedDictionary<string, DomainACL>(1000);
+    private readonly BoundedDictionary<string, InstanceAcl> _instanceAcls = new BoundedDictionary<string, InstanceAcl>(1000);
+    private readonly BoundedDictionary<string, DomainAcl> _domainAcls = new BoundedDictionary<string, DomainAcl>(1000);
 
     /// <summary>
     /// Default access policy for instances not explicitly configured.
@@ -2466,7 +2470,7 @@ public sealed class KnowledgeACL
     /// </summary>
     /// <param name="instanceId">Instance ID.</param>
     /// <param name="acl">Access control rules.</param>
-    public void SetInstanceACL(string instanceId, InstanceACL acl)
+    public void SetInstanceAcl(string instanceId, InstanceAcl acl)
     {
         _instanceAcls[instanceId] = acl;
     }
@@ -2476,7 +2480,7 @@ public sealed class KnowledgeACL
     /// </summary>
     /// <param name="domain">Knowledge domain.</param>
     /// <param name="acl">Access control rules.</param>
-    public void SetDomainACL(string domain, DomainACL acl)
+    public void SetDomainAcl(string domain, DomainAcl acl)
     {
         _domainAcls[domain] = acl;
     }
@@ -2545,7 +2549,7 @@ public sealed class KnowledgeACL
     /// </summary>
     /// <param name="instanceId">Instance ID.</param>
     /// <returns>Instance ACL, or null if not set.</returns>
-    public InstanceACL? GetInstanceACL(string instanceId)
+    public InstanceAcl? GetInstanceAcl(string instanceId)
     {
         _instanceAcls.TryGetValue(instanceId, out var acl);
         return acl;
@@ -2556,7 +2560,7 @@ public sealed class KnowledgeACL
     /// </summary>
     /// <param name="domain">Domain name.</param>
     /// <returns>Domain ACL, or null if not set.</returns>
-    public DomainACL? GetDomainACL(string domain)
+    public DomainAcl? GetDomainAcl(string domain)
     {
         _domainAcls.TryGetValue(domain, out var acl);
         return acl;
@@ -2566,7 +2570,7 @@ public sealed class KnowledgeACL
 /// <summary>
 /// Access control rules for an instance.
 /// </summary>
-public sealed record InstanceACL
+public sealed record InstanceAcl
 {
     /// <summary>Instance ID.</summary>
     public required string InstanceId { get; init; }
@@ -2590,7 +2594,7 @@ public sealed record InstanceACL
 /// <summary>
 /// Access control rules for a knowledge domain.
 /// </summary>
-public sealed record DomainACL
+public sealed record DomainAcl
 {
     /// <summary>Domain name.</summary>
     public required string Domain { get; init; }

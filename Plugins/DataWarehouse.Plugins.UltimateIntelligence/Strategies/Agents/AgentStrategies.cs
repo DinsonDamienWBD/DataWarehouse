@@ -157,10 +157,10 @@ public sealed record AgentState
 /// </summary>
 public abstract class AgentStrategyBase : FeatureStrategyBase
 {
-    protected readonly BoundedDictionary<string, ToolDefinition> _tools = new BoundedDictionary<string, ToolDefinition>(1000);
-    protected readonly ConcurrentQueue<AgentAction> _executionHistory = new();
-    protected AgentState _currentState = new AgentState { IsRunning = false };
-    protected CancellationTokenSource? _executionCts;
+    protected readonly BoundedDictionary<string, ToolDefinition> Tools = new BoundedDictionary<string, ToolDefinition>(1000);
+    protected readonly ConcurrentQueue<AgentAction> ExecutionHistory = new();
+    protected AgentState CurrentState = new AgentState { IsRunning = false };
+    protected CancellationTokenSource? ExecutionCts;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyCategory Category => IntelligenceStrategyCategory.Agent;
@@ -175,7 +175,7 @@ public abstract class AgentStrategyBase : FeatureStrategyBase
     /// </summary>
     public virtual Task RegisterToolAsync(ToolDefinition tool)
     {
-        _tools[tool.ToolId] = tool;
+        Tools[tool.ToolId] = tool;
         return Task.CompletedTask;
     }
 
@@ -184,7 +184,7 @@ public abstract class AgentStrategyBase : FeatureStrategyBase
     /// </summary>
     public virtual Task<List<AgentAction>> GetExecutionHistoryAsync()
     {
-        return Task.FromResult(_executionHistory.ToList());
+        return Task.FromResult(ExecutionHistory.ToList());
     }
 
     /// <summary>
@@ -192,7 +192,7 @@ public abstract class AgentStrategyBase : FeatureStrategyBase
     /// </summary>
     public virtual Task PauseAsync()
     {
-        _currentState = _currentState with { IsPaused = true };
+        CurrentState = CurrentState with { IsPaused = true };
         return Task.CompletedTask;
     }
 
@@ -201,7 +201,7 @@ public abstract class AgentStrategyBase : FeatureStrategyBase
     /// </summary>
     public virtual Task ResumeAsync()
     {
-        _currentState = _currentState with { IsPaused = false };
+        CurrentState = CurrentState with { IsPaused = false };
         return Task.CompletedTask;
     }
 
@@ -210,7 +210,7 @@ public abstract class AgentStrategyBase : FeatureStrategyBase
     /// </summary>
     public virtual Task<AgentState> GetAgentStateAsync()
     {
-        return Task.FromResult(_currentState);
+        return Task.FromResult(CurrentState);
     }
 
     /// <summary>
@@ -218,7 +218,7 @@ public abstract class AgentStrategyBase : FeatureStrategyBase
     /// </summary>
     protected void RecordAction(AgentAction action)
     {
-        _executionHistory.Enqueue(action);
+        ExecutionHistory.Enqueue(action);
     }
 
     /// <summary>
@@ -226,7 +226,7 @@ public abstract class AgentStrategyBase : FeatureStrategyBase
     /// </summary>
     protected async Task<object> ExecuteToolAsync(string toolId, Dictionary<string, object> parameters)
     {
-        if (!_tools.TryGetValue(toolId, out var tool))
+        if (!Tools.TryGetValue(toolId, out var tool))
             throw new InvalidOperationException($"Tool '{toolId}' not found");
 
         if (tool.Execute == null)
@@ -275,7 +275,7 @@ public sealed class ReActAgentStrategy : AgentStrategyBase
         if (AiProvider == null)
             throw new InvalidOperationException("AI provider not configured");
 
-        _currentState = new AgentState { IsRunning = true, CurrentTask = task, StartedAt = DateTime.UtcNow };
+        CurrentState = new AgentState { IsRunning = true, CurrentTask = task, StartedAt = DateTime.UtcNow };
         var startTime = DateTime.UtcNow;
         var reasoningChain = new List<string>();
         var actions = new List<AgentAction>();
@@ -286,7 +286,7 @@ public sealed class ReActAgentStrategy : AgentStrategyBase
         {
             for (int step = 0; step < maxSteps; step++)
             {
-                _currentState = _currentState with { CurrentStep = step, TotalSteps = maxSteps };
+                CurrentState = CurrentState with { CurrentStep = step, TotalSteps = maxSteps };
 
                 // Thought: Reasoning step
                 var thoughtPrompt = BuildReActPrompt(task, actions, context);
@@ -310,7 +310,7 @@ public sealed class ReActAgentStrategy : AgentStrategyBase
                     thought.Contains("COMPLETE", StringComparison.OrdinalIgnoreCase))
                 {
                     var finalResult = ExtractFinalAnswer(thought);
-                    _currentState = _currentState with { IsRunning = false };
+                    CurrentState = CurrentState with { IsRunning = false };
                     return new AgentExecutionResult
                     {
                         Success = true,
@@ -337,7 +337,7 @@ public sealed class ReActAgentStrategy : AgentStrategyBase
             }
 
             // Max steps reached
-            _currentState = _currentState with { IsRunning = false };
+            CurrentState = CurrentState with { IsRunning = false };
             return new AgentExecutionResult
             {
                 Success = false,
@@ -353,7 +353,7 @@ public sealed class ReActAgentStrategy : AgentStrategyBase
         catch (Exception ex)
         {
             Debug.WriteLine($"Caught exception in AgentStrategies.cs: {ex.Message}");
-            _currentState = _currentState with { IsRunning = false };
+            CurrentState = CurrentState with { IsRunning = false };
             return new AgentExecutionResult
             {
                 Success = false,
@@ -494,7 +494,7 @@ public sealed class AutoGptAgentStrategy : AgentStrategyBase
         if (AiProvider == null)
             throw new InvalidOperationException("AI provider not configured");
 
-        _currentState = new AgentState { IsRunning = true, CurrentTask = task, StartedAt = DateTime.UtcNow };
+        CurrentState = new AgentState { IsRunning = true, CurrentTask = task, StartedAt = DateTime.UtcNow };
         var startTime = DateTime.UtcNow;
         var reasoningChain = new List<string>();
         var actions = new List<AgentAction>();
@@ -518,7 +518,7 @@ public sealed class AutoGptAgentStrategy : AgentStrategyBase
             int completedTasks = 0;
             while (_taskQueue.TryDequeue(out var subtask) && completedTasks < context.MaxIterations)
             {
-                _currentState = _currentState with { CurrentStep = completedTasks, CurrentTask = subtask };
+                CurrentState = CurrentState with { CurrentStep = completedTasks, CurrentTask = subtask };
 
                 var result = await ExecuteSubtaskAsync(subtask, context, ct);
                 actions.Add(new AgentAction
@@ -544,7 +544,7 @@ public sealed class AutoGptAgentStrategy : AgentStrategyBase
             // Note: token count is estimated; SynthesizeResultsAsync does not return usage metadata.
             totalTokens += 300;
 
-            _currentState = _currentState with { IsRunning = false };
+            CurrentState = CurrentState with { IsRunning = false };
             return new AgentExecutionResult
             {
                 Success = true,
@@ -559,7 +559,7 @@ public sealed class AutoGptAgentStrategy : AgentStrategyBase
         catch (Exception ex)
         {
             Debug.WriteLine($"Caught exception in AgentStrategies.cs: {ex.Message}");
-            _currentState = _currentState with { IsRunning = false };
+            CurrentState = CurrentState with { IsRunning = false };
             return new AgentExecutionResult
             {
                 Success = false,
@@ -664,7 +664,7 @@ public sealed class CrewAiAgentStrategy : AgentStrategyBase
         if (AiProvider == null)
             throw new InvalidOperationException("AI provider not configured");
 
-        _currentState = new AgentState { IsRunning = true, CurrentTask = task, StartedAt = DateTime.UtcNow };
+        CurrentState = new AgentState { IsRunning = true, CurrentTask = task, StartedAt = DateTime.UtcNow };
         var startTime = DateTime.UtcNow;
         var reasoningChain = new List<string>();
         var actions = new List<AgentAction>();
@@ -715,7 +715,7 @@ public sealed class CrewAiAgentStrategy : AgentStrategyBase
             // Synthesize results
             var finalResult = string.Join("\n\n", actions.Select(a => $"{a.Content}\n{a.Result}"));
 
-            _currentState = _currentState with { IsRunning = false };
+            CurrentState = CurrentState with { IsRunning = false };
             return new AgentExecutionResult
             {
                 Success = true,
@@ -730,7 +730,7 @@ public sealed class CrewAiAgentStrategy : AgentStrategyBase
         catch (Exception ex)
         {
             Debug.WriteLine($"Caught exception in AgentStrategies.cs: {ex.Message}");
-            _currentState = _currentState with { IsRunning = false };
+            CurrentState = CurrentState with { IsRunning = false };
             return new AgentExecutionResult
             {
                 Success = false,
@@ -825,7 +825,7 @@ public sealed class LangGraphAgentStrategy : AgentStrategyBase
         if (AiProvider == null)
             throw new InvalidOperationException("AI provider not configured");
 
-        _currentState = new AgentState { IsRunning = true, CurrentTask = task, StartedAt = DateTime.UtcNow };
+        CurrentState = new AgentState { IsRunning = true, CurrentTask = task, StartedAt = DateTime.UtcNow };
         var startTime = DateTime.UtcNow;
         var reasoningChain = new List<string>();
         var actions = new List<AgentAction>();
@@ -855,7 +855,7 @@ public sealed class LangGraphAgentStrategy : AgentStrategyBase
                 if (!localGraph.TryGetValue(currentNode, out var node))
                     break;
 
-                _currentState = _currentState with { CurrentStep = depth, CurrentTask = node.Name };
+                CurrentState = CurrentState with { CurrentStep = depth, CurrentTask = node.Name };
 
                 // Execute node
                 var result = await ExecuteNodeAsync(node, state, ct);
@@ -880,7 +880,7 @@ public sealed class LangGraphAgentStrategy : AgentStrategyBase
 
             var finalResult = state.TryGetValue("last_result", out var lastResult) ? lastResult?.ToString() ?? "" : "No result";
 
-            _currentState = _currentState with { IsRunning = false };
+            CurrentState = CurrentState with { IsRunning = false };
             return new AgentExecutionResult
             {
                 Success = currentNode == "end",
@@ -895,7 +895,7 @@ public sealed class LangGraphAgentStrategy : AgentStrategyBase
         catch (Exception ex)
         {
             Debug.WriteLine($"Caught exception in AgentStrategies.cs: {ex.Message}");
-            _currentState = _currentState with { IsRunning = false };
+            CurrentState = CurrentState with { IsRunning = false };
             return new AgentExecutionResult
             {
                 Success = false,
@@ -1010,7 +1010,7 @@ public sealed class BabyAgiAgentStrategy : AgentStrategyBase
         if (AiProvider == null)
             throw new InvalidOperationException("AI provider not configured");
 
-        _currentState = new AgentState { IsRunning = true, CurrentTask = task, StartedAt = DateTime.UtcNow };
+        CurrentState = new AgentState { IsRunning = true, CurrentTask = task, StartedAt = DateTime.UtcNow };
         var startTime = DateTime.UtcNow;
         var reasoningChain = new List<string>();
         var actions = new List<AgentAction>();
@@ -1032,7 +1032,7 @@ public sealed class BabyAgiAgentStrategy : AgentStrategyBase
                 // Step 1: Pull highest priority task
                 var currentTask = _taskList.OrderBy(t => t.Priority).First();
                 _taskList.Remove(currentTask);
-                _currentState = _currentState with { CurrentStep = iteration, CurrentTask = currentTask.Description };
+                CurrentState = CurrentState with { CurrentStep = iteration, CurrentTask = currentTask.Description };
 
                 reasoningChain.Add($"Executing task {currentTask.Id}: {currentTask.Description}");
 
@@ -1077,7 +1077,7 @@ public sealed class BabyAgiAgentStrategy : AgentStrategyBase
 
             var finalResult = string.Join("\n\n", results);
 
-            _currentState = _currentState with { IsRunning = false };
+            CurrentState = CurrentState with { IsRunning = false };
             return new AgentExecutionResult
             {
                 Success = _taskList.Count == 0,
@@ -1092,7 +1092,7 @@ public sealed class BabyAgiAgentStrategy : AgentStrategyBase
         catch (Exception ex)
         {
             Debug.WriteLine($"Caught exception in AgentStrategies.cs: {ex.Message}");
-            _currentState = _currentState with { IsRunning = false };
+            CurrentState = CurrentState with { IsRunning = false };
             return new AgentExecutionResult
             {
                 Success = false,
@@ -1219,7 +1219,7 @@ public sealed class ToolCallingAgentStrategy : AgentStrategyBase
         if (AiProvider == null)
             throw new InvalidOperationException("AI provider not configured");
 
-        _currentState = new AgentState { IsRunning = true, CurrentTask = task, StartedAt = DateTime.UtcNow };
+        CurrentState = new AgentState { IsRunning = true, CurrentTask = task, StartedAt = DateTime.UtcNow };
         var startTime = DateTime.UtcNow;
         var reasoningChain = new List<string>();
         var actions = new List<AgentAction>();
@@ -1234,7 +1234,7 @@ public sealed class ToolCallingAgentStrategy : AgentStrategyBase
 
             while (continueExecution && callCount < maxCalls)
             {
-                _currentState = _currentState with { CurrentStep = callCount };
+                CurrentState = CurrentState with { CurrentStep = callCount };
 
                 // Build prompt with conversation history
                 var prompt = BuildToolCallingPrompt(task, conversationHistory, context.Tools);
@@ -1256,7 +1256,6 @@ public sealed class ToolCallingAgentStrategy : AgentStrategyBase
                 if (toolCalls.Count == 0)
                 {
                     // No tool calls - task complete
-                    continueExecution = false;
                     reasoningChain.Add("No tool calls requested - task complete");
                     break;
                 }
@@ -1284,7 +1283,7 @@ public sealed class ToolCallingAgentStrategy : AgentStrategyBase
 
             var finalResult = conversationHistory.LastOrDefault() ?? "No result";
 
-            _currentState = _currentState with { IsRunning = false };
+            CurrentState = CurrentState with { IsRunning = false };
             return new AgentExecutionResult
             {
                 Success = true,
@@ -1299,7 +1298,7 @@ public sealed class ToolCallingAgentStrategy : AgentStrategyBase
         catch (Exception ex)
         {
             Debug.WriteLine($"Caught exception in AgentStrategies.cs: {ex.Message}");
-            _currentState = _currentState with { IsRunning = false };
+            CurrentState = CurrentState with { IsRunning = false };
             return new AgentExecutionResult
             {
                 Success = false,

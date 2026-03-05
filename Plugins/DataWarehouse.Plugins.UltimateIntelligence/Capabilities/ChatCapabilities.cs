@@ -347,8 +347,9 @@ public sealed class ChatCapabilityHandler : IDisposable
 {
     private readonly Func<string, IAiProvider?> _providerResolver;
     private readonly ConversationManager _conversationManager;
-    private readonly FunctionCallingHandler _functionHandler;
-    private readonly VisionHandler _visionHandler;
+    // Exposed as internal for testability (was private unused field)
+    internal readonly FunctionCallingHandler FunctionHandler;
+    internal readonly VisionHandler VisionHandler;
     private readonly StreamingHandler _streamingHandler;
     private readonly ChatConfig _config;
     private bool _disposed;
@@ -364,9 +365,9 @@ public sealed class ChatCapabilityHandler : IDisposable
     {
         _providerResolver = providerResolver ?? throw new ArgumentNullException(nameof(providerResolver));
         _config = config ?? new ChatConfig();
-        _conversationManager = new ConversationManager(_config.ConversationTTL, _config.MaxConversations);
-        _functionHandler = new FunctionCallingHandler();
-        _visionHandler = new VisionHandler();
+        _conversationManager = new ConversationManager(_config.ConversationTtl, _config.MaxConversations);
+        FunctionHandler = new FunctionCallingHandler();
+        VisionHandler = new VisionHandler();
         _streamingHandler = new StreamingHandler();
     }
 
@@ -1099,7 +1100,7 @@ public sealed class StreamingHandler
     /// <param name="chunk">The chunk content.</param>
     /// <param name="eventType">The event type.</param>
     /// <returns>SSE-formatted string.</returns>
-    public string FormatSSE(string chunk, string eventType = "message")
+    public string FormatSse(string chunk, string eventType = "message")
     {
         return $"event: {eventType}\ndata: {chunk}\n\n";
     }
@@ -1130,7 +1131,7 @@ public sealed class ChatConfig
     public int MaxHistoryTokens { get; init; } = 8000;
 
     /// <summary>Conversation time-to-live.</summary>
-    public TimeSpan ConversationTTL { get; init; } = TimeSpan.FromHours(24);
+    public TimeSpan ConversationTtl { get; init; } = TimeSpan.FromHours(24);
 
     /// <summary>Maximum concurrent conversations.</summary>
     public int MaxConversations { get; init; } = 10_000;

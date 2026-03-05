@@ -523,7 +523,7 @@ internal sealed class PatternExtractor
         var position = 0;
         foreach (var ender in SentenceEnders)
         {
-            var idx = text.IndexOf(ender, position);
+            var idx = text.IndexOf(ender, position, StringComparison.Ordinal);
             while (idx >= 0)
             {
                 patterns.Add(new ExtractedPattern
@@ -534,7 +534,7 @@ internal sealed class PatternExtractor
                     StartPosition = idx,
                     EndPosition = idx + 1
                 });
-                idx = text.IndexOf(ender, idx + 1);
+                idx = text.IndexOf(ender, idx + 1, StringComparison.Ordinal);
             }
         }
 

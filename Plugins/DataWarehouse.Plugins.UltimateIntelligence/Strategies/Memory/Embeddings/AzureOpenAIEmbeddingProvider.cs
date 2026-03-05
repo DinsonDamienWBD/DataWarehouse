@@ -16,7 +16,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Embedding
 /// - Retry logic with exponential backoff
 /// - Rate limiting awareness
 /// </summary>
-public sealed class AzureOpenAIEmbeddingProvider : EmbeddingProviderBase
+public sealed class AzureOpenAiEmbeddingProvider : EmbeddingProviderBase
 {
     private const string DefaultApiVersion = "2024-02-01";
     private const int MaxBatchSize = 2048;
@@ -124,7 +124,7 @@ public sealed class AzureOpenAIEmbeddingProvider : EmbeddingProviderBase
     /// <param name="config">Provider configuration.</param>
     /// <param name="deploymentName">Azure OpenAI deployment name.</param>
     /// <param name="httpClient">Optional HTTP client.</param>
-    public AzureOpenAIEmbeddingProvider(
+    public AzureOpenAiEmbeddingProvider(
         EmbeddingProviderConfig config,
         string deploymentName,
         HttpClient? httpClient = null)
@@ -154,7 +154,7 @@ public sealed class AzureOpenAIEmbeddingProvider : EmbeddingProviderBase
     /// <param name="deploymentName">Azure OpenAI deployment name.</param>
     /// <param name="tokenProvider">Function to retrieve Azure AD tokens.</param>
     /// <param name="httpClient">Optional HTTP client.</param>
-    public AzureOpenAIEmbeddingProvider(
+    public AzureOpenAiEmbeddingProvider(
         EmbeddingProviderConfig config,
         string deploymentName,
         Func<CancellationToken, Task<string>> tokenProvider,
@@ -282,7 +282,7 @@ public sealed class AzureOpenAIEmbeddingProvider : EmbeddingProviderBase
         catch (Exception ex)
         {
             // P2-3121: Surface connectivity failures via Trace so they are visible in production.
-            Trace.TraceWarning($"[AzureOpenAIEmbeddingProvider] ValidateConnectionAsync failed: {ex.GetType().Name}: {ex.Message}");
+            Trace.TraceWarning($"[AzureOpenAiEmbeddingProvider] ValidateConnectionAsync failed: {ex.GetType().Name}: {ex.Message}");
             return false;
         }
     }

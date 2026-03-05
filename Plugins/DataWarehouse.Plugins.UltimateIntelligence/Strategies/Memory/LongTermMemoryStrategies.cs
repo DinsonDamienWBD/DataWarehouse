@@ -257,7 +257,7 @@ public interface IContextRegenerator
 /// </summary>
 public sealed class AIContextRegenerator : IContextRegenerator
 {
-    private readonly AIAdvancedContextRegenerator _advanced = new();
+    private readonly AiAdvancedContextRegenerator _advanced = new();
 
     /// <inheritdoc/>
     public async Task<RegenerationResult> RegenerateAsync(byte[] aiContext, string expectedFormat, CancellationToken ct = default)

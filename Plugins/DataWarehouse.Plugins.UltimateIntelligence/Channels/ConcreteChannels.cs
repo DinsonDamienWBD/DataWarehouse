@@ -266,19 +266,19 @@ public sealed class ChannelRegistry : IAsyncDisposable
 /// Messages are processed synchronously to maintain terminal output order.
 /// </para>
 /// </remarks>
-public sealed class CLIChannel : IntelligenceChannelBase
+public sealed class CliChannel : IntelligenceChannelBase
 {
     private readonly TextReader _input;
     private readonly TextWriter _output;
     private readonly TextWriter _errorOutput;
-    private readonly CLIChannelOptions _options;
+    private readonly CliChannelOptions _options;
     private readonly ConcurrentQueue<ChannelMessage> _pendingMessages = new();
     private CancellationTokenSource? _inputLoopCts;
     private Task? _inputLoopTask;
     private bool _connected;
 
     /// <inheritdoc/>
-    public override ChannelType Type => ChannelType.CLI;
+    public override ChannelType Type => ChannelType.Cli;
 
     /// <summary>
     /// Gets the channel identifier.
@@ -293,19 +293,19 @@ public sealed class CLIChannel : IntelligenceChannelBase
     /// <param name="output">Output writer for responses.</param>
     /// <param name="errorOutput">Error output writer.</param>
     /// <param name="options">Channel configuration options.</param>
-    public CLIChannel(
+    public CliChannel(
         string channelId,
         TextReader input,
         TextWriter output,
         TextWriter? errorOutput = null,
-        CLIChannelOptions? options = null)
+        CliChannelOptions? options = null)
         : base(options?.QueueCapacity ?? 1000)
     {
         ChannelId = channelId ?? throw new ArgumentNullException(nameof(channelId));
         _input = input ?? throw new ArgumentNullException(nameof(input));
         _output = output ?? throw new ArgumentNullException(nameof(output));
         _errorOutput = errorOutput ?? output;
-        _options = options ?? new CLIChannelOptions();
+        _options = options ?? new CliChannelOptions();
     }
 
     /// <summary>
@@ -313,7 +313,7 @@ public sealed class CLIChannel : IntelligenceChannelBase
     /// </summary>
     /// <param name="channelId">Unique channel identifier.</param>
     /// <param name="options">Channel configuration options.</param>
-    public CLIChannel(string channelId, CLIChannelOptions? options = null)
+    public CliChannel(string channelId, CliChannelOptions? options = null)
         : this(channelId, Console.In, Console.Out, Console.Error, options)
     {
     }
@@ -477,7 +477,7 @@ public sealed class CLIChannel : IntelligenceChannelBase
 /// <summary>
 /// Configuration options for CLI channel.
 /// </summary>
-public sealed class CLIChannelOptions
+public sealed class CliChannelOptions
 {
     /// <summary>Gets or sets whether to run in interactive mode with input loop.</summary>
     public bool InteractiveMode { get; set; } = true;
@@ -517,16 +517,16 @@ public sealed class CLIChannelOptions
 ///   <item>Rate limiting and request throttling</item>
 /// </list>
 /// </remarks>
-public sealed class RESTChannel : IntelligenceChannelBase
+public sealed class RestChannel : IntelligenceChannelBase
 {
     private readonly HttpClient _httpClient;
-    private readonly RESTChannelOptions _options;
+    private readonly RestChannelOptions _options;
     private readonly SemaphoreSlim _rateLimiter;
     private readonly BoundedDictionary<string, PendingRequest> _pendingRequests = new BoundedDictionary<string, PendingRequest>(1000);
     private bool _ownsHttpClient;
 
     /// <inheritdoc/>
-    public override ChannelType Type => ChannelType.API;
+    public override ChannelType Type => ChannelType.Api;
 
     /// <summary>
     /// Gets the channel identifier.
@@ -544,7 +544,7 @@ public sealed class RESTChannel : IntelligenceChannelBase
     /// <param name="channelId">Unique channel identifier.</param>
     /// <param name="options">Channel configuration options.</param>
     /// <param name="httpClient">Optional HTTP client to use. If null, a new client is created.</param>
-    public RESTChannel(string channelId, RESTChannelOptions options, HttpClient? httpClient = null)
+    public RestChannel(string channelId, RestChannelOptions options, HttpClient? httpClient = null)
         : base(options?.QueueCapacity ?? 1000)
     {
         ChannelId = channelId ?? throw new ArgumentNullException(nameof(channelId));
@@ -769,7 +769,7 @@ public sealed class RESTChannel : IntelligenceChannelBase
 /// <summary>
 /// Configuration options for REST channel.
 /// </summary>
-public sealed class RESTChannelOptions
+public sealed class RestChannelOptions
 {
     /// <summary>Gets or sets the base URL for the REST API.</summary>
     public required Uri BaseUrl { get; set; }
@@ -816,11 +816,11 @@ public sealed class RESTChannelOptions
 /// connected to actual gRPC infrastructure via dependency injection.
 /// </para>
 /// </remarks>
-public sealed class GRPCChannel : IntelligenceChannelBase
+public sealed class GrpcChannel : IntelligenceChannelBase
 {
-    private readonly GRPCChannelOptions _options;
-    private readonly BoundedDictionary<string, GRPCCallState> _activeCalls = new BoundedDictionary<string, GRPCCallState>(1000);
-    private IGRPCClientAdapter? _clientAdapter;
+    private readonly GrpcChannelOptions _options;
+    private readonly BoundedDictionary<string, GrpcCallState> _activeCalls = new BoundedDictionary<string, GrpcCallState>(1000);
+    private IGrpcClientAdapter? _clientAdapter;
     private CancellationTokenSource? _streamingCts;
 
     /// <inheritdoc/>
@@ -842,7 +842,7 @@ public sealed class GRPCChannel : IntelligenceChannelBase
     /// <param name="channelId">Unique channel identifier.</param>
     /// <param name="options">Channel configuration options.</param>
     /// <param name="clientAdapter">Optional gRPC client adapter for actual gRPC operations.</param>
-    public GRPCChannel(string channelId, GRPCChannelOptions options, IGRPCClientAdapter? clientAdapter = null)
+    public GrpcChannel(string channelId, GrpcChannelOptions options, IGrpcClientAdapter? clientAdapter = null)
         : base(options?.QueueCapacity ?? 1000)
     {
         ChannelId = channelId ?? throw new ArgumentNullException(nameof(channelId));
@@ -857,7 +857,7 @@ public sealed class GRPCChannel : IntelligenceChannelBase
     /// Sets the gRPC client adapter for actual gRPC operations.
     /// </summary>
     /// <param name="adapter">The client adapter.</param>
-    public void SetClientAdapter(IGRPCClientAdapter adapter)
+    public void SetClientAdapter(IGrpcClientAdapter adapter)
     {
         _clientAdapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
     }
@@ -920,7 +920,7 @@ public sealed class GRPCChannel : IntelligenceChannelBase
             return IntelligenceResponse.CreateFailure(request.RequestId, "gRPC client adapter not configured", "NO_ADAPTER");
         }
 
-        var callState = new GRPCCallState
+        var callState = new GrpcCallState
         {
             CallId = request.RequestId,
             Cts = CancellationTokenSource.CreateLinkedTokenSource(ct),
@@ -957,7 +957,7 @@ public sealed class GRPCChannel : IntelligenceChannelBase
             yield break;
         }
 
-        var callState = new GRPCCallState
+        var callState = new GrpcCallState
         {
             CallId = request.RequestId,
             Cts = CancellationTokenSource.CreateLinkedTokenSource(ct),
@@ -988,7 +988,7 @@ public sealed class GRPCChannel : IntelligenceChannelBase
         }
     }
 
-    private sealed class GRPCCallState
+    private sealed class GrpcCallState
     {
         public required string CallId { get; init; }
         public required CancellationTokenSource Cts { get; init; }
@@ -999,7 +999,7 @@ public sealed class GRPCChannel : IntelligenceChannelBase
 /// <summary>
 /// Configuration options for gRPC channel.
 /// </summary>
-public sealed class GRPCChannelOptions
+public sealed class GrpcChannelOptions
 {
     /// <summary>Gets or sets the gRPC endpoint.</summary>
     public required string Endpoint { get; set; }
@@ -1030,7 +1030,7 @@ public sealed class GRPCChannelOptions
 /// Adapter interface for actual gRPC client operations.
 /// Implement this interface to connect to real gRPC infrastructure.
 /// </summary>
-public interface IGRPCClientAdapter
+public interface IGrpcClientAdapter
 {
     /// <summary>
     /// Connects to the gRPC endpoint.

@@ -184,7 +184,7 @@ public record RegenerationPassResult
 /// AI-powered context regenerator that uses multiple strategies to
 /// achieve 5-sigma accuracy in regenerating original data from AI context.
 /// </summary>
-public sealed class AIAdvancedContextRegenerator : IAdvancedContextRegenerator
+public sealed class AiAdvancedContextRegenerator : IAdvancedContextRegenerator
 {
     private readonly BoundedDictionary<string, RegenerationStrategy> _strategies = new BoundedDictionary<string, RegenerationStrategy>(1000);
     private long _totalRegenerations;
@@ -197,7 +197,7 @@ public sealed class AIAdvancedContextRegenerator : IAdvancedContextRegenerator
     /// <summary>
     /// Initializes a new AI context regenerator.
     /// </summary>
-    public AIAdvancedContextRegenerator()
+    public AiAdvancedContextRegenerator()
     {
         // Register default strategies
         RegisterStrategy(new TextRegenerationStrategy());

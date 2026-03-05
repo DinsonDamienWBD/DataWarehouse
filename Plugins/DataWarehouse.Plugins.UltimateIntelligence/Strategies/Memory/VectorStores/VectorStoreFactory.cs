@@ -298,14 +298,14 @@ public sealed class VectorStoreFactory : IAsyncDisposable
     /// <summary>
     /// Creates an Azure AI Search vector store.
     /// </summary>
-    public Task<AzureAISearchVectorStore> CreateAzureAISearchAsync(
+    public Task<AzureAiSearchVectorStore> CreateAzureAISearchAsync(
         string endpoint,
         string apiKey,
         string indexName = "datawarehouse-vectors",
         bool useSemanticRanking = false,
         CancellationToken ct = default)
     {
-        var options = new AzureAISearchOptions
+        var options = new AzureAiSearchOptions
         {
             Endpoint = endpoint,
             ApiKey = apiKey,
@@ -313,7 +313,7 @@ public sealed class VectorStoreFactory : IAsyncDisposable
             UseSemanticRanking = useSemanticRanking
         };
 
-        return Task.FromResult(new AzureAISearchVectorStore(options, _httpClient));
+        return Task.FromResult(new AzureAiSearchVectorStore(options, _httpClient));
     }
 
     /// <summary>

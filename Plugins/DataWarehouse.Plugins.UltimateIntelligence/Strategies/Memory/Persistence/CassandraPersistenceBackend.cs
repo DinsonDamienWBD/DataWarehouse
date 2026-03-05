@@ -47,10 +47,10 @@ public sealed record CassandraPersistenceConfig : PersistenceBackendConfig
     public CassandraConsistency WriteConsistency { get; init; } = CassandraConsistency.LocalQuorum;
 
     /// <summary>Default TTL for records in seconds (0 = no TTL).</summary>
-    public int DefaultTTLSeconds { get; init; }
+    public int DefaultTtlSeconds { get; init; }
 
     /// <summary>TTL per tier in seconds.</summary>
-    public Dictionary<MemoryTier, int> TierTTLSeconds { get; init; } = new()
+    public Dictionary<MemoryTier, int> TierTtlSeconds { get; init; } = new()
     {
         [MemoryTier.Immediate] = 1800, // 30 minutes
         [MemoryTier.Working] = 86400, // 24 hours
@@ -873,14 +873,14 @@ public sealed class CassandraPersistenceBackend : IProductionPersistenceBackend
 
     private DateTimeOffset? GetExpiration(MemoryTier tier)
     {
-        if (_config.TierTTLSeconds.TryGetValue(tier, out var ttlSeconds) && ttlSeconds > 0)
+        if (_config.TierTtlSeconds.TryGetValue(tier, out var ttlSeconds) && ttlSeconds > 0)
         {
             return DateTimeOffset.UtcNow.AddSeconds(ttlSeconds);
         }
 
-        if (_config.DefaultTTLSeconds > 0)
+        if (_config.DefaultTtlSeconds > 0)
         {
-            return DateTimeOffset.UtcNow.AddSeconds(_config.DefaultTTLSeconds);
+            return DateTimeOffset.UtcNow.AddSeconds(_config.DefaultTtlSeconds);
         }
 
         return null;

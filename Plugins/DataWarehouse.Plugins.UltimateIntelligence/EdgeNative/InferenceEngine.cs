@@ -177,19 +177,19 @@ public enum ExecutionProvider
     Auto,
 
     /// <summary>CPU execution.</summary>
-    CPU,
+    Cpu,
 
     /// <summary>GPU execution (CUDA/Metal/DirectML).</summary>
-    GPU,
+    Gpu,
 
     /// <summary>Neural Processing Unit.</summary>
-    NPU,
+    Npu,
 
     /// <summary>WebAssembly SIMD.</summary>
-    WASM,
+    Wasm,
 
     /// <summary>WASI-NN runtime.</summary>
-    WasiNN
+    WasiNn
 }
 
 /// <summary>
@@ -425,7 +425,7 @@ public class WasiNnGpuBridge
     public async Task<InferenceResult> ExecuteAsync(string modelPath, InferenceInput input, InferenceOptions options, CancellationToken ct = default)
     {
         // Try GPU first if available
-        if (IsGpuAvailable && options.Provider != ExecutionProvider.CPU)
+        if (IsGpuAvailable && options.Provider != ExecutionProvider.Cpu)
         {
             try
             {
@@ -810,7 +810,7 @@ public class OnnxInferenceStrategy : IInferenceStrategy
         return new InferenceCapabilities
         {
             ModelFormat = "onnx",
-            SupportedProviders = new[] { ExecutionProvider.CPU, ExecutionProvider.GPU, ExecutionProvider.WasiNN },
+            SupportedProviders = new[] { ExecutionProvider.Cpu, ExecutionProvider.Gpu, ExecutionProvider.WasiNn },
             SupportedDataTypes = new[]
             {
                 TensorDataType.Float32,
@@ -910,7 +910,7 @@ public class GgufInferenceStrategy : IInferenceStrategy
         return new InferenceCapabilities
         {
             ModelFormat = "gguf",
-            SupportedProviders = new[] { ExecutionProvider.CPU, ExecutionProvider.GPU },
+            SupportedProviders = new[] { ExecutionProvider.Cpu, ExecutionProvider.Gpu },
             SupportedDataTypes = new[]
             {
                 TensorDataType.Float32,

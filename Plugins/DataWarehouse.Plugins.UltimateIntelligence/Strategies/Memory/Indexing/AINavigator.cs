@@ -9,7 +9,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Indexing;
 ///
 /// This is the primary interface AI agents should use to find relevant context.
 /// </summary>
-public interface IAINavigator
+public interface IAiNavigator
 {
     /// <summary>
     /// AI asks a question, gets exactly what it needs.
@@ -67,7 +67,7 @@ public interface IAINavigator
 /// <summary>
 /// Implementation of the AI Navigator that orchestrates the composite index.
 /// </summary>
-public sealed class AINavigator : IAINavigator
+public sealed class AiNavigator : IAiNavigator
 {
     private readonly CompositeContextIndex _index;
     private readonly HierarchicalSummaryIndex? _hierarchicalIndex;
@@ -80,7 +80,7 @@ public sealed class AINavigator : IAINavigator
     /// Initializes the AI Navigator with a composite index.
     /// </summary>
     /// <param name="compositeIndex">The composite index to navigate.</param>
-    public AINavigator(CompositeContextIndex compositeIndex)
+    public AiNavigator(CompositeContextIndex compositeIndex)
     {
         _index = compositeIndex;
 
@@ -96,7 +96,7 @@ public sealed class AINavigator : IAINavigator
     /// Initializes the AI Navigator with an index manager.
     /// </summary>
     /// <param name="manager">The index manager.</param>
-    public AINavigator(IndexManager manager) : this(manager.CompositeIndex)
+    public AiNavigator(IndexManager manager) : this(manager.CompositeIndex)
     {
     }
 

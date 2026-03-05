@@ -346,7 +346,7 @@ public sealed class AccuracyVerifier
         // Use multiple structural metrics
         var levenshtein = CalculateLevenshteinSimilarity(original, regenerated);
         var jaroWinkler = CalculateJaroWinklerSimilarity(original, regenerated);
-        var lcs = CalculateLCSSimilarity(original, regenerated);
+        var lcs = CalculateLcsSimilarity(original, regenerated);
 
         return (levenshtein + jaroWinkler + lcs) / 3.0;
     }
@@ -432,7 +432,7 @@ public sealed class AccuracyVerifier
 
         var jaro = ((double)matches / s1.Length +
                    (double)matches / s2.Length +
-                   (double)(matches - transpositions / 2) / matches) / 3.0;
+                   (double)(matches - transpositions / 2.0) / matches) / 3.0;
 
         // Winkler modification
         int prefix = 0;
@@ -445,13 +445,13 @@ public sealed class AccuracyVerifier
         return jaro + prefix * 0.1 * (1 - jaro);
     }
 
-    private double CalculateLCSSimilarity(string s1, string s2)
+    private double CalculateLcsSimilarity(string s1, string s2)
     {
-        var lcsLength = CalculateLCSLength(s1, s2);
+        var lcsLength = CalculateLcsLength(s1, s2);
         return (2.0 * lcsLength) / (s1.Length + s2.Length);
     }
 
-    private int CalculateLCSLength(string s1, string s2)
+    private int CalculateLcsLength(string s1, string s2)
     {
         // Finding 3173: Cap inputs identically to Levenshtein to avoid O(m×n) allocation.
         if (s1.Length > LevenshteinMaxLength) s1 = s1[..LevenshteinMaxLength];

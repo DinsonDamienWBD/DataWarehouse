@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Providers;
 /// Hugging Face Inference API provider strategy.
 /// Supports thousands of open-source models for text generation, embeddings, and more.
 /// </summary>
-public sealed class HuggingFaceProviderStrategy : AIProviderStrategyBase
+public sealed class HuggingFaceProviderStrategy : AiProviderStrategyBase
 {
     private const string DefaultApiBase = "https://api-inference.huggingface.co";
     private const string DefaultModel = "mistralai/Mistral-7B-Instruct-v0.2";

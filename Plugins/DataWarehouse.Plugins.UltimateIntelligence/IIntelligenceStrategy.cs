@@ -198,7 +198,7 @@ public enum IntelligenceCapabilities : long
     MultiAgentCollaboration = 1L << 42,
 
     // Common capability groups
-    AllAIProvider = TextCompletion | ChatCompletion | Streaming | Embeddings | FunctionCalling,
+    AllAiProvider = TextCompletion | ChatCompletion | Streaming | Embeddings | FunctionCalling,
     AllVectorStore = VectorStorage | VectorSearch | MetadataFiltering | BatchOperations,
     AllKnowledgeGraph = NodeManagement | EdgeManagement | GraphTraversal | GraphQueries | PathFinding,
     AllLongTermMemory = MemoryStorage | MemoryRetrieval | MemoryConsolidation | EpisodicMemory | SemanticMemory,

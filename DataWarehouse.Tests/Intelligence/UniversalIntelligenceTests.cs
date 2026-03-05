@@ -18,15 +18,15 @@ public class UniversalIntelligenceTests
     #region AI Provider Strategy Contract Tests
 
     [Fact]
-    public void AIProviderStrategyBase_ShouldBeAbstract()
+    public void AiProviderStrategyBase_ShouldBeAbstract()
     {
-        typeof(AIProviderStrategyBase).IsAbstract.Should().BeTrue();
+        typeof(AiProviderStrategyBase).IsAbstract.Should().BeTrue();
     }
 
     [Fact]
-    public void AIProviderStrategyBase_ShouldDefineRequiredMethods()
+    public void AiProviderStrategyBase_ShouldDefineRequiredMethods()
     {
-        var type = typeof(AIProviderStrategyBase);
+        var type = typeof(AiProviderStrategyBase);
         var methods = type.GetMethods(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance);
         methods.Should().Contain(m => m.Name == "GetStrategyCapability");
     }

@@ -517,7 +517,7 @@ public sealed class ChatHandler : FeatureStrategyBase
     /// <param name="provider">AI provider to use.</param>
     public void Initialize(IAiProvider provider)
     {
-        SetAIProvider(provider);
+        SetAiProvider(provider);
         _streamingSupport = new StreamingSupport(provider);
     }
 
@@ -2565,9 +2565,9 @@ public sealed class InteractionModeCoordinator : FeatureStrategyBase
     /// <param name="aiProvider">AI provider to use.</param>
     public void Initialize(IAiProvider aiProvider)
     {
-        SetAIProvider(aiProvider);
+        SetAiProvider(aiProvider);
         ChatHandler.Initialize(aiProvider);
-        ReportGenerator.SetAIProvider(aiProvider);
+        ReportGenerator.SetAiProvider(aiProvider);
     }
 
     /// <summary>

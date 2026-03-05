@@ -25,7 +25,7 @@ public enum DocumentationSourceType
     /// <summary>Plain text documentation.</summary>
     PlainText,
     /// <summary>GraphQL schema definition.</summary>
-    GraphQL,
+    GraphQl,
     /// <summary>WSDL for SOAP services.</summary>
     Wsdl
 }
@@ -376,11 +376,11 @@ public sealed class ZeroDayConnectorGeneratorStrategy : FeatureStrategyBase
             case DocumentationSourceType.Html:
             case DocumentationSourceType.Markdown:
             case DocumentationSourceType.PlainText:
-                endpoints = await ParseWithAIAsync(content, sourceType, ct);
+                endpoints = await ParseWithAiAsync(content, sourceType, ct);
                 break;
 
-            case DocumentationSourceType.GraphQL:
-                endpoints = ParseGraphQLSchema(content);
+            case DocumentationSourceType.GraphQl:
+                endpoints = ParseGraphQlSchema(content);
                 break;
 
             case DocumentationSourceType.Wsdl:
@@ -543,7 +543,7 @@ public sealed class ZeroDayConnectorGeneratorStrategy : FeatureStrategyBase
         return endpoints;
     }
 
-    private async Task<List<DiscoveredEndpoint>> ParseWithAIAsync(string content, DocumentationSourceType sourceType, CancellationToken ct)
+    private async Task<List<DiscoveredEndpoint>> ParseWithAiAsync(string content, DocumentationSourceType sourceType, CancellationToken ct)
     {
         if (AiProvider == null) return new List<DiscoveredEndpoint>();
 
@@ -630,7 +630,7 @@ Return ONLY the JSON array, no other text.";
         return endpoints;
     }
 
-    private List<DiscoveredEndpoint> ParseGraphQLSchema(string content)
+    private List<DiscoveredEndpoint> ParseGraphQlSchema(string content)
     {
         var endpoints = new List<DiscoveredEndpoint>();
         var queryPattern = new Regex(@"type\s+Query\s*\{([^}]+)\}", RegexOptions.Singleline, TimeSpan.FromSeconds(5));
@@ -1039,7 +1039,7 @@ public sealed class SemanticSchemaAlignmentStrategy : FeatureStrategyBase
             var matches = FindSemanticMatches(schemas, fieldEmbeddings);
 
             // Step 3: Use AI to refine and validate matches
-            var refinedMappings = await RefineMatchesWithAIAsync(schemas, matches, ct);
+            var refinedMappings = await RefineMatchesWithAiAsync(schemas, matches, ct);
 
             // Step 4: Discover semantic entities
             var entities = await DiscoverSemanticEntitiesAsync(schemas, refinedMappings, ct);
@@ -1139,7 +1139,7 @@ public sealed class SemanticSchemaAlignmentStrategy : FeatureStrategyBase
         return matches.OrderByDescending(m => m.Item3).ToList();
     }
 
-    private async Task<List<(string UnifiedName, string SemanticType, List<(string SourceId, string FieldName, string DataType)> Sources, double Confidence)>> RefineMatchesWithAIAsync(
+    private async Task<List<(string UnifiedName, string SemanticType, List<(string SourceId, string FieldName, string DataType)> Sources, double Confidence)>> RefineMatchesWithAiAsync(
         SchemaSource[] schemas,
         List<(string Field1, string Field2, float Similarity)> matches,
         CancellationToken ct)
@@ -1397,7 +1397,7 @@ public enum TargetDialect
     /// <summary>Neo4j Cypher query language.</summary>
     Cypher,
     /// <summary>InfluxDB InfluxQL.</summary>
-    InfluxQL,
+    InfluxQl,
     /// <summary>InfluxDB Flux query language.</summary>
     Flux,
     /// <summary>IBM CICS transaction commands.</summary>
@@ -1405,7 +1405,7 @@ public enum TargetDialect
     /// <summary>HL7 FHIR search parameters.</summary>
     Hl7Fhir,
     /// <summary>GraphQL query.</summary>
-    GraphQL,
+    GraphQl,
     /// <summary>Elasticsearch Query DSL.</summary>
     ElasticsearchDsl,
     /// <summary>Apache Cassandra CQL.</summary>
@@ -1585,7 +1585,7 @@ public sealed class UniversalQueryTranspilationStrategy : FeatureStrategyBase
                 };
             }
 
-            var transpiledQuery = await TranspileWithAIAsync(sql, target, ct);
+            var transpiledQuery = await TranspileWithAiAsync(sql, target, ct);
 
             if (string.IsNullOrEmpty(transpiledQuery))
             {
@@ -1628,7 +1628,7 @@ public sealed class UniversalQueryTranspilationStrategy : FeatureStrategyBase
         });
     }
 
-    private async Task<string> TranspileWithAIAsync(string sql, TargetDialect target, CancellationToken ct)
+    private async Task<string> TranspileWithAiAsync(string sql, TargetDialect target, CancellationToken ct)
     {
         var dialectInfo = GetDialectInfo(target);
         var prompt = $@"Transpile this SQL query to {target} ({dialectInfo.Description}).
@@ -1679,11 +1679,11 @@ Return JSON: {{""estimatedCost"": 0, ""estimatedRows"": 0, ""operations"": [], "
     {
         TargetDialect.MongoDb => ("MongoDB Aggregation Pipeline", "Use $match, $project, $group, $sort stages."),
         TargetDialect.Cypher => ("Neo4j Cypher", "Use MATCH, WHERE, RETURN clauses with relationship patterns."),
-        TargetDialect.InfluxQL => ("InfluxDB InfluxQL", "Use SELECT, FROM, WHERE, GROUP BY TIME()."),
+        TargetDialect.InfluxQl => ("InfluxDB InfluxQL", "Use SELECT, FROM, WHERE, GROUP BY TIME()."),
         TargetDialect.Flux => ("InfluxDB Flux", "Use from(), range(), filter(), map() with pipe-forward |>."),
         TargetDialect.CicsTransaction => ("IBM CICS", "Generate EXEC CICS commands."),
         TargetDialect.Hl7Fhir => ("HL7 FHIR Search", "Use FHIR search parameters with modifiers."),
-        TargetDialect.GraphQL => ("GraphQL Query", "Use query/mutation with fields and arguments."),
+        TargetDialect.GraphQl => ("GraphQL Query", "Use query/mutation with fields and arguments."),
         TargetDialect.ElasticsearchDsl => ("Elasticsearch DSL", "Use bool query with must, should, filter."),
         TargetDialect.CassandraCql => ("Cassandra CQL", "Consider partition key restrictions."),
         TargetDialect.Redis => ("Redis Commands", "Use appropriate data structure commands."),
@@ -3180,7 +3180,7 @@ public sealed class ProbabilisticDataBufferingStrategy : FeatureStrategyBase
         else
         {
             // Use AI for complex predictions
-            predictions = await GenerateAIPredictionsAsync(dataPath, history, context, ct);
+            predictions = await GenerateAiPredictionsAsync(dataPath, history, context, ct);
         }
 
         return predictions;
@@ -3226,7 +3226,7 @@ public sealed class ProbabilisticDataBufferingStrategy : FeatureStrategyBase
         return predictions;
     }
 
-    private async Task<List<PredictedValue>> GenerateAIPredictionsAsync(string dataPath, List<HistoricalDataPoint> history, PredictionContext context, CancellationToken ct)
+    private async Task<List<PredictedValue>> GenerateAiPredictionsAsync(string dataPath, List<HistoricalDataPoint> history, PredictionContext context, CancellationToken ct)
     {
         var historyJson = JsonSerializer.Serialize(history.TakeLast(20).Select(h => new { h.Timestamp, h.Value }));
         var prompt = $@"Predict future values for '{dataPath}' based on this history:

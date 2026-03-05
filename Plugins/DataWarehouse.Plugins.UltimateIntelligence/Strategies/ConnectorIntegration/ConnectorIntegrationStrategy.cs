@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
         private ConnectorIntegrationMode _mode = ConnectorIntegrationMode.Disabled;
         private readonly BoundedDictionary<string, System.Net.Http.HttpClient> _httpClients = new BoundedDictionary<string, System.Net.Http.HttpClient>(1000);
         // P2-3081: Shared HttpClient for registry health checks; avoids per-call socket exhaustion.
-        private static readonly System.Net.Http.HttpClient _registryHealthClient = new(new System.Net.Http.SocketsHttpHandler
+        private static readonly System.Net.Http.HttpClient RegistryHealthClient = new(new System.Net.Http.SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(5),
             ConnectTimeout = TimeSpan.FromSeconds(10)
@@ -188,7 +188,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
 
                 var registryEndpoint = ConnectorRegistryEndpoint;
                 // P2-3081: Reuse shared static HttpClient to prevent socket exhaustion.
-                using var response = await _registryHealthClient.GetAsync($"{registryEndpoint}/health", ct);
+                using var response = await RegistryHealthClient.GetAsync($"{registryEndpoint}/health", ct);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -439,7 +439,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
                     request.StrategyId, request.OperationType);
 
                 // Example transformation logic using AI provider
-                var transformedPayload = await TransformPayloadWithAIAsync(request);
+                var transformedPayload = await TransformPayloadWithAiAsync(request);
 
                 var response = new TransformResponse
                 {
@@ -498,7 +498,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
                     request.QueryLanguage, request.StrategyId);
 
                 // Example: Use AI to optimize SQL query
-                var optimizedQuery = await OptimizeQueryWithAIAsync(request);
+                var optimizedQuery = await OptimizeQueryWithAiAsync(request);
 
                 var response = new OptimizeQueryResponse
                 {
@@ -539,7 +539,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
                     request.SchemaName, request.StrategyId);
 
                 // Example: Use AI to analyze schema and add semantic metadata
-                var enrichedMetadata = await EnrichSchemaWithAIAsync(request);
+                var enrichedMetadata = await EnrichSchemaWithAiAsync(request);
 
                 var response = new EnrichSchemaResponse
                 {
@@ -578,7 +578,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
                     request.OperationType, request.StrategyId);
 
                 // Example: Use AI to detect anomalies in response data
-                var anomalies = await DetectAnomaliesWithAIAsync(request);
+                var anomalies = await DetectAnomaliesWithAiAsync(request);
 
                 var response = new AnomalyDetectionResponse
                 {
@@ -619,7 +619,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
                     request.OperationType, request.StrategyId);
 
                 // Example: Use AI to predict failure likelihood
-                var failureProbability = await PredictFailureWithAIAsync(request);
+                var failureProbability = await PredictFailureWithAiAsync(request);
 
                 var response = new FailurePredictionResponse
                 {
@@ -649,7 +649,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.ConnectorIntegra
         // AI INTEGRATION METHODS (Placeholder implementations)
         // ============================================================================
 
-        private async Task<Dictionary<string, object>> TransformPayloadWithAIAsync(TransformRequest request)
+        private async Task<Dictionary<string, object>> TransformPayloadWithAiAsync(TransformRequest request)
         {
             // M10: AI payload transformation with intelligent request analysis
             if (AiProvider == null)
@@ -722,7 +722,7 @@ Provide only the optimized JSON payload in your response, no explanations.";
             }
         }
 
-        private async Task<string> OptimizeQueryWithAIAsync(OptimizeQueryRequest request)
+        private async Task<string> OptimizeQueryWithAiAsync(OptimizeQueryRequest request)
         {
             // M11: Query optimization with AI-powered analysis
             if (AiProvider == null)
@@ -802,7 +802,7 @@ Return ONLY the optimized query text. Do not include explanations or markdown fo
             }
         }
 
-        private async Task<Dictionary<string, object>> EnrichSchemaWithAIAsync(EnrichSchemaRequest request)
+        private async Task<Dictionary<string, object>> EnrichSchemaWithAiAsync(EnrichSchemaRequest request)
         {
             // M12: Schema analysis with semantic metadata generation
             var enrichedMetadata = new Dictionary<string, object>
@@ -894,7 +894,7 @@ Return only valid JSON, no explanations.";
             }
         }
 
-        private async Task<List<DetectedAnomaly>> DetectAnomaliesWithAIAsync(AnomalyDetectionRequest request)
+        private async Task<List<DetectedAnomaly>> DetectAnomaliesWithAiAsync(AnomalyDetectionRequest request)
         {
             // M13: Anomaly detection using ML-based analysis
             var anomalies = new List<DetectedAnomaly>();
@@ -1019,7 +1019,7 @@ Return only the JSON array, or [] if no anomalies detected.";
             }
         }
 
-        private async Task<double> PredictFailureWithAIAsync(FailurePredictionRequest request)
+        private async Task<double> PredictFailureWithAiAsync(FailurePredictionRequest request)
         {
             // M14: Failure prediction using ML-based probability analysis
             double baseProbability = 0.15; // Default low probability

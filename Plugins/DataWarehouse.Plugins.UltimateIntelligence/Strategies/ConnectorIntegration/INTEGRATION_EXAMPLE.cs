@@ -47,7 +47,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence
             var aiProvider = GetActiveAIProvider();
             if (aiProvider != null)
             {
-                _connectorIntegration.SetAIProvider(aiProvider);
+                _connectorIntegration.SetAiProvider(aiProvider);
                 _logger.LogInformation("Configured connector integration with AI provider: {ProviderId}",
                     aiProvider.ProviderId);
             }

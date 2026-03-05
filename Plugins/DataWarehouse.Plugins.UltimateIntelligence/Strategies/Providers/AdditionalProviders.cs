@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Providers;
 /// Google Gemini API provider strategy.
 /// Supports Gemini Pro, Gemini Pro Vision, and Gemini Ultra models.
 /// </summary>
-public sealed class GeminiProviderStrategy : AIProviderStrategyBase
+public sealed class GeminiProviderStrategy : AiProviderStrategyBase
 {
     private const string DefaultApiBase = "https://generativelanguage.googleapis.com/v1beta";
     private const string DefaultModel = "gemini-pro";
@@ -41,7 +41,7 @@ public sealed class GeminiProviderStrategy : AIProviderStrategyBase
     {
         ProviderName = "Google Gemini",
         Description = "Google Gemini models for multimodal AI including chat, vision, and embeddings",
-        Capabilities = IntelligenceCapabilities.AllAIProvider,
+        Capabilities = IntelligenceCapabilities.AllAiProvider,
         ConfigurationRequirements = new[]
         {
             new ConfigurationRequirement { Key = "ApiKey", Description = "Google AI API key", Required = true, IsSecret = true },
@@ -278,7 +278,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
 /// Mistral AI provider strategy.
 /// Supports Mistral Tiny, Small, Medium, and Large models.
 /// </summary>
-public sealed class MistralProviderStrategy : AIProviderStrategyBase
+public sealed class MistralProviderStrategy : AiProviderStrategyBase
 {
     private const string DefaultApiBase = "https://api.mistral.ai/v1";
     private const string DefaultModel = "mistral-medium";
@@ -556,7 +556,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
 /// Cohere API provider strategy.
 /// Supports Command, Command Light, Command R models with chat, embeddings, and rerank.
 /// </summary>
-public sealed class CohereProviderStrategy : AIProviderStrategyBase
+public sealed class CohereProviderStrategy : AiProviderStrategyBase
 {
     private const string DefaultApiBase = "https://api.cohere.ai/v1";
     private const string DefaultModel = "command-r-plus";
@@ -788,7 +788,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
 /// Perplexity AI provider strategy.
 /// Supports Perplexity models with live web search capabilities.
 /// </summary>
-public sealed class PerplexityProviderStrategy : AIProviderStrategyBase
+public sealed class PerplexityProviderStrategy : AiProviderStrategyBase
 {
     private const string DefaultApiBase = "https://api.perplexity.ai";
     private const string DefaultModel = "llama-3-sonar-large-32k-online";
@@ -1010,7 +1010,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
 /// Groq API provider strategy.
 /// Provides ultra-fast inference for Llama 3, Mixtral, and Gemma models.
 /// </summary>
-public sealed class GroqProviderStrategy : AIProviderStrategyBase
+public sealed class GroqProviderStrategy : AiProviderStrategyBase
 {
     private const string DefaultApiBase = "https://api.groq.com/openai/v1";
     private const string DefaultModel = "llama-3.1-70b-versatile";
@@ -1257,7 +1257,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
 /// Together AI provider strategy.
 /// Provides access to hundreds of open-source models with fine-tuning support.
 /// </summary>
-public sealed class TogetherProviderStrategy : AIProviderStrategyBase
+public sealed class TogetherProviderStrategy : AiProviderStrategyBase
 {
     private const string DefaultApiBase = "https://api.together.xyz/v1";
     private const string DefaultModel = "mistralai/Mixtral-8x7B-Instruct-v0.1";

@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.EdgeNative;
 /// Auto-ML Agent Loop that generates, compiles, and trains ML models using AI-generated code.
 /// Provides schema extraction, code generation via AI, JIT compilation, and resource-aware training.
 /// </summary>
-public sealed class AutoMLEngine
+public sealed class AutoMlEngine
 {
     private readonly SchemaExtractionService _schemaExtractor;
     private readonly AgentCodeRequest _codeGenerator;
@@ -24,7 +24,7 @@ public sealed class AutoMLEngine
     /// Initializes the Auto-ML Engine with all required components.
     /// </summary>
     /// <param name="messageBus">Message bus for inter-plugin communication.</param>
-    public AutoMLEngine(IMessageBus? messageBus = null)
+    public AutoMlEngine(IMessageBus? messageBus = null)
     {
         _schemaExtractor = new SchemaExtractionService();
         _codeGenerator = new AgentCodeRequest(messageBus);
@@ -42,7 +42,7 @@ public sealed class AutoMLEngine
     /// <param name="modelType">Type of model to train (classification, regression, etc.).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Path to the trained model file.</returns>
-    public async Task<string> RunAutoMLPipelineAsync(
+    public async Task<string> RunAutoMlPipelineAsync(
         string dataSource,
         string targetColumn,
         string modelType = "auto",
@@ -73,7 +73,7 @@ public sealed class AutoMLEngine
         }
         catch (Exception ex)
         {
-            throw new AutoMLException($"Auto-ML pipeline failed: {ex.Message}", ex);
+            throw new AutoMlException($"Auto-ML pipeline failed: {ex.Message}", ex);
         }
     }
 
@@ -538,7 +538,7 @@ public sealed class AgentCodeRequest
             var prompt = BuildTrainingCodePrompt(schema, targetColumn, modelType);
 
             // Send request to AI provider via message bus
-            var response = await SendAIRequestAsync(prompt, ct);
+            var response = await SendAiRequestAsync(prompt, ct);
 
             // Parse generated code
             var code = ExtractCodeFromResponse(response);
@@ -587,7 +587,7 @@ public sealed class AgentCodeRequest
         return sb.ToString();
     }
 
-    private async Task<string> SendAIRequestAsync(string prompt, CancellationToken ct)
+    private async Task<string> SendAiRequestAsync(string prompt, CancellationToken ct)
     {
         if (_messageBus == null)
         {
@@ -660,7 +660,7 @@ print('Model saved to model.pkl')
         // Extract code from markdown code blocks if present
         if (response.Contains("```"))
         {
-            var start = response.IndexOf("```") + 3;
+            var start = response.IndexOf("```", StringComparison.Ordinal) + 3;
             if (start > 3)
             {
                 // Skip language identifier (e.g., ```python)
@@ -668,7 +668,7 @@ print('Model saved to model.pkl')
                 if (newlineAfterStart > start)
                     start = newlineAfterStart + 1;
 
-                var end = response.IndexOf("```", start);
+                var end = response.IndexOf("```", start, StringComparison.Ordinal);
                 if (end > start)
                     return response.Substring(start, end - start).Trim();
             }
@@ -891,7 +891,7 @@ public sealed class TrainingCheckpointManager
         }
         catch
         {
-            Debug.WriteLine($"Caught exception in AutoMLEngine.cs");
+            Debug.WriteLine($"Caught exception in AutoMlEngine.cs");
             return null;
         }
     }
@@ -1163,7 +1163,7 @@ public sealed class EdgeResourceAwareTrainer
             CpuUsagePercent = 50.0,
             TemperatureCelsius = 60.0,
             BatteryPercent = 80.0,
-            AvailableMemoryMB = 4096
+            AvailableMemoryMb = 4096
         };
     }
 
@@ -1187,7 +1187,7 @@ public sealed class EdgeResourceAwareTrainer
         }
         catch
         {
-            Debug.WriteLine($"Caught exception in AutoMLEngine.cs");
+            Debug.WriteLine($"Caught exception in AutoMlEngine.cs");
             // Process may have exited
         }
     }
@@ -1200,7 +1200,7 @@ public sealed class EdgeResourceAwareTrainer
         }
         catch
         {
-            Debug.WriteLine($"Caught exception in AutoMLEngine.cs");
+            Debug.WriteLine($"Caught exception in AutoMlEngine.cs");
             // Process may have exited
         }
     }
@@ -1331,7 +1331,7 @@ public sealed class SystemMetrics
     public double BatteryPercent { get; init; }
 
     /// <summary>Available memory in megabytes.</summary>
-    public long AvailableMemoryMB { get; init; }
+    public long AvailableMemoryMb { get; init; }
 }
 
 // ==================== Exceptions ====================
@@ -1339,13 +1339,13 @@ public sealed class SystemMetrics
 /// <summary>
 /// Exception thrown when Auto-ML pipeline fails.
 /// </summary>
-public sealed class AutoMLException : Exception
+public sealed class AutoMlException : Exception
 {
-    /// <summary>Initializes a new instance of the AutoMLException class.</summary>
-    public AutoMLException(string message) : base(message) { }
+    /// <summary>Initializes a new instance of the AutoMlException class.</summary>
+    public AutoMlException(string message) : base(message) { }
 
-    /// <summary>Initializes a new instance of the AutoMLException class.</summary>
-    public AutoMLException(string message, Exception innerException) : base(message, innerException) { }
+    /// <summary>Initializes a new instance of the AutoMlException class.</summary>
+    public AutoMlException(string message, Exception innerException) : base(message, innerException) { }
 }
 
 /// <summary>

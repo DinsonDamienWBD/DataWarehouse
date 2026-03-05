@@ -300,7 +300,7 @@ public sealed class EmbeddingProviderRegistry : IDisposable
         _registrations["azure-openai"] = new ProviderRegistration
         {
             ProviderId = "azure-openai",
-            ProviderType = typeof(AzureOpenAIEmbeddingProvider)
+            ProviderType = typeof(AzureOpenAiEmbeddingProvider)
             // Factory requires deployment name, so left null
         };
 

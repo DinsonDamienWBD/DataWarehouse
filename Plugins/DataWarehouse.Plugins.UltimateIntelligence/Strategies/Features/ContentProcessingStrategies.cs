@@ -200,7 +200,7 @@ public sealed class ContentExtractionStrategy : FeatureStrategyBase
             catch { /* ZIP extraction failure — fall back to AI */ }
         }
 
-        return await ExtractWithAIAsync(content, "Microsoft Word document", ct);
+        return await ExtractWithAiAsync(content, "Microsoft Word document", ct);
     }
 
     private async Task<string> ExtractExcelAsync(byte[] content, CancellationToken ct)
@@ -235,7 +235,7 @@ public sealed class ContentExtractionStrategy : FeatureStrategyBase
             catch { /* ZIP extraction failure — fall back to AI */ }
         }
 
-        return await ExtractWithAIAsync(content, "Microsoft Excel spreadsheet", ct);
+        return await ExtractWithAiAsync(content, "Microsoft Excel spreadsheet", ct);
     }
 
     private async Task<string> ExtractPowerPointAsync(byte[] content, CancellationToken ct)
@@ -271,7 +271,7 @@ public sealed class ContentExtractionStrategy : FeatureStrategyBase
             catch { /* ZIP extraction failure — fall back to AI */ }
         }
 
-        return await ExtractWithAIAsync(content, "Microsoft PowerPoint presentation", ct);
+        return await ExtractWithAiAsync(content, "Microsoft PowerPoint presentation", ct);
     }
 
     private async Task<string> ExtractImageTextAsync(byte[] content, string contentType, CancellationToken ct)
@@ -327,10 +327,10 @@ public sealed class ContentExtractionStrategy : FeatureStrategyBase
         if (text.Length > 100)
             return text;
 
-        return await ExtractWithAIAsync(content, contentType, ct);
+        return await ExtractWithAiAsync(content, contentType, ct);
     }
 
-    private async Task<string> ExtractWithAIAsync(byte[] content, string format, CancellationToken ct)
+    private async Task<string> ExtractWithAiAsync(byte[] content, string format, CancellationToken ct)
     {
         if (AiProvider == null)
             return $"[{format} - No AI provider available for extraction]";

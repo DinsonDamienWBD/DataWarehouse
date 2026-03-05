@@ -11,7 +11,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Providers;
 /// Cohere embedding provider strategy for text-embedding via Cohere's embed API.
 /// Supports embed-english-v3.0, embed-multilingual-v3.0, and legacy models.
 /// </summary>
-public sealed class CohereEmbeddingProvider : AIProviderStrategyBase
+public sealed class CohereEmbeddingProvider : AiProviderStrategyBase
 {
     private const string DefaultApiBase = "https://api.cohere.ai/v1";
     private const string DefaultModel = "embed-english-v3.0";
@@ -133,7 +133,7 @@ public sealed class CohereEmbeddingProvider : AIProviderStrategyBase
 /// HuggingFace Inference API embedding provider for sentence-transformers models.
 /// Supports all-MiniLM-L6-v2, all-mpnet-base-v2, and custom models.
 /// </summary>
-public sealed class HuggingFaceEmbeddingProvider : AIProviderStrategyBase
+public sealed class HuggingFaceEmbeddingProvider : AiProviderStrategyBase
 {
     private const string DefaultApiBase = "https://api-inference.huggingface.co/pipeline/feature-extraction";
     private const string DefaultModel = "sentence-transformers/all-MiniLM-L6-v2";
@@ -223,8 +223,8 @@ public sealed class HuggingFaceEmbeddingProvider : AIProviderStrategyBase
 /// </summary>
 public sealed class UnifiedEmbeddingProvider : IntelligenceStrategyBase
 {
-    private readonly List<AIProviderStrategyBase> _providers = new();
-    private AIProviderStrategyBase? _primaryProvider;
+    private readonly List<AiProviderStrategyBase> _providers = new();
+    private AiProviderStrategyBase? _primaryProvider;
 
     /// <inheritdoc/>
     public override string StrategyId => "intelligence.embedding.unified";
@@ -250,7 +250,7 @@ public sealed class UnifiedEmbeddingProvider : IntelligenceStrategyBase
     };
 
     /// <summary>Registers an embedding-capable provider.</summary>
-    public void RegisterProvider(AIProviderStrategyBase provider)
+    public void RegisterProvider(AiProviderStrategyBase provider)
     {
         _providers.Add(provider);
         if (_primaryProvider == null || provider.StrategyId == GetConfig("PrimaryProvider"))

@@ -354,8 +354,8 @@ public sealed class HybridSearchStrategy : FeatureStrategyBase
     {
         if (aiProvider != null)
         {
-            SetAIProvider(aiProvider);
-            _semanticSearch.SetAIProvider(aiProvider);
+            SetAiProvider(aiProvider);
+            _semanticSearch.SetAiProvider(aiProvider);
         }
         if (vectorStore != null)
         {

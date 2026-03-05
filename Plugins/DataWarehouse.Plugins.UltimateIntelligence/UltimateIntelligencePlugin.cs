@@ -246,7 +246,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
     /// <param name="preferLowLatency">Prefer lower latency providers.</param>
     /// <returns>The recommended strategy.</returns>
     public IIntelligenceStrategy? SelectBestAIProvider(
-        IntelligenceCapabilities capabilities = IntelligenceCapabilities.AllAIProvider,
+        IntelligenceCapabilities capabilities = IntelligenceCapabilities.AllAiProvider,
         bool preferLowCost = false,
         bool preferLowLatency = false)
     {
@@ -292,7 +292,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         ArgumentNullException.ThrowIfNull(feature);
 
         if (_activeAIProvider is IAiProvider aiProvider)
-            feature.SetAIProvider(aiProvider);
+            feature.SetAiProvider(aiProvider);
 
         if (_activeVectorStore is IVectorStore vectorStore)
             feature.SetVectorStore(vectorStore);

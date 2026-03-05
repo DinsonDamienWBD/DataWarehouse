@@ -17,19 +17,19 @@ public enum ModelArchitecture
     Transformer,
 
     /// <summary>Convolutional Neural Network (for spatial data).</summary>
-    CNN,
+    Cnn,
 
     /// <summary>Recurrent Neural Network (for sequential data).</summary>
-    RNN,
+    Rnn,
 
     /// <summary>Feedforward Neural Network (simple MLP).</summary>
     FeedForward,
 
     /// <summary>Graph Neural Network (for graph-structured data).</summary>
-    GNN,
+    Gnn,
 
     /// <summary>Variational Autoencoder (for generative tasks).</summary>
-    VAE
+    Vae
 }
 
 /// <summary>
@@ -215,7 +215,7 @@ public sealed record TrainingSchedule
     public double MaxCpuUsage { get; init; } = 0.5;
 
     /// <summary>Maximum memory usage in MB.</summary>
-    public long MaxMemoryMB { get; init; } = 2048;
+    public long MaxMemoryMb { get; init; } = 2048;
 
     /// <summary>Whether this is recurring.</summary>
     public bool IsRecurring { get; init; }

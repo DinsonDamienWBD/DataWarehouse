@@ -27,7 +27,7 @@ public enum AzureSearchAlgorithm
 /// <summary>
 /// Configuration for Azure AI Search vector store.
 /// </summary>
-public sealed class AzureAISearchOptions : VectorStoreOptions
+public sealed class AzureAiSearchOptions : VectorStoreOptions
 {
     /// <summary>Azure AI Search service endpoint (e.g., "https://myservice.search.windows.net").</summary>
     public required string Endpoint { get; init; }
@@ -74,9 +74,9 @@ public sealed class AzureAISearchOptions : VectorStoreOptions
 /// <item>Enterprise security and compliance</item>
 /// </list>
 /// </remarks>
-public sealed class AzureAISearchVectorStore : ProductionVectorStoreBase
+public sealed class AzureAiSearchVectorStore : ProductionVectorStoreBase
 {
-    private readonly AzureAISearchOptions _options;
+    private readonly AzureAiSearchOptions _options;
     private int _dimensions;
 
     /// <inheritdoc/>
@@ -93,7 +93,7 @@ public sealed class AzureAISearchVectorStore : ProductionVectorStoreBase
     /// </summary>
     /// <param name="options">Azure AI Search configuration options.</param>
     /// <param name="httpClient">Optional HTTP client for testing.</param>
-    public AzureAISearchVectorStore(AzureAISearchOptions options, HttpClient? httpClient = null)
+    public AzureAiSearchVectorStore(AzureAiSearchOptions options, HttpClient? httpClient = null)
         : base(httpClient, options)
     {
         _options = options ?? throw new ArgumentNullException(nameof(options));
@@ -482,7 +482,7 @@ public sealed class AzureAISearchVectorStore : ProductionVectorStoreBase
         }
         catch
         {
-            Debug.WriteLine($"Caught exception in AzureAISearchVectorStore.cs");
+            Debug.WriteLine($"Caught exception in AzureAiSearchVectorStore.cs");
             return false;
         }
     }
@@ -532,7 +532,7 @@ public sealed class AzureAISearchVectorStore : ProductionVectorStoreBase
         }
         catch
         {
-            Debug.WriteLine($"Caught exception in AzureAISearchVectorStore.cs");
+            Debug.WriteLine($"Caught exception in AzureAiSearchVectorStore.cs");
             return false;
         }
     }
