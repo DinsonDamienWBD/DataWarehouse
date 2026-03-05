@@ -2736,7 +2736,7 @@ Plans:
   4. `dotnet test` passes after each commit
 **Plans**: 5 plans
 Plans:
-- [ ] 097-01-PLAN.md — Findings 1253-1499 (IoUringBindings through OpenClInterop)
+- [x] 097-01-PLAN.md — Findings 1253-1499 (IoUringBindings through OpenClInterop)
 - [ ] 097-02-PLAN.md — Findings 1500-1742 (OpenClInterop through RaftConsensusEngine)
 - [ ] 097-03-PLAN.md — Findings 1743-1974 (RaftLogEntry through StorageProcessingStrategy)
 - [ ] 097-04-PLAN.md — Findings 1975-2256 (StrategyBase through VDE/Identity)
