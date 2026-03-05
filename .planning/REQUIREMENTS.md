@@ -809,90 +809,57 @@ Requirements for v6.0 Intelligent Policy Engine & Composable VDE. Each maps to r
 
 ## v7.0 Requirements
 
-Requirements for production hardening milestone. Each maps to roadmap phases 96-104.
+Requirements for military-grade production readiness milestone. Maps to roadmap phases 96-111 across 4 stages.
+Single source of truth: `Metadata/production-audit-2026-03-05/CONSOLIDATED-FINDINGS.md` (11,128 findings).
 
-### Audit Fix — SDK (AFIX)
+### Component-Level Hardening (HARD) — Phases 96-101
 
-- [ ] **AFIX-01**: All 939 SDK audit findings (348 P1, 415 P2, 160 LOW) are resolved — each finding either fixed or explicitly marked as resolved by a prior fix with reference
-- [ ] **AFIX-02**: Audit fix ledger `Metadata/audit-fix-ledger-sdk.md` tracks every finding's disposition (FIXED, RESOLVED-BY, or WON'T-FIX with approved justification)
-- [ ] **AFIX-03**: Build compiles with 0 errors, 0 warnings after all SDK fixes
+- [ ] **HARD-01**: Every finding in CONSOLIDATED-FINDINGS.md (11,128 total) has a corresponding failing test in `DataWarehouse.Hardening.Tests/` proving the vulnerability exists (Coyote for concurrency, xUnit for logic/memory)
+- [ ] **HARD-02**: Every finding has a production code fix that makes its test pass — no finding skipped regardless of severity, type, or style
+- [ ] **HARD-03**: Processing is strictly sequential: project by project, file by file, line by line through CONSOLIDATED-FINDINGS.md — no reordering
+- [ ] **HARD-04**: Solution builds with 0 errors after each commit; `dotnet test` passes after each commit (post-commit sanity)
+- [ ] **HARD-05**: Commits batched per project (≤150 findings = 1 commit) or per file group (larger projects)
 
-### Audit Fix — Kernel & Plugins (AFIX)
+### Full Audit (AUDT) — Phase 102
 
-- [ ] **AFIX-04**: All 27 Kernel audit findings (12 P1, 5 P2, 7 LOW) are resolved with explicit disposition
-- [ ] **AFIX-05**: All 3,675 Plugin audit findings (1,391 P1, 1,443 P2, 663 LOW) are resolved with explicit disposition
-- [ ] **AFIX-06**: Audit fix ledgers `Metadata/audit-fix-ledger-kernel.md` and `Metadata/audit-fix-ledger-plugins.md` track every finding
-- [ ] **AFIX-07**: Build compiles with 0 errors, 0 warnings after all Kernel + Plugin fixes
-- [ ] **AFIX-08**: Processing is strictly sequential top-to-bottom through the audit file — no reordering by severity
+- [ ] **AUDT-01**: Coyote concurrency testing finds 0 new bugs across all `DataWarehouse.Hardening.Tests`
+- [ ] **AUDT-02**: dotCover confirms hardening tests execute the vulnerable lines identified in CONSOLIDATED-FINDINGS.md
+- [ ] **AUDT-03**: Coverage report exported to `Metadata/dotcover-hardening-report/`; any gaps addressed with additional tests
 
-### Pillar Verification (PILR)
+### Profiling (PROF) — Phase 103
 
-- [ ] **PILR-01**: Every plugin (52 total) is policy-aware — PolicyContext is accessible, cascade resolution produces effective policy at every level (Block/Chunk/Object/Container/VDE), and no plugin operates in a "dumb" one-size-fits-all mode
-- [ ] **PILR-02**: Every feature-specific strategy verifies it respects the resolved effective policy — intensity levels, cascade rules, and AI autonomy settings are honored, not ignored
-- [ ] **PILR-03**: AI advisors (5 total) correctly influence policy at all autonomy levels (ManualOnly through AutoSilent) and overhead throttling prevents runaway AI cost
-- [ ] **PILR-04**: VDE structures morph correctly across scale transitions — tiny (KB) → small (MB) → medium (GB) → large (TB) → massive (PB) → yottabyte (YB) → federation (multi-VDE) and back down
-- [ ] **PILR-05**: All golden-path VDE structures (superblock, allocation groups, inodes, extent trees, WAL, ARC cache, MVCC, SQL engine, tag index, defrag, dedup, heat tiering) function correctly at each scale level without errors
-- [ ] **PILR-06**: All SMA (Scale-Morphing Architecture) structures (morph levels 1-7, Bw-Tree, HNSW, Masstree, ALEX, Hilbert, Clock-SI, metaslab allocator) transition smoothly between scale thresholds
-- [ ] **PILR-07**: Scale-down path verified — a VDE that grew to TB+ scale and then shrank back operates correctly with compacted/merged structures (no orphan allocations, no dead morph levels)
-- [ ] **PILR-08**: Federation scale-up/scale-down verified — adding/removing VDEs from federation maintains shard catalog integrity, routing correctness, and zero-overhead single-VDE passthrough when federation dissolves back to single VDE
+- [ ] **PROF-01**: dotTrace shows no new hot-path lock contention introduced by hardening fixes
+- [ ] **PROF-02**: dotMemory shows no new large object heap allocations on formerly zero-allocation paths; no GC pressure regression
 
-### Contract Tests (TEST)
+### Mutation Testing (MUTN) — Phase 104
 
-- [ ] **TEST-01**: Every strategy subclass (3,036 total) has a generated test verifying base class contract compliance (constructor, lifecycle, dispose, required properties)
-- [ ] **TEST-02**: Every plugin base class (23 total) has contract tests verifying lifecycle, dispose, capability registration, message bus subscription patterns
-- [ ] **TEST-03**: Domain-specific contract tests exist for each of the 14 domain strategy bases (e.g., CompressionStrategy round-trip, EncryptionStrategy encrypt/decrypt symmetry)
-- [ ] **TEST-04**: All generated contract tests pass with 0 failures
+- [ ] **MUTN-01**: Stryker.NET mutation score ≥ 95% across all hardening test projects
+- [ ] **MUTN-02**: Surviving mutants documented with justification (equivalent mutants, etc.)
 
-### Integration Tests (TEST)
+### Integration Profiling (SOAK) — Phases 105-106
 
-- [ ] **TEST-05**: Message bus pub/sub tests cover all known cross-plugin communication paths (extracted from plugin map headers)
-- [ ] **TEST-06**: Pipeline orchestration round-trip tests verify compress-encrypt-store-retrieve-decrypt-decompress
-- [ ] **TEST-07**: VDE decorator chain tests verify each decorator in isolation and full chain
-- [ ] **TEST-08**: VDE mount pipeline tests verify SuperblockV2 feature bits produce correct decorator chain
-- [ ] **TEST-09**: Federation router tests verify hierarchical shard catalog, zero-overhead passthrough, cross-VDE queries
-- [ ] **TEST-10**: Policy engine tests verify cascade resolution, compliance scoring, AI advisor integration
+- [ ] **SOAK-01**: Test harness boots entire Kernel + all 52 plugins and streams 100GB synthetic payload through VDE pipeline
+- [ ] **SOAK-02**: dotTrace cross-boundary analysis shows no single bottleneck exceeding 5% of total execution time
+- [ ] **SOAK-03**: Soak test harness with configurable duration (CI: 10min, manual: 24-72hr) and GC event counter monitoring
+- [ ] **SOAK-04**: Gen2 collection rate stays below threshold; working set does not grow monotonically over soak duration
 
-### Companion Tests (TEST)
+### Chaos Engineering (CHAOS) — Phases 107-110
 
-- [ ] **TEST-11**: Every CLI command class has test coverage (argument parsing, kernel interaction, output formatting)
-- [ ] **TEST-12**: Every Dashboard controller, service, and SignalR hub method has test coverage
-- [ ] **TEST-13**: GUI service layer (DashboardFramework, NavigationService, ThemeManager, etc.) has test coverage
-- [ ] **TEST-14**: Launcher adapter pattern, plugin profile loading, host lifecycle, and HTTP server have test coverage
-- [ ] **TEST-15**: All 53 Shared .cs files (InstanceManager, MessageBridge, etc.) have test coverage
+- [ ] **CHAOS-01**: Plugin fault injection (fatal exceptions mid-operation) → Kernel isolates faulted plugin, other plugins continue
+- [ ] **CHAOS-02**: Concurrent plugin load/unload during active I/O → no torn state, no orphaned subscriptions
+- [ ] **CHAOS-03**: Torn-write recovery via Coyote-controlled crash mid-VDE chain → WAL/RAID parity rebuilds correctly
+- [ ] **CHAOS-04**: Resource exhaustion (ThreadPool, MemoryPool, disk-full) → graceful degradation, no hangs or corruption
+- [ ] **CHAOS-05**: Message bus disruption (loss, duplication, reorder) → idempotency verified, no data corruption
+- [ ] **CHAOS-06**: Federation network partition mid-replication → CRDT convergence after partition heals
+- [ ] **CHAOS-07**: Malicious payloads (zip bombs, malformed IVs, path traversal) → instant rejection without OOM/hang
+- [ ] **CHAOS-08**: Clock skew (±24hr TimeProvider manipulation) → no auth bypass, no stale cache, no policy errors
 
-### Adversarial & Fuzz Tests (TEST)
+### CI/CD Fortress (CICD) — Phase 111
 
-- [ ] **TEST-16**: Null/empty/boundary input tests exist for every public SDK method
-- [ ] **TEST-17**: Corrupt data injection tests verify graceful handling of malformed VDE superblocks, truncated payloads, invalid RAID parity
-- [ ] **TEST-18**: Resource exhaustion tests verify behavior under OOM, disk full, network timeout, CancellationToken fire
-- [ ] **TEST-19**: Concurrency stress tests verify parallel strategy execution, concurrent pipeline runs, race conditions
-- [ ] **TEST-20**: Fuzz harnesses exist for config deserialization, VDE format parsing, compression round-trip, encryption key derivation, message bus parsing
-- [ ] **TEST-21**: Automated security regression tests cover STRIDE/OWASP pentest plan scenarios
-
-### Performance Baselines (PERF)
-
-- [ ] **PERF-01**: Real DataWarehouse benchmarks replace generic .NET benchmarks (VDE throughput, pipeline latency, strategy selection, plugin load, RAID rebuild, encryption, federation routing, message bus, index ops)
-- [ ] **PERF-02**: Baseline results stored as JSON artifacts (`artifacts/benchmarks/baseline.json`)
-- [ ] **PERF-03**: CI gate defined: any benchmark regressing >10% fails the build
-
-### Hostile Analysis (HOST)
-
-- [ ] **HOST-01**: Thread safety audit of every ConcurrentDictionary, lock, Interlocked, volatile — verified with concurrent test harnesses
-- [ ] **HOST-02**: CancellationToken propagation trace from top-level APIs to async leaves — dropped tokens identified and fixed
-- [ ] **HOST-03**: Configuration validation: adversarial config values to every configurable option — rejection or safe handling verified
-- [ ] **HOST-04**: Error path completeness: failures injected at every external boundary — graceful degradation, no silent corruption
-- [ ] **HOST-05**: Memory leak detection via long-running test harness with memory snapshots — no unbounded growth
-- [ ] **HOST-06**: Deadlock detection: concurrent lifecycle operations across plugin combinations
-- [ ] **HOST-07**: Every hostile finding becomes a failing test first, then gets fixed
-- [ ] **HOST-08**: All findings documented in `Metadata/hostile-analysis-findings.md`
-
-### Final Gate (GATE)
-
-- [ ] **GATE-01**: Entire test suite green (0 failures across all test categories)
-- [ ] **GATE-02**: Build: 0 errors, 0 warnings
-- [ ] **GATE-03**: All benchmarks within established baselines (no >10% regressions)
-- [ ] **GATE-04**: Zero unfixed audit findings (all 4,444 have explicit disposition)
-- [ ] **GATE-05**: Zero unfixed hostile analysis findings
+- [ ] **CICD-01**: `.github/workflows/audit.yml` updated with all hardened gates
+- [ ] **CICD-02**: Coyote: 1,000 iterations per PR; any non-deterministic failure blocks merge
+- [ ] **CICD-03**: BenchmarkDotNet: Gen2 heap allocation on zero-allocation path blocks merge
+- [ ] **CICD-04**: Stryker: mutation score drop below v7.0 baseline blocks merge
 
 ## v7.1 Requirements (Next Milestone — Companion Sync)
 
