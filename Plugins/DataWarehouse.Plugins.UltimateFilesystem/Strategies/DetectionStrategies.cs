@@ -47,6 +47,7 @@ public sealed class AutoDetectStrategy : FilesystemStrategyBase
     // LOW-3039: Use async I/O with FileOptions.Asynchronous to avoid blocking the threadpool thread.
     public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default)
     {
+        path = Path.GetFullPath(path); // Prevent path traversal attacks
         await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, 4096, FileOptions.Asynchronous);
         fs.Seek(offset, SeekOrigin.Begin);
         var buffer = new byte[length];

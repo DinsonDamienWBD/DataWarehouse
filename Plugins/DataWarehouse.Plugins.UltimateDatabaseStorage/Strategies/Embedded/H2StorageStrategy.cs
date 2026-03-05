@@ -317,6 +317,10 @@ public sealed class H2StorageStrategy : DatabaseStorageStrategyBase
                 command.ExecuteScalar();
                 return true;
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch
             {
                 return false;

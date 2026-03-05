@@ -59,7 +59,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
                 var connection = handle.GetConnection<DbConnection>();
                 return connection.State == System.Data.ConnectionState.Open;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)

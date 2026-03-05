@@ -50,7 +50,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Pod"] = pod, ["Endpoint"] = endpoint });
         }
 
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/fscmRestApi/resources/11.13.18.05/", ct); return response.IsSuccessStatusCode; } catch { return false; } }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/fscmRestApi/resources/11.13.18.05/", ct); return response.IsSuccessStatusCode; } catch (OperationCanceledException) { throw; } catch { return false; } }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Oracle Fusion is reachable" : "Oracle Fusion is not responding", sw.Elapsed, DateTimeOffset.UtcNow); }
 

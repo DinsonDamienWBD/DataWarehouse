@@ -20,8 +20,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             _httpClient = new HttpClient { BaseAddress = new Uri("https://bigquery.googleapis.com/bigquery/v2/"), Timeout = config.Timeout };
-            if (!string.IsNullOrEmpty(config.AuthCredential))
-                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential);
+            if (!string.IsNullOrEmpty(config.AuthCredential?.Trim()!))
+                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential?.Trim()!);
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["project_id"] = config.ConnectionString });
         }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
                 // 200 or 401/403 means the service is reachable; 503 means unavailable
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "BigQuery healthy" : "BigQuery unhealthy", sw.Elapsed, DateTimeOffset.UtcNow); }

@@ -36,7 +36,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
             var host = info.GetValueOrDefault("host")?.ToString() ?? "";
             if (!int.TryParse(info.GetValueOrDefault("port")?.ToString(), out var port)) port = 50000;
             try { using var probe = new TcpClient(); await probe.ConnectAsync(host, port, ct); return true; }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<TcpClient>().Close(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)

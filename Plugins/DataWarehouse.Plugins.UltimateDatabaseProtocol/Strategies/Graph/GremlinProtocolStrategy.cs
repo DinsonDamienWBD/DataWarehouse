@@ -498,6 +498,10 @@ public sealed class GremlinProtocolStrategy : DatabaseProtocolStrategyBase
             var result = await ExecuteQueryCoreAsync("1+1", null, ct);
             return result.Success;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -838,6 +842,10 @@ public sealed class NeptuneGremlinProtocolStrategy : DatabaseProtocolStrategyBas
         {
             var result = await ExecuteQueryCoreAsync("g.V().limit(0)", null, ct);
             return result.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {

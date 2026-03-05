@@ -340,6 +340,10 @@ public sealed class MongoDbStorageStrategy : DatabaseStorageStrategyBase
             await _database!.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: ct);
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

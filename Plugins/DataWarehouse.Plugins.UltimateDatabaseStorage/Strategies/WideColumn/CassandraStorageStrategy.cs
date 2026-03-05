@@ -281,6 +281,10 @@ public sealed class CassandraStorageStrategy : DatabaseStorageStrategyBase
             var result = await _session!.ExecuteAsync(new SimpleStatement("SELECT now() FROM system.local"));
             return result.Any();
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

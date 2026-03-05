@@ -39,7 +39,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 // 200 = success, 401/403 = auth failure (report unhealthy so the caller knows creds are wrong)
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }

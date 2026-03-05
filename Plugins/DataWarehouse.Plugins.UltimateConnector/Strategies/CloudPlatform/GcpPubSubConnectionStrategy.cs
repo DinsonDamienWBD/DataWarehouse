@@ -100,6 +100,10 @@ public sealed class GcpPubSubConnectionStrategy : SaaSConnectionStrategyBase
             // but credentials are wrong — report as unhealthy so callers know.
             return false;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

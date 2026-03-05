@@ -284,6 +284,10 @@ public sealed class CosmosDbStorageStrategy : DatabaseStorageStrategyBase
             await database.ReadAsync(cancellationToken: ct);
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

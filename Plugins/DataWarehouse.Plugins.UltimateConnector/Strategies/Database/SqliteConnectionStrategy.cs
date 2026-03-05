@@ -91,6 +91,10 @@ public sealed class SqliteConnectionStrategy : DatabaseConnectionStrategyBase
             var result = await cmd.ExecuteScalarAsync(ct);
             return result != null && Convert.ToInt64(result) == 1;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

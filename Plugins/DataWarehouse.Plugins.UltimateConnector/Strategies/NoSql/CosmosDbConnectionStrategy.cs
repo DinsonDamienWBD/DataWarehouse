@@ -105,6 +105,10 @@ public sealed class CosmosDbConnectionStrategy : DatabaseConnectionStrategyBase
             await client.ReadAccountAsync();
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

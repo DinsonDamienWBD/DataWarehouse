@@ -51,7 +51,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             var client = handle.GetConnection<TcpClient>();
             if (!client.Connected) return false;
             try { await client.GetStream().WriteAsync(Array.Empty<byte>(), ct); return true; }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)

@@ -344,6 +344,10 @@ public sealed class DerbyStorageStrategy : DatabaseStorageStrategyBase
                 command.ExecuteScalar();
                 return true;
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch
             {
                 return false;

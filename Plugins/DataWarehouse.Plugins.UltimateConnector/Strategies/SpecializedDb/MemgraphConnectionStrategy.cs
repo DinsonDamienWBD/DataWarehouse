@@ -44,7 +44,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 await client.GetStream().WriteAsync(Array.Empty<byte>(), 0, 0, ct).ConfigureAwait(false);
                 return true;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)

@@ -82,6 +82,10 @@ public sealed class MongoDbConnectionStrategy : DatabaseConnectionStrategyBase
             await adminDb.RunCommandAsync<BsonDocument>(new BsonDocument("ping", 1), cancellationToken: ct);
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

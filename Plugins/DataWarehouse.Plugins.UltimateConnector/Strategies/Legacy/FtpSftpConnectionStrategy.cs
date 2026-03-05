@@ -72,7 +72,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
                 await testClient.ConnectAsync(info.Host, info.Port, ct);
                 return true;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.CompletedTask;
@@ -266,7 +266,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
                 return response.StatusCode == FtpStatusCode.FileActionOK;
 #pragma warning restore SYSLIB0014
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         private static FtpEntry ParseFtpListLine(string line)

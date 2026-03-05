@@ -51,6 +51,8 @@ public sealed class FullTextSearchStrategy : FeatureStrategyBase
         Dictionary<string, object>? metadata = null,
         CancellationToken ct = default)
     {
+        if (string.IsNullOrEmpty(documentId)) throw new ArgumentNullException(nameof(documentId));
+        if (string.IsNullOrEmpty(content)) throw new ArgumentNullException(nameof(content));
         return ExecuteWithTrackingAsync(() =>
         {
             var tokens = Tokenize(content);

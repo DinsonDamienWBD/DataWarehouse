@@ -339,6 +339,10 @@ public sealed class Neo4jStorageStrategy : DatabaseStorageStrategyBase
             await _driver!.VerifyConnectivityAsync();
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

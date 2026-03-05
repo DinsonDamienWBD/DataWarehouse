@@ -208,6 +208,10 @@ public sealed class SolrProtocolStrategy : DatabaseProtocolStrategyBase
             using var response = await _httpClient.GetAsync($"/{_collection}/admin/ping", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -409,6 +413,10 @@ public sealed class MeiliSearchProtocolStrategy : DatabaseProtocolStrategyBase
             using var response = await _httpClient.GetAsync("/health", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -609,6 +617,10 @@ public sealed class TypesenseProtocolStrategy : DatabaseProtocolStrategyBase
         {
             using var response = await _httpClient.GetAsync("/health", ct);
             return response.IsSuccessStatusCode;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {

@@ -88,6 +88,10 @@ public sealed class RabbitMqConnectionStrategy : MessagingConnectionStrategyBase
             var wrapper = handle.GetConnection<RabbitMqConnectionWrapper>();
             return wrapper.Connection.IsOpen && wrapper.Channel.IsOpen;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

@@ -76,7 +76,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                     .GetAsync("/sap/opu/odata/sap/", ct);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {

@@ -284,6 +284,10 @@ public sealed class SnowflakeProtocolStrategy : DatabaseProtocolStrategyBase
             var result = await ExecuteQueryCoreAsync("SELECT 1", null, ct);
             return result.Success;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -535,6 +539,10 @@ public sealed class BigQueryProtocolStrategy : DatabaseProtocolStrategyBase
         {
             var result = await ExecuteQueryCoreAsync("SELECT 1", null, ct);
             return result.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
@@ -916,6 +924,10 @@ public sealed class RedshiftProtocolStrategy : DatabaseProtocolStrategyBase
             var result = await ExecuteQueryCoreAsync("SELECT 1", null, ct);
             return result.Success;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -1126,6 +1138,10 @@ public sealed class DatabricksProtocolStrategy : DatabaseProtocolStrategyBase
         {
             var result = await ExecuteQueryCoreAsync("SELECT 1", null, ct);
             return result.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
@@ -1660,6 +1676,10 @@ public sealed class SynapseProtocolStrategy : DatabaseProtocolStrategyBase
         {
             var result = await ExecuteQueryCoreAsync("SELECT 1", null, ct);
             return result.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {

@@ -288,6 +288,10 @@ public sealed class YugabyteDbStorageStrategy : DatabaseStorageStrategyBase
             await command.ExecuteScalarAsync(ct);
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

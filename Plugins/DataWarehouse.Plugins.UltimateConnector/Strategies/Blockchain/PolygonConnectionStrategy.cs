@@ -17,11 +17,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Blockchain
         public override string SemanticDescription => "Connects to Polygon blockchain (EVM-compatible)";
         public override string[] Tags => new[] { "polygon", "blockchain", "evm", "web3", "layer2" };
         public PolygonConnectionStrategy(ILogger? logger = null) : base(logger) { }
-        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var client = new HttpClient { BaseAddress = new Uri(config.ConnectionString) }; await client.PostAsync("/", new StringContent(@"{""jsonrpc"":""2.0"",""method"":""eth_blockNumber"",""params"":[],""id"":1}", Encoding.UTF8, "application/json"), ct); return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "Polygon JSON-RPC" }); }
+        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var client = new HttpClient { BaseAddress = new Uri(config.ConnectionString ?? throw new ArgumentException("Connection string is required")) }; await client.PostAsync("/", new StringContent(@"{""jsonrpc"":""2.0"",""method"":""eth_blockNumber"",""params"":[],""id"":1}", Encoding.UTF8, "application/json"), ct); return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "Polygon JSON-RPC" }); }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             try { using var r = await handle.GetConnection<HttpClient>().PostAsync("/", new StringContent(@"{""jsonrpc"":""2.0"",""method"":""eth_blockNumber"",""params"":[],""id"":1}", Encoding.UTF8, "application/json"), ct); return r.IsSuccessStatusCode; }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>().Dispose(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)

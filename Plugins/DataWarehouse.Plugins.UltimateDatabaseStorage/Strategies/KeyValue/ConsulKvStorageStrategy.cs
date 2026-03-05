@@ -244,6 +244,10 @@ public sealed class ConsulKvStorageStrategy : DatabaseStorageStrategyBase
             var leader = await _client!.Status.Leader(ct);
             return !string.IsNullOrEmpty(leader);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

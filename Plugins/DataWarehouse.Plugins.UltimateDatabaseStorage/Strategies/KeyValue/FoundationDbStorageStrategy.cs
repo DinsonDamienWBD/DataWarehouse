@@ -302,6 +302,10 @@ public sealed class FoundationDbStorageStrategy : DatabaseStorageStrategyBase
             await _db!.ReadAsync(tr => tr.GetAsync(_metadataPrefix), ct);
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

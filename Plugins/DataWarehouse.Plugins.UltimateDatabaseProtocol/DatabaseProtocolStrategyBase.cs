@@ -1012,6 +1012,10 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
         {
             return await PingCoreAsync(ct);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

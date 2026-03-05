@@ -21,8 +21,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
         {
             var endpoint = config.ConnectionString.Contains("snowflakecomputing.com") ? config.ConnectionString : $"https://{config.ConnectionString}.snowflakecomputing.com";
             _httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout };
-            if (!string.IsNullOrEmpty(config.AuthCredential))
-                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential);
+            if (!string.IsNullOrEmpty(config.AuthCredential?.Trim()!))
+                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential?.Trim()!);
             // Finding 1846: Read warehouse from config.Properties; fall back to COMPUTE_WH only when absent.
             var warehouse = config.Properties.TryGetValue("Warehouse", out var wh) && wh != null
                 ? wh.ToString()!
@@ -37,7 +37,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
                 using var response = await client.GetAsync("/", ct);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Snowflake healthy" : "Snowflake unhealthy", sw.Elapsed, DateTimeOffset.UtcNow); }

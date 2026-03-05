@@ -106,8 +106,9 @@ public sealed class AwsSqsConnectionStrategy : SaaSConnectionStrategyBase
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(
         IConnectionHandle handle, CancellationToken ct = default)
     {
-        // AWS uses Signature V4 per-request
-        return Task.FromResult((Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(1)));
+        // AWS uses Signature V4 per-request - return stored credential token
+        var token = handle.ConnectionInfo.TryGetValue("AuthToken", out var t) ? t?.ToString() ?? string.Empty : string.Empty;
+        return Task.FromResult((token, DateTimeOffset.UtcNow.AddHours(1)));
     }
 
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(

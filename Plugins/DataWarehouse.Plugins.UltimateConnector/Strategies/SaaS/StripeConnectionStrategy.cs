@@ -58,7 +58,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 var response = await handle.GetConnection<HttpClient>().GetAsync("/v1/balance", ct);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {

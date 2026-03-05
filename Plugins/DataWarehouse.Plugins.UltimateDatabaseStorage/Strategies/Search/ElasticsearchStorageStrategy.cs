@@ -294,6 +294,10 @@ public sealed class ElasticsearchStorageStrategy : DatabaseStorageStrategyBase
             var response = await _client!.Cluster.HealthAsync(ct);
             return response.IsValidResponse && response.Status != Elastic.Clients.Elasticsearch.HealthStatus.Red;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

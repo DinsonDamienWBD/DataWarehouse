@@ -113,7 +113,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
 
         protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            var token = Guid.NewGuid().ToString("N");
+            var token = handle.ConnectionInfo.TryGetValue("AuthToken", out var storedToken) ? storedToken?.ToString() ?? string.Empty : string.Empty;
             var expiry = DateTimeOffset.UtcNow.AddHours(1);
             return Task.FromResult((token, expiry));
         }

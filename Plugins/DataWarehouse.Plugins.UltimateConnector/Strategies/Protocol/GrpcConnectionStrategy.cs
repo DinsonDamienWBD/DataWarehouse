@@ -125,6 +125,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
                 using var response = await client.SendAsync(healthRequest, ct);
                 return response.Version.Major >= 2;
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch
             {
                 return false;

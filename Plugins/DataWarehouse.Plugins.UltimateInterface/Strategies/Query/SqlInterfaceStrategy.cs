@@ -167,35 +167,21 @@ internal sealed class SqlInterfaceStrategy : SdkInterface.InterfaceStrategyBase,
         string statementType,
         CancellationToken cancellationToken)
     {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+
         // Route to message bus for wire protocol plugins to handle
         if (MessageBus != null)
         {
             var routingKey = $"sql.{statementType.ToLowerInvariant()}";
-            // Message bus dispatch would happen here
-            // Wire protocol plugins (PostgreSQL, MySQL, etc.) would execute the query
+            // Wire protocol plugins (PostgreSQL, MySQL, etc.) would handle this message
         }
 
-        // Mock result (production would return actual database results)
-        var columns = statementType == "SELECT"
-            ? new[] { "id", "name", "created_at" }
-            : Array.Empty<string>();
+        sw.Stop();
 
-        var rows = statementType == "SELECT"
-            ? new object[]
-            {
-                new object[] { 1, "Example 1", "2026-02-11T00:00:00Z" },
-                new object[] { 2, "Example 2", "2026-02-11T01:00:00Z" }
-            }
-            : Array.Empty<object>();
-
-        return new SqlResult
-        {
-            RowCount = statementType == "SELECT" ? 2 : (statementType == "INSERT" ? 1 : 0),
-            ColumnCount = columns.Length,
-            Columns = columns,
-            Rows = rows,
-            ExecutionTimeMs = 42
-        };
+        // Requires wire protocol plugin (PostgreSQL, MySQL, etc.) to execute actual queries
+        throw new NotSupportedException(
+            $"SQL query execution requires a wire protocol plugin (PostgreSQL, MySQL, etc.) " +
+            $"subscribed to the message bus. Statement type: {statementType}");
     }
 
     private sealed class SqlRequest

@@ -16,7 +16,7 @@ public sealed class AzureMonitorConnectionStrategy : ObservabilityConnectionStra
             using var response = await handle.GetConnection<HttpClient>().GetAsync("/health", ct);
             return (int)response.StatusCode != 503;
         }
-        catch { return false; }
+        catch (OperationCanceledException) { throw; } catch { return false; }
     }
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct){handle.GetConnection<HttpClient>().Dispose();if (handle is DefaultConnectionHandle defaultHandle) defaultHandle.MarkDisconnected();return Task.CompletedTask;}
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)

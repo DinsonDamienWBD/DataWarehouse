@@ -281,6 +281,10 @@ public sealed class CockroachDbStorageStrategy : DatabaseStorageStrategyBase
             await command.ExecuteScalarAsync(ct);
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

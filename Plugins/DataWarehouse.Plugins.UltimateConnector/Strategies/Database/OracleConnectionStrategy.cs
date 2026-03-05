@@ -89,6 +89,10 @@ public sealed class OracleConnectionStrategy : DatabaseConnectionStrategyBase
 
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -148,18 +152,7 @@ public sealed class OracleConnectionStrategy : DatabaseConnectionStrategyBase
         string query,
         Dictionary<string, object?>? parameters = null,
         CancellationToken ct = default)
-    {
-        var result = new List<Dictionary<string, object?>>
-        {
-            new()
-            {
-                ["__status"] = "OPERATION_NOT_SUPPORTED",
-                ["__message"] = "Query execution requires Oracle.ManagedDataAccess.Core NuGet package. This strategy provides TCP connectivity validation only.",
-                ["__strategy"] = StrategyId,
-                ["__capabilities"] = "connectivity_test,health_check"
-            }
-        };
-        return Task.FromResult<IReadOnlyList<Dictionary<string, object?>>>(result);
+    { throw new NotSupportedException("Query execution requires Oracle.ManagedDataAccess.Core NuGet package. This strategy provides TCP connectivity validation only.");
     }
 
     /// <inheritdoc/>

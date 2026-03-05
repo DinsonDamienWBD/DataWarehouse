@@ -256,6 +256,10 @@ public sealed class LiteDbStorageStrategy : DatabaseStorageStrategyBase
             await _collection!.CountAsync();
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

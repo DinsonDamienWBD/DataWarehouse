@@ -339,6 +339,10 @@ public sealed class HBaseStorageStrategy : DatabaseStorageStrategyBase
             var response = await _httpClient!.GetAsync("/version/cluster", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

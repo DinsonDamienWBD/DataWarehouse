@@ -138,6 +138,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
                 var response = await _messageBus.SendAsync(KeystoreStatusTopic, message, _requestTimeout, ct);
                 return response.Success;
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch
             {
                 return false;

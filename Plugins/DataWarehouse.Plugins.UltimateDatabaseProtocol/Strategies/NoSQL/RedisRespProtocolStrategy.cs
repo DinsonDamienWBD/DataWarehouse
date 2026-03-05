@@ -549,6 +549,10 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
             var response = await SendCommandInternalAsync(["PING"], ct);
             return response?.ToString() == "PONG";
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

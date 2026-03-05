@@ -65,6 +65,10 @@ public sealed class AzureEventHubConnectionStrategy : SaaSConnectionStrategyBase
             await producer.GetEventHubPropertiesAsync(ct);
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -114,7 +118,7 @@ public sealed class AzureEventHubConnectionStrategy : SaaSConnectionStrategyBase
 
     protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(
         IConnectionHandle handle, CancellationToken ct = default)
-        => Task.FromResult((Guid.NewGuid().ToString("N"), DateTimeOffset.UtcNow.AddHours(1)));
+        { var token = handle.ConnectionInfo.TryGetValue("AuthToken", out var t) ? t?.ToString() ?? string.Empty : string.Empty; return Task.FromResult((token, DateTimeOffset.UtcNow.AddHours(1))); }
 
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(
         IConnectionHandle handle, string currentToken, CancellationToken ct = default)

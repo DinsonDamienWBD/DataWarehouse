@@ -68,7 +68,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                 using var response = await client.SendAsync(request, ct);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {

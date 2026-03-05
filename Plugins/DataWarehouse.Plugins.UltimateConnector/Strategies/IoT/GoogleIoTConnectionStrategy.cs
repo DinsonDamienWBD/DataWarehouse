@@ -89,7 +89,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             var commandUrl = $"/v1/projects/-/locations/-/registries/-/devices/{deviceId}:sendCommandToDevice";
             try
             {
-                using var response = await client.GetAsync(commandUrl, ct);
+                using var response = await client.PostAsync(commandUrl, null, ct);
                 return $"{{\"status\":\"queued\",\"deviceId\":\"{deviceId}\",\"command\":\"{command}\",\"endpoint\":\"{commandUrl}\"}}";
             }
             catch (Exception ex)

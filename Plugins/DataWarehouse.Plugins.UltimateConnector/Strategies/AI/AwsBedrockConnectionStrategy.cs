@@ -36,7 +36,7 @@ public sealed class AwsBedrockConnectionStrategy : AiConnectionStrategyBase
             using var response = await httpClient.SendAsync(request, ct);
             return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Forbidden;
         }
-        catch { return false; }
+        catch (OperationCanceledException) { throw; } catch { return false; }
     }
 
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)

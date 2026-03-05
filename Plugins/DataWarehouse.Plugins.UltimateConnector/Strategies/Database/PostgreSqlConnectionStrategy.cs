@@ -94,6 +94,10 @@ public sealed class PostgreSqlConnectionStrategy : DatabaseConnectionStrategyBas
             var result = await cmd.ExecuteScalarAsync(ct);
             return result != null && Convert.ToInt32(result) == 1;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

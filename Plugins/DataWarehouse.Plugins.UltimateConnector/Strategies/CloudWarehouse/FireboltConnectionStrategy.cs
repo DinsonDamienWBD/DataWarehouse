@@ -21,8 +21,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
         {
             var endpoint = config.ConnectionString.StartsWith("http") ? config.ConnectionString : $"https://{config.ConnectionString}";
             _httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout };
-            if (!string.IsNullOrEmpty(config.AuthCredential))
-                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential);
+            if (!string.IsNullOrEmpty(config.AuthCredential?.Trim()!))
+                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential?.Trim()!);
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["account"] = config.ConnectionString });
         }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
                 using var response = await client.GetAsync("/", ct);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Firebolt healthy" : "Firebolt unhealthy", sw.Elapsed, DateTimeOffset.UtcNow); }

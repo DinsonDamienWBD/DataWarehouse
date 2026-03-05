@@ -60,6 +60,10 @@ public sealed class ThanosConnectionStrategy : ObservabilityConnectionStrategyBa
             using var response = await httpClient.GetAsync("/-/healthy", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

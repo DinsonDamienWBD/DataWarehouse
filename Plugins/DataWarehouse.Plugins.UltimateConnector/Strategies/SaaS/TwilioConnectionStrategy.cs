@@ -61,7 +61,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                     .GetAsync($"/2010-04-01/Accounts/{_accountSid}.json", ct);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {

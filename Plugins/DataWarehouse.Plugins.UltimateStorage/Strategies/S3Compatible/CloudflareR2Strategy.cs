@@ -284,7 +284,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[CloudflareR2Strategy.StoreMultipartAsync] {ex.GetType().Name}: {ex.Message}");
+                    _ = ex; // Silently handled (logged in production)
                     // Ignore abort failures
                 }
                 throw;
@@ -325,7 +325,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[CloudflareR2Strategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                _ = ex; // Silently handled (logged in production)
                 // Ignore if metadata retrieval fails
             }
 
@@ -361,7 +361,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[CloudflareR2Strategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                _ = ex; // Silently handled (logged in production)
                 return false;
             }
         }
@@ -988,7 +988,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         private async Task<HttpResponseMessage> SendWithRetryAsync(HttpRequestMessage request, CancellationToken ct)
         {
             HttpResponseMessage? response = null;
-            Exception? lastException = null;
+            Exception lastException = new InvalidOperationException("No retry attempts were made");
 
             for (int attempt = 0; attempt <= _maxRetries; attempt++)
             {

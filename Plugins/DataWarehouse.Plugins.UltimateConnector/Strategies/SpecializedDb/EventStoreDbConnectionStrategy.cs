@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { using var response = await _httpClient.GetAsync("/stats", ct); return response.IsSuccessStatusCode; } catch { return false; } }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { using var response = await _httpClient.GetAsync("/stats", ct); return response.IsSuccessStatusCode; } catch (OperationCanceledException) { throw; } catch { return false; } }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {

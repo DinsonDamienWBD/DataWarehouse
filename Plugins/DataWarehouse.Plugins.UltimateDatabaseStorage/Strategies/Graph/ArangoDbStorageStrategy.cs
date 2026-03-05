@@ -328,6 +328,10 @@ public sealed class ArangoDbStorageStrategy : DatabaseStorageStrategyBase
             var response = await _httpClient!.GetAsync("/_api/version", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

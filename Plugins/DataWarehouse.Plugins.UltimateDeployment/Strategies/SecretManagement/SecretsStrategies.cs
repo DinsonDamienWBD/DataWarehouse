@@ -164,7 +164,7 @@ public sealed class HashiCorpVaultStrategy : DeploymentStrategyBase
         return data;
     }
 
-    private Task<string> AuthenticateAsync(string addr, DeploymentConfig config, CancellationToken ct) => Task.FromResult("hvs.token123");
+    private Task<string> AuthenticateAsync(string addr, DeploymentConfig config, CancellationToken ct) => throw new NotSupportedException("Vault authentication requires real HashiCorp Vault SDK integration. Configure VAULT_TOKEN or auth method.");
     private Task<int> WriteSecretAsync(string addr, string token, string mount, string path, Dictionary<string, string> data, CancellationToken ct) => Task.FromResult(42);
     private Task SetupDynamicSecretsAsync(string addr, string token, string path, DeploymentConfig config, CancellationToken ct) => Task.Delay(50, ct);
     private Task ConfigurePoliciesAsync(string addr, string token, string path, DeploymentConfig config, CancellationToken ct) => Task.Delay(30, ct);

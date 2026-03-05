@@ -295,6 +295,10 @@ public sealed class JanusGraphStorageStrategy : DatabaseStorageStrategyBase
             await _client!.SubmitAsync<object>("g.V().limit(1)");
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

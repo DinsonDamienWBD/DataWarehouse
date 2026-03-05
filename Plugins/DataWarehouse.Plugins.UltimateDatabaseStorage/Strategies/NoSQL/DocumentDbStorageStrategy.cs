@@ -315,6 +315,10 @@ public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
             await _container!.ReadContainerAsync(cancellationToken: ct);
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

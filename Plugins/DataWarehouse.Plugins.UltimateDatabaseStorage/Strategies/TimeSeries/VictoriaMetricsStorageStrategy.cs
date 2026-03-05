@@ -273,6 +273,10 @@ public sealed class VictoriaMetricsStorageStrategy : DatabaseStorageStrategyBase
             var response = await _httpClient!.GetAsync("/health", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

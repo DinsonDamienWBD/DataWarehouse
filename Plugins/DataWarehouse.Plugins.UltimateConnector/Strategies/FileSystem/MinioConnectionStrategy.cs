@@ -92,6 +92,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
                 using var response = await httpClient.GetAsync("/minio/health/live", ct);
                 return response.IsSuccessStatusCode;
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch
             {
                 return false;

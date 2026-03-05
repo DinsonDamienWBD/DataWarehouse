@@ -405,6 +405,10 @@ public sealed class KafkaStorageStrategy : DatabaseStorageStrategyBase
             var metadata = _adminClient!.GetMetadata(TimeSpan.FromSeconds(5));
             return metadata.Brokers.Count > 0;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

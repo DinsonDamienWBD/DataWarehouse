@@ -258,6 +258,10 @@ public sealed class MemcachedStorageStrategy : DatabaseStorageStrategyBase
             await _client!.GetAsync<string>("__health__");
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

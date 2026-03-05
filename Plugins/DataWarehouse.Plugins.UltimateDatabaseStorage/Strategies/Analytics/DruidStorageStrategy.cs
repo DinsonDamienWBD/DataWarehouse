@@ -499,6 +499,10 @@ public sealed class DruidStorageStrategy : DatabaseStorageStrategyBase
             var response = await _httpClient!.GetAsync($"{_routerUrl}/status", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

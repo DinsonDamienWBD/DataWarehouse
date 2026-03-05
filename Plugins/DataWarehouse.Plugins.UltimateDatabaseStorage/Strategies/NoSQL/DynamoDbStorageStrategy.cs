@@ -494,6 +494,10 @@ public sealed class DynamoDbStorageStrategy : DatabaseStorageStrategyBase
             var response = await _client!.DescribeTableAsync(_tableName, ct);
             return response.Table.TableStatus == TableStatus.ACTIVE;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

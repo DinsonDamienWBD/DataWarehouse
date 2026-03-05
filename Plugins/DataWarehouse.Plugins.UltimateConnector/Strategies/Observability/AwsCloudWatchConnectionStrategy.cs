@@ -19,7 +19,7 @@ public sealed class AwsCloudWatchConnectionStrategy : ObservabilityConnectionStr
             // 200 OK or 403 Forbidden both mean the endpoint is reachable; 503 means unavailable.
             return (int)response.StatusCode != 503;
         }
-        catch { return false; }
+        catch (OperationCanceledException) { throw; } catch { return false; }
     }
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct){handle.GetConnection<HttpClient>().Dispose();if (handle is DefaultConnectionHandle defaultHandle) defaultHandle.MarkDisconnected();return Task.CompletedTask;}
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)

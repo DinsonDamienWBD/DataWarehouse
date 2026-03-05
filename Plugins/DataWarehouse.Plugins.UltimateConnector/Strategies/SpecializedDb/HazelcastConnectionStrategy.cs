@@ -42,7 +42,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
         {
             if (_httpClient == null) return false;
             try { using var response = await _httpClient.GetAsync("/hazelcast/rest/cluster", ct); return response.IsSuccessStatusCode; }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {

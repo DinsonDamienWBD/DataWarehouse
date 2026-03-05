@@ -94,7 +94,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Protocol
                 try { await client.ReceiveAsync(cts.Token); } catch (OperationCanceledException) { /* timeout is acceptable */ }
                 return true;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         /// <inheritdoc/>

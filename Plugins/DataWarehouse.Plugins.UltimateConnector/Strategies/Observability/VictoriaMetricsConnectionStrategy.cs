@@ -77,6 +77,10 @@ public sealed class VictoriaMetricsConnectionStrategy : ObservabilityConnectionS
             using var response = await httpClient.GetAsync("/health", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

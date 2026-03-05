@@ -570,6 +570,10 @@ public sealed class JdbcBridgeProtocolStrategy : DatabaseProtocolStrategyBase
             var response = await _httpClient.PostAsJsonAsync("/api/jdbc", request, ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

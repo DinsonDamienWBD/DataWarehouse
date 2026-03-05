@@ -99,6 +99,10 @@ public sealed class DynamoDbConnectionStrategy : DatabaseConnectionStrategyBase
             await client.ListTablesAsync(new ListTablesRequest { Limit = 1 }, ct);
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

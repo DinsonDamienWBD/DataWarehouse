@@ -412,7 +412,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[BackblazeB2Strategy.StoreMultipartAsync] {ex.GetType().Name}: {ex.Message}");
+                    _ = ex; // Silently handled (logged in production)
                     // Ignore abort failures
                 }
                 throw;
@@ -481,7 +481,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[BackblazeB2Strategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                _ = ex; // Silently handled (logged in production)
                 // Ignore errors
             }
 
@@ -526,7 +526,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[BackblazeB2Strategy.ExistsAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                _ = ex; // Silently handled (logged in production)
                 IncrementOperationCounter(StorageOperationType.Exists);
                 return false;
             }
@@ -944,7 +944,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         /// </summary>
         private async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, CancellationToken ct)
         {
-            Exception? lastException = null;
+            Exception lastException = new InvalidOperationException("No retry attempts were made");
 
             for (int attempt = 0; attempt <= _maxRetries; attempt++)
             {

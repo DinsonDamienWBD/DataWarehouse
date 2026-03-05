@@ -23,14 +23,14 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
             _httpClient = new HttpClient { BaseAddress = new Uri($"http://{host}:{port}"), Timeout = config.Timeout };
             if (config.AuthMethod == "basic" && !string.IsNullOrEmpty(config.AuthCredential))
             {
-                var authBytes = System.Text.Encoding.UTF8.GetBytes($"{config.AuthSecondary ?? "admin"}:{config.AuthCredential}");
+                var authBytes = System.Text.Encoding.UTF8.GetBytes($"{(config.AuthSecondary ?? "admin").Trim()}:{config.AuthCredential.Trim()}");
                 _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Basic", Convert.ToBase64String(authBytes));
             }
             using var response = await _httpClient.GetAsync("/apiv2/server_status", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["host"] = host, ["port"] = port });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { var response = await _httpClient.GetAsync("/apiv2/server_status", ct); return response.IsSuccessStatusCode; } catch { return false; } }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { var response = await _httpClient.GetAsync("/apiv2/server_status", ct); return response.IsSuccessStatusCode; } catch (OperationCanceledException) { throw; } catch { return false; } }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {

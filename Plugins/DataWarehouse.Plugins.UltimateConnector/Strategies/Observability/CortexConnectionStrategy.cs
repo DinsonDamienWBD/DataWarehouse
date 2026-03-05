@@ -57,6 +57,10 @@ public sealed class CortexConnectionStrategy : ObservabilityConnectionStrategyBa
             var response = await handle.GetConnection<HttpClient>().GetAsync("/ready", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

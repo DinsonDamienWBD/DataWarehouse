@@ -85,6 +85,10 @@ public sealed class MariaDbConnectionStrategy : DatabaseConnectionStrategyBase
             var tcpConnection = handle.GetConnection<MariaDbTcpConnection>();
             return await tcpConnection.TestConnectivityAsync(ct);
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -144,18 +148,7 @@ public sealed class MariaDbConnectionStrategy : DatabaseConnectionStrategyBase
         string query,
         Dictionary<string, object?>? parameters = null,
         CancellationToken ct = default)
-    {
-        var result = new List<Dictionary<string, object?>>
-        {
-            new()
-            {
-                ["__status"] = "OPERATION_NOT_SUPPORTED",
-                ["__message"] = "Query execution requires MySqlConnector NuGet package. This strategy provides TCP connectivity validation only.",
-                ["__strategy"] = StrategyId,
-                ["__capabilities"] = "connectivity_test,health_check"
-            }
-        };
-        return Task.FromResult<IReadOnlyList<Dictionary<string, object?>>>(result);
+    { throw new NotSupportedException("Query execution requires MySqlConnector NuGet package. This strategy provides TCP connectivity validation only.");
     }
 
     /// <inheritdoc/>

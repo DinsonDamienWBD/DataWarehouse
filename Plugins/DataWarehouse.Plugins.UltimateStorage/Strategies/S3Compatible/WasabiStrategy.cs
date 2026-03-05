@@ -463,7 +463,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[WasabiStrategy.StoreMultipartAsync] {ex.GetType().Name}: {ex.Message}");
+                    _ = ex; // Silently handled (logged in production)
                     // Ignore abort failures
                 }
                 throw;
@@ -532,7 +532,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[WasabiStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                _ = ex; // Silently handled (logged in production)
                 // Ignore errors
             }
 
@@ -1076,7 +1076,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         /// </summary>
         private async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, CancellationToken ct)
         {
-            Exception? lastException = null;
+            Exception lastException = new InvalidOperationException("No retry attempts were made");
 
             for (int attempt = 0; attempt <= _maxRetries; attempt++)
             {

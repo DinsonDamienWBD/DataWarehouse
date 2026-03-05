@@ -38,7 +38,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Endpoint"] = "https://api.notion.com" });
         }
 
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/v1/users/me", ct); return response.IsSuccessStatusCode; } catch { return false; } }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { try { var response = await handle.GetConnection<HttpClient>().GetAsync("/v1/users/me", ct); return response.IsSuccessStatusCode; } catch (OperationCanceledException) { throw; } catch { return false; } }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>()?.Dispose(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "Notion is reachable" : "Notion is not responding", sw.Elapsed, DateTimeOffset.UtcNow); }
 

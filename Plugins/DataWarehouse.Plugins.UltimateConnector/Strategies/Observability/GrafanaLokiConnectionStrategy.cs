@@ -60,6 +60,10 @@ public sealed class GrafanaLokiConnectionStrategy : ObservabilityConnectionStrat
             var response = await handle.GetConnection<HttpClient>().GetAsync("/ready", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

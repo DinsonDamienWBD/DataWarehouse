@@ -985,7 +985,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
         public override async Task DeleteKeyAsync(string keyId, ISecurityContext context, CancellationToken ct = default)
         {
             ValidateSecurityContext(context);
-            if (!context.IsSystemAdmin) throw new UnauthorizedAccessException();
+            if (!context.IsSystemAdmin) throw new UnauthorizedAccessException("FROST key deletion requires system administrator privileges. Current context does not have IsSystemAdmin=true.");
 
             await _lock.WaitAsync(ct);
             try

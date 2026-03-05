@@ -21,13 +21,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
         {
             var endpoint = config.ConnectionString.StartsWith("http") ? config.ConnectionString : $"https://{config.ConnectionString}";
             _httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout };
-            if (!string.IsNullOrEmpty(config.AuthCredential))
-                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential);
+            if (!string.IsNullOrEmpty(config.AuthCredential?.Trim()!))
+                _httpClient.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", config.AuthCredential?.Trim()!);
             using var response = await _httpClient.GetAsync("/api/2.0/clusters/list", ct);
             response.EnsureSuccessStatusCode();
             return new DefaultConnectionHandle(_httpClient, new Dictionary<string, object> { ["workspace_url"] = config.ConnectionString });
         }
-        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { var response = await _httpClient.GetAsync("/api/2.0/clusters/list", ct); return response.IsSuccessStatusCode; } catch { return false; } }
+        protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_httpClient == null) return false; try { var response = await _httpClient.GetAsync("/api/2.0/clusters/list", ct); return response.IsSuccessStatusCode; } catch (OperationCanceledException) { throw; } catch { return false; } }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { _httpClient?.Dispose(); _httpClient = null; return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {

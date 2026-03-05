@@ -19,7 +19,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Blockchain
         public TheGraphConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var client = new HttpClient { BaseAddress = new Uri(config.ConnectionString) };
+            var client = new HttpClient { BaseAddress = new Uri(config.ConnectionString ?? throw new ArgumentException("Connection string is required")) };
             // Valid GraphQL introspection query to verify subgraph connectivity
             var body = new StringContent("{\"query\":\"{_meta{block{number}}}\"}", Encoding.UTF8, "application/json");
             await client.PostAsync("", body, ct);
@@ -28,7 +28,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Blockchain
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             try { using var r = await handle.GetConnection<HttpClient>().PostAsync("", new StringContent("{\"query\":\"{_meta{block{number}}}\"}", Encoding.UTF8, "application/json"), ct); return r.IsSuccessStatusCode; }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>().Dispose(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)

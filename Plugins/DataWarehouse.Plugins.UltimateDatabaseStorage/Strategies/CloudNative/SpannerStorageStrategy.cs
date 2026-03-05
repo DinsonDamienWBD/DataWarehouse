@@ -270,6 +270,10 @@ public sealed class SpannerStorageStrategy : DatabaseStorageStrategyBase
             await cmd.ExecuteScalarAsync(ct);
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

@@ -20,7 +20,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Blockchain
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             try { using var response = await handle.GetConnection<HttpClient>().GetAsync("/info", ct); return response.IsSuccessStatusCode; }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>().Dispose(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)

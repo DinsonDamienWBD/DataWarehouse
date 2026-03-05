@@ -105,6 +105,7 @@ public sealed class UnixFuseFilesystemStrategy : FilesystemStrategyBase
     /// <inheritdoc/>
     public override async Task<byte[]> ReadBlockAsync(string path, long offset, int length, BlockIoOptions? options = null, CancellationToken ct = default)
     {
+        path = Path.GetFullPath(path); // Prevent path traversal attacks
         // FUSE-mounted paths are accessed via standard POSIX I/O
         var fileOptions = options?.AsyncIo == true ? FileOptions.Asynchronous : FileOptions.None;
         await using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read,

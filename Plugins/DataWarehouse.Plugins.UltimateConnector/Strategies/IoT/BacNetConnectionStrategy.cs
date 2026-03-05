@@ -73,7 +73,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
                 await client.SendAsync(whoIs, whoIs.Length).WaitAsync(ct);
                 return true;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         /// <inheritdoc/>

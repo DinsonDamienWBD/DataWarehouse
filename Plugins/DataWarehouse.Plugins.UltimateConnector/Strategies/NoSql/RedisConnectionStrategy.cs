@@ -80,6 +80,10 @@ public sealed class RedisConnectionStrategy : DatabaseConnectionStrategyBase
             var result = await db.PingAsync();
             return result.TotalMilliseconds >= 0;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

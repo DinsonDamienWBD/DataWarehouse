@@ -16,11 +16,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Blockchain
         public override string SemanticDescription => "Connects to Cosmos SDK-based blockchains";
         public override string[] Tags => new[] { "cosmos", "blockchain", "ibc", "tendermint", "rest" };
         public CosmosChainConnectionStrategy(ILogger? logger = null) : base(logger) { }
-        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var client = new HttpClient { BaseAddress = new Uri(config.ConnectionString) }; await client.GetAsync("/node_info", ct); return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "Cosmos REST" }); }
+        protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct) { var client = new HttpClient { BaseAddress = new Uri(config.ConnectionString ?? throw new ArgumentException("Connection string is required")) }; await client.GetAsync("/node_info", ct); return new DefaultConnectionHandle(client, new Dictionary<string, object> { ["protocol"] = "Cosmos REST" }); }
         protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             try { using var r = await handle.GetConnection<HttpClient>().GetAsync("/node_info", ct); return r.IsSuccessStatusCode; }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>().Dispose(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)

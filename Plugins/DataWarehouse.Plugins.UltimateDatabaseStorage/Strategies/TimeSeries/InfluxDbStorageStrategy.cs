@@ -319,6 +319,10 @@ public sealed class InfluxDbStorageStrategy : DatabaseStorageStrategyBase
         {
             return await _client!.PingAsync();
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

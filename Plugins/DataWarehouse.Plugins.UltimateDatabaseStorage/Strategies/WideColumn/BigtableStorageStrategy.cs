@@ -302,6 +302,10 @@ public sealed class BigtableStorageStrategy : DatabaseStorageStrategyBase
             var table = await _adminClient!.GetTableAsync(_tableName);
             return table != null;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

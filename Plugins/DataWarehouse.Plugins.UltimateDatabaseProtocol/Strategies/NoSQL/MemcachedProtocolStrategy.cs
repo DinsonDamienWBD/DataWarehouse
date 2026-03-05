@@ -1058,6 +1058,10 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
             }
             return false;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

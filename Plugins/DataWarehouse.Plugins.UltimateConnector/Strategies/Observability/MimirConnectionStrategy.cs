@@ -84,6 +84,10 @@ public sealed class MimirConnectionStrategy : ObservabilityConnectionStrategyBas
             using var response = await httpClient.GetAsync("/ready", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

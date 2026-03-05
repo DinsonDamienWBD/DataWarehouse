@@ -53,7 +53,7 @@ public sealed class OtlpCollectorConnectionStrategy : ObservabilityConnectionStr
     public override async Task PushMetricsAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> metrics, CancellationToken ct = default)
     {
         var httpClient = handle.GetConnection<HttpClient>();
-        var json = JsonSerializer.Serialize(new { resourceMetrics = metrics });
+        var json = JsonSerializer.Serialize(new { resourceMetrics = new[] { new { scopeMetrics = metrics } } });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
         using var response = await httpClient.PostAsync("/v1/metrics", content, ct);
         response.EnsureSuccessStatusCode();

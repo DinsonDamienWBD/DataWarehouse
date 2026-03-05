@@ -114,7 +114,7 @@ public sealed class ConsulConfigStrategy : DeploymentStrategyBase
     protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(
         string deploymentId, DeploymentState currentState, CancellationToken ct)
     {
-        IncrementCounter("etcd_config.deploy");
+        IncrementCounter("consul_config.health_check");
         var keyPrefix = currentState.Metadata.TryGetValue("keyPrefix", out var kp) ? kp?.ToString() : "";
         return Task.FromResult(new[]
         {

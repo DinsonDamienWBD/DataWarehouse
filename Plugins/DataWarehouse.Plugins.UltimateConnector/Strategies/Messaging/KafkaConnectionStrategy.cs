@@ -89,6 +89,10 @@ public sealed class KafkaConnectionStrategy : MessagingConnectionStrategyBase
             var metadata = adminClient.GetMetadata(TimeSpan.FromSeconds(5));
             return metadata.Brokers.Count > 0;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

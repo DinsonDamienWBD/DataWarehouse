@@ -282,6 +282,10 @@ public sealed class OpenSearchStorageStrategy : DatabaseStorageStrategyBase
             var response = await _client!.Cluster.HealthAsync(ct: ct);
             return response.IsValid && response.Status != Health.Red;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

@@ -88,6 +88,10 @@ public sealed class CassandraConnectionStrategy : DatabaseConnectionStrategyBase
             var rs = await Task.Run(() => session.Execute("SELECT now() FROM system.local"), ct);
             return rs.Any();
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

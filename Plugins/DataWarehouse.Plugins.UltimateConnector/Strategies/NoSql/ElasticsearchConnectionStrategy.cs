@@ -96,6 +96,10 @@ public sealed class ElasticsearchConnectionStrategy : DatabaseConnectionStrategy
             var response = await client.PingAsync(ct);
             return response.IsValidResponse;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

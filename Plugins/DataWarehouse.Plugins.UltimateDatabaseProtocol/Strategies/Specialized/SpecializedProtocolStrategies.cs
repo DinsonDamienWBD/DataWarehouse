@@ -354,6 +354,10 @@ public sealed class ClickHouseProtocolStrategy : DatabaseProtocolStrategyBase
             var response = await ReadVarUIntAsync(ct);
             return response == ServerPong;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -658,6 +662,10 @@ public sealed class HBaseProtocolStrategy : DatabaseProtocolStrategyBase
             var response = await _httpClient!.GetAsync("/version", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -854,6 +862,10 @@ public sealed class CouchbaseProtocolStrategy : DatabaseProtocolStrategyBase
             var response = await _httpClient!.GetAsync("/admin/ping", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -1042,6 +1054,10 @@ public sealed class DruidProtocolStrategy : DatabaseProtocolStrategyBase
         {
             var response = await _httpClient!.GetAsync("/status/health", ct);
             return response.IsSuccessStatusCode;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
@@ -1281,6 +1297,10 @@ public sealed class PrestoProtocolStrategy : DatabaseProtocolStrategyBase
         {
             var response = await _httpClient!.GetAsync("/v1/info", ct);
             return response.IsSuccessStatusCode;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {

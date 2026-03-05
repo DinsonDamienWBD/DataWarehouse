@@ -211,6 +211,10 @@ public sealed class ArangoDbProtocolStrategy : DatabaseProtocolStrategyBase
             using var response = await _httpClient.GetAsync("/_api/version", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -411,6 +415,10 @@ public sealed class JanusGraphProtocolStrategy : DatabaseProtocolStrategyBase
             var testGremlin = new { gremlin = "g.V().limit(0)" };
             var response = await _httpClient.PostAsJsonAsync("/gremlin", testGremlin, ct);
             return response.IsSuccessStatusCode;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {
@@ -631,6 +639,10 @@ public sealed class TigerGraphProtocolStrategy : DatabaseProtocolStrategyBase
         {
             using var response = await _httpClient.GetAsync("/version", ct);
             return response.IsSuccessStatusCode;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {

@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
         public ConfluentCloudConnectionStrategy(ILogger? logger = null) : base(logger) { }
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
-            var brokers = config.ConnectionString.Split(',');
+            if (string.IsNullOrEmpty(config.ConnectionString)) throw new ArgumentException("Connection string is required"); var brokers = config.ConnectionString.Split(',');
             var parts = brokers[0].Split(':');
             var host = parts[0];
             var port = parts.Length > 1 && int.TryParse(parts[1], out var p9092) ? p9092 : 9092;

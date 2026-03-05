@@ -44,7 +44,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
                 await client.SendAsync(searchReq, searchReq.Length).WaitAsync(ct);
                 return true;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<UdpClient>().Close(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)

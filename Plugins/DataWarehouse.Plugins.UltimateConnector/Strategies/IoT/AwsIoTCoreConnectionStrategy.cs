@@ -129,7 +129,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             var jobsUrl = $"/things/{deviceId}/jobs";
             try
             {
-                using var response = await client.GetAsync(jobsUrl, ct);
+                using var response = await client.PostAsync(jobsUrl, null, ct);
                 return $"{{\"status\":\"queued\",\"thingName\":\"{deviceId}\",\"command\":\"{command}\",\"endpoint\":\"{jobsUrl}\"}}";
             }
             catch (Exception ex)

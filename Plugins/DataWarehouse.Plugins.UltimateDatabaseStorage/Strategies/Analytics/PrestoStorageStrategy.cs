@@ -262,6 +262,10 @@ public sealed class PrestoStorageStrategy : DatabaseStorageStrategyBase
             var response = await _httpClient!.GetAsync("/v1/cluster", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

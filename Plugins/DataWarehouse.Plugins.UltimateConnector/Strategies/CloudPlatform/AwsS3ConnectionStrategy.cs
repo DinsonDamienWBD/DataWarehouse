@@ -129,7 +129,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         {
             // AWS uses signature v4 for each request, not a persistent token
             // Return a placeholder token that expires in 1 hour
-            var token = Guid.NewGuid().ToString("N");
+            var token = handle.ConnectionInfo.TryGetValue("AuthToken", out var storedToken) ? storedToken?.ToString() ?? string.Empty : string.Empty;
             var expiry = DateTimeOffset.UtcNow.AddHours(1);
             return Task.FromResult((token, expiry));
         }

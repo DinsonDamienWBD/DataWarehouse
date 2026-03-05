@@ -315,6 +315,10 @@ public sealed class CouchDbStorageStrategy : DatabaseStorageStrategyBase
             var response = await _httpClient!.GetAsync($"/{Uri.EscapeDataString(_databaseName)}", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

@@ -650,6 +650,10 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
             using var response = await _httpClient.GetAsync("/_cluster/health", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -940,6 +944,10 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
         {
             using var response = await _httpClient.GetAsync("/_cluster/health", ct);
             return response.IsSuccessStatusCode;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {

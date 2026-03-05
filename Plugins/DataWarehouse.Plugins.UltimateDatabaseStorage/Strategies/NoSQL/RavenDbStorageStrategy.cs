@@ -267,6 +267,10 @@ public sealed class RavenDbStorageStrategy : DatabaseStorageStrategyBase
             await session.Query<StorageDocument>().Take(1).ToListAsync(ct);
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

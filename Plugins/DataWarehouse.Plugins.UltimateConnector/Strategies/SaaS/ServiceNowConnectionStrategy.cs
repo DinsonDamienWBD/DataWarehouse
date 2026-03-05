@@ -68,7 +68,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                     .GetAsync("/api/now/table/sys_user?sysparm_limit=1", ct);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {

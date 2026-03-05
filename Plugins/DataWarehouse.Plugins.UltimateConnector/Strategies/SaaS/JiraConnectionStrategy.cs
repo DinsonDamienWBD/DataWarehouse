@@ -66,7 +66,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
                     .GetAsync("/rest/api/3/myself", ct);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {

@@ -93,7 +93,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             var methodUrl = $"/twins/{deviceId}/methods?api-version=2021-04-12";
             try
             {
-                using var response = await client.GetAsync(methodUrl, ct);
+                using var response = await client.PostAsync(methodUrl, null, ct);
                 return $"{{\"status\":\"queued\",\"deviceId\":\"{deviceId}\",\"methodName\":\"{command}\",\"endpoint\":\"{methodUrl}\"}}";
             }
             catch (Exception ex)

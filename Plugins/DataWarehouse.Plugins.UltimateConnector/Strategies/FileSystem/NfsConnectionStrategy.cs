@@ -39,7 +39,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.FileSystem
                 await client.GetStream().WriteAsync(Array.Empty<byte>(), ct);
                 return true;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct)

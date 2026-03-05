@@ -254,6 +254,10 @@ public sealed class EtcdStorageStrategy : DatabaseStorageStrategyBase
             var status = await _client!.StatusAsync(new StatusRequest());
             return status != null;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

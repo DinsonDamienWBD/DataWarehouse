@@ -274,6 +274,10 @@ public sealed class TiDbStorageStrategy : DatabaseStorageStrategyBase
             await command.ExecuteScalarAsync(ct);
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

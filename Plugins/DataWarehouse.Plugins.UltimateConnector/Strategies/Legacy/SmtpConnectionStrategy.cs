@@ -74,7 +74,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
                 await testClient.ConnectAsync(_host, _port, ct);
                 return true;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) => Task.CompletedTask;

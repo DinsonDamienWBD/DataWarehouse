@@ -267,6 +267,10 @@ public sealed class MeilisearchStorageStrategy : DatabaseStorageStrategyBase
             var health = await _client!.HealthAsync(ct);
             return health.Status == "available";
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

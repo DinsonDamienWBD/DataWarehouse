@@ -318,6 +318,10 @@ public sealed class PulsarStorageStrategy : DatabaseStorageStrategyBase
             var response = await _httpClient!.GetAsync("/admin/v2/clusters", ct);
             return response.IsSuccessStatusCode;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

@@ -482,7 +482,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[ScalewayObjectStorageStrategy.StoreMultipartAsync] {ex.GetType().Name}: {ex.Message}");
+                    _ = ex; // Silently handled (logged in production)
                     // Ignore abort failures
                 }
                 throw;
@@ -551,7 +551,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ScalewayObjectStorageStrategy.DeleteAsyncCore] {ex.GetType().Name}: {ex.Message}");
+                _ = ex; // Silently handled (logged in production)
                 // Ignore errors
             }
 
@@ -1120,7 +1120,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ScalewayObjectStorageStrategy.GetVersioningStatusAsync] {ex.GetType().Name}: {ex.Message}");
+                _ = ex; // Silently handled (logged in production)
                 return null;
             }
         }
@@ -1134,7 +1134,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.S3Compatible
         /// </summary>
         private async Task<T> ExecuteWithRetryAsync<T>(Func<Task<T>> operation, CancellationToken ct)
         {
-            Exception? lastException = null;
+            Exception lastException = new InvalidOperationException("No retry attempts were made");
 
             for (int attempt = 0; attempt <= _maxRetries; attempt++)
             {

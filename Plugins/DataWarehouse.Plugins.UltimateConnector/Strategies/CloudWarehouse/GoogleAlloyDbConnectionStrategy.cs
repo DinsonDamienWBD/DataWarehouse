@@ -35,7 +35,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
                 await probe.ConnectAsync(host, port, ct);
                 return true;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { if (_tcpClient != null) { _tcpClient.Close(); _tcpClient.Dispose(); _tcpClient = null; } return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct) { var sw = System.Diagnostics.Stopwatch.StartNew(); var isHealthy = await TestCoreAsync(handle, ct); sw.Stop(); return new ConnectionHealth(isHealthy, isHealthy ? "AlloyDB healthy" : "AlloyDB unhealthy", sw.Elapsed, DateTimeOffset.UtcNow); }

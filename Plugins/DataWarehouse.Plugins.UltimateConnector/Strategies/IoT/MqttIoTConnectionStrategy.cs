@@ -67,7 +67,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
             var host = info.GetValueOrDefault("host")?.ToString() ?? "";
             if (!int.TryParse(info.GetValueOrDefault("port")?.ToString(), out var port)) port = 1883;
             try { using var probe = new TcpClient(); await probe.ConnectAsync(host, port, ct); return true; }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         /// <inheritdoc/>

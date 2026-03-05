@@ -519,6 +519,10 @@ public sealed class CockroachDbProtocolStrategy : DatabaseProtocolStrategyBase
             var result = await ExecuteQueryCoreAsync("SELECT 1", null, ct);
             return result.Success;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -978,6 +982,10 @@ public sealed class TiDbProtocolStrategy : DatabaseProtocolStrategyBase
             var response = await ReadPacketAsync(ct);
             return response[0] == 0x00;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -1351,6 +1359,10 @@ public sealed class YugabyteDbProtocolStrategy : DatabaseProtocolStrategyBase
             var result = await ExecuteQueryCoreAsync("SELECT 1", null, ct);
             return result.Success;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -1696,6 +1708,10 @@ public sealed class VoltDbProtocolStrategy : DatabaseProtocolStrategyBase
         {
             var result = await ExecuteQueryCoreAsync("SELECT 1", null, ct);
             return result.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {

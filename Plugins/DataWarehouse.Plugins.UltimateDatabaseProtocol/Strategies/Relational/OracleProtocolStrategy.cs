@@ -562,6 +562,10 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
             var result = await ExecuteQueryCoreAsync("SELECT 1 FROM DUAL", null, ct);
             return result.Success;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
@@ -1033,6 +1037,10 @@ public sealed class Db2DrdaProtocolStrategy : DatabaseProtocolStrategyBase
         {
             var result = await ExecuteQueryCoreAsync("VALUES 1", null, ct);
             return result.Success;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch
         {

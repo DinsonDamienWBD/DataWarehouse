@@ -358,6 +358,10 @@ public sealed class ClickHouseStorageStrategy : DatabaseStorageStrategyBase
             await cmd.ExecuteScalarAsync(ct);
             return true;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

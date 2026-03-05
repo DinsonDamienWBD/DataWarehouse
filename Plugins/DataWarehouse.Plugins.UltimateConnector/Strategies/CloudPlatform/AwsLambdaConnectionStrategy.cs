@@ -52,6 +52,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
                 using var response = await httpClient.GetAsync("/2015-03-31/functions", ct);
                 return response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.Forbidden;
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch
             {
                 return false;
@@ -80,7 +84,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
 
         protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default)
         {
-            var token = Guid.NewGuid().ToString("N");
+            var token = handle.ConnectionInfo.TryGetValue("AuthToken", out var storedToken) ? storedToken?.ToString() ?? string.Empty : string.Empty;
             var expiry = DateTimeOffset.UtcNow.AddHours(1);
             return Task.FromResult((token, expiry));
         }

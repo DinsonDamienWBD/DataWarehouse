@@ -172,7 +172,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.IoT
                 await client.SendAsync(ping, ping.Length).WaitAsync(ct);
                 return true;
             }
-            catch { return false; }
+            catch (OperationCanceledException) { throw; } catch { return false; }
         }
 
         /// <inheritdoc/>

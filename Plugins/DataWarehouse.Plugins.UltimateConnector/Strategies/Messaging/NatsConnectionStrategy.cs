@@ -67,6 +67,10 @@ public sealed class NatsConnectionStrategy : MessagingConnectionStrategyBase
             var connection = handle.GetConnection<NatsConnection>();
             return connection.ConnectionState == NatsConnectionState.Open;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;

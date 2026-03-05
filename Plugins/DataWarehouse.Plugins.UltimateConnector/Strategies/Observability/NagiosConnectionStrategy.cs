@@ -7,7 +7,7 @@ public sealed class NagiosConnectionStrategy : ObservabilityConnectionStrategyBa
 {
     public override string StrategyId => "nagios";public override string DisplayName => "Nagios";public override ConnectionStrategyCapabilities Capabilities => new();public override string SemanticDescription => "Nagios infrastructure monitoring. Check-based monitoring with alerting. Industry-standard for decades.";public override string[] Tags => ["nagios", "monitoring", "infrastructure", "alerting", "open-source"];
     public NagiosConnectionStrategy(ILogger? logger = null) : base(logger) { }
-    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct){var parts = config.ConnectionString?.Split(':') ?? ["localhost", "5667"];var host = parts[0];var port = parts.Length > 1 && int.TryParse(parts[1], out var p5667) ? p5667 : 5667;var tcpClient = new TcpClient();await tcpClient.ConnectAsync(host, port, ct);return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Provider"] = "Nagios", ["Host"] = host, ["Port"] = port });}
+    protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct){var parts = (string.IsNullOrEmpty(config.ConnectionString) ? throw new ArgumentException("Connection string is required") : config.ConnectionString)?.Split(':') ?? ["localhost", "5667"];var host = parts[0];var port = parts.Length > 1 && int.TryParse(parts[1], out var p5667) ? p5667 : 5667;var tcpClient = new TcpClient();await tcpClient.ConnectAsync(host, port, ct);return new DefaultConnectionHandle(tcpClient, new Dictionary<string, object> { ["Provider"] = "Nagios", ["Host"] = host, ["Port"] = port });}
     // Finding 2071: TcpClient.Connected is stale; probe with fresh TCP connect.
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct)
     {
@@ -15,7 +15,7 @@ public sealed class NagiosConnectionStrategy : ObservabilityConnectionStrategyBa
         var host = info.GetValueOrDefault("Host")?.ToString() ?? "localhost";
         if (!int.TryParse(info.GetValueOrDefault("Port")?.ToString(), out var port)) port = 5667;
         try { using var probe = new TcpClient(); await probe.ConnectAsync(host, port, ct); return true; }
-        catch { return false; }
+        catch (OperationCanceledException) { throw; } catch { return false; }
     }
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct){handle.GetConnection<TcpClient>().Close();if (handle is DefaultConnectionHandle defaultHandle) defaultHandle.MarkDisconnected();return Task.CompletedTask;}
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)

@@ -296,6 +296,10 @@ public sealed class RedisStorageStrategy : DatabaseStorageStrategyBase
             var ping = await _database!.PingAsync();
             return ping.TotalMilliseconds < 5000;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch
         {
             return false;
