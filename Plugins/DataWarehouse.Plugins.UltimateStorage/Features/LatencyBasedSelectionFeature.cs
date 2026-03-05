@@ -55,7 +55,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             // Delay the first run by 1 second to allow the constructor to finish
             // and all fields to be initialized before the timer callback fires.
             _healthCheckTimer = new Timer(
-                callback: async _ => await RunHealthCheckCycleAsync(),
+                callback: async _ => { try { await RunHealthCheckCycleAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[LatencyBasedSelectionFeature] Health check error: {ex.Message}"); } },
                 state: null,
                 dueTime: TimeSpan.FromSeconds(1),
                 period: _healthCheckInterval);

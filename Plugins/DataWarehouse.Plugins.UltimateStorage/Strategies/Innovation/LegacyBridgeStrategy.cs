@@ -92,7 +92,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var asciiData = ms.ToArray();
 
             // Convert ASCII to EBCDIC (mainframe encoding)
-            var ebcdicData = ConvertToEBCDIC(asciiData);
+            var ebcdicData = ConvertToEbcdic(asciiData);
 
             // Write as fixed-length records (typical mainframe format)
             var recordLength = 80; // Standard COBOL record length
@@ -126,7 +126,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             var ebcdicData = await File.ReadAllBytesAsync(filePath, ct);
 
             // Convert EBCDIC back to ASCII
-            var asciiData = ConvertFromEBCDIC(ebcdicData);
+            var asciiData = ConvertFromEbcdic(ebcdicData);
 
             // Remove padding
             asciiData = RemovePadding(asciiData);
@@ -193,7 +193,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             return full;
         }
 
-        private byte[] ConvertToEBCDIC(byte[] ascii)
+        private byte[] ConvertToEbcdic(byte[] ascii)
         {
             // Production EBCDIC conversion via IBM037 code page.
             // Falls back to identity copy on stripped runtimes (NativeAOT/Wasm) that lack the CodePages provider.
@@ -208,7 +208,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             }
         }
 
-        private byte[] ConvertFromEBCDIC(byte[] ebcdic)
+        private byte[] ConvertFromEbcdic(byte[] ebcdic)
         {
             try
             {

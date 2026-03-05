@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
     /// </summary>
     public class LustreStrategy : UltimateStorageStrategyBase
     {
-        private static readonly SearchValues<char> s_shellInjectionChars =
+        private static readonly SearchValues<char> ShellInjectionChars =
             SearchValues.Create(";|&$`\n\r");
 
         private string _mountPath = string.Empty;
@@ -67,6 +67,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         // OST pool management
         private bool _useOstPools = false;
         private readonly List<string> _availableOstPools = new();
+        /// <summary>Gets the available OST pool names.</summary>
+        internal IReadOnlyList<string> AvailableOstPools => _availableOstPools;
 
         // Hierarchical Storage Management (HSM)
         private bool _enableHsm = false;
@@ -90,6 +92,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         // FID-based addressing
         private bool _useFidAddressing = false;
         private readonly Dictionary<string, string> _keyToFidCache = new();
+        /// <summary>Gets the number of cached FID entries.</summary>
+        internal int FidCacheCount => _keyToFidCache.Count;
         private readonly object _fidCacheLock = new();
 
         // Fileset support
@@ -284,7 +288,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             }
 
             // Write file with appropriate options
-            long bytesWritten = 0;
+            long bytesWritten;
             var fileOptions = FileOptions.Asynchronous;
 
             if (_enableDirectIo)
@@ -1133,7 +1137,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private async Task StoreMetadataAsync(string filePath, IDictionary<string, string> metadata, CancellationToken ct)
         {
-            if (metadata == null || metadata.Count == 0)
+            if (metadata.Count == 0)
             {
                 return;
             }
@@ -1261,7 +1265,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private static void ValidateLustreArgument(string argument, string paramName)
         {
-            if (argument.AsSpan().IndexOfAny(s_shellInjectionChars) >= 0)
+            if (argument.AsSpan().IndexOfAny(ShellInjectionChars) >= 0)
                 throw new ArgumentException($"Invalid characters in Lustre CLI argument '{paramName}': {argument}");
         }
 
@@ -1280,7 +1284,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 CreateNoWindow = true
             };
 
-            using var process = new Process { StartInfo = startInfo };
+            using var process = new Process();
+            process.StartInfo = startInfo;
             process.Start();
 
             var output = await process.StandardOutput.ReadToEndAsync();

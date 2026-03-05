@@ -416,7 +416,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             {
                 MediaType.Ssd or MediaType.NvMe => 128 * 1024,      // 128KB for SSDs
                 MediaType.Hdd => 64 * 1024,                          // 64KB for HDDs
-                MediaType.USB or MediaType.SDCard => 32 * 1024,     // 32KB for removable
+                MediaType.Usb or MediaType.SdCard => 32 * 1024,     // 32KB for removable
                 MediaType.Optical => 2 * 1024 * 1024,                // 2MB for optical (large sequential reads)
                 MediaType.Tape => 4 * 1024 * 1024,                   // 4MB for tape
                 MediaType.Network => 256 * 1024,                     // 256KB for network
@@ -471,7 +471,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 if (driveInfo.DriveType == DriveType.CDRom)
                     return MediaType.Optical;
                 if (driveInfo.DriveType == DriveType.Removable)
-                    return MediaType.USB; // Could be USB or SD card
+                    return MediaType.Usb; // Could be USB or SD card
 
                 // For fixed drives, try to detect SSD vs HDD
                 if (driveInfo.DriveType == DriveType.Fixed)
@@ -591,8 +591,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         Hdd,
         Ssd,
         NvMe,
-        USB,
-        SDCard,
+        Usb,
+        SdCard,
         Optical,
         Tape,
         Network,

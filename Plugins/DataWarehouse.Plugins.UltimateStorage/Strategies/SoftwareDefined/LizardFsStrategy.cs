@@ -333,7 +333,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             }
 
             // Write file with appropriate options
-            long bytesWritten = 0;
+            long bytesWritten;
             var fileOptions = FileOptions.Asynchronous;
 
             if (_enableWriteCache)
@@ -1116,7 +1116,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private async Task StoreMetadataAsync(string filePath, IDictionary<string, string> metadata, CancellationToken ct)
         {
-            if (metadata == null || metadata.Count == 0)
+            if (metadata.Count == 0)
             {
                 return;
             }

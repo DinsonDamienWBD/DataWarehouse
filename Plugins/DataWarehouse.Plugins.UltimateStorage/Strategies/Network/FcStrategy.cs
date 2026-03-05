@@ -64,6 +64,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private volatile bool _isFabricConnected = false;
         private DateTime _lastFabricLogin = DateTime.MinValue; // reads/writes always under _connectionLock
         private readonly Dictionary<string, MultipathState> _multipathStates = new();
+        /// <summary>Gets the current multipath states for diagnostics.</summary>
+        internal IReadOnlyDictionary<string, MultipathState> MultipathStates => _multipathStates;
         private HttpClient? _fabricApiClient;
 
         public override string StrategyId => "fc";
@@ -771,15 +773,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 // Sum available capacity across all LUNs
                 long totalCapacity = 0;
-                long usedCapacity = 0;
 
                 foreach (var mapping in _lunMappings.Values)
                 {
                     totalCapacity += mapping.SizeBytes;
-                    // Would need to track used blocks per LUN
                 }
 
-                return totalCapacity - usedCapacity;
+                return totalCapacity;
             }
             catch (Exception ex)
             {
@@ -1213,7 +1213,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 if (response.IsSuccessStatusCode)
                 {
-                    object? data = null;
+                    object? data;
                     try
                     {
                         data = JsonSerializer.Deserialize<object>(responseBody);

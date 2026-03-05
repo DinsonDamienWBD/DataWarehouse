@@ -147,12 +147,12 @@ public sealed class QuorumConsistencyManager
         var totalActive = _replicas.Values.Count(r => r.Status == ReplicaStatus.Active);
         return level switch
         {
-            ConsistencyLevel.ONE => 1,
-            ConsistencyLevel.TWO => 2,
-            ConsistencyLevel.THREE => 3,
-            ConsistencyLevel.QUORUM => totalActive / 2 + 1,
-            ConsistencyLevel.LOCAL_QUORUM => Math.Max(1, totalActive / 4 + 1),
-            ConsistencyLevel.ALL => totalActive,
+            ConsistencyLevel.One => 1,
+            ConsistencyLevel.Two => 2,
+            ConsistencyLevel.Three => 3,
+            ConsistencyLevel.Quorum => totalActive / 2 + 1,
+            ConsistencyLevel.LocalQuorum => Math.Max(1, totalActive / 4 + 1),
+            ConsistencyLevel.All => totalActive,
             _ => 1
         };
     }
@@ -168,7 +168,7 @@ public sealed class QuorumConsistencyManager
 
     private List<ReplicaState> SelectReplicas(List<ReplicaState> replicas, int count, ConsistencyLevel level)
     {
-        if (level == ConsistencyLevel.LOCAL_QUORUM)
+        if (level == ConsistencyLevel.LocalQuorum)
         {
             // Use the configured local region; fall back to the first registered region only
             // when no explicit local region was supplied to the constructor.
@@ -213,17 +213,17 @@ public sealed class QuorumConsistencyManager
 public enum ConsistencyLevel
 {
     /// <summary>Only one replica must respond.</summary>
-    ONE,
+    One,
     /// <summary>Two replicas must respond.</summary>
-    TWO,
+    Two,
     /// <summary>Three replicas must respond.</summary>
-    THREE,
+    Three,
     /// <summary>A majority (n/2 + 1) of replicas must respond.</summary>
-    QUORUM,
+    Quorum,
     /// <summary>A majority of replicas in the local datacenter.</summary>
-    LOCAL_QUORUM,
+    LocalQuorum,
     /// <summary>All replicas must respond.</summary>
-    ALL
+    All
 }
 
 /// <summary>Exception thrown when insufficient replicas are available.</summary>
@@ -351,7 +351,6 @@ public sealed class MultiRegionReplicationManager
         var results = new List<(string region, bool success)>();
 
         // Batch replication with WAN optimization
-        var batch = new List<ReplicationEvent>();
         foreach (var region in targetRegions)
         {
             var evt = new ReplicationEvent
@@ -363,16 +362,15 @@ public sealed class MultiRegionReplicationManager
                 Version = version,
                 Timestamp = DateTime.UtcNow
             };
-            batch.Add(evt);
 
             var log = _replicationLog.GetOrAdd(region.RegionId, _ => new List<ReplicationEvent>());
             lock (log)
             {
                 log.Add(evt);
                 // Cap the per-region log to 10 000 entries to prevent unbounded memory growth.
-                const int MaxLogEntries = 10_000;
-                if (log.Count > MaxLogEntries)
-                    log.RemoveRange(0, log.Count - MaxLogEntries);
+                const int maxLogEntries = 10_000;
+                if (log.Count > maxLogEntries)
+                    log.RemoveRange(0, log.Count - maxLogEntries);
             }
 
             results.Add((region.RegionId, true));
@@ -675,6 +673,8 @@ public sealed class GeoDistributionManager
     private readonly BoundedDictionary<string, GeoNode> _topology = new BoundedDictionary<string, GeoNode>(1000);
     private readonly BoundedDictionary<string, FailoverRecord> _failoverHistory = new BoundedDictionary<string, FailoverRecord>(1000);
     private readonly TimeSpan _healthCheckInterval;
+    /// <summary>Gets the configured health check interval.</summary>
+    internal TimeSpan HealthCheckInterval => _healthCheckInterval;
     // Monotonic counter makes failover keys unique even when multiple failovers occur within
     // the same 100-ns tick, preventing silent overwrites with DateTime.Ticks keys.
     private long _failoverSeq;
@@ -734,7 +734,7 @@ public sealed class GeoDistributionManager
     /// <summary>Gets the best active node for a given region preference.</summary>
     public GeoNode? GetBestNode(string? preferredRegion = null)
     {
-        var healthy = _topology.Values.Where(n => n.IsHealthy && n.Role == GeoNodeRole.Active);
+        var healthy = _topology.Values.Where(n => n.IsHealthy && n.Role == GeoNodeRole.Active).ToList();
         if (preferredRegion != null)
         {
             var local = healthy.Where(n => n.Region == preferredRegion).MinBy(n => n.LatencyMs);

@@ -34,6 +34,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
         private int _maxMessageSize = 16 * 1024 * 1024; // 16MB
         private bool _useTls = true;
         private string? _authToken;
+        /// <summary>Gets the configured AuthToken value.</summary>
+        internal string? AuthToken => _authToken;
         private readonly SemaphoreSlim _channelLock = new(1, 1);
 
         public override string StrategyId => "grpc-connector";

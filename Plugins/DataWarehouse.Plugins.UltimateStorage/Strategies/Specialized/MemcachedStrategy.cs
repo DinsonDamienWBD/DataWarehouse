@@ -44,6 +44,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         private string _keyPrefix = "storage:";
         private string _metadataKeyPrefix = "meta:";
         private string _indexKeyPrefix = "index:";
+        /// <summary>Gets the configured IndexKeyPrefix value.</summary>
+        internal string IndexKeyPrefix => _indexKeyPrefix;
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly Dictionary<string, long> _keyIndex = new(); // In-memory index for listing
         private readonly SemaphoreSlim _indexLock = new(1, 1);
@@ -413,7 +415,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                 }
 
                 // Get metadata
-                StorageObjectMetadata? meta = null;
+                StorageObjectMetadata meta;
                 try
                 {
                     meta = await GetMetadataAsyncCore(key, ct);
@@ -427,10 +429,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                     continue;
                 }
 
-                if (meta != null)
-                {
-                    yield return meta;
-                }
+                yield return meta;
 
                 await Task.Yield();
             }

@@ -41,6 +41,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private GoogleCredential? _credential;
         private bool _enableVersioning = false;
         private bool _enableRequesterPays = false;
+        /// <summary>Gets the configured EnableRequesterPays value.</summary>
+        internal bool EnableRequesterPays => _enableRequesterPays;
         private string? _kmsKeyName; // Customer-managed encryption key
         private int _timeoutSeconds = 300;
         private long _resumableUploadThresholdBytes = 10 * 1024 * 1024; // 10MB

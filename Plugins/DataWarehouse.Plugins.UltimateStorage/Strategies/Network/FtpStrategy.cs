@@ -56,6 +56,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private bool _autoReconnect = true;
         private int _maxRetries = 3;
         private bool _useCompression = false;
+        /// <summary>Gets the configured UseCompression value.</summary>
+        internal bool UseCompression => _useCompression;
         private FluentFTP.FtpDataType _transferMode = FluentFTP.FtpDataType.Binary;
 
         // Connection state
@@ -344,7 +346,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
             if (!success)
             {
-                memoryStream.Dispose();
+                await memoryStream.DisposeAsync();
                 throw new IOException($"Failed to download file from FTP server: {remotePath}");
             }
 

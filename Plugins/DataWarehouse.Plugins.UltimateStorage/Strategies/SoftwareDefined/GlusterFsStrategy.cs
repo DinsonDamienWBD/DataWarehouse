@@ -45,6 +45,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         private int _disperseCount = 0; // Erasure coding data fragments
         private int _redundancyCount = 0; // Erasure coding redundancy fragments
         private int _arbiterCount = 0; // Arbiter bricks for quorum
+        /// <summary>Gets the configured ArbiterCount value.</summary>
+        internal int ArbiterCount => _arbiterCount;
 
         // Geo-replication
         private bool _enableGeoReplication = false;
@@ -128,6 +130,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         // Lock management
         private readonly Dictionary<string, SemaphoreSlim> _fileLocks = new();
+        /// <summary>Gets the current file lock count for diagnostics.</summary>
+        internal int FileLockCount => _fileLocks.Count;
         private readonly object _lockDictionaryLock = new();
 
         public override string StrategyId => "glusterfs";
@@ -358,7 +362,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             }
 
             // Write file with appropriate options
-            long bytesWritten = 0;
+            long bytesWritten;
             var fileOptions = FileOptions.Asynchronous;
 
             if (_enableWriteBehind)
@@ -1010,7 +1014,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private async Task StoreMetadataAsync(string filePath, IDictionary<string, string> metadata, CancellationToken ct)
         {
-            if (metadata == null || metadata.Count == 0)
+            if (metadata.Count == 0)
             {
                 return;
             }
@@ -1170,17 +1174,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         private static async Task RunGlusterCommandAsync(string command, string arguments, CancellationToken ct)
         {
-            using var process = new System.Diagnostics.Process
+            using var process = new System.Diagnostics.Process();
+            process.StartInfo = new System.Diagnostics.ProcessStartInfo
             {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = command,
-                    Arguments = arguments,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
+                FileName = command,
+                Arguments = arguments,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
             process.Start();
             await process.WaitForExitAsync(ct).ConfigureAwait(false);

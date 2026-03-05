@@ -34,7 +34,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly List<EdgeTier> _edgeTiers = new();
         private int _edgeCacheTtlSeconds = 3600;
         private long _edgeCacheMaxBytes = 10_000_000_000L;
+        /// <summary>Gets the maximum edge cache size in bytes.</summary>
+        internal long EdgeCacheMaxBytes => _edgeCacheMaxBytes;
         private bool _enableCacheWarming = true;
+        /// <summary>Gets whether cache warming is enabled.</summary>
+        internal bool EnableCacheWarming => _enableCacheWarming;
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly BoundedDictionary<string, CachedItem> _originCache = new BoundedDictionary<string, CachedItem>(1000);
         private readonly BoundedDictionary<string, BoundedDictionary<string, CachedItem>> _edgeCaches = new BoundedDictionary<string, BoundedDictionary<string, CachedItem>>(1000);

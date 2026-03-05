@@ -40,6 +40,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         private string? _kmsKeyName; // Customer-managed encryption key
         private string? _replicationRegion; // For turbo replication
         private int _timeoutSeconds = 600; // 10 minutes for archive operations
+        /// <summary>Gets the configured TimeoutSeconds value.</summary>
+        internal int TimeoutSeconds => _timeoutSeconds;
         private long _resumableUploadThresholdBytes = 10 * 1024 * 1024; // 10MB
         private int _chunkSizeBytes = 8 * 1024 * 1024; // 8MB chunks for archive
         private int _maxRetries = 5; // More retries for archive operations

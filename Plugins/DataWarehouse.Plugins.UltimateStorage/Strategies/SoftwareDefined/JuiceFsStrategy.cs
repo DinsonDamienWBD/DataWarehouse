@@ -397,7 +397,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             }
 
             // Write file
-            long bytesWritten = 0;
+            long bytesWritten;
             await using (var fileStream = new FileStream(filePath, FileMode.Create, FileAccess.Write, FileShare.None, _writeBufferSizeBytes, useAsync: true))
             {
                 await data.CopyToAsync(fileStream, _writeBufferSizeBytes, ct);
@@ -878,8 +878,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 request.Headers.Authorization = new AuthenticationHeaderValue("Basic", authValue);
             }
 
-            HttpResponseMessage? response = null;
-            string? xml = null;
+            HttpResponseMessage? response;
+            string? xml;
 
             try
             {
@@ -950,8 +950,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             var request = new HttpRequestMessage(HttpMethod.Get, listUrl);
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-            HttpResponseMessage? response = null;
-            string? json = null;
+            HttpResponseMessage? response;
+            string? json;
 
             try
             {

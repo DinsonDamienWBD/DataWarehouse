@@ -40,12 +40,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private int _replicationFactor = 3;
         private int _virtualNodes = 150; // For consistent hashing
         private bool _enableAutoRebalancing = true;
+        /// <summary>Gets the configured EnableAutoRebalancing value.</summary>
+        internal bool EnableAutoRebalancing => _enableAutoRebalancing;
         private bool _enableCostOptimization = true;
         private bool _enableHealthMonitoring = true;
         private long _providerQuotaBytes = 1_000_000_000_000L; // 1TB per provider
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly SortedDictionary<uint, string> _consistentHashRing = new();
         private Timer? _healthCheckTimer = null;
+        /// <summary>Gets the configured HealthCheckTimer value.</summary>
+        internal Timer? HealthCheckTimer => _healthCheckTimer;
 
         public override string StrategyId => "infinite-storage";
         public override string Name => "Infinite Federated Storage";
@@ -114,7 +118,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 // Start health monitoring
                 if (_enableHealthMonitoring)
                 {
-                    _healthCheckTimer = new Timer(async _ => await MonitorProvidersHealthAsync(), null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
+                    _healthCheckTimer = new Timer(async _ => { try { await MonitorProvidersHealthAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[InfiniteStorageStrategy] Health monitor error: {ex.Message}"); } }, null, TimeSpan.FromMinutes(1), TimeSpan.FromMinutes(5));
                 }
 
                 await Task.CompletedTask;

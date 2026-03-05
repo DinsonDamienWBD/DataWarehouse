@@ -209,7 +209,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             ValidateStream(data);
 
             // Key format: graphql://mutation/name
-            var mutationName = ParseGraphQLKey(key);
+            var mutationName = ParseGraphQlKey(key);
 
             // Read mutation from stream
             using var reader = new StreamReader(data, Encoding.UTF8);
@@ -267,7 +267,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             ValidateKey(key);
 
             // Key format: graphql://query/name or graphql://querystring
-            var queryName = ParseGraphQLKey(key);
+            var queryName = ParseGraphQlKey(key);
 
             // Build GraphQL query
             var query = $"{{ {queryName} }}";
@@ -302,7 +302,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
         {
             // GraphQL doesn't have native delete - execute a delete mutation
             // Validate the parsed key component to prevent injection into the mutation
-            var parsedKey = ParseGraphQLKey(key);
+            var parsedKey = ParseGraphQlKey(key);
             if (!System.Text.RegularExpressions.Regex.IsMatch(parsedKey, @"^[A-Za-z_][A-Za-z0-9_()""':,\s]*$"))
             {
                 throw new ArgumentException($"GraphQL delete key contains invalid characters: {parsedKey}");
@@ -330,7 +330,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             try
             {
                 var stream = await RetrieveAsyncCore(key, ct);
-                stream.Dispose();
+                await stream.DisposeAsync();
                 return true;
             }
             catch (Exception ex)
@@ -408,7 +408,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             EnsureInitialized();
             ValidateKey(key);
 
-            var queryName = ParseGraphQLKey(key);
+            var queryName = ParseGraphQlKey(key);
 
             IncrementOperationCounter(StorageOperationType.GetMetadata);
 
@@ -491,7 +491,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
             return Task.FromResult<long?>(null);
         }
 
-        private string ParseGraphQLKey(string key)
+        private string ParseGraphQlKey(string key)
         {
             if (!key.StartsWith("graphql://", StringComparison.OrdinalIgnoreCase))
             {

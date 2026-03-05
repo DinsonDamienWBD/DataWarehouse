@@ -48,6 +48,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         private int _keepAliveIntervalSeconds = 30;
         private bool _enableLoadBalancing = false;
         private string _loadBalancingPolicy = "round_robin";
+        /// <summary>Gets the configured LoadBalancingPolicy value.</summary>
+        internal string LoadBalancingPolicy => _loadBalancingPolicy;
         private int _maxConnectionPoolSize = 10;
         private readonly SemaphoreSlim _channelLock = new(1, 1);
 

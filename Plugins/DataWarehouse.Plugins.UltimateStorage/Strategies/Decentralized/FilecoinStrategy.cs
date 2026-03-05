@@ -290,7 +290,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             ValidateKey(key);
 
             // Get CID from local state
-            FilecoinDealInfo? dealInfo = null;
+            FilecoinDealInfo? dealInfo;
             lock (_mapLock)
             {
                 if (!_keyToDealMap.TryGetValue(key, out dealInfo))
@@ -333,10 +333,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             ValidateKey(key);
 
             // Get deal info before removal
-            FilecoinDealInfo? dealInfo = null;
+            FilecoinDealInfo? dealInfo;
             lock (_mapLock)
             {
-                if (_keyToDealMap.TryGetValue(key, out dealInfo))
+                _keyToDealMap.TryGetValue(key, out dealInfo);
+                if (dealInfo != null)
                 {
                     _keyToDealMap.TryRemove(key, out _);
                 }
@@ -407,7 +408,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             EnsureInitialized();
             ValidateKey(key);
 
-            FilecoinDealInfo? dealInfo = null;
+            FilecoinDealInfo? dealInfo;
             lock (_mapLock)
             {
                 if (!_keyToDealMap.TryGetValue(key, out dealInfo))
@@ -896,7 +897,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             EnsureInitialized();
             ValidateKey(key);
 
-            FilecoinDealInfo? dealInfo = null;
+            FilecoinDealInfo? dealInfo;
             lock (_mapLock)
             {
                 if (!_keyToDealMap.TryGetValue(key, out dealInfo))

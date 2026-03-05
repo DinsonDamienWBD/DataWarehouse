@@ -76,12 +76,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
             }
 
             // Load existing SSTables
-            await LoadExistingSSTables(ct);
+            await LoadExistingSsTables(ct);
 
             _initialized = true;
         }
 
-        private async Task LoadExistingSSTables(CancellationToken ct)
+        private async Task LoadExistingSsTables(CancellationToken ct)
         {
             // Sort by filename-embedded timestamp for reliable ordering regardless of filesystem precision.
             // Filename format: sstable-L{level}-{ticks}.sst — parse the ticks from the name.
@@ -105,7 +105,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"[LsmTreeEngine.LoadExistingSSTables] {ex.GetType().Name}: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"[LsmTreeEngine.LoadExistingSsTables] {ex.GetType().Name}: {ex.Message}");
                     // Skip corrupted SSTables
                 }
             }
@@ -319,8 +319,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Scale.LsmTree
             // Perform I/O without holding any lock.
             var timestamp = DateTime.UtcNow.Ticks;
             var sstablePath = Path.Combine(_dataDirectory, $"sstable-L0-{timestamp}.sst");
-            var sstable = await SSTableWriter.WriteAsync(entries, sstablePath, ct);
-            sstable = sstable with { Level = 0 };
+            await SSTableWriter.WriteAsync(entries, sstablePath, ct);
             var reader = await SSTableReader.OpenAsync(sstablePath, ct);
 
             // Now hold only _writeLock for the critical section.

@@ -73,7 +73,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private int _errorRecoveryLevel = 0; // 0 = session level, 1 = digest, 2 = connection
         private int _defaultTime2Wait = 2;
         private int _defaultTime2Retain = 20;
-        private bool _dataPDUInOrder = true;
+        private bool _dataPduInOrder = true;
         private bool _dataSequenceInOrder = true;
 
         // Multipath I/O configuration
@@ -309,7 +309,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             }
             finally
             {
-                _stream?.Dispose();
+                if (_stream != null) await _stream.DisposeAsync();
                 _stream = null;
                 _client?.Dispose();
                 _client = null;
@@ -466,7 +466,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 sb.Append($"ErrorRecoveryLevel={_errorRecoveryLevel}\0");
                 sb.Append($"DefaultTime2Wait={_defaultTime2Wait}\0");
                 sb.Append($"DefaultTime2Retain={_defaultTime2Retain}\0");
-                sb.Append($"DataPDUInOrder={(_dataPDUInOrder ? "Yes" : "No")}\0");
+                sb.Append($"DataPDUInOrder={(_dataPduInOrder ? "Yes" : "No")}\0");
                 sb.Append($"DataSequenceInOrder={(_dataSequenceInOrder ? "Yes" : "No")}\0");
             }
 
@@ -705,7 +705,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 var mapping = new BlockMapping
                 {
                     Key = key,
-                    StartLBA = startLba,
+                    StartLba = startLba,
                     BlockCount = numBlocks,
                     Size = size,
                     Created = DateTime.UtcNow,
@@ -798,7 +798,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                         // Update next block address — use DefaultIfEmpty to guard against
                         // empty deserialization result (InvalidOperationException from Max on empty).
                         _nextBlockAddress = _blockMappings.Values.Count > 0
-                            ? _blockMappings.Values.Max(m => m.StartLBA + m.BlockCount)
+                            ? _blockMappings.Values.Max(m => m.StartLba + m.BlockCount)
                             : 0;
                     }
                 }
@@ -862,7 +862,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             var mapping = await AllocateBlocksAsync(key, dataBytes.Length, ct);
 
             // Write to blocks
-            await WriteBlocksAsync(mapping.StartLBA, dataBytes, ct);
+            await WriteBlocksAsync(mapping.StartLba, dataBytes, ct);
 
             // Store metadata
             if (metadata != null && metadata.Count > 0)
@@ -915,7 +915,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             }
 
             // Read from blocks
-            var data = await ReadBlocksAsync(mapping.StartLBA, mapping.BlockCount, ct);
+            var data = await ReadBlocksAsync(mapping.StartLba, mapping.BlockCount, ct);
 
             // Trim to actual size
             var trimmedData = new byte[mapping.Size];
@@ -1193,7 +1193,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private string GenerateETag(BlockMapping mapping)
         {
-            var hash = HashCode.Combine(mapping.Modified.Ticks, mapping.Size, mapping.StartLBA);
+            var hash = HashCode.Combine(mapping.Modified.Ticks, mapping.Size, mapping.StartLba);
             return hash.ToString("x");
         }
 
@@ -1272,7 +1272,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private class BlockMapping
         {
             public string Key { get; set; } = string.Empty;
-            public long StartLBA { get; set; }
+            public long StartLba { get; set; }
             public int BlockCount { get; set; }
             public long Size { get; set; }
             public DateTime Created { get; set; }

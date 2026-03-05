@@ -42,7 +42,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private string _secretKey = string.Empty; // SECURITY: Credential stored in-memory only, populated from encrypted config
         private string? _region = null;
         private string? _sessionToken = null;
-        private bool _useSSL = true;
+        private bool _useSsl = true;
         private bool _enableVersioning = false;
         private bool _enableServerSideEncryption = false;
         private string _sseAlgorithm = "AES256"; // AES256, aws:kms
@@ -101,7 +101,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 _port = GetConfiguration("Port", 9000);
                 _region = GetConfiguration<string?>("Region", null);
                 _sessionToken = GetConfiguration<string?>("SessionToken", null);
-                _useSSL = GetConfiguration("UseSSL", true);
+                _useSsl = GetConfiguration("UseSSL", true);
                 _enableVersioning = GetConfiguration("EnableVersioning", false);
                 _enableServerSideEncryption = GetConfiguration("EnableServerSideEncryption", false);
                 _sseAlgorithm = GetConfiguration("SSEAlgorithm", "AES256");
@@ -140,7 +140,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 var clientBuilder = new MinioClient()
                     .WithEndpoint(_endpoint, _port)
                     .WithCredentials(_accessKey, _secretKey)
-                    .WithSSL(_useSSL)
+                    .WithSSL(_useSsl)
                     .WithTimeout(_timeoutSeconds * 1000);
 
                 if (!string.IsNullOrEmpty(_region))

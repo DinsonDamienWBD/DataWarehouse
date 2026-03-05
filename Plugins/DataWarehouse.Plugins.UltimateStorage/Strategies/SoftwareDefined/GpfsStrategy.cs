@@ -42,8 +42,12 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         // REST API configuration
         private string? _managementApiUrl;
         private string? _managementApiUser;
+        /// <summary>Gets the configured ManagementApiUser value.</summary>
+        internal string? ManagementApiUser => _managementApiUser;
         private string? _managementApiPassword;
         private bool _useManagementApi = false;
+        /// <summary>Gets the configured UseManagementApi value.</summary>
+        internal bool UseManagementApi => _useManagementApi;
 
         // ILM (Information Lifecycle Management)
         private bool _enableIlm = false;
@@ -135,6 +139,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         // Lock management
         private readonly Dictionary<string, SemaphoreSlim> _fileLocks = new();
+        /// <summary>Gets the current file lock count for diagnostics.</summary>
+        internal int FileLockCount => _fileLocks.Count;
         private readonly object _lockDictionaryLock = new();
 
         public override string StrategyId => "gpfs";
@@ -340,7 +346,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             }
 
             // Write file with appropriate options
-            long bytesWritten = 0;
+            long bytesWritten;
             var fileOptions = FileOptions.Asynchronous;
 
             if (_useDirectIo)
@@ -1052,7 +1058,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private async Task StoreMetadataAsync(string filePath, IDictionary<string, string> metadata, CancellationToken ct)
         {
-            if (metadata == null || metadata.Count == 0)
+            if (metadata.Count == 0)
             {
                 return;
             }
@@ -1236,17 +1242,15 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         private async Task RunMmchattrAsync(string arguments, CancellationToken ct)
         {
-            using var process = new System.Diagnostics.Process
+            using var process = new System.Diagnostics.Process();
+            process.StartInfo = new System.Diagnostics.ProcessStartInfo
             {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "mmchattr",
-                    Arguments = arguments,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
+                FileName = "mmchattr",
+                Arguments = arguments,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
             process.Start();
             await process.WaitForExitAsync(ct).ConfigureAwait(false);

@@ -55,6 +55,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private int _maxRetries = 3;
         private int _retryDelayMs = 1000;
         private bool _enableAsperaSupport = false;
+        /// <summary>Gets the configured EnableAsperaSupport value.</summary>
+        internal bool EnableAsperaSupport => _enableAsperaSupport;
         private bool _enableActivityTracker = false;
         private bool _enableImmutableStorage = false;
         private int _retentionPeriodDays = 0;
@@ -206,7 +208,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             ValidateStream(data);
 
             var startTime = DateTime.UtcNow;
-            long uploadedSize = 0;
+            long uploadedSize;
 
             try
             {
@@ -529,9 +531,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
                 // Extract custom metadata
                 var customMetadata = new Dictionary<string, string>();
-                foreach (var key_meta in response.Metadata.Keys)
+                foreach (var keyMeta in response.Metadata.Keys)
                 {
-                    customMetadata[key_meta] = response.Metadata[key_meta];
+                    customMetadata[keyMeta] = response.Metadata[keyMeta];
                 }
 
                 return new StorageObjectMetadata

@@ -33,6 +33,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private string _globalStorePath = string.Empty;
         private string _indexPath = string.Empty;
         private bool _enableCrosstenantDedup = true;
+        /// <summary>Gets the configured EnableCrosstenantDedup value.</summary>
+        internal bool EnableCrosstenantDedup => _enableCrosstenantDedup;
         private bool _enableConvergentEncryption = true;
         private int _blockSize = 8192;
         private readonly SemaphoreSlim _initLock = new(1, 1);
@@ -455,8 +457,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                         globalChunk.RefCount--;
                         globalChunk.TenantRefs.Remove(manifest.TenantId);
 
-                        // Delete chunk if no longer referenced
-                        if (globalChunk.RefCount <= 0)
+                        // Delete chunk if no longer referenced by any tenant
+                        if (globalChunk.RefCount <= 0 && globalChunk.TenantRefs.Count == 0)
                         {
                             await DeleteChunkAsync(chunkHash, ct);
                             _globalChunkStore.TryRemove(chunkHash, out _);

@@ -38,6 +38,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private int _transactionRetryLimit = 5;
         private TimeSpan _transactionTimeout = TimeSpan.FromSeconds(5);
+        /// <summary>Gets the configured TransactionTimeout value.</summary>
+        internal TimeSpan TransactionTimeout => _transactionTimeout;
 
         public override string StrategyId => "foundationdb";
         public override string Name => "FoundationDB Storage";
@@ -434,7 +436,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
             {
                 ct.ThrowIfCancellationRequested();
 
-                StorageObjectMetadata? meta = null;
+                StorageObjectMetadata meta;
                 try
                 {
                     meta = await GetMetadataAsyncCore(key, ct);
@@ -446,10 +448,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                     continue;
                 }
 
-                if (meta != null)
-                {
-                    yield return meta;
-                }
+                yield return meta;
 
                 await Task.Yield();
             }

@@ -80,6 +80,8 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
     private string _nodeId = string.Empty;
     private string _driverName = "csi.datawarehouse.io";
     private string _socketPath = "/csi/csi.sock";
+    /// <summary>Gets the configured SocketPath value.</summary>
+    internal string SocketPath => _socketPath;
 
     private const string CsiSpecVersion = "1.8.0";
     private const long DefaultVolumeCapacityBytes = 10L * 1024 * 1024 * 1024; // 10GiB
@@ -137,7 +139,7 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
                     StorageTier = CsiStorageTier.Hot,
                     AccessTypes = new List<VolumeAccessType> { VolumeAccessType.SingleNodeWriter },
                     Encrypted = true,
-                    EncryptionType = CsiEncryptionType.AES256GCM,
+                    EncryptionType = CsiEncryptionType.Aes256Gcm,
                     ReplicationFactor = 3,
                     ComplianceMode = CsiComplianceMode.None,
                     CreatedAt = DateTime.UtcNow,
@@ -290,9 +292,9 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
             long capacityBytes = DefaultVolumeCapacityBytes;
             if (payload.TryGetValue("capacity_range", out var cr) && cr is Dictionary<string, object> capacityRange)
             {
-                if (capacityRange.TryGetValue("required_bytes", out var rb) && rb != null)
+                if (capacityRange.TryGetValue("required_bytes", out var rb))
                     capacityBytes = Convert.ToInt64(rb);
-                else if (capacityRange.TryGetValue("limit_bytes", out var lb) && lb != null)
+                else if (capacityRange.TryGetValue("limit_bytes", out var lb))
                     capacityBytes = Convert.ToInt64(lb);
             }
 
@@ -412,7 +414,7 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
             long newCapacityBytes = volume.CapacityBytes;
             if (payload.TryGetValue("capacity_range", out var cr) && cr is Dictionary<string, object> capacityRange)
             {
-                if (capacityRange.TryGetValue("required_bytes", out var rb) && rb != null)
+                if (capacityRange.TryGetValue("required_bytes", out var rb))
                     newCapacityBytes = Convert.ToInt64(rb);
             }
 
@@ -573,38 +575,38 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
     {
         _storageClasses["datawarehouse-hot"] = new StorageClassConfig
         {
-            Name = "datawarehouse-hot", Tier = CsiStorageTier.Hot, Encryption = CsiEncryptionType.AES256GCM,
+            Name = "datawarehouse-hot", Tier = CsiStorageTier.Hot, Encryption = CsiEncryptionType.Aes256Gcm,
             ComplianceMode = CsiComplianceMode.None, ReplicationFactor = 3, AllowVolumeExpansion = true,
             VolumeBindingMode = "WaitForFirstConsumer", ReclaimPolicy = "Delete", IopsLimit = 10000, ThroughputLimitMBps = 500
         };
         _storageClasses["datawarehouse-warm"] = new StorageClassConfig
         {
-            Name = "datawarehouse-warm", Tier = CsiStorageTier.Warm, Encryption = CsiEncryptionType.AES256GCM,
+            Name = "datawarehouse-warm", Tier = CsiStorageTier.Warm, Encryption = CsiEncryptionType.Aes256Gcm,
             ComplianceMode = CsiComplianceMode.None, ReplicationFactor = 2, AllowVolumeExpansion = true,
             VolumeBindingMode = "WaitForFirstConsumer", ReclaimPolicy = "Delete", IopsLimit = 3000, ThroughputLimitMBps = 125
         };
         _storageClasses["datawarehouse-cold"] = new StorageClassConfig
         {
-            Name = "datawarehouse-cold", Tier = CsiStorageTier.Cold, Encryption = CsiEncryptionType.AES256GCM,
+            Name = "datawarehouse-cold", Tier = CsiStorageTier.Cold, Encryption = CsiEncryptionType.Aes256Gcm,
             ComplianceMode = CsiComplianceMode.None, ReplicationFactor = 2, AllowVolumeExpansion = true,
             VolumeBindingMode = "Immediate", ReclaimPolicy = "Delete", IopsLimit = 500, ThroughputLimitMBps = 50
         };
         _storageClasses["datawarehouse-archive"] = new StorageClassConfig
         {
-            Name = "datawarehouse-archive", Tier = CsiStorageTier.Archive, Encryption = CsiEncryptionType.AES256GCM,
+            Name = "datawarehouse-archive", Tier = CsiStorageTier.Archive, Encryption = CsiEncryptionType.Aes256Gcm,
             ComplianceMode = CsiComplianceMode.Worm, ReplicationFactor = 3, AllowVolumeExpansion = false,
             VolumeBindingMode = "Immediate", ReclaimPolicy = "Retain", IopsLimit = 100, ThroughputLimitMBps = 10
         };
         _storageClasses["datawarehouse-gdpr"] = new StorageClassConfig
         {
-            Name = "datawarehouse-gdpr", Tier = CsiStorageTier.Hot, Encryption = CsiEncryptionType.AES256GCM,
+            Name = "datawarehouse-gdpr", Tier = CsiStorageTier.Hot, Encryption = CsiEncryptionType.Aes256Gcm,
             ComplianceMode = CsiComplianceMode.Gdpr, ReplicationFactor = 3, AllowVolumeExpansion = true,
             VolumeBindingMode = "WaitForFirstConsumer", ReclaimPolicy = "Retain", IopsLimit = 10000,
             ThroughputLimitMBps = 500, DataResidencyRegion = "eu-west"
         };
         _storageClasses["datawarehouse-hipaa"] = new StorageClassConfig
         {
-            Name = "datawarehouse-hipaa", Tier = CsiStorageTier.Hot, Encryption = CsiEncryptionType.AES256GCM,
+            Name = "datawarehouse-hipaa", Tier = CsiStorageTier.Hot, Encryption = CsiEncryptionType.Aes256Gcm,
             ComplianceMode = CsiComplianceMode.Hipaa, ReplicationFactor = 3, AllowVolumeExpansion = true,
             VolumeBindingMode = "WaitForFirstConsumer", ReclaimPolicy = "Retain", IopsLimit = 10000,
             ThroughputLimitMBps = 500, AuditLoggingEnabled = true
@@ -686,7 +688,7 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
                 if (r.TryGetValue("segments", out var seg) && seg is Dictionary<string, object> segments)
                 {
                     var segDict = segments.ToDictionary(k => k.Key, v => v.Value?.ToString() ?? "");
-                    if (!topology.Any(t => t.SequenceEqual(segDict)))
+                    if (!topology.Any(t => t.Count == segDict.Count && t.All(kvp => segDict.TryGetValue(kvp.Key, out var v) && v == kvp.Value)))
                         topology.Add(segDict);
                 }
             }
@@ -824,7 +826,7 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
     }
 
     private enum CsiStorageTier { Hot, Warm, Cold, Archive }
-    private enum CsiEncryptionType { None, AES256GCM, AES256CBC, ChaCha20Poly1305 }
+    private enum CsiEncryptionType { None, Aes256Gcm, Aes256Cbc, ChaCha20Poly1305 }
     private enum CsiComplianceMode { None, Worm, Gdpr, Hipaa, Soc2, PciDss }
     private enum VolumeState { Creating, Available, InUse, Deleting, Error }
     private enum SnapshotState { Creating, Ready, Deleting, Error }

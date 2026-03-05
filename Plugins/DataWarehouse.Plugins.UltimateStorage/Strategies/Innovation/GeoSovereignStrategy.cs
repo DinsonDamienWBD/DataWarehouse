@@ -29,6 +29,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     {
         private string _baseStoragePath = string.Empty;
         private bool _enforceGdpr = true;
+        /// <summary>Gets the configured EnforceGdpr value.</summary>
+        internal bool EnforceGdpr => _enforceGdpr;
         private bool _enforceCcpa = true;
         private bool _enforcePipeda = true;
         private bool _allowCrossBorderTransfer = false;

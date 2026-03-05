@@ -246,7 +246,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             ValidateKey(key);
 
             // Try to get CID from cache first
-            Cid? cid = null;
+            Cid? cid;
             lock (_mapLock)
             {
                 _keyToCidMap.TryGetValue(key, out cid);
@@ -296,7 +296,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             ValidateKey(key);
 
             // Get CID for statistics before deletion
-            Cid? cid = null;
+            Cid? cid;
             long size = 0;
 
             lock (_mapLock)
