@@ -99,7 +99,7 @@ public sealed class SegmentedBlockStore : IDisposable
             new BoundedCacheOptions<long, BlockData>
             {
                 MaxEntries = maxCacheEntries > 0 ? maxCacheEntries : DefaultMaxCacheEntries,
-                EvictionPolicy = CacheEvictionMode.LRU
+                EvictionPolicy = CacheEvictionMode.Lru
             });
 
         // Initialize first segment

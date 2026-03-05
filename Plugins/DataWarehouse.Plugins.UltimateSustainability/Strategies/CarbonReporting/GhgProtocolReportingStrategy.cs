@@ -78,7 +78,7 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
     private const double DownstreamComputeEmissionFactorKgCO2ePerGbRead = 0.01; // End-user compute
 
     // Default carbon intensity when no real-time grid data is available (gCO2e/kWh)
-    private const double DefaultCarbonIntensityGCO2ePerKwh = 400.0;
+    private const double DefaultCarbonIntensityGco2EPerKwh = 400.0;
 
     // In-memory storage for energy measurements received via message bus
     private readonly ConcurrentBag<EnergyMeasurementRecord> _energyMeasurements = new();
@@ -180,9 +180,9 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
 
                 entries.Add(new GhgReportEntry
                 {
-                    Scope = GhgScopeCategory.Scope2_PurchasedElectricity,
+                    Scope = GhgScopeCategory.Scope2PurchasedElectricity,
                     Category = "Electricity consumption - compute",
-                    EmissionsGramsCO2e = Math.Round(emissionsGrams, 4),
+                    EmissionsGramsCo2E = Math.Round(emissionsGrams, 4),
                     EnergyConsumedWh = Math.Round(totalEnergyWh, 4),
                     PeriodStart = from,
                     PeriodEnd = to,
@@ -201,9 +201,9 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
 
                 entries.Add(new GhgReportEntry
                 {
-                    Scope = GhgScopeCategory.Scope2_PurchasedElectricity,
+                    Scope = GhgScopeCategory.Scope2PurchasedElectricity,
                     Category = "Electricity consumption - storage",
-                    EmissionsGramsCO2e = Math.Round(emissionsGrams, 4),
+                    EmissionsGramsCo2E = Math.Round(emissionsGrams, 4),
                     EnergyConsumedWh = Math.Round(totalEnergyWh, 4),
                     PeriodStart = from,
                     PeriodEnd = to,
@@ -222,9 +222,9 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
 
                 entries.Add(new GhgReportEntry
                 {
-                    Scope = GhgScopeCategory.Scope2_PurchasedElectricity,
+                    Scope = GhgScopeCategory.Scope2PurchasedElectricity,
                     Category = "Electricity consumption - network",
-                    EmissionsGramsCO2e = Math.Round(emissionsGrams, 4),
+                    EmissionsGramsCo2E = Math.Round(emissionsGrams, 4),
                     EnergyConsumedWh = Math.Round(totalEnergyWh, 4),
                     PeriodStart = from,
                     PeriodEnd = to,
@@ -282,9 +282,9 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
             {
                 entries.Add(new GhgReportEntry
                 {
-                    Scope = GhgScopeCategory.Scope3_ValueChain,
+                    Scope = GhgScopeCategory.Scope3ValueChain,
                     Category = "Category 1 - Purchased goods/services (vendor-hosted storage)",
-                    EmissionsGramsCO2e = Math.Round(emissionsGrams, 4),
+                    EmissionsGramsCo2E = Math.Round(emissionsGrams, 4),
                     EnergyConsumedWh = 0, // Scope 3 upstream -- energy not directly measured
                     PeriodStart = from,
                     PeriodEnd = to,
@@ -316,9 +316,9 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
             {
                 entries.Add(new GhgReportEntry
                 {
-                    Scope = GhgScopeCategory.Scope3_ValueChain,
+                    Scope = GhgScopeCategory.Scope3ValueChain,
                     Category = "Category 4 - Upstream transportation (data transfers between regions)",
-                    EmissionsGramsCO2e = Math.Round(emissionsGrams, 4),
+                    EmissionsGramsCo2E = Math.Round(emissionsGrams, 4),
                     EnergyConsumedWh = 0,
                     PeriodStart = from,
                     PeriodEnd = to,
@@ -353,9 +353,9 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
             {
                 entries.Add(new GhgReportEntry
                 {
-                    Scope = GhgScopeCategory.Scope3_ValueChain,
+                    Scope = GhgScopeCategory.Scope3ValueChain,
                     Category = "Category 11 - Use of sold products (downstream user compute)",
-                    EmissionsGramsCO2e = Math.Round(emissionsGrams, 4),
+                    EmissionsGramsCo2E = Math.Round(emissionsGrams, 4),
                     EnergyConsumedWh = 0,
                     PeriodStart = from,
                     PeriodEnd = to,
@@ -392,8 +392,8 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
         var scope3Entries = await GenerateScope3ReportAsync(from, to, tenantId, ct);
 
         var allEntries = scope2Entries.Concat(scope3Entries).ToList();
-        var totalScope2 = scope2Entries.Sum(e => e.EmissionsGramsCO2e);
-        var totalScope3 = scope3Entries.Sum(e => e.EmissionsGramsCO2e);
+        var totalScope2 = scope2Entries.Sum(e => e.EmissionsGramsCo2E);
+        var totalScope3 = scope3Entries.Sum(e => e.EmissionsGramsCo2E);
         var totalEmissions = totalScope2 + totalScope3;
 
         var executiveSummary = BuildExecutiveSummary(totalScope2, totalScope3, scope2Entries, scope3Entries, from, to);
@@ -453,7 +453,7 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
     {
         return _regionCarbonIntensity.TryGetValue(region, out var intensity) && intensity > 0
             ? intensity
-            : DefaultCarbonIntensityGCO2ePerKwh;
+            : DefaultCarbonIntensityGco2EPerKwh;
     }
 
     private static bool IsComputeOperation(string operationType)

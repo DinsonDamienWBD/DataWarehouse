@@ -93,8 +93,8 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
         // Atomic check-and-increment under lock
         lock (entry.Lock)
         {
-            var usagePercent = entry.BudgetGramsCO2e > 0
-                ? ((entry.UsedGramsCO2e + carbonGramsCO2e) / entry.BudgetGramsCO2e) * 100.0
+            var usagePercent = entry.BudgetGramsCo2E > 0
+                ? ((entry.UsedGramsCo2E + carbonGramsCO2e) / entry.BudgetGramsCo2E) * 100.0
                 : 0;
 
             if (usagePercent > entry.HardLimitPercent)
@@ -102,7 +102,7 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
                 return Task.FromResult(false);
             }
 
-            entry.UsedGramsCO2e += carbonGramsCO2e;
+            entry.UsedGramsCo2E += carbonGramsCO2e;
         }
 
         MarkDirty();
@@ -138,7 +138,7 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
 
                     entry.PeriodStart = newStart;
                     entry.PeriodEnd = newEnd;
-                    entry.UsedGramsCO2e = 0;
+                    entry.UsedGramsCo2E = 0;
                     anyReset = true;
                 }
             }
@@ -235,8 +235,8 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
 
         lock (entry.Lock)
         {
-            return entry.BudgetGramsCO2e > 0
-                ? (entry.UsedGramsCO2e / entry.BudgetGramsCO2e) * 100.0
+            return entry.BudgetGramsCo2E > 0
+                ? (entry.UsedGramsCo2E / entry.BudgetGramsCo2E) * 100.0
                 : 0;
         }
     }
@@ -332,8 +332,8 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
         public readonly object Lock = new();
         public string TenantId { get; set; } = string.Empty;
         public CarbonBudgetPeriod BudgetPeriod { get; set; }
-        public double BudgetGramsCO2e { get; set; }
-        public double UsedGramsCO2e { get; set; }
+        public double BudgetGramsCo2E { get; set; }
+        public double UsedGramsCo2E { get; set; }
         public double ThrottleThresholdPercent { get; set; } = 80.0;
         public double HardLimitPercent { get; set; } = 100.0;
         public DateTimeOffset PeriodStart { get; set; }
@@ -347,8 +347,8 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
                 {
                     TenantId = TenantId,
                     BudgetPeriod = BudgetPeriod,
-                    BudgetGramsCO2e = BudgetGramsCO2e,
-                    UsedGramsCO2e = UsedGramsCO2e,
+                    BudgetGramsCo2E = BudgetGramsCo2E,
+                    UsedGramsCo2E = UsedGramsCo2E,
                     ThrottleThresholdPercent = ThrottleThresholdPercent,
                     HardLimitPercent = HardLimitPercent,
                     PeriodStart = PeriodStart,
@@ -363,8 +363,8 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
             {
                 TenantId = TenantId,
                 BudgetPeriod = BudgetPeriod,
-                BudgetGramsCO2e = BudgetGramsCO2e,
-                UsedGramsCO2e = UsedGramsCO2e,
+                BudgetGramsCo2E = BudgetGramsCo2E,
+                UsedGramsCo2E = UsedGramsCo2E,
                 ThrottleThresholdPercent = ThrottleThresholdPercent,
                 HardLimitPercent = HardLimitPercent,
                 PeriodStart = PeriodStart,
@@ -378,8 +378,8 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
             {
                 TenantId = budget.TenantId,
                 BudgetPeriod = budget.BudgetPeriod,
-                BudgetGramsCO2e = budget.BudgetGramsCO2e,
-                UsedGramsCO2e = budget.UsedGramsCO2e,
+                BudgetGramsCo2E = budget.BudgetGramsCo2E,
+                UsedGramsCo2E = budget.UsedGramsCo2E,
                 ThrottleThresholdPercent = budget.ThrottleThresholdPercent,
                 HardLimitPercent = budget.HardLimitPercent,
                 PeriodStart = budget.PeriodStart,
@@ -393,8 +393,8 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
             {
                 TenantId = stored.TenantId,
                 BudgetPeriod = stored.BudgetPeriod,
-                BudgetGramsCO2e = stored.BudgetGramsCO2e,
-                UsedGramsCO2e = stored.UsedGramsCO2e,
+                BudgetGramsCo2E = stored.BudgetGramsCo2E,
+                UsedGramsCo2E = stored.UsedGramsCo2E,
                 ThrottleThresholdPercent = stored.ThrottleThresholdPercent,
                 HardLimitPercent = stored.HardLimitPercent,
                 PeriodStart = stored.PeriodStart,
@@ -414,8 +414,8 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
     {
         public string TenantId { get; set; } = string.Empty;
         public CarbonBudgetPeriod BudgetPeriod { get; set; }
-        public double BudgetGramsCO2e { get; set; }
-        public double UsedGramsCO2e { get; set; }
+        public double BudgetGramsCo2E { get; set; }
+        public double UsedGramsCo2E { get; set; }
         public double ThrottleThresholdPercent { get; set; } = 80.0;
         public double HardLimitPercent { get; set; } = 100.0;
         public DateTimeOffset PeriodStart { get; set; }

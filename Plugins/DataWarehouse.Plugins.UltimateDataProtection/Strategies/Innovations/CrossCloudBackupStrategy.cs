@@ -35,13 +35,13 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         public enum CloudProvider
         {
             /// <summary>Amazon Web Services S3.</summary>
-            AWS,
+            Aws,
 
             /// <summary>Microsoft Azure Blob Storage.</summary>
             Azure,
 
             /// <summary>Google Cloud Storage.</summary>
-            GCP
+            Gcp
         }
 
         /// <inheritdoc/>
@@ -359,7 +359,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                     PercentComplete = 10
                 });
 
-                var preferredProvider = GetOption(request.Options, "PreferredProvider", CloudProvider.AWS);
+                var preferredProvider = GetOption(request.Options, "PreferredProvider", CloudProvider.Aws);
                 var selectedProvider = await SelectRestoreProviderAsync(metadata, preferredProvider, ct);
 
                 // Phase 3: Verify provider data integrity before restore
@@ -741,9 +741,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
                 var location = provider switch
                 {
-                    CloudProvider.AWS => $"s3://backup-bucket/{transaction.BackupId}",
+                    CloudProvider.Aws => $"s3://backup-bucket/{transaction.BackupId}",
                     CloudProvider.Azure => $"https://backup.blob.core.windows.net/{transaction.BackupId}",
-                    CloudProvider.GCP => $"gs://backup-bucket/{transaction.BackupId}",
+                    CloudProvider.Gcp => $"gs://backup-bucket/{transaction.BackupId}",
                     _ => throw new ArgumentOutOfRangeException(nameof(provider))
                 };
 
@@ -909,11 +909,11 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             var providers = new List<CloudProvider>();
 
             if (GetOption(options, "EnableAWS", true))
-                providers.Add(CloudProvider.AWS);
+                providers.Add(CloudProvider.Aws);
             if (GetOption(options, "EnableAzure", true))
                 providers.Add(CloudProvider.Azure);
             if (GetOption(options, "EnableGCP", true))
-                providers.Add(CloudProvider.GCP);
+                providers.Add(CloudProvider.Gcp);
 
             return providers;
         }

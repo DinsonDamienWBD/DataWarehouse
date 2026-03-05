@@ -128,7 +128,7 @@ public sealed class BackupScalingManager : IScalableSubsystem, IDisposable
         var jobCacheOptions = new BoundedCacheOptions<string, BackupJobMetadata>
         {
             MaxEntries = 1_000,
-            EvictionPolicy = CacheEvictionMode.LRU,
+            EvictionPolicy = CacheEvictionMode.Lru,
             BackingStore = _backingStore,
             BackingStorePath = "dw://internal/backup/",
             WriteThrough = true,
@@ -142,7 +142,7 @@ public sealed class BackupScalingManager : IScalableSubsystem, IDisposable
         var chainCacheOptions = new BoundedCacheOptions<string, BackupChain>
         {
             MaxEntries = 10_000,
-            EvictionPolicy = CacheEvictionMode.LRU,
+            EvictionPolicy = CacheEvictionMode.Lru,
             BackingStore = _backingStore,
             BackingStorePath = "dw://internal/backup-chains/",
             WriteThrough = true,

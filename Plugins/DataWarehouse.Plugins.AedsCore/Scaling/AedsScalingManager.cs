@@ -507,7 +507,7 @@ public sealed class AedsScalingManager : IScalableSubsystem, IDisposable
         return new BoundedCache<string, byte[]>(new BoundedCacheOptions<string, byte[]>
         {
             MaxEntries = maxEntries,
-            EvictionPolicy = CacheEvictionMode.LRU
+            EvictionPolicy = CacheEvictionMode.Lru
         });
     }
 

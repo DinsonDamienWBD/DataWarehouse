@@ -100,11 +100,11 @@ internal sealed class CoApStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
             // Parse CoAP method from HTTP method or custom header
             var method = request.Method switch
             {
-                SdkInterface.HttpMethod.GET => CoApMethod.GET,
-                SdkInterface.HttpMethod.POST => CoApMethod.POST,
-                SdkInterface.HttpMethod.PUT => CoApMethod.PUT,
-                SdkInterface.HttpMethod.DELETE => CoApMethod.DELETE,
-                _ => CoApMethod.GET
+                SdkInterface.HttpMethod.GET => CoApMethod.Get,
+                SdkInterface.HttpMethod.POST => CoApMethod.Post,
+                SdkInterface.HttpMethod.PUT => CoApMethod.Put,
+                SdkInterface.HttpMethod.DELETE => CoApMethod.Delete,
+                _ => CoApMethod.Get
             };
 
             // Build CoAP request

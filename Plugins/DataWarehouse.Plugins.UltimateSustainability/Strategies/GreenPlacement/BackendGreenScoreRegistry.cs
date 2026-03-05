@@ -99,7 +99,7 @@ public sealed class BackendGreenScoreRegistry
             BackendId = backendId,
             Region = region,
             RenewablePercentage = Math.Clamp(renewablePct, 0, 100),
-            CarbonIntensityGCO2ePerKwh = carbonIntensity,
+            CarbonIntensityGco2EPerKwh = carbonIntensity,
             PowerUsageEffectiveness = Math.Max(1.0, pue),
             WaterUsageEffectiveness = wue.HasValue ? Math.Max(0, wue.Value) : null,
             Score = score,
@@ -133,7 +133,7 @@ public sealed class BackendGreenScoreRegistry
 
                 _scores[kvp.Key] = existing with
                 {
-                    CarbonIntensityGCO2ePerKwh = intensity,
+                    CarbonIntensityGco2EPerKwh = intensity,
                     Score = newScore,
                     LastUpdated = DateTimeOffset.UtcNow
                 };
@@ -300,7 +300,7 @@ public sealed class BackendGreenScoreRegistry
                     BackendId = entry.BackendId,
                     Region = entry.Region,
                     RenewablePercentage = entry.RenewablePercentage,
-                    CarbonIntensityGCO2ePerKwh = entry.CarbonIntensityGCO2ePerKwh,
+                    CarbonIntensityGco2EPerKwh = entry.CarbonIntensityGco2EPerKwh,
                     PowerUsageEffectiveness = entry.PowerUsageEffectiveness,
                     WaterUsageEffectiveness = entry.WaterUsageEffectiveness,
                     Score = entry.Score,
@@ -327,7 +327,7 @@ public sealed class BackendGreenScoreRegistry
         public string BackendId { get; set; } = string.Empty;
         public string Region { get; set; } = string.Empty;
         public double RenewablePercentage { get; set; }
-        public double CarbonIntensityGCO2ePerKwh { get; set; }
+        public double CarbonIntensityGco2EPerKwh { get; set; }
         public double PowerUsageEffectiveness { get; set; }
         public double? WaterUsageEffectiveness { get; set; }
         public double Score { get; set; }

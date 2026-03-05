@@ -140,14 +140,14 @@ public sealed class EncryptionScalingManager : IScalableSubsystem, IDisposable
             new BoundedCacheOptions<string, int>
             {
                 MaxEntries = 100,
-                EvictionPolicy = CacheEvictionMode.LRU
+                EvictionPolicy = CacheEvictionMode.Lru
             });
 
         _keyDerivationCache = new BoundedCache<string, byte[]>(
             new BoundedCacheOptions<string, byte[]>
             {
                 MaxEntries = Math.Min(_currentLimits.MaxCacheEntries, 5_000),
-                EvictionPolicy = CacheEvictionMode.TTL,
+                EvictionPolicy = CacheEvictionMode.Ttl,
                 DefaultTtl = TimeSpan.FromMinutes(15)
             });
 

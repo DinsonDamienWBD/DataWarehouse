@@ -146,7 +146,7 @@ public sealed class WasmScalingManager : IScalableSubsystem, IDisposable
             new BoundedCacheOptions<string, WasmModuleConfig>
             {
                 MaxEntries = Math.Min(_currentLimits.MaxCacheEntries, 10_000),
-                EvictionPolicy = CacheEvictionMode.LRU,
+                EvictionPolicy = CacheEvictionMode.Lru,
                 BackingStore = backingStore,
                 BackingStorePath = "dw://internal/wasm-config",
                 WriteThrough = true,
@@ -161,7 +161,7 @@ public sealed class WasmScalingManager : IScalableSubsystem, IDisposable
             new BoundedCacheOptions<string, ConcurrentQueue<WasmInstance>>
             {
                 MaxEntries = 1_000,
-                EvictionPolicy = CacheEvictionMode.LRU
+                EvictionPolicy = CacheEvictionMode.Lru
             });
 
         _emaCpuLoad = 0.5; // Start at mid-point

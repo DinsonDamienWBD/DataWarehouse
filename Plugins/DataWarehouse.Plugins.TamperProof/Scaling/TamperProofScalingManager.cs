@@ -174,14 +174,14 @@ public sealed class TamperProofScalingManager : IScalableSubsystem, IBackpressur
         _hashCache = new BoundedCache<string, byte[]>(new BoundedCacheOptions<string, byte[]>
         {
             MaxEntries = hashCacheCapacity,
-            EvictionPolicy = CacheEvictionMode.LRU
+            EvictionPolicy = CacheEvictionMode.Lru
         });
 
         // Manifest cache (LRU)
         _manifestCache = new BoundedCache<string, byte[]>(new BoundedCacheOptions<string, byte[]>
         {
             MaxEntries = manifestCacheCapacity,
-            EvictionPolicy = CacheEvictionMode.LRU
+            EvictionPolicy = CacheEvictionMode.Lru
         });
 
         // Verification cache (TTL)
@@ -189,7 +189,7 @@ public sealed class TamperProofScalingManager : IScalableSubsystem, IBackpressur
         _verificationCache = new BoundedCache<string, bool>(new BoundedCacheOptions<string, bool>
         {
             MaxEntries = verificationCacheCapacity,
-            EvictionPolicy = CacheEvictionMode.TTL,
+            EvictionPolicy = CacheEvictionMode.Ttl,
             DefaultTtl = vtl
         });
 

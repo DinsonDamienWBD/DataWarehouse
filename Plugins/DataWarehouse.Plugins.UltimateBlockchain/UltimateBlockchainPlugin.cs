@@ -44,7 +44,7 @@ public class UltimateBlockchainPlugin : BlockchainProviderPluginBase
             new BoundedCacheOptions<Guid, BlockchainAnchor>
             {
                 MaxEntries = 100_000,
-                EvictionPolicy = CacheEvictionMode.LRU
+                EvictionPolicy = CacheEvictionMode.Lru
             });
 
         // Set data directory for segmented store and sharded journal

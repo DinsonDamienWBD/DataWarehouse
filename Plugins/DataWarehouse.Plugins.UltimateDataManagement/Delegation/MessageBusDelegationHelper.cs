@@ -65,7 +65,7 @@ internal sealed class MessageBusDelegationHelper : IDisposable
         _fallbackCache = new BoundedCache<string, object>(new BoundedCacheOptions<string, object>
         {
             MaxEntries = DefaultCacheMaxEntries,
-            EvictionPolicy = CacheEvictionMode.TTL,
+            EvictionPolicy = CacheEvictionMode.Ttl,
             DefaultTtl = DefaultCacheTtl
         });
     }

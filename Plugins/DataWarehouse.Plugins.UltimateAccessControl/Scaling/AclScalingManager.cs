@@ -165,7 +165,7 @@ public sealed class AclScalingManager : IScalableSubsystem, IDisposable
             new BoundedCacheOptions<string, PolicyAccessDecision>
             {
                 MaxEntries = policyCacheCapacity,
-                EvictionPolicy = CacheEvictionMode.TTL,
+                EvictionPolicy = CacheEvictionMode.Ttl,
                 DefaultTtl = ttl
             });
 
@@ -174,7 +174,7 @@ public sealed class AclScalingManager : IScalableSubsystem, IDisposable
             new BoundedCacheOptions<string, double>
             {
                 MaxEntries = DefaultThresholdCacheCapacity,
-                EvictionPolicy = CacheEvictionMode.LRU
+                EvictionPolicy = CacheEvictionMode.Lru
             });
 
         // Seed default thresholds

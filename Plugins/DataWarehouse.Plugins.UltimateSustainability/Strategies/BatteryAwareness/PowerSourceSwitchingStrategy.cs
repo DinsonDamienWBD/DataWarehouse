@@ -41,7 +41,7 @@ public sealed class PowerSourceSwitchingStrategy : SustainabilityStrategyBase
                 SourceId = sourceId,
                 Type = type,
                 MaxPowerWatts = maxPowerWatts,
-                CarbonIntensityGCO2ePerKwh = carbonIntensity,
+                CarbonIntensityGco2EPerKwh = carbonIntensity,
                 CostPerKwh = costPerKwh,
                 IsAvailable = true
             };
@@ -81,7 +81,7 @@ public sealed class PowerSourceSwitchingStrategy : SustainabilityStrategyBase
             // Sort by priority
             var sortedSources = availableSources
                 .OrderBy(s => SourcePriority.IndexOf(s.SourceId) >= 0 ? SourcePriority.IndexOf(s.SourceId) : 999)
-                .ThenBy(s => s.CarbonIntensityGCO2ePerKwh)
+                .ThenBy(s => s.CarbonIntensityGco2EPerKwh)
                 .ThenBy(s => s.CostPerKwh)
                 .ToList();
 
@@ -101,7 +101,7 @@ public sealed class PowerSourceSwitchingStrategy : SustainabilityStrategyBase
                 RecommendedSourceId = recommended.SourceId,
                 SourceType = recommended.Type,
                 Reason = $"Best available source: {recommended.Type}",
-                CarbonIntensity = recommended.CarbonIntensityGCO2ePerKwh,
+                CarbonIntensity = recommended.CarbonIntensityGco2EPerKwh,
                 CostPerKwh = recommended.CostPerKwh,
                 IsEmergency = false
             };
@@ -184,7 +184,7 @@ public sealed class PowerSource
     public required string SourceId { get; init; }
     public required PowerSourceType Type { get; init; }
     public required double MaxPowerWatts { get; init; }
-    public double CarbonIntensityGCO2ePerKwh { get; set; }
+    public double CarbonIntensityGco2EPerKwh { get; set; }
     public double CostPerKwh { get; set; }
     public bool IsAvailable { get; set; }
     public double CurrentPowerWatts { get; set; }

@@ -72,14 +72,14 @@ public sealed class BlockchainScalingManager : IScalableSubsystem, IDisposable
             new BoundedCacheOptions<string, byte[]>
             {
                 MaxEntries = Math.Min(_currentLimits.MaxCacheEntries, 10_000),
-                EvictionPolicy = CacheEvictionMode.LRU
+                EvictionPolicy = CacheEvictionMode.Lru
             });
 
         _validationCache = new BoundedCache<string, bool>(
             new BoundedCacheOptions<string, bool>
             {
                 MaxEntries = Math.Min(_currentLimits.MaxCacheEntries * 5, 50_000),
-                EvictionPolicy = CacheEvictionMode.TTL,
+                EvictionPolicy = CacheEvictionMode.Ttl,
                 DefaultTtl = TimeSpan.FromMinutes(5)
             });
 

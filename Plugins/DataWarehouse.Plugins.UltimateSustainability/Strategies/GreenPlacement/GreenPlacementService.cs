@@ -133,7 +133,7 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
                 gridData = await GetGridCarbonDataAsync(region, ct);
 
                 // Step 3: Update registry with fresh carbon intensity
-                _registry.UpdateCarbonIntensity(region, gridData.CarbonIntensityGCO2ePerKwh);
+                _registry.UpdateCarbonIntensity(region, gridData.CarbonIntensityGco2EPerKwh);
             }
             else
             {
@@ -154,7 +154,7 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
                     BackendId = backendId,
                     Region = region ?? "unknown",
                     RenewablePercentage = 30.0,
-                    CarbonIntensityGCO2ePerKwh = gridData.CarbonIntensityGCO2ePerKwh,
+                    CarbonIntensityGco2EPerKwh = gridData.CarbonIntensityGco2EPerKwh,
                     PowerUsageEffectiveness = 1.5,
                     Score = 30.0,
                     LastUpdated = DateTimeOffset.UtcNow
@@ -169,7 +169,7 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
 
         // Step 6: Estimate carbon for the operation
         var pue = best.Score.PowerUsageEffectiveness;
-        var carbonIntensity = best.GridData.CarbonIntensityGCO2ePerKwh;
+        var carbonIntensity = best.GridData.CarbonIntensityGco2EPerKwh;
         var energyWh = dataSizeBytes * StorageEnergyPerByteWh * pue;
         var carbonGrams = energyWh * carbonIntensity / 1000.0;
 
@@ -186,7 +186,7 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
             GreenScore = best.Score,
             Reason = BuildDecisionReason(best.Score, best.GridData),
             AlternativeBackendIds = alternatives,
-            EstimatedCarbonGramsCO2e = Math.Round(carbonGrams, 6),
+            EstimatedCarbonGramsCo2E = Math.Round(carbonGrams, 6),
             EstimatedEnergyWh = Math.Round(energyWh, 6)
         };
 
@@ -284,7 +284,7 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
             try
             {
                 var data = await GetGridCarbonDataAsync(region, ct);
-                _registry.UpdateCarbonIntensity(region, data.CarbonIntensityGCO2ePerKwh);
+                _registry.UpdateCarbonIntensity(region, data.CarbonIntensityGco2EPerKwh);
             }
             finally
             {
@@ -379,14 +379,14 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
                 SourcePluginId = PluginId,
                 Source = "GreenPlacementService",
                 Description = $"Green placement: selected {decision.PreferredBackendId} (score: {decision.GreenScore.Score:F1}, " +
-                              $"carbon: {decision.EstimatedCarbonGramsCO2e:F4} gCO2e)",
+                              $"carbon: {decision.EstimatedCarbonGramsCo2E:F4} gCO2e)",
                 Payload = new Dictionary<string, object>
                 {
                     ["preferredBackendId"] = decision.PreferredBackendId,
                     ["greenScore"] = decision.GreenScore.Score,
                     ["renewablePercentage"] = decision.GreenScore.RenewablePercentage,
-                    ["carbonIntensity"] = decision.GreenScore.CarbonIntensityGCO2ePerKwh,
-                    ["estimatedCarbonGrams"] = decision.EstimatedCarbonGramsCO2e,
+                    ["carbonIntensity"] = decision.GreenScore.CarbonIntensityGco2EPerKwh,
+                    ["estimatedCarbonGrams"] = decision.EstimatedCarbonGramsCo2E,
                     ["estimatedEnergyWh"] = decision.EstimatedEnergyWh,
                     ["dataSizeBytes"] = dataSizeBytes,
                     ["alternativeCount"] = decision.AlternativeBackendIds.Count,
@@ -413,7 +413,7 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
         var parts = new List<string>
         {
             $"Renewable: {score.RenewablePercentage:F0}%",
-            $"Carbon intensity: {gridData.CarbonIntensityGCO2ePerKwh:F0} gCO2e/kWh",
+            $"Carbon intensity: {gridData.CarbonIntensityGco2EPerKwh:F0} gCO2e/kWh",
             $"PUE: {score.PowerUsageEffectiveness:F2}"
         };
 
@@ -449,10 +449,10 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
         var worst = scoredCandidates[^1];
 
         var bestEnergy = dataSizeBytes * StorageEnergyPerByteWh * best.Score.PowerUsageEffectiveness;
-        var bestCarbon = bestEnergy * best.GridData.CarbonIntensityGCO2ePerKwh / 1000.0;
+        var bestCarbon = bestEnergy * best.GridData.CarbonIntensityGco2EPerKwh / 1000.0;
 
         var worstEnergy = dataSizeBytes * StorageEnergyPerByteWh * worst.Score.PowerUsageEffectiveness;
-        var worstCarbon = worstEnergy * worst.GridData.CarbonIntensityGCO2ePerKwh / 1000.0;
+        var worstCarbon = worstEnergy * worst.GridData.CarbonIntensityGco2EPerKwh / 1000.0;
 
         return Math.Max(0, worstCarbon - bestCarbon);
     }
@@ -466,7 +466,7 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
         {
             Region = region ?? "unknown",
             Timestamp = DateTimeOffset.UtcNow,
-            CarbonIntensityGCO2ePerKwh = 475.0,
+            CarbonIntensityGco2EPerKwh = 475.0,
             RenewablePercentage = 30.0,
             Source = GridDataSource.Estimation,
             ForecastHours = 0,

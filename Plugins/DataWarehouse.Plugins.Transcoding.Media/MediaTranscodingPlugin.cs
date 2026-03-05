@@ -532,7 +532,7 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
         {
             MediaFormat.Mp4 or MediaFormat.WebM or MediaFormat.Mkv or
             MediaFormat.Avi or MediaFormat.Mov or MediaFormat.H264 or
-            MediaFormat.H265 or MediaFormat.VP8 or MediaFormat.VP9 or MediaFormat.AV1 => "video",
+            MediaFormat.H265 or MediaFormat.Vp8 or MediaFormat.Vp9 or MediaFormat.Av1 => "video",
 
             MediaFormat.Mp3 or MediaFormat.Aac or MediaFormat.Wav or
             MediaFormat.Flac or MediaFormat.Ogg or MediaFormat.Opus => "audio",
@@ -1868,8 +1868,8 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
         {
             MediaFormat.Mp4 or MediaFormat.WebM or MediaFormat.Mkv or
             MediaFormat.Avi or MediaFormat.Mov or MediaFormat.H264 or
-            MediaFormat.H265 or MediaFormat.VP8 or MediaFormat.VP9 or
-            MediaFormat.AV1 or MediaFormat.Mp3 or MediaFormat.Aac or
+            MediaFormat.H265 or MediaFormat.Vp8 or MediaFormat.Vp9 or
+            MediaFormat.Av1 or MediaFormat.Mp3 or MediaFormat.Aac or
             MediaFormat.Wav or MediaFormat.Flac or MediaFormat.Ogg or
             MediaFormat.Opus => true,
             _ => false

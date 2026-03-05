@@ -50,7 +50,7 @@ public sealed record TenantCarbonUsage
     public required string TenantId { get; init; }
 
     /// <summary>Total carbon emissions in grams CO2e for the period.</summary>
-    public required double TotalEmissionsGramsCO2e { get; init; }
+    public required double TotalEmissionsGramsCo2E { get; init; }
 
     /// <summary>Total energy consumed in watt-hours for the period.</summary>
     public required double TotalEnergyWh { get; init; }
@@ -249,7 +249,7 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
 
         return _tenantEmissions.Values
             .Select(a => a.ToUsage())
-            .OrderByDescending(u => u.TotalEmissionsGramsCO2e)
+            .OrderByDescending(u => u.TotalEmissionsGramsCo2E)
             .Take(topN)
             .ToList()
             .AsReadOnly();
@@ -554,7 +554,7 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
     private sealed class TenantAccumulator
     {
         private readonly string _tenantId;
-        private double _totalEmissionsGramsCO2e;
+        private double _totalEmissionsGramsCo2E;
         private double _totalEnergyWh;
         private long _operationCount;
         private readonly object _lock = new();
@@ -568,7 +568,7 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
         {
             lock (_lock)
             {
-                _totalEmissionsGramsCO2e += emissionsGrams;
+                _totalEmissionsGramsCo2E += emissionsGrams;
                 _totalEnergyWh += energyWh;
                 _operationCount++;
             }
@@ -581,7 +581,7 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
                 return new TenantCarbonUsage
                 {
                     TenantId = _tenantId,
-                    TotalEmissionsGramsCO2e = _totalEmissionsGramsCO2e,
+                    TotalEmissionsGramsCo2E = _totalEmissionsGramsCo2E,
                     TotalEnergyWh = _totalEnergyWh,
                     OperationCount = _operationCount
                 };

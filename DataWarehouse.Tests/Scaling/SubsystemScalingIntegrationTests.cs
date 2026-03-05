@@ -150,7 +150,7 @@ namespace DataWarehouse.Tests.Scaling
                 var opts = new BoundedCacheOptions<string, string>
                 {
                     MaxEntries = maxEntries,
-                    EvictionPolicy = CacheEvictionMode.LRU,
+                    EvictionPolicy = CacheEvictionMode.Lru,
                 };
 
                 if (_backingStore != null)
@@ -268,7 +268,7 @@ namespace DataWarehouse.Tests.Scaling
             using var cache = new BoundedCache<string, string>(new BoundedCacheOptions<string, string>
             {
                 MaxEntries = 10_000,
-                EvictionPolicy = CacheEvictionMode.LRU,
+                EvictionPolicy = CacheEvictionMode.Lru,
             });
 
             var memBefore = GC.GetTotalMemory(true);

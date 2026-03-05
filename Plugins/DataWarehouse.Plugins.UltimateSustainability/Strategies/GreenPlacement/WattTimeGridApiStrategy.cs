@@ -164,7 +164,7 @@ public sealed class WattTimeGridApiStrategy : SustainabilityStrategyBase
 
             var data = await FetchSignalIndexWithRetryAsync(balancingAuthority, ct);
             _cache[cacheKey] = (data, DateTimeOffset.UtcNow.AddSeconds(CacheTtlSeconds));
-            RecordSample(0, data.CarbonIntensityGCO2ePerKwh);
+            RecordSample(0, data.CarbonIntensityGco2EPerKwh);
             return data;
         }
         catch (Exception)
@@ -301,7 +301,7 @@ public sealed class WattTimeGridApiStrategy : SustainabilityStrategyBase
                 {
                     Region = balancingAuthority,
                     Timestamp = latestPoint.PointTime ?? DateTimeOffset.UtcNow,
-                    CarbonIntensityGCO2ePerKwh = carbonIntensity,
+                    CarbonIntensityGco2EPerKwh = carbonIntensity,
                     RenewablePercentage = EstimateRenewableFromMoer(moer),
                     Source = GridDataSource.WattTime,
                     ForecastHours = 0,
@@ -358,7 +358,7 @@ public sealed class WattTimeGridApiStrategy : SustainabilityStrategyBase
                 {
                     Region = balancingAuthority,
                     Timestamp = DateTimeOffset.UtcNow,
-                    CarbonIntensityGCO2ePerKwh = carbonIntensity,
+                    CarbonIntensityGco2EPerKwh = carbonIntensity,
                     RenewablePercentage = EstimateRenewableFromMoer(avgMoer),
                     Source = GridDataSource.WattTime,
                     ForecastHours = 24,
@@ -400,7 +400,7 @@ public sealed class WattTimeGridApiStrategy : SustainabilityStrategyBase
         {
             Region = region,
             Timestamp = DateTimeOffset.UtcNow,
-            CarbonIntensityGCO2ePerKwh = 475.0,
+            CarbonIntensityGco2EPerKwh = 475.0,
             RenewablePercentage = 30.0,
             Source = GridDataSource.Estimation,
             ForecastHours = forecastHours,

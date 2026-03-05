@@ -132,7 +132,7 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
         var depthCacheOptions = new BoundedCacheOptions<string, int>
         {
             MaxEntries = 1_000,
-            EvictionPolicy = CacheEvictionMode.LRU
+            EvictionPolicy = CacheEvictionMode.Lru
         };
         _strategyQueueDepths = new BoundedCache<string, int>(depthCacheOptions);
         _strategyQueueDepths.Put("NVMe", DefaultNvmeQueueDepth);
@@ -143,7 +143,7 @@ public sealed class FilesystemScalingManager : IScalableSubsystem, IDisposable
         var quotaCacheOptions = new BoundedCacheOptions<string, IoQuotaInfo>
         {
             MaxEntries = 10_000,
-            EvictionPolicy = CacheEvictionMode.TTL,
+            EvictionPolicy = CacheEvictionMode.Ttl,
             DefaultTtl = TimeSpan.FromHours(1)
         };
         _callerQuotas = new BoundedCache<string, IoQuotaInfo>(quotaCacheOptions);

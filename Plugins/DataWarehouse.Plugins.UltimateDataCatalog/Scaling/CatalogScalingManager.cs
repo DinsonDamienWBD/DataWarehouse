@@ -123,7 +123,7 @@ public sealed class CatalogScalingManager : IScalableSubsystem, IDisposable
         _relationships = new BoundedCache<string, byte[]>(new BoundedCacheOptions<string, byte[]>
         {
             MaxEntries = DefaultMaxRelationships,
-            EvictionPolicy = CacheEvictionMode.LRU,
+            EvictionPolicy = CacheEvictionMode.Lru,
             BackingStore = _backingStore,
             BackingStorePath = $"{BackingStorePrefix}/relationships",
             Serializer = static v => v,
@@ -136,7 +136,7 @@ public sealed class CatalogScalingManager : IScalableSubsystem, IDisposable
         _glossary = new BoundedCache<string, byte[]>(new BoundedCacheOptions<string, byte[]>
         {
             MaxEntries = DefaultMaxGlossaryTerms,
-            EvictionPolicy = CacheEvictionMode.LRU,
+            EvictionPolicy = CacheEvictionMode.Lru,
             BackingStore = _backingStore,
             BackingStorePath = $"{BackingStorePrefix}/glossary",
             Serializer = static v => v,
@@ -387,7 +387,7 @@ public sealed class CatalogScalingManager : IScalableSubsystem, IDisposable
         return new BoundedCache<string, byte[]>(new BoundedCacheOptions<string, byte[]>
         {
             MaxEntries = DefaultMaxAssetsPerShard,
-            EvictionPolicy = CacheEvictionMode.LRU,
+            EvictionPolicy = CacheEvictionMode.Lru,
             BackingStore = _backingStore,
             BackingStorePath = $"{BackingStorePrefix}/assets/shard-{shardId}",
             Serializer = static v => v,

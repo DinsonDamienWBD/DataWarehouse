@@ -78,6 +78,7 @@
   <Project Path="DataWarehouse.CLI/DataWarehouse.CLI.csproj" />
   <Project Path="DataWarehouse.Dashboard/DataWarehouse.Dashboard.csproj" />
   <Project Path="DataWarehouse.GUI/DataWarehouse.GUI.csproj" />
+  <Project Path="DataWarehouse.Hardening.Tests/DataWarehouse.Hardening.Tests.csproj" />
   <Project Path="DataWarehouse.Kernel/DataWarehouse.Kernel.csproj" />
   <Project Path="DataWarehouse.Launcher/DataWarehouse.Launcher.csproj" />
   <Project Path="DataWarehouse.SDK/DataWarehouse.SDK.csproj" />

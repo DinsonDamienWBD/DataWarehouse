@@ -108,8 +108,8 @@ public class CarbonAwareLifecycleTests : IDisposable
         {
             TenantId = "tenant-budget-1",
             BudgetPeriod = CarbonBudgetPeriod.Monthly,
-            BudgetGramsCO2e = 1000.0,
-            UsedGramsCO2e = 0,
+            BudgetGramsCo2E = 1000.0,
+            UsedGramsCo2E = 0,
             ThrottleThresholdPercent = 80.0,
             HardLimitPercent = 100.0,
             PeriodStart = DateTimeOffset.UtcNow.Date,
@@ -122,8 +122,8 @@ public class CarbonAwareLifecycleTests : IDisposable
         Assert.NotNull(retrieved);
         Assert.Equal("tenant-budget-1", retrieved.TenantId);
         Assert.Equal(CarbonBudgetPeriod.Monthly, retrieved.BudgetPeriod);
-        Assert.Equal(1000.0, retrieved.BudgetGramsCO2e);
-        Assert.Equal(0.0, retrieved.UsedGramsCO2e);
+        Assert.Equal(1000.0, retrieved.BudgetGramsCo2E);
+        Assert.Equal(0.0, retrieved.UsedGramsCo2E);
         Assert.Equal(80.0, retrieved.ThrottleThresholdPercent);
         Assert.Equal(100.0, retrieved.HardLimitPercent);
     }
@@ -137,8 +137,8 @@ public class CarbonAwareLifecycleTests : IDisposable
         {
             TenantId = "tenant-usage-1",
             BudgetPeriod = CarbonBudgetPeriod.Monthly,
-            BudgetGramsCO2e = 1000.0,
-            UsedGramsCO2e = 0,
+            BudgetGramsCo2E = 1000.0,
+            UsedGramsCo2E = 0,
             ThrottleThresholdPercent = 80.0,
             HardLimitPercent = 100.0,
             PeriodStart = DateTimeOffset.UtcNow.Date,
@@ -152,8 +152,8 @@ public class CarbonAwareLifecycleTests : IDisposable
 
         var updated = await store.GetAsync("tenant-usage-1");
         Assert.NotNull(updated);
-        Assert.Equal(300.0, updated.UsedGramsCO2e);
-        Assert.Equal(700.0, updated.RemainingGramsCO2e);
+        Assert.Equal(300.0, updated.UsedGramsCo2E);
+        Assert.Equal(700.0, updated.RemainingGramsCo2E);
     }
 
     [Fact]
@@ -222,8 +222,8 @@ public class CarbonAwareLifecycleTests : IDisposable
         {
             TenantId = "tenant-reset",
             BudgetPeriod = CarbonBudgetPeriod.Monthly,
-            BudgetGramsCO2e = 500.0,
-            UsedGramsCO2e = 350.0,
+            BudgetGramsCo2E = 500.0,
+            UsedGramsCo2E = 350.0,
             ThrottleThresholdPercent = 80.0,
             HardLimitPercent = 100.0,
             PeriodStart = pastPeriodStart,
@@ -235,7 +235,7 @@ public class CarbonAwareLifecycleTests : IDisposable
 
         var reset = await store.GetAsync("tenant-reset");
         Assert.NotNull(reset);
-        Assert.Equal(0.0, reset.UsedGramsCO2e);
+        Assert.Equal(0.0, reset.UsedGramsCo2E);
         Assert.True(reset.PeriodEnd > DateTimeOffset.UtcNow,
             "Period end should be advanced past current time");
     }
@@ -338,13 +338,13 @@ public class CarbonAwareLifecycleTests : IDisposable
 
         Assert.NotEmpty(entries);
 
-        var totalEmissions = entries.Sum(e => e.EmissionsGramsCO2e);
+        var totalEmissions = entries.Sum(e => e.EmissionsGramsCo2E);
         // 100 Wh * 400 gCO2e/kWh / 1000 = 40 gCO2e
         Assert.True(totalEmissions >= 30.0 && totalEmissions <= 50.0,
             $"Expected ~40g CO2e, got {totalEmissions:F4}g");
 
         Assert.All(entries, e =>
-            Assert.Equal(GhgScopeCategory.Scope2_PurchasedElectricity, e.Scope));
+            Assert.Equal(GhgScopeCategory.Scope2PurchasedElectricity, e.Scope));
 
         await strategy.DisposeAsync();
     }
@@ -383,8 +383,8 @@ public class CarbonAwareLifecycleTests : IDisposable
             e.Category.Contains("transfer", StringComparison.OrdinalIgnoreCase));
 
         Assert.NotNull(transferEntry);
-        Assert.Equal(GhgScopeCategory.Scope3_ValueChain, transferEntry.Scope);
-        Assert.True(transferEntry.EmissionsGramsCO2e > 0,
+        Assert.Equal(GhgScopeCategory.Scope3ValueChain, transferEntry.Scope);
+        Assert.True(transferEntry.EmissionsGramsCo2E > 0,
             "Data transfer should produce Scope 3 emissions");
 
         await strategy.DisposeAsync();
@@ -420,7 +420,7 @@ public class CarbonAwareLifecycleTests : IDisposable
         var summary = await service.GetCarbonSummaryAsync();
 
         Assert.NotNull(summary);
-        Assert.True(summary.TotalEmissionsGramsCO2e >= 0, "Emissions should be non-negative");
+        Assert.True(summary.TotalEmissionsGramsCo2E >= 0, "Emissions should be non-negative");
         Assert.True(summary.TotalEnergyWh >= 0, "Energy should be non-negative");
         Assert.True(summary.RenewablePercentage >= 0 && summary.RenewablePercentage <= 100,
             "Renewable % should be between 0 and 100");
@@ -573,7 +573,7 @@ public class CarbonAwareLifecycleTests : IDisposable
 
         Assert.Equal(2, topEmitters.Count);
         Assert.Equal("tenant-c", topEmitters[0].TenantId);
-        Assert.Equal(800.0, topEmitters[0].TotalEmissionsGramsCO2e);
+        Assert.Equal(800.0, topEmitters[0].TotalEmissionsGramsCo2E);
         Assert.Equal("tenant-a", topEmitters[1].TenantId);
 
         await strategy.DisposeAsync();
@@ -654,7 +654,7 @@ public class CarbonAwareLifecycleTests : IDisposable
         Assert.NotNull(report.ReportId);
 
         // Verify data quality tagging
-        var scope2Entries = report.Entries.Where(e => e.Scope == GhgScopeCategory.Scope2_PurchasedElectricity).ToList();
+        var scope2Entries = report.Entries.Where(e => e.Scope == GhgScopeCategory.Scope2PurchasedElectricity).ToList();
         Assert.NotEmpty(scope2Entries);
         // Since we used RAPL source, data quality should be Measured
         Assert.Contains(scope2Entries, e => e.DataQuality == DataQualityLevel.Measured);
@@ -684,8 +684,8 @@ public class CarbonAwareLifecycleTests : IDisposable
 
         // Verify budget tracking
         var budget = await enforcement.GetBudgetAsync("e2e-tenant");
-        Assert.True(budget.UsedGramsCO2e > 0, "Budget should track usage");
-        Assert.True(budget.RemainingGramsCO2e < 1000.0, "Remaining should decrease");
+        Assert.True(budget.UsedGramsCo2E > 0, "Budget should track usage");
+        Assert.True(budget.RemainingGramsCo2E < 1000.0, "Remaining should decrease");
 
         // Set up reporting
         var ghgStrategy = new GhgProtocolReportingStrategy();
@@ -712,7 +712,7 @@ public class CarbonAwareLifecycleTests : IDisposable
             now.AddMinutes(-1), now.AddMinutes(1), "e2e-tenant");
 
         Assert.NotEmpty(entries);
-        var totalReported = entries.Sum(e => e.EmissionsGramsCO2e);
+        var totalReported = entries.Sum(e => e.EmissionsGramsCo2E);
         Assert.True(totalReported > 0, "Report should show emissions");
 
         // Verify throttle state is still nominal

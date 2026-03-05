@@ -170,10 +170,10 @@ public class CoApProtocolStrategy : ProtocolStrategyBase
         // For now, construct proper response based on method
         var responseCode = method switch
         {
-            CoApMethod.GET => 205, // 2.05 Content
-            CoApMethod.POST => 201, // 2.01 Created
-            CoApMethod.PUT => 204, // 2.04 Changed
-            CoApMethod.DELETE => 202, // 2.02 Deleted
+            CoApMethod.Get => 205, // 2.05 Content
+            CoApMethod.Post => 201, // 2.01 Created
+            CoApMethod.Put => 204, // 2.04 Changed
+            CoApMethod.Delete => 202, // 2.02 Deleted
             _ => 400
         };
 
@@ -200,10 +200,10 @@ public class CoApProtocolStrategy : ProtocolStrategyBase
         // Code: class(3 bits) . detail(5 bits)
         byte code = method switch
         {
-            CoApMethod.GET => 0x01,    // 0.01 GET
-            CoApMethod.POST => 0x02,   // 0.02 POST
-            CoApMethod.PUT => 0x03,    // 0.03 PUT
-            CoApMethod.DELETE => 0x04, // 0.04 DELETE
+            CoApMethod.Get => 0x01,    // 0.01 GET
+            CoApMethod.Post => 0x02,   // 0.02 POST
+            CoApMethod.Put => 0x03,    // 0.03 PUT
+            CoApMethod.Delete => 0x04, // 0.04 DELETE
             _ => 0x01
         };
         packet.Add(code);

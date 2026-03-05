@@ -57,10 +57,10 @@ public enum MqttQoS
 /// </summary>
 public enum CoApMethod
 {
-    GET,
-    POST,
-    PUT,
-    DELETE
+    Get,
+    Post,
+    Put,
+    Delete
 }
 
 /// <summary>

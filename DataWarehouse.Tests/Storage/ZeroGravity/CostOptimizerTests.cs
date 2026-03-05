@@ -88,17 +88,17 @@ public sealed class CostOptimizerTests
         var spotPricing = new List<SpotPricing>
         {
             new SpotPricing(
-                Provider: CloudProvider.AWS,
+                Provider: CloudProvider.Aws,
                 Region: "us-east-1",
                 StorageClass: "Standard",
-                CurrentPricePerGBMonth: 0.023m,
-                SpotPricePerGBMonth: 0.010m,
+                CurrentPricePerGbMonth: 0.023m,
+                SpotPricePerGbMonth: 0.010m,
                 SavingsPercent: 56.5,
-                AvailableCapacityGB: 10000,
+                AvailableCapacityGb: 10000,
                 InterruptionProbability: 0.05)
         };
 
-        var provider = new TestBillingProvider(CloudProvider.AWS, spotPricing: spotPricing);
+        var provider = new TestBillingProvider(CloudProvider.Aws, spotPricing: spotPricing);
         var optimizer = new StorageCostOptimizer(
             new[] { provider },
             new StorageCostOptimizerOptions { MinMonthlySavings = 10m });
@@ -117,17 +117,17 @@ public sealed class CostOptimizerTests
         var spotPricing = new List<SpotPricing>
         {
             new SpotPricing(
-                Provider: CloudProvider.AWS,
+                Provider: CloudProvider.Aws,
                 Region: "us-east-1",
                 StorageClass: "Standard",
-                CurrentPricePerGBMonth: 0.023m,
-                SpotPricePerGBMonth: 0.005m,
+                CurrentPricePerGbMonth: 0.023m,
+                SpotPricePerGbMonth: 0.005m,
                 SavingsPercent: 78.0,
-                AvailableCapacityGB: 5000,
+                AvailableCapacityGb: 5000,
                 InterruptionProbability: 0.50) // 50% interruption risk - too high
         };
 
-        var provider = new TestBillingProvider(CloudProvider.AWS, spotPricing: spotPricing);
+        var provider = new TestBillingProvider(CloudProvider.Aws, spotPricing: spotPricing);
         var optimizer = new StorageCostOptimizer(
             new[] { provider },
             new StorageCostOptimizerOptions { MaxSpotInterruptionRisk = 0.10 });
@@ -146,7 +146,7 @@ public sealed class CostOptimizerTests
     {
         var report = new BillingReport(
             ProviderId: "aws-1",
-            Provider: CloudProvider.AWS,
+            Provider: CloudProvider.Aws,
             PeriodStart: DateTimeOffset.UtcNow.AddDays(-30),
             PeriodEnd: DateTimeOffset.UtcNow,
             TotalCost: 500m,
@@ -157,7 +157,7 @@ public sealed class CostOptimizerTests
                 new CostBreakdown(CostCategory.Operations, "S3-Ops", 5m, "Operations", 10, "us-east-1") // Very low ops = cold
             });
 
-        var provider = new TestBillingProvider(CloudProvider.AWS, report: report);
+        var provider = new TestBillingProvider(CloudProvider.Aws, report: report);
         var optimizer = new StorageCostOptimizer(
             new[] { provider },
             new StorageCostOptimizerOptions { ColdTierAccessThresholdPerDay = 1.0, MinMonthlySavings = 10m });
@@ -179,7 +179,7 @@ public sealed class CostOptimizerTests
     {
         var awsReport = new BillingReport(
             ProviderId: "aws-1",
-            Provider: CloudProvider.AWS,
+            Provider: CloudProvider.Aws,
             PeriodStart: DateTimeOffset.UtcNow.AddDays(-30),
             PeriodEnd: DateTimeOffset.UtcNow,
             TotalCost: 2000m,
@@ -192,7 +192,7 @@ public sealed class CostOptimizerTests
 
         var gcpReport = new BillingReport(
             ProviderId: "gcp-1",
-            Provider: CloudProvider.GCP,
+            Provider: CloudProvider.Gcp,
             PeriodStart: DateTimeOffset.UtcNow.AddDays(-30),
             PeriodEnd: DateTimeOffset.UtcNow,
             TotalCost: 500m, // 75% cheaper
@@ -203,8 +203,8 @@ public sealed class CostOptimizerTests
                 new CostBreakdown(CostCategory.Operations, "GCS-Ops", 100m, "Operations", 50000, "us-central1")
             });
 
-        var awsProvider = new TestBillingProvider(CloudProvider.AWS, report: awsReport);
-        var gcpProvider = new TestBillingProvider(CloudProvider.GCP, report: gcpReport);
+        var awsProvider = new TestBillingProvider(CloudProvider.Aws, report: awsReport);
+        var gcpProvider = new TestBillingProvider(CloudProvider.Gcp, report: gcpReport);
         var optimizer = new StorageCostOptimizer(
             new IBillingProvider[] { awsProvider, gcpProvider },
             new StorageCostOptimizerOptions { MinMonthlySavings = 10m });
@@ -227,19 +227,19 @@ public sealed class CostOptimizerTests
         var spotPricing = new List<SpotPricing>
         {
             new SpotPricing(
-                Provider: CloudProvider.AWS,
+                Provider: CloudProvider.Aws,
                 Region: "us-east-1",
                 StorageClass: "Standard",
-                CurrentPricePerGBMonth: 0.023m,
-                SpotPricePerGBMonth: 0.010m,
+                CurrentPricePerGbMonth: 0.023m,
+                SpotPricePerGbMonth: 0.010m,
                 SavingsPercent: 56.5,
-                AvailableCapacityGB: 10000,
+                AvailableCapacityGb: 10000,
                 InterruptionProbability: 0.05)
         };
 
         var report = new BillingReport(
             ProviderId: "aws-1",
-            Provider: CloudProvider.AWS,
+            Provider: CloudProvider.Aws,
             PeriodStart: DateTimeOffset.UtcNow.AddDays(-30),
             PeriodEnd: DateTimeOffset.UtcNow,
             TotalCost: 1000m,
@@ -250,7 +250,7 @@ public sealed class CostOptimizerTests
                 new CostBreakdown(CostCategory.Operations, "S3-Ops", 5m, "Operations", 10, "us-east-1")
             });
 
-        var provider = new TestBillingProvider(CloudProvider.AWS, report: report, spotPricing: spotPricing);
+        var provider = new TestBillingProvider(CloudProvider.Aws, report: report, spotPricing: spotPricing);
         var optimizer = new StorageCostOptimizer(
             new[] { provider },
             new StorageCostOptimizerOptions { MinMonthlySavings = 10m });
@@ -272,7 +272,7 @@ public sealed class CostOptimizerTests
     {
         var report = new BillingReport(
             ProviderId: "aws-1",
-            Provider: CloudProvider.AWS,
+            Provider: CloudProvider.Aws,
             PeriodStart: DateTimeOffset.UtcNow.AddDays(-30),
             PeriodEnd: DateTimeOffset.UtcNow,
             TotalCost: 500m,
@@ -283,7 +283,7 @@ public sealed class CostOptimizerTests
                 new CostBreakdown(CostCategory.Operations, "S3-Ops", 5m, "Operations", 10, "us-east-1")
             });
 
-        var provider = new TestBillingProvider(CloudProvider.AWS, report: report);
+        var provider = new TestBillingProvider(CloudProvider.Aws, report: report);
         var optimizer = new StorageCostOptimizer(
             new[] { provider },
             new StorageCostOptimizerOptions { MinMonthlySavings = 10m });

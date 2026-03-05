@@ -242,7 +242,7 @@ public sealed class VectorShard : IDisposable
             new BoundedCacheOptions<long, float[]>
             {
                 MaxEntries = maxEntries,
-                EvictionPolicy = CacheEvictionMode.LRU
+                EvictionPolicy = CacheEvictionMode.Lru
             });
     }
 
@@ -426,7 +426,7 @@ public sealed class SearchScalingManager : IScalableSubsystem, IDisposable
             new BoundedCacheOptions<string, PostingList>
             {
                 MaxEntries = _currentLimits.MaxCacheEntries,
-                EvictionPolicy = CacheEvictionMode.LRU
+                EvictionPolicy = CacheEvictionMode.Lru
             });
 
         // Initialize vector shards

@@ -142,7 +142,7 @@ public sealed class PipelineScalingManager : IScalableSubsystem, IDisposable
             new BoundedCacheOptions<string, List<PipelineStageCapturedState>>
             {
                 MaxEntries = Math.Min(_currentLimits.MaxCacheEntries, 10_000),
-                EvictionPolicy = CacheEvictionMode.LRU
+                EvictionPolicy = CacheEvictionMode.Lru
             });
     }
 

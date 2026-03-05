@@ -161,7 +161,7 @@ public sealed class ElectricityMapsApiStrategy : SustainabilityStrategyBase
             {
                 Region = zone,
                 Timestamp = intensity.UpdatedAt ?? DateTimeOffset.UtcNow,
-                CarbonIntensityGCO2ePerKwh = intensity.CarbonIntensity ?? 475.0,
+                CarbonIntensityGco2EPerKwh = intensity.CarbonIntensity ?? 475.0,
                 RenewablePercentage = breakdown.RenewablePercentage ?? 30.0,
                 Source = GridDataSource.ElectricityMaps,
                 ForecastHours = 0,
@@ -169,7 +169,7 @@ public sealed class ElectricityMapsApiStrategy : SustainabilityStrategyBase
             };
 
             _cache[cacheKey] = (data, DateTimeOffset.UtcNow.AddSeconds(CacheTtlSeconds));
-            RecordSample(0, data.CarbonIntensityGCO2ePerKwh);
+            RecordSample(0, data.CarbonIntensityGco2EPerKwh);
             return data;
         }
         catch (Exception)
@@ -340,7 +340,7 @@ public sealed class ElectricityMapsApiStrategy : SustainabilityStrategyBase
                 {
                     Region = zone,
                     Timestamp = DateTimeOffset.UtcNow,
-                    CarbonIntensityGCO2ePerKwh = avgIntensity,
+                    CarbonIntensityGco2EPerKwh = avgIntensity,
                     RenewablePercentage = EstimateRenewableFromIntensity(avgIntensity),
                     Source = GridDataSource.ElectricityMaps,
                     ForecastHours = Math.Max(1, forecastHours),
@@ -379,7 +379,7 @@ public sealed class ElectricityMapsApiStrategy : SustainabilityStrategyBase
         {
             Region = zone,
             Timestamp = DateTimeOffset.UtcNow,
-            CarbonIntensityGCO2ePerKwh = 475.0,
+            CarbonIntensityGco2EPerKwh = 475.0,
             RenewablePercentage = 30.0,
             Source = GridDataSource.Estimation,
             ForecastHours = forecastHours,

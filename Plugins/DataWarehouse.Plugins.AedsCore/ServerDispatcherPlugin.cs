@@ -69,7 +69,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
         await _queueLock.WaitAsync(ct);
         try
         {
-            if (_jobs.Count >= MaxQueueDepth)
+            if (Jobs.Count >= MaxQueueDepth)
             {
                 _logger.LogWarning("Job queue depth limit reached ({MaxDepth}). Rejecting new job.", MaxQueueDepth);
                 throw new InvalidOperationException($"Job queue is full ({MaxQueueDepth} jobs). Cannot accept new jobs.");
@@ -88,7 +88,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
                 CompletedAt: null
             );
 
-            _jobs[jobId] = job;
+            Jobs[jobId] = job;
 
             _logger.LogInformation(
                 "Queued job {JobId} for manifest {ManifestId} targeting {TargetCount} recipients (mode: {DeliveryMode}, priority: {Priority})",
@@ -113,22 +113,22 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
         {
             _logger.LogInformation("Starting processing for job {JobId}", jobId);
 
-            await _lock.WaitAsync(ct);
+            await Lock.WaitAsync(ct);
             DistributionJob job;
             try
             {
-                if (!_jobs.TryGetValue(jobId, out job!))
+                if (!Jobs.TryGetValue(jobId, out job!))
                 {
                     _logger.LogError("Job {JobId} not found in job store", jobId);
                     return;
                 }
 
                 // Update status to InProgress
-                _jobs[jobId] = job with { Status = JobStatus.InProgress };
+                Jobs[jobId] = job with { Status = JobStatus.InProgress };
             }
             finally
             {
-                _lock.Release();
+                Lock.Release();
             }
 
             var manifest = job.Manifest;
@@ -174,14 +174,14 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
             }
 
             // Update final status
-            await _lock.WaitAsync(ct);
+            await Lock.WaitAsync(ct);
             try
             {
                 var finalStatus = failed == 0 ? JobStatus.Completed :
                                  delivered == 0 ? JobStatus.Failed :
                                  JobStatus.PartiallyCompleted;
 
-                _jobs[jobId] = job with
+                Jobs[jobId] = job with
                 {
                     Status = finalStatus,
                     DeliveredCount = delivered,
@@ -200,19 +200,19 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
             }
             finally
             {
-                _lock.Release();
+                Lock.Release();
             }
         }
         catch (OperationCanceledException)
         {
             _logger.LogWarning("Job {JobId} processing was cancelled", jobId);
 
-            await _lock.WaitAsync(CancellationToken.None);
+            await Lock.WaitAsync(CancellationToken.None);
             try
             {
-                if (_jobs.TryGetValue(jobId, out var job))
+                if (Jobs.TryGetValue(jobId, out var job))
                 {
-                    _jobs[jobId] = job with
+                    Jobs[jobId] = job with
                     {
                         Status = JobStatus.Cancelled,
                         CompletedAt = DateTimeOffset.UtcNow
@@ -221,7 +221,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
             }
             finally
             {
-                _lock.Release();
+                Lock.Release();
             }
         }
         catch (Exception ex)
@@ -229,12 +229,12 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
             _logger.LogError(ex, "Unhandled exception during job {JobId} processing", jobId);
             Interlocked.Increment(ref _totalJobsFailed);
 
-            await _lock.WaitAsync(CancellationToken.None);
+            await Lock.WaitAsync(CancellationToken.None);
             try
             {
-                if (_jobs.TryGetValue(jobId, out var job))
+                if (Jobs.TryGetValue(jobId, out var job))
                 {
-                    _jobs[jobId] = job with
+                    Jobs[jobId] = job with
                     {
                         Status = JobStatus.Failed,
                         CompletedAt = DateTimeOffset.UtcNow
@@ -243,7 +243,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
             }
             finally
             {
-                _lock.Release();
+                Lock.Release();
             }
         }
         finally
@@ -262,7 +262,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
     {
         var targets = new List<AedsClient>();
 
-        await _lock.WaitAsync(ct);
+        await Lock.WaitAsync(ct);
         try
         {
             switch (manifest.DeliveryMode)
@@ -271,7 +271,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
                     // Direct targeting by ClientID
                     foreach (var targetId in manifest.Targets)
                     {
-                        if (_clients.TryGetValue(targetId, out var client))
+                        if (Clients.TryGetValue(targetId, out var client))
                         {
                             targets.Add(client);
                         }
@@ -286,9 +286,9 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
                     // Send to all clients subscribed to the specified channels
                     foreach (var channelId in manifest.Targets)
                     {
-                        if (_channels.TryGetValue(channelId, out var channel))
+                        if (Channels.TryGetValue(channelId, out var channel))
                         {
-                            var subscribers = _clients.Values
+                            var subscribers = Clients.Values
                                 .Where(c => c.SubscribedChannels.Contains(channelId) &&
                                            c.TrustLevel >= channel.MinTrustLevel)
                                 .ToList();
@@ -316,7 +316,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
         }
         finally
         {
-            _lock.Release();
+            Lock.Release();
         }
 
         // Remove duplicates
@@ -326,7 +326,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
     /// <inheritdoc />
     protected override async Task<AedsClient> CreateClientAsync(ClientRegistration registration, CancellationToken ct)
     {
-        await _lock.WaitAsync(ct);
+        await Lock.WaitAsync(ct);
         try
         {
             var clientId = $"client-{Guid.NewGuid():N}";
@@ -343,7 +343,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
                 Capabilities = registration.Capabilities
             };
 
-            _clients[clientId] = client;
+            Clients[clientId] = client;
 
             _logger.LogInformation(
                 "Registered new client {ClientId} (name: {ClientName}, capabilities: {Capabilities}, PIN: {Pin})",
@@ -353,14 +353,14 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
         }
         finally
         {
-            _lock.Release();
+            Lock.Release();
         }
     }
 
     /// <inheritdoc />
     protected override async Task<DistributionChannel> CreateChannelInternalAsync(ChannelCreation channel, CancellationToken ct)
     {
-        await _lock.WaitAsync(ct);
+        await Lock.WaitAsync(ct);
         try
         {
             var channelId = $"channel-{Guid.NewGuid():N}";
@@ -376,7 +376,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
                 CreatedAt = DateTimeOffset.UtcNow
             };
 
-            _channels[channelId] = distributionChannel;
+            Channels[channelId] = distributionChannel;
 
             _logger.LogInformation(
                 "Created distribution channel {ChannelId} (name: {Name}, type: {Type}, minTrust: {MinTrust})",
@@ -386,7 +386,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
         }
         finally
         {
-            _lock.Release();
+            Lock.Release();
         }
     }
 
@@ -399,12 +399,12 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
     /// <returns>Task representing the async operation.</returns>
     public async Task UpdateHeartbeatAsync(string clientId, ClientStatus status, CancellationToken ct = default)
     {
-        await _lock.WaitAsync(ct);
+        await Lock.WaitAsync(ct);
         try
         {
-            if (_clients.TryGetValue(clientId, out var client))
+            if (Clients.TryGetValue(clientId, out var client))
             {
-                _clients[clientId] = client with { LastHeartbeat = DateTimeOffset.UtcNow };
+                Clients[clientId] = client with { LastHeartbeat = DateTimeOffset.UtcNow };
                 _logger.LogDebug("Updated heartbeat for client {ClientId} (status: {Status})", clientId, status);
             }
             else
@@ -414,7 +414,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
         }
         finally
         {
-            _lock.Release();
+            Lock.Release();
         }
     }
 
@@ -427,16 +427,16 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
     /// <returns>True if subscription succeeded, false otherwise.</returns>
     public async Task<bool> SubscribeClientAsync(string clientId, string channelId, CancellationToken ct = default)
     {
-        await _lock.WaitAsync(ct);
+        await Lock.WaitAsync(ct);
         try
         {
-            if (!_clients.TryGetValue(clientId, out var client))
+            if (!Clients.TryGetValue(clientId, out var client))
             {
                 _logger.LogWarning("Cannot subscribe unknown client {ClientId} to channel {ChannelId}", clientId, channelId);
                 return false;
             }
 
-            if (!_channels.TryGetValue(channelId, out var channel))
+            if (!Channels.TryGetValue(channelId, out var channel))
             {
                 _logger.LogWarning("Cannot subscribe client {ClientId} to unknown channel {ChannelId}", clientId, channelId);
                 return false;
@@ -455,10 +455,10 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
             if (!client.SubscribedChannels.Contains(channelId))
             {
                 var updatedChannels = client.SubscribedChannels.Append(channelId).ToArray();
-                _clients[clientId] = client with { SubscribedChannels = updatedChannels };
+                Clients[clientId] = client with { SubscribedChannels = updatedChannels };
 
                 // Update subscriber count
-                _channels[channelId] = channel with { SubscriberCount = channel.SubscriberCount + 1 };
+                Channels[channelId] = channel with { SubscriberCount = channel.SubscriberCount + 1 };
 
                 _logger.LogInformation("Client {ClientId} subscribed to channel {ChannelId}", clientId, channelId);
             }
@@ -467,7 +467,7 @@ public class ServerDispatcherPlugin : ServerDispatcherPluginBase
         }
         finally
         {
-            _lock.Release();
+            Lock.Release();
         }
     }
 

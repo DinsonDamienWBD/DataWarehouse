@@ -106,7 +106,7 @@ public sealed class GovernanceScalingManager : IScalableSubsystem, IDisposable
         _policies = new BoundedCache<string, byte[]>(new BoundedCacheOptions<string, byte[]>
         {
             MaxEntries = DefaultMaxPolicies,
-            EvictionPolicy = CacheEvictionMode.TTL,
+            EvictionPolicy = CacheEvictionMode.Ttl,
             DefaultTtl = _ttl,
             BackingStore = _backingStore,
             BackingStorePath = $"{BackingStorePrefix}/policies",
@@ -120,7 +120,7 @@ public sealed class GovernanceScalingManager : IScalableSubsystem, IDisposable
         _ownerships = new BoundedCache<string, byte[]>(new BoundedCacheOptions<string, byte[]>
         {
             MaxEntries = DefaultMaxOwnerships,
-            EvictionPolicy = CacheEvictionMode.TTL,
+            EvictionPolicy = CacheEvictionMode.Ttl,
             DefaultTtl = _ttl,
             BackingStore = _backingStore,
             BackingStorePath = $"{BackingStorePrefix}/ownerships",
@@ -134,7 +134,7 @@ public sealed class GovernanceScalingManager : IScalableSubsystem, IDisposable
         _classifications = new BoundedCache<string, byte[]>(new BoundedCacheOptions<string, byte[]>
         {
             MaxEntries = DefaultMaxClassifications,
-            EvictionPolicy = CacheEvictionMode.TTL,
+            EvictionPolicy = CacheEvictionMode.Ttl,
             DefaultTtl = _ttl,
             BackingStore = _backingStore,
             BackingStorePath = $"{BackingStorePrefix}/classifications",

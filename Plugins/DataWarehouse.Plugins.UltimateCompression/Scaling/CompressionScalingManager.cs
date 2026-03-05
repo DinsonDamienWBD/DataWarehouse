@@ -127,14 +127,14 @@ public sealed class CompressionScalingManager : IScalableSubsystem, IDisposable
             new BoundedCacheOptions<string, byte[]>
             {
                 MaxEntries = Math.Min(_currentLimits.MaxCacheEntries, 1_000),
-                EvictionPolicy = CacheEvictionMode.LRU
+                EvictionPolicy = CacheEvictionMode.Lru
             });
 
         _compressionRatioCache = new BoundedCache<string, long>(
             new BoundedCacheOptions<string, long>
             {
                 MaxEntries = Math.Min(_currentLimits.MaxCacheEntries, 50_000),
-                EvictionPolicy = CacheEvictionMode.TTL,
+                EvictionPolicy = CacheEvictionMode.Ttl,
                 DefaultTtl = TimeSpan.FromMinutes(10)
             });
 

@@ -121,7 +121,7 @@ public sealed class ComplianceScalingManager : IScalableSubsystem, IDisposable
             new BoundedCacheOptions<string, ComplianceResult>
             {
                 MaxEntries = resultCacheCapacity,
-                EvictionPolicy = CacheEvictionMode.TTL,
+                EvictionPolicy = CacheEvictionMode.Ttl,
                 DefaultTtl = _resultTtl
             });
 

@@ -128,7 +128,7 @@ public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
         var topologyCacheOptions = new BoundedCacheOptions<string, int>
         {
             MaxEntries = 100,
-            EvictionPolicy = CacheEvictionMode.LRU
+            EvictionPolicy = CacheEvictionMode.Lru
         };
         _topologyMaxNodes = new BoundedCache<string, int>(topologyCacheOptions);
         _topologyMaxNodes.Put(FabricTopology.Star.ToString(), DefaultStarMaxNodes);
@@ -139,7 +139,7 @@ public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
         var healthCacheOptions = new BoundedCacheOptions<string, NodeHealth>
         {
             MaxEntries = 50_000,
-            EvictionPolicy = CacheEvictionMode.LRU
+            EvictionPolicy = CacheEvictionMode.Lru
         };
         _nodeHealth = new BoundedCache<string, NodeHealth>(healthCacheOptions);
 
@@ -147,7 +147,7 @@ public sealed class FabricScalingManager : IScalableSubsystem, IDisposable
         var recCacheOptions = new BoundedCacheOptions<string, TopologySwitchRecommendation>
         {
             MaxEntries = 100,
-            EvictionPolicy = CacheEvictionMode.TTL,
+            EvictionPolicy = CacheEvictionMode.Ttl,
             DefaultTtl = TimeSpan.FromHours(1)
         };
         _switchRecommendations = new BoundedCache<string, TopologySwitchRecommendation>(recCacheOptions);

@@ -304,11 +304,11 @@ public class VdeFormatModuleTests
     public void RegionPointerTable_MutableSlots_Assignment()
     {
         var rpt = new RegionPointerTable();
-        var pointer = new RegionPointer(BlockTypeTags.POLV, RegionFlags.Active, 10, 2, 0);
+        var pointer = new RegionPointer(BlockTypeTags.Polv, RegionFlags.Active, 10, 2, 0);
         rpt.SetSlot(0, pointer);
         var retrieved = rpt.GetSlot(0);
         Assert.Equal(pointer, retrieved);
-        Assert.Equal(BlockTypeTags.POLV, retrieved.RegionTypeId);
+        Assert.Equal(BlockTypeTags.Polv, retrieved.RegionTypeId);
     }
 
     [Fact]
@@ -355,7 +355,7 @@ public class VdeFormatModuleTests
         // Write some payload
         block[0] = 0xAB;
         block[1] = 0xCD;
-        UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.DATA, 1);
+        UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Data, 1);
         Assert.True(UniversalBlockTrailer.Verify(block, blockSize));
     }
 
@@ -363,11 +363,11 @@ public class VdeFormatModuleTests
     public void UniversalBlockTrailer_BlockTypeTag_BigEndian()
     {
         // SUPB = 0x53555042 which is 'S','U','P','B' in big-endian
-        string tag = BlockTypeTags.TagToString(BlockTypeTags.SUPB);
+        string tag = BlockTypeTags.TagToString(BlockTypeTags.Supb);
         Assert.Equal("SUPB", tag);
 
         uint roundTrip = BlockTypeTags.StringToTag("SUPB");
-        Assert.Equal(BlockTypeTags.SUPB, roundTrip);
+        Assert.Equal(BlockTypeTags.Supb, roundTrip);
     }
 
     [Fact]
@@ -375,10 +375,10 @@ public class VdeFormatModuleTests
     {
         int blockSize = 4096;
         var block = new byte[blockSize];
-        UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.DATA, 42);
+        UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Data, 42);
 
         var trailer = UniversalBlockTrailer.Read(block, blockSize);
-        Assert.Equal(BlockTypeTags.DATA, trailer.BlockTypeTag);
+        Assert.Equal(BlockTypeTags.Data, trailer.BlockTypeTag);
         Assert.Equal(42u, trailer.GenerationNumber);
         Assert.True(UniversalBlockTrailer.Verify(block, blockSize));
     }
@@ -388,7 +388,7 @@ public class VdeFormatModuleTests
     {
         int blockSize = 4096;
         var block = new byte[blockSize];
-        UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.DATA, 1);
+        UniversalBlockTrailer.Write(block, blockSize, BlockTypeTags.Data, 1);
         // Corrupt payload
         block[0] ^= 0xFF;
         Assert.False(UniversalBlockTrailer.Verify(block, blockSize));
@@ -474,14 +474,14 @@ public class VdeFormatModuleTests
     {
         var tags = new HashSet<uint>
         {
-            BlockTypeTags.SUPB, BlockTypeTags.RMAP, BlockTypeTags.POLV, BlockTypeTags.ENCR,
-            BlockTypeTags.BMAP, BlockTypeTags.INOD, BlockTypeTags.TAGI, BlockTypeTags.MWAL,
-            BlockTypeTags.MTRK, BlockTypeTags.BTRE, BlockTypeTags.SNAP, BlockTypeTags.REPL,
-            BlockTypeTags.RAID, BlockTypeTags.COMP, BlockTypeTags.INTE, BlockTypeTags.STRE,
-            BlockTypeTags.XREF, BlockTypeTags.WORM, BlockTypeTags.CODE, BlockTypeTags.DWAL,
-            BlockTypeTags.DATA, BlockTypeTags.FREE, BlockTypeTags.CMVT, BlockTypeTags.ALOG,
-            BlockTypeTags.CLOG, BlockTypeTags.DICT, BlockTypeTags.ANON, BlockTypeTags.MLOG,
-            BlockTypeTags.ERCV
+            BlockTypeTags.Supb, BlockTypeTags.Rmap, BlockTypeTags.Polv, BlockTypeTags.Encr,
+            BlockTypeTags.Bmap, BlockTypeTags.Inod, BlockTypeTags.Tagi, BlockTypeTags.Mwal,
+            BlockTypeTags.Mtrk, BlockTypeTags.Btre, BlockTypeTags.Snap, BlockTypeTags.Repl,
+            BlockTypeTags.Raid, BlockTypeTags.Comp, BlockTypeTags.Inte, BlockTypeTags.Stre,
+            BlockTypeTags.Xref, BlockTypeTags.Worm, BlockTypeTags.Code, BlockTypeTags.Dwal,
+            BlockTypeTags.Data, BlockTypeTags.Free, BlockTypeTags.Cmvt, BlockTypeTags.Alog,
+            BlockTypeTags.Clog, BlockTypeTags.Dict, BlockTypeTags.Anon, BlockTypeTags.Mlog,
+            BlockTypeTags.Ercv
         };
         Assert.True(tags.Count >= 28);
     }
@@ -491,14 +491,14 @@ public class VdeFormatModuleTests
     {
         var tags = new[]
         {
-            BlockTypeTags.SUPB, BlockTypeTags.RMAP, BlockTypeTags.POLV, BlockTypeTags.ENCR,
-            BlockTypeTags.BMAP, BlockTypeTags.INOD, BlockTypeTags.TAGI, BlockTypeTags.MWAL,
-            BlockTypeTags.MTRK, BlockTypeTags.BTRE, BlockTypeTags.SNAP, BlockTypeTags.REPL,
-            BlockTypeTags.RAID, BlockTypeTags.COMP, BlockTypeTags.INTE, BlockTypeTags.STRE,
-            BlockTypeTags.XREF, BlockTypeTags.WORM, BlockTypeTags.CODE, BlockTypeTags.DWAL,
-            BlockTypeTags.DATA, BlockTypeTags.FREE, BlockTypeTags.CMVT, BlockTypeTags.ALOG,
-            BlockTypeTags.CLOG, BlockTypeTags.DICT, BlockTypeTags.ANON, BlockTypeTags.MLOG,
-            BlockTypeTags.ERCV
+            BlockTypeTags.Supb, BlockTypeTags.Rmap, BlockTypeTags.Polv, BlockTypeTags.Encr,
+            BlockTypeTags.Bmap, BlockTypeTags.Inod, BlockTypeTags.Tagi, BlockTypeTags.Mwal,
+            BlockTypeTags.Mtrk, BlockTypeTags.Btre, BlockTypeTags.Snap, BlockTypeTags.Repl,
+            BlockTypeTags.Raid, BlockTypeTags.Comp, BlockTypeTags.Inte, BlockTypeTags.Stre,
+            BlockTypeTags.Xref, BlockTypeTags.Worm, BlockTypeTags.Code, BlockTypeTags.Dwal,
+            BlockTypeTags.Data, BlockTypeTags.Free, BlockTypeTags.Cmvt, BlockTypeTags.Alog,
+            BlockTypeTags.Clog, BlockTypeTags.Dict, BlockTypeTags.Anon, BlockTypeTags.Mlog,
+            BlockTypeTags.Ercv
         };
         Assert.Equal(tags.Length, tags.Distinct().Count());
     }
@@ -518,8 +518,8 @@ public class VdeFormatModuleTests
     [Fact]
     public void BlockTypeTags_IsKnownTag_RecognizesDefinedTags()
     {
-        Assert.True(BlockTypeTags.IsKnownTag(BlockTypeTags.SUPB));
-        Assert.True(BlockTypeTags.IsKnownTag(BlockTypeTags.ERCV));
+        Assert.True(BlockTypeTags.IsKnownTag(BlockTypeTags.Supb));
+        Assert.True(BlockTypeTags.IsKnownTag(BlockTypeTags.Ercv));
         Assert.False(BlockTypeTags.IsKnownTag(0x12345678u));
     }
 
@@ -675,9 +675,9 @@ public class VdeFormatModuleTests
     public void RegionDirectory_AddRegion_FindRegion_RoundTrip()
     {
         var dir = new RegionDirectory();
-        int slot = dir.AddRegion(BlockTypeTags.POLV, RegionFlags.None, 10, 2);
+        int slot = dir.AddRegion(BlockTypeTags.Polv, RegionFlags.None, 10, 2);
         Assert.Equal(0, slot);
-        int found = dir.FindRegion(BlockTypeTags.POLV);
+        int found = dir.FindRegion(BlockTypeTags.Polv);
         Assert.Equal(0, found);
         Assert.Equal(1, dir.ActiveRegionCount);
     }
@@ -687,8 +687,8 @@ public class VdeFormatModuleTests
     {
         int blockSize = 4096;
         var dir = new RegionDirectory { Generation = 7 };
-        dir.AddRegion(BlockTypeTags.POLV, RegionFlags.None, 10, 2);
-        dir.AddRegion(BlockTypeTags.TAGI, RegionFlags.None, 20, 64);
+        dir.AddRegion(BlockTypeTags.Polv, RegionFlags.None, 10, 2);
+        dir.AddRegion(BlockTypeTags.Tagi, RegionFlags.None, 20, 64);
 
         var buffer = new byte[2 * blockSize];
         dir.Serialize(buffer, blockSize);
@@ -696,14 +696,14 @@ public class VdeFormatModuleTests
         var deserialized = RegionDirectory.Deserialize(buffer, blockSize);
         Assert.Equal(2, deserialized.ActiveRegionCount);
         Assert.Equal(7u, deserialized.Generation);
-        Assert.Equal(0, deserialized.FindRegion(BlockTypeTags.POLV));
-        Assert.Equal(1, deserialized.FindRegion(BlockTypeTags.TAGI));
+        Assert.Equal(0, deserialized.FindRegion(BlockTypeTags.Polv));
+        Assert.Equal(1, deserialized.FindRegion(BlockTypeTags.Tagi));
     }
 
     [Fact]
     public void RegionPointer_SerializeDeserialize_RoundTrip()
     {
-        var original = new RegionPointer(BlockTypeTags.INOD, RegionFlags.Active | RegionFlags.Encrypted, 100, 200, 50);
+        var original = new RegionPointer(BlockTypeTags.Inod, RegionFlags.Active | RegionFlags.Encrypted, 100, 200, 50);
         var buffer = new byte[32];
         RegionPointer.Serialize(original, buffer);
         var deserialized = RegionPointer.Deserialize(buffer);
@@ -753,11 +753,11 @@ public class VdeFormatModuleTests
         var tags = ModuleRegistry.GetRequiredBlockTypeTags(standard);
         Assert.NotEmpty(tags);
         // Security has POLV + ENCR, Compression has DICT, Integrity has MTRK, Snapshot has SNAP
-        Assert.Contains(BlockTypeTags.POLV, tags);
-        Assert.Contains(BlockTypeTags.ENCR, tags);
-        Assert.Contains(BlockTypeTags.DICT, tags);
-        Assert.Contains(BlockTypeTags.MTRK, tags);
-        Assert.Contains(BlockTypeTags.SNAP, tags);
+        Assert.Contains(BlockTypeTags.Polv, tags);
+        Assert.Contains(BlockTypeTags.Encr, tags);
+        Assert.Contains(BlockTypeTags.Dict, tags);
+        Assert.Contains(BlockTypeTags.Mtrk, tags);
+        Assert.Contains(BlockTypeTags.Snap, tags);
     }
 
     [Fact]

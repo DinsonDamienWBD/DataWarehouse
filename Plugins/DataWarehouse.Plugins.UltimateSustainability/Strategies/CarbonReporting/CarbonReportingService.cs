@@ -154,11 +154,11 @@ public sealed class CarbonReportingService : SustainabilityStrategyBase, ICarbon
 
         switch (scope)
         {
-            case GhgScopeCategory.Scope2_PurchasedElectricity:
+            case GhgScopeCategory.Scope2PurchasedElectricity:
                 entries = await _ghgStrategy.GenerateScope2ReportAsync(from, to, tenantId: null, ct);
                 break;
 
-            case GhgScopeCategory.Scope3_ValueChain:
+            case GhgScopeCategory.Scope3ValueChain:
                 entries = await _ghgStrategy.GenerateScope3ReportAsync(from, to, tenantId: null, ct);
                 break;
 
@@ -167,7 +167,7 @@ public sealed class CarbonReportingService : SustainabilityStrategyBase, ICarbon
                 return 0;
         }
 
-        return entries.Sum(e => e.EmissionsGramsCO2e);
+        return entries.Sum(e => e.EmissionsGramsCo2E);
     }
 
     /// <inheritdoc/>
@@ -182,7 +182,7 @@ public sealed class CarbonReportingService : SustainabilityStrategyBase, ICarbon
             .GroupBy(e => e.Region)
             .ToDictionary(
                 g => g.Key,
-                g => Math.Round(g.Sum(e => e.EmissionsGramsCO2e), 4));
+                g => Math.Round(g.Sum(e => e.EmissionsGramsCo2E), 4));
 
         return byRegion;
     }
@@ -198,7 +198,7 @@ public sealed class CarbonReportingService : SustainabilityStrategyBase, ICarbon
 
         // Get total emissions from GHG report
         var entries = await GenerateGhgReportAsync(periodStart, now, tenantId, ct);
-        var totalEmissions = entries.Sum(e => e.EmissionsGramsCO2e);
+        var totalEmissions = entries.Sum(e => e.EmissionsGramsCo2E);
         var totalEnergy = entries.Sum(e => e.EnergyConsumedWh);
 
         // Calculate average renewable percentage from tracked regions
@@ -214,7 +214,7 @@ public sealed class CarbonReportingService : SustainabilityStrategyBase, ICarbon
         // Determine top emitting region
         var regionEmissions = entries
             .GroupBy(e => e.Region)
-            .Select(g => new { Region = g.Key, Total = g.Sum(e => e.EmissionsGramsCO2e) })
+            .Select(g => new { Region = g.Key, Total = g.Sum(e => e.EmissionsGramsCo2E) })
             .OrderByDescending(x => x.Total)
             .FirstOrDefault();
 
@@ -222,7 +222,7 @@ public sealed class CarbonReportingService : SustainabilityStrategyBase, ICarbon
 
         return new CarbonSummary
         {
-            TotalEmissionsGramsCO2e = Math.Round(totalEmissions, 4),
+            TotalEmissionsGramsCo2E = Math.Round(totalEmissions, 4),
             TotalEnergyWh = Math.Round(totalEnergy, 4),
             RenewablePercentage = Math.Round(avgRenewable, 2),
             AvgCarbonIntensity = Math.Round(avgCarbonIntensity, 2),

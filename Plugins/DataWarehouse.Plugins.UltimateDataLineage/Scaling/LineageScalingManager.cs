@@ -360,7 +360,7 @@ public sealed class LineageScalingManager : IScalableSubsystem, IDisposable
         return new BoundedCache<string, byte[]>(new BoundedCacheOptions<string, byte[]>
         {
             MaxEntries = maxEntries,
-            EvictionPolicy = CacheEvictionMode.LRU,
+            EvictionPolicy = CacheEvictionMode.Lru,
             BackingStore = _backingStore,
             BackingStorePath = $"{BackingStorePrefix}/partition-{partitionId}",
             Serializer = static v => v,

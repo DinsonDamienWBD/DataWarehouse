@@ -136,7 +136,7 @@ public sealed class ReplicationScalingManager : IScalableSubsystem, IDisposable
         _strategyRoutes = new BoundedCache<string, string>(new BoundedCacheOptions<string, string>
         {
             MaxEntries = Math.Max(1, _currentLimits.MaxCacheEntries / 10),
-            EvictionPolicy = CacheEvictionMode.LRU
+            EvictionPolicy = CacheEvictionMode.Lru
         });
 
         SubscribeToMessageBus();

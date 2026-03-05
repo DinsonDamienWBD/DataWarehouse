@@ -152,7 +152,7 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
         var cacheOptions = new BoundedCacheOptions<string, StreamCheckpoint>
         {
             MaxEntries = 10_000,
-            EvictionPolicy = CacheEvictionMode.LRU,
+            EvictionPolicy = CacheEvictionMode.Lru,
             BackingStore = _backingStore,
             BackingStorePath = $"dw://streaming/checkpoints/{SubsystemName}/",
             WriteThrough = true,

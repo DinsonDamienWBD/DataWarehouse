@@ -26,21 +26,21 @@ namespace DataWarehouse.Tests.Scaling
             => new()
             {
                 MaxEntries = max,
-                EvictionPolicy = CacheEvictionMode.LRU,
+                EvictionPolicy = CacheEvictionMode.Lru,
             };
 
         private static BoundedCacheOptions<string, string> ArcOptions(int max = 5)
             => new()
             {
                 MaxEntries = max,
-                EvictionPolicy = CacheEvictionMode.ARC,
+                EvictionPolicy = CacheEvictionMode.Arc,
             };
 
         private static BoundedCacheOptions<string, string> TtlOptions(TimeSpan ttl, int max = 1000)
             => new()
             {
                 MaxEntries = max,
-                EvictionPolicy = CacheEvictionMode.TTL,
+                EvictionPolicy = CacheEvictionMode.Ttl,
                 DefaultTtl = ttl,
             };
 
@@ -49,7 +49,7 @@ namespace DataWarehouse.Tests.Scaling
             => new()
             {
                 MaxEntries = max,
-                EvictionPolicy = CacheEvictionMode.LRU,
+                EvictionPolicy = CacheEvictionMode.Lru,
                 BackingStore = store,
                 BackingStorePath = "dw://test/cache/",
                 Serializer = v => Encoding.UTF8.GetBytes(v),
@@ -346,7 +346,7 @@ namespace DataWarehouse.Tests.Scaling
             {
                 AutoSizeFromRam = true,
                 RamPercentage = 0.1,
-                EvictionPolicy = CacheEvictionMode.LRU,
+                EvictionPolicy = CacheEvictionMode.Lru,
             };
             using var cache = new BoundedCache<string, string>(opts);
 

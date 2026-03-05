@@ -131,7 +131,7 @@ public sealed class ConsensusScalingManager : IScalableSubsystem, IDisposable
             new BoundedCacheOptions<string, ConnectionPool>
             {
                 MaxEntries = 1_000,
-                EvictionPolicy = CacheEvictionMode.TTL,
+                EvictionPolicy = CacheEvictionMode.Ttl,
                 DefaultTtl = _idleConnectionTimeout,
                 KeyToString = k => k
             });

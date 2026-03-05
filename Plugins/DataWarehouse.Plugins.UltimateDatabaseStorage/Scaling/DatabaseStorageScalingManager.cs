@@ -104,7 +104,7 @@ public sealed class DatabaseStorageScalingManager : IScalableSubsystem, IDisposa
         var queryCacheOptions = new BoundedCacheOptions<string, byte[]>
         {
             MaxEntries = _currentLimits.MaxCacheEntries,
-            EvictionPolicy = CacheEvictionMode.LRU,
+            EvictionPolicy = CacheEvictionMode.Lru,
             BackingStore = _backingStore,
             BackingStorePath = $"dw://cache/{SubsystemName}/queries/",
             WriteThrough = true,
@@ -118,7 +118,7 @@ public sealed class DatabaseStorageScalingManager : IScalableSubsystem, IDisposa
         var healthCacheOptions = new BoundedCacheOptions<string, StrategyHealthInfo>
         {
             MaxEntries = 1_000,
-            EvictionPolicy = CacheEvictionMode.TTL,
+            EvictionPolicy = CacheEvictionMode.Ttl,
             DefaultTtl = TimeSpan.FromMinutes(5)
         };
         _strategyHealth = new BoundedCache<string, StrategyHealthInfo>(healthCacheOptions);
