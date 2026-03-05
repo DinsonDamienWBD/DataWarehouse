@@ -842,7 +842,7 @@ public sealed class QueryExecutionEngine
                 var pattern = EvaluateExpression(like.Pattern, batch, row)?.ToString();
                 if (likeVal == null || pattern == null) return false;
                 var regex = "^" + Regex.Escape(pattern).Replace("%", ".*").Replace("_", ".") + "$";
-                var match = Regex.IsMatch(likeVal, regex, RegexOptions.IgnoreCase);
+                var match = Regex.IsMatch(likeVal, regex, RegexOptions.IgnoreCase, TimeSpan.FromSeconds(2));
                 return like.Negated ? !match : match;
 
             case FunctionCallExpression func:
