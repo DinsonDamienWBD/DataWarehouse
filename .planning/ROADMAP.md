@@ -2946,8 +2946,8 @@ Plans:
 **Report as**: "Stage 1 - Step 4 - Performance Profile Results"
 **Plans**: 2 plans
 Plans:
-- [ ] 103-01-PLAN.md — dotTrace performance profiling (lock contention, hot-path analysis)
-- [ ] 103-02-PLAN.md — dotMemory memory profiling (LOH allocations, GC pressure)
+- [ ] 103-01-PLAN.md ï¿½ dotTrace performance profiling (lock contention, hot-path analysis)
+- [ ] 103-02-PLAN.md ï¿½ dotMemory memory profiling (LOH allocations, GC pressure)
 
 ### Phase 104: Stage 1, Step 5 â€” Mutation Testing (Stryker)
 **Goal**: Prove test assertions are tight enough that code mutations are caught â€” 95%+ mutation score
@@ -2961,8 +2961,8 @@ Plans:
 **Report as**: "Stage 1 - Step 5 - Stryker Mutation Score"
 **Plans**: 2 plans
 Plans:
-- [ ] 104-01-PLAN.md — Stryker initial mutation analysis run
-- [ ] 104-02-PLAN.md — Tighten assertions for surviving mutants, re-run Stryker
+- [ ] 104-01-PLAN.md ï¿½ Stryker initial mutation analysis run
+- [ ] 104-02-PLAN.md ï¿½ Tighten assertions for surviving mutants, re-run Stryker
 
 ### Phase 105: Stage 2, Step 1 â€” Integration Profiling
 **Goal**: Ensure components don't destroy each other when combined under a realistic 100GB workload
@@ -2981,8 +2981,8 @@ Plans:
 **Report as**: "Stage 2 - Step 1 - Integration Profiling Results"
 **Plans**: 2 plans
 Plans:
-- [ ] 105-01-PLAN.md — Integration harness setup (Kernel + 52 plugins + 100GB streaming)
-- [ ] 105-02-PLAN.md — Integration profiling (cross-boundary bottleneck + memory analysis)
+- [ ] 105-01-PLAN.md ï¿½ Integration harness setup (Kernel + 52 plugins + 100GB streaming)
+- [ ] 105-02-PLAN.md ï¿½ Integration profiling (cross-boundary bottleneck + memory analysis)
 
 ### Phase 106: Stage 2, Step 2 â€” Soak Test Harness
 **Goal**: Prove the system handles sustained continuous load without slow memory leaks or GC degradation
@@ -3001,8 +3001,8 @@ Plans:
 **Report as**: "Stage 2 - Step 2 - Soak Test Results"
 **Plans**: 2 plans
 Plans:
-- [ ] 106-01-PLAN.md — Soak harness implementation (configurable duration + GC monitoring)
-- [ ] 106-02-PLAN.md — Soak test execution (10-min CI run + results report)
+- [ ] 106-01-PLAN.md ï¿½ Soak harness implementation (configurable duration + GC monitoring)
+- [ ] 106-02-PLAN.md ï¿½ Soak test execution (10-min CI run + results report)
 
 ### Phase 107: Stage 3, Steps 1-2 â€” Chaos: Plugin Faults + Concurrent Lifecycle
 **Goal**: Prove the Kernel survives plugin failures and concurrent load/unload without corruption
@@ -3019,7 +3019,10 @@ Plans:
   3. Concurrent lifecycle tests prove no torn state across 100+ load/unload cycles with active I/O
   4. Message bus subscription count returns to expected value after unload
 **Report as**: "Stage 3 - Steps 1-2 - Plugin Fault + Lifecycle Chaos Results"
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 107-01-PLAN.md -- Plugin fault injection
+- [ ] 107-02-PLAN.md -- Concurrent plugin lifecycle
 
 ### Phase 108: Stage 3, Steps 3-4 â€” Chaos: Torn-Write + Resource Exhaustion
 **Goal**: Prove data integrity survives mid-write crashes and the system degrades gracefully under resource starvation
@@ -3036,7 +3039,10 @@ Plans:
   3. RAID parity recovery verified where applicable
   4. Resource exhaustion tests prove clean failure (no hang, no corruption) for ThreadPool, MemoryPool, and disk-full scenarios
 **Report as**: "Stage 3 - Steps 3-4 - Torn-Write + Resource Exhaustion Results"
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 108-01-PLAN.md -- Torn-write recovery
+- [ ] 108-02-PLAN.md -- Resource exhaustion
 
 ### Phase 109: Stage 3, Steps 5-6 â€” Chaos: Message Bus + Federation Partition
 **Goal**: Prove message bus handles disruption without data loss and federation recovers from network partitions
@@ -3054,7 +3060,10 @@ Plans:
   3. Idempotency verified: identical final state regardless of message duplication
   4. CRDT convergence verified within bounded time after partition heal
 **Report as**: "Stage 3 - Steps 5-6 - Message Bus + Federation Partition Results"
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 109-01-PLAN.md -- Message bus disruption
+- [ ] 109-02-PLAN.md -- Federation partition
 
 ### Phase 110: Stage 3, Steps 7-8 â€” Chaos: Malicious Payloads + Clock Skew
 **Goal**: Prove the system rejects hostile inputs without OOM/hang and handles time manipulation without auth bypass
@@ -3071,7 +3080,10 @@ Plans:
   3. All zip bomb / malformed IV tests reject within bounded time and memory
   4. Clock skew of Â±24 hours doesn't bypass any auth, policy, or cache expiry logic
 **Report as**: "Stage 3 - Steps 7-8 - Malicious Payload + Clock Skew Results"
-**Plans**: TBD
+**Plans**: 2 plans
+Plans:
+- [ ] 110-01-PLAN.md -- Malicious payloads
+- [ ] 110-02-PLAN.md -- Clock skew
 
 ### Phase 111: Stage 4 â€” CI/CD Fortress
 **Goal**: Lock down the pipeline so no PR can degrade the hardened state. Leverage full JetBrains dotUltimate suite and GitHub Actions runners for expensive operations.
@@ -3114,7 +3126,11 @@ Plans:
   7. Branch protection rules require `audit-summary` job to pass
   8. All jobs have timeout guards â€” no infinite hangs on throttled runners
 **Report as**: "Stage 4 - CI/CD Fortress Lock-Down Results"
-**Plans**: TBD
+**Plans**: 3 plans
+Plans:
+- [ ] 111-01-PLAN.md -- CI/CD pipeline finalization
+- [ ] 111-02-PLAN.md -- Gate verification
+- [ ] 111-03-PLAN.md -- Final documentation
 
 ### v7.0 Progress
 
@@ -3133,8 +3149,8 @@ Plans:
 | 104 | 1 | Mutation Testing: Stryker 95%+ | 0/TBD | Not started | - |
 | 105 | 2 | Integration Profiling: 100GB payload | 0/TBD | Not started | - |
 | 106 | 2 | Soak Test: continuous load + GC | 0/TBD | Not started | - |
-| 107 | 3 | Chaos: Plugin Faults + Lifecycle | 0/TBD | Not started | - |
-| 108 | 3 | Chaos: Torn-Write + Exhaustion | 0/TBD | Not started | - |
-| 109 | 3 | Chaos: Message Bus + Federation | 0/TBD | Not started | - |
-| 110 | 3 | Chaos: Malicious Payloads + Clock | 0/TBD | Not started | - |
-| 111 | 4 | CI/CD Fortress | 0/TBD | Not started | - |
+| 107 | 3 | Chaos: Plugin Faults + Lifecycle | 0/2 | Planned | - |
+| 108 | 3 | Chaos: Torn-Write + Exhaustion | 0/2 | Planned | - |
+| 109 | 3 | Chaos: Message Bus + Federation | 0/2 | Planned | - |
+| 110 | 3 | Chaos: Malicious Payloads + Clock | 0/2 | Planned | - |
+| 111 | 4 | CI/CD Fortress | 0/3 | Planned | - |
