@@ -116,13 +116,13 @@ public record MetadataCapabilities(
 /// <param name="EnableVersioning">If true, maintain metadata version history.</param>
 /// <param name="EnableIndexing">If true, create indexes for efficient querying.</param>
 /// <param name="RetentionDays">Number of days to retain old metadata versions (0 = forever).</param>
-/// <param name="CacheTTLSeconds">Time-to-live for metadata cache in seconds (0 = no cache).</param>
+/// <param name="CacheTtlSeconds">Time-to-live for metadata cache in seconds (0 = no cache).</param>
 /// <param name="EnableCompression">If true, compress metadata to save space.</param>
 public record MetadataConfig(
     bool EnableVersioning = false,
     bool EnableIndexing = true,
     int RetentionDays = 0,
-    int CacheTTLSeconds = 300,
+    int CacheTtlSeconds = 300,
     bool EnableCompression = false);
 
 /// <summary>

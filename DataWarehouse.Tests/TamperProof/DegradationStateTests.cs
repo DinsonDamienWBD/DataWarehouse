@@ -137,7 +137,7 @@ public class DegradationStateTests
     [Fact]
     public void SecureWriteResult_ShouldDefaultToHealthyDegradationState()
     {
-        var integrityHash = IntegrityHash.Create(HashAlgorithmType.SHA256, "AABB");
+        var integrityHash = IntegrityHash.Create(HashAlgorithmType.Sha256, "AABB");
         var writeContext = new WriteContextRecord
         {
             Author = "test", Comment = "test", Timestamp = DateTimeOffset.UtcNow

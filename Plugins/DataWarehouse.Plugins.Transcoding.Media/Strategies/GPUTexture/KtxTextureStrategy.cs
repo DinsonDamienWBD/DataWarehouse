@@ -51,11 +51,11 @@ internal sealed class KtxTextureStrategy : MediaStrategyBase
     public KtxTextureStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.KTX, MediaFormat.PNG, MediaFormat.JPEG, MediaFormat.DDS
+            MediaFormat.Ktx, MediaFormat.Png, MediaFormat.Jpeg, MediaFormat.Dds
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.KTX
+            MediaFormat.Ktx
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
@@ -161,7 +161,7 @@ internal sealed class KtxTextureStrategy : MediaStrategyBase
 
         return new MediaMetadata(
             Duration: TimeSpan.Zero,
-            Format: MediaFormat.KTX,
+            Format: MediaFormat.Ktx,
             VideoCodec: null,
             AudioCodec: null,
             Resolution: new Resolution(width, height),

@@ -18,17 +18,17 @@ public static class MediaFormatDetector
         if (data.Length < 4) return MediaFormat.Unknown;
 
         // Video containers
-        if (IsMp4(data)) return MediaFormat.MP4;
+        if (IsMp4(data)) return MediaFormat.Mp4;
         if (IsWebM(data) || IsMatroska(data)) return MediaFormat.WebM;
-        if (IsAvi(data)) return MediaFormat.AVI;
-        if (IsFlv(data)) return MediaFormat.FLV;
-        if (IsMpegTs(data)) return MediaFormat.HLS; // MPEG-TS often used for HLS
+        if (IsAvi(data)) return MediaFormat.Avi;
+        if (IsFlv(data)) return MediaFormat.Flv;
+        if (IsMpegTs(data)) return MediaFormat.Hls; // MPEG-TS often used for HLS
 
         // Image formats
-        if (IsJpeg(data)) return MediaFormat.JPEG;
-        if (IsPng(data)) return MediaFormat.PNG;
+        if (IsJpeg(data)) return MediaFormat.Jpeg;
+        if (IsPng(data)) return MediaFormat.Png;
         if (IsWebP(data)) return MediaFormat.WebP;
-        if (IsAvif(data)) return MediaFormat.AVIF;
+        if (IsAvif(data)) return MediaFormat.Avif;
 
         return MediaFormat.Unknown;
     }

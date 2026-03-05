@@ -592,20 +592,20 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
         _storageClasses["datawarehouse-archive"] = new StorageClassConfig
         {
             Name = "datawarehouse-archive", Tier = CsiStorageTier.Archive, Encryption = CsiEncryptionType.AES256GCM,
-            ComplianceMode = CsiComplianceMode.WORM, ReplicationFactor = 3, AllowVolumeExpansion = false,
+            ComplianceMode = CsiComplianceMode.Worm, ReplicationFactor = 3, AllowVolumeExpansion = false,
             VolumeBindingMode = "Immediate", ReclaimPolicy = "Retain", IopsLimit = 100, ThroughputLimitMBps = 10
         };
         _storageClasses["datawarehouse-gdpr"] = new StorageClassConfig
         {
             Name = "datawarehouse-gdpr", Tier = CsiStorageTier.Hot, Encryption = CsiEncryptionType.AES256GCM,
-            ComplianceMode = CsiComplianceMode.GDPR, ReplicationFactor = 3, AllowVolumeExpansion = true,
+            ComplianceMode = CsiComplianceMode.Gdpr, ReplicationFactor = 3, AllowVolumeExpansion = true,
             VolumeBindingMode = "WaitForFirstConsumer", ReclaimPolicy = "Retain", IopsLimit = 10000,
             ThroughputLimitMBps = 500, DataResidencyRegion = "eu-west"
         };
         _storageClasses["datawarehouse-hipaa"] = new StorageClassConfig
         {
             Name = "datawarehouse-hipaa", Tier = CsiStorageTier.Hot, Encryption = CsiEncryptionType.AES256GCM,
-            ComplianceMode = CsiComplianceMode.HIPAA, ReplicationFactor = 3, AllowVolumeExpansion = true,
+            ComplianceMode = CsiComplianceMode.Hipaa, ReplicationFactor = 3, AllowVolumeExpansion = true,
             VolumeBindingMode = "WaitForFirstConsumer", ReclaimPolicy = "Retain", IopsLimit = 10000,
             ThroughputLimitMBps = 500, AuditLoggingEnabled = true
         };
@@ -825,7 +825,7 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
 
     private enum CsiStorageTier { Hot, Warm, Cold, Archive }
     private enum CsiEncryptionType { None, AES256GCM, AES256CBC, ChaCha20Poly1305 }
-    private enum CsiComplianceMode { None, WORM, GDPR, HIPAA, SOC2, PCI_DSS }
+    private enum CsiComplianceMode { None, Worm, Gdpr, Hipaa, Soc2, PciDss }
     private enum VolumeState { Creating, Available, InUse, Deleting, Error }
     private enum SnapshotState { Creating, Ready, Deleting, Error }
 

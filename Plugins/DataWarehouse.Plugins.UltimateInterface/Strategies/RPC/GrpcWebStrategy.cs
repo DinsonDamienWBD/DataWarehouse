@@ -27,7 +27,7 @@ internal sealed class GrpcWebStrategy : SdkInterface.InterfaceStrategyBase, IPlu
     public InterfaceCategory Category => InterfaceCategory.Rpc;
     public string[] Tags => ["grpc-web", "browser", "http", "cors", "base64"];
 
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.gRPC;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.GRpc;
 
     public override SdkInterface.InterfaceCapabilities Capabilities => new(
         SupportsStreaming: true,
@@ -38,7 +38,7 @@ internal sealed class GrpcWebStrategy : SdkInterface.InterfaceStrategyBase, IPlu
         SupportsBidirectionalStreaming: false, // gRPC-Web only supports server streaming
         SupportsMultiplexing: false,
         DefaultTimeout: TimeSpan.FromMinutes(5),
-        RequiresTLS: false // Can work over HTTP/1.1
+        RequiresTls: false // Can work over HTTP/1.1
     );
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;

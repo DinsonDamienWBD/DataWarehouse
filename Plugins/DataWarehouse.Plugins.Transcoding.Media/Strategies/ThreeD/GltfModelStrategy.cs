@@ -51,11 +51,11 @@ internal sealed class GltfModelStrategy : MediaStrategyBase
     public GltfModelStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.GLTF
+            MediaFormat.Gltf
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.GLTF
+            MediaFormat.Gltf
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
@@ -187,7 +187,7 @@ internal sealed class GltfModelStrategy : MediaStrategyBase
 
         return new MediaMetadata(
             Duration: stats.AnimationDuration,
-            Format: MediaFormat.GLTF,
+            Format: MediaFormat.Gltf,
             VideoCodec: null,
             AudioCodec: null,
             Resolution: null,

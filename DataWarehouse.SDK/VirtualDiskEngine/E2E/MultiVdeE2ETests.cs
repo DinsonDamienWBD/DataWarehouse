@@ -52,7 +52,7 @@ public static class MultiVdeE2ETests
             ("TestDeviceLevelRaid6AcrossPool", TestDeviceLevelRaid6AcrossPoolAsync),
             ("TestDualRaidSimultaneousFailure", TestDualRaidSimultaneousFailureAsync),
             ("TestCrossVdeOperations", TestCrossVdeOperationsAsync),
-            ("TestTBScaleSimulation", TestTBScaleSimulationAsync),
+            ("TestTbScaleSimulation", TestTbScaleSimulationAsync),
             ("TestHotSpareRebuildUnderLoad", TestHotSpareRebuildUnderLoadAsync),
         };
 
@@ -505,7 +505,7 @@ public static class MultiVdeE2ETests
     /// by 6-device RAID 6 arrays. Stores 100 objects across all VDEs, verifies
     /// counts and data integrity on random samples, then deletes a subset.
     /// </summary>
-    private static async Task TestTBScaleSimulationAsync(CancellationToken ct)
+    private static async Task TestTbScaleSimulationAsync(CancellationToken ct)
     {
         const int vdeCount = 4;
         const int devicesPerVde = 6;

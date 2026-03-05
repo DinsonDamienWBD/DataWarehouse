@@ -69,7 +69,7 @@ public enum MeshProtocol
     /// <summary>
     /// BLE mesh (Bluetooth Low Energy mesh, 2.4GHz, 10-30m range).
     /// </summary>
-    BLE
+    Ble
 }
 
 /// <summary>

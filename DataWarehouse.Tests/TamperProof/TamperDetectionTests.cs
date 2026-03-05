@@ -21,7 +21,7 @@ public class TamperDetectionTests
     {
         var objectId = Guid.NewGuid();
         var evidence = TamperEvidence.Create(
-            HashAlgorithmType.SHA256, 4096, 4096, "manifest-checksum");
+            HashAlgorithmType.Sha256, 4096, 4096, "manifest-checksum");
 
         var report = TamperIncidentReport.Create(
             objectId, "expected-hash", "actual-hash",
@@ -44,7 +44,7 @@ public class TamperDetectionTests
     {
         var objectId = Guid.NewGuid();
         var evidence = TamperEvidence.Create(
-            HashAlgorithmType.SHA256, 4096, 4096, "manifest-checksum");
+            HashAlgorithmType.Sha256, 4096, 4096, "manifest-checksum");
         var attribution = AttributionAnalysis.CreateConfirmed(
             "user:admin-rogue",
             new List<AccessLogEntry> { new() { EntryId = Guid.NewGuid(), ObjectId = Guid.NewGuid(), Principal = "admin", AccessType = AccessType.Read, Timestamp = DateTimeOffset.UtcNow, Succeeded = true }, new() { EntryId = Guid.NewGuid(), ObjectId = Guid.NewGuid(), Principal = "admin", AccessType = AccessType.Write, Timestamp = DateTimeOffset.UtcNow, Succeeded = true } },
@@ -66,7 +66,7 @@ public class TamperDetectionTests
     public void TamperIncidentReport_ShouldConvertToSummary()
     {
         var evidence = TamperEvidence.Create(
-            HashAlgorithmType.SHA256, 1000, 1000, "cs");
+            HashAlgorithmType.Sha256, 1000, 1000, "cs");
         var report = TamperIncidentReport.Create(
             Guid.NewGuid(), "aabb", "ccdd", "Primary",
             TamperRecoveryBehavior.AutoRecoverSilent, true, evidence);
@@ -83,7 +83,7 @@ public class TamperDetectionTests
     public void TamperIncidentReport_ShouldTrackAffectedShards()
     {
         var evidence = TamperEvidence.Create(
-            HashAlgorithmType.SHA256, 1000, 1000, "cs");
+            HashAlgorithmType.Sha256, 1000, 1000, "cs");
 
         var report = new TamperIncidentReport
         {
@@ -170,9 +170,9 @@ public class TamperDetectionTests
     public void TamperEvidence_Create_ShouldPopulateBasicFields()
     {
         var evidence = TamperEvidence.Create(
-            HashAlgorithmType.SHA512, 4000, 4096, "manifest-cs");
+            HashAlgorithmType.Sha512, 4000, 4096, "manifest-cs");
 
-        evidence.HashAlgorithm.Should().Be(HashAlgorithmType.SHA512);
+        evidence.HashAlgorithm.Should().Be(HashAlgorithmType.Sha512);
         evidence.CorruptedDataSize.Should().Be(4000);
         evidence.ExpectedDataSize.Should().Be(4096);
         evidence.ManifestChecksum.Should().Be("manifest-cs");
@@ -182,7 +182,7 @@ public class TamperDetectionTests
     public void TamperEvidence_CreateWithRecovery_ShouldIncludeRecoveryInfo()
     {
         var evidence = TamperEvidence.CreateWithRecovery(
-            HashAlgorithmType.SHA256, 4000, 4096, "cs",
+            HashAlgorithmType.Sha256, 4000, 4096, "cs",
             "WORM-Tier", "recovered-hash-value");
 
         evidence.RecoverySource.Should().Be("WORM-Tier");
@@ -193,7 +193,7 @@ public class TamperDetectionTests
     public void TamperEvidence_CreateDetailed_ShouldIncludeByteCorruptionInfo()
     {
         var evidence = TamperEvidence.CreateDetailed(
-            HashAlgorithmType.SHA256, 4096, 4096, "cs",
+            HashAlgorithmType.Sha256, 4096, 4096, "cs",
             3, new List<long> { 100, 200, 300 });
 
         evidence.CorruptedByteCount.Should().Be(3);
@@ -215,8 +215,8 @@ public class TamperDetectionTests
             Version = 1,
             DetectedAt = DateTimeOffset.UtcNow,
             TamperedComponent = "shard-3",
-            ExpectedHash = IntegrityHash.Create(HashAlgorithmType.SHA256, "expected"),
-            ActualHash = IntegrityHash.Create(HashAlgorithmType.SHA256, "actual"),
+            ExpectedHash = IntegrityHash.Create(HashAlgorithmType.Sha256, "expected"),
+            ActualHash = IntegrityHash.Create(HashAlgorithmType.Sha256, "actual"),
             AttributionConfidence = AttributionConfidence.Likely,
             SuspectedPrincipal = "user:suspect",
             RecoveryPerformed = true,

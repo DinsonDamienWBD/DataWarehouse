@@ -230,17 +230,14 @@ public sealed class NetworkPartitionFault : IFaultInjector
             throw new ArgumentException("Command must not be empty.", nameof(command));
 
         // Use ArgumentList to avoid shell interpretation of container name
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "docker",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
+        // Finding #1285-1289: Do not use object initializer for 'using' variable —
+        // set properties after construction so the object is disposed if an exception occurs during init.
+        using var process = new Process();
+        process.StartInfo.FileName = "docker";
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.RedirectStandardError = true;
+        process.StartInfo.UseShellExecute = false;
+        process.StartInfo.CreateNoWindow = true;
 
         process.StartInfo.ArgumentList.Add("exec");
         process.StartInfo.ArgumentList.Add(containerName);
@@ -326,17 +323,14 @@ public sealed class ProcessKillFault : IFaultInjector
         if (string.IsNullOrWhiteSpace(command))
             throw new ArgumentException("Command must not be empty.", nameof(command));
 
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "docker",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
+        // Finding #1285-1289: Do not use object initializer for 'using' variable —
+        // set properties after construction so the object is disposed if an exception occurs during init.
+        using var process = new Process();
+        process.StartInfo.FileName = "docker";
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.RedirectStandardError = true;
+        process.StartInfo.UseShellExecute = false;
+        process.StartInfo.CreateNoWindow = true;
 
         process.StartInfo.ArgumentList.Add("exec");
         process.StartInfo.ArgumentList.Add(containerName);
@@ -378,18 +372,17 @@ public sealed class ClockSkewFault : IFaultInjector
 
         var targetSet = target.NodeIds.ToHashSet();
         var nodes = cluster.Nodes.Where(n => targetSet.Contains(n.NodeId));
-        var random = new Random();
 
         foreach (var node in nodes)
         {
-            // Random skew between min and max
-            var skewMs = random.Next(
+            // Random skew between min and max (finding #1287: use Random.Shared to avoid identical sequences)
+            var skewMs = Random.Shared.Next(
                 (int)MinSkew.TotalMilliseconds,
                 (int)MaxSkew.TotalMilliseconds + 1);
             var skewSeconds = skewMs / 1000.0;
 
             // Apply positive or negative skew randomly
-            var direction = random.Next(2) == 0 ? "+" : "-";
+            var direction = Random.Shared.Next(2) == 0 ? "+" : "-";
 
             await DockerExecAsync(
                 node.ContainerName,
@@ -446,17 +439,14 @@ public sealed class ClockSkewFault : IFaultInjector
             throw new ArgumentException("Command must not be empty.", nameof(command));
 
         // Use ArgumentList to avoid shell interpretation of container name
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "docker",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
+        // Finding #1285-1289: Do not use object initializer for 'using' variable —
+        // set properties after construction so the object is disposed if an exception occurs during init.
+        using var process = new Process();
+        process.StartInfo.FileName = "docker";
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.RedirectStandardError = true;
+        process.StartInfo.UseShellExecute = false;
+        process.StartInfo.CreateNoWindow = true;
 
         process.StartInfo.ArgumentList.Add("exec");
         process.StartInfo.ArgumentList.Add(containerName);
@@ -544,17 +534,14 @@ public sealed class DiskCorruptionFault : IFaultInjector
             throw new ArgumentException("Command must not be empty.", nameof(command));
 
         // Use ArgumentList to avoid shell interpretation of container name
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "docker",
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
+        // Finding #1285-1289: Do not use object initializer for 'using' variable —
+        // set properties after construction so the object is disposed if an exception occurs during init.
+        using var process = new Process();
+        process.StartInfo.FileName = "docker";
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.RedirectStandardError = true;
+        process.StartInfo.UseShellExecute = false;
+        process.StartInfo.CreateNoWindow = true;
 
         process.StartInfo.ArgumentList.Add("exec");
         process.StartInfo.ArgumentList.Add(containerName);

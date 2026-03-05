@@ -42,7 +42,7 @@ internal sealed class JsonRpcStrategy : SdkInterface.InterfaceStrategyBase, IPlu
         SupportsBidirectionalStreaming: false,
         SupportsMultiplexing: false,
         DefaultTimeout: TimeSpan.FromSeconds(30),
-        RequiresTLS: false
+        RequiresTls: false
     );
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;

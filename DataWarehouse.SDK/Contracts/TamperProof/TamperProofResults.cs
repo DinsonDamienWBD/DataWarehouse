@@ -870,7 +870,7 @@ public class IntegrityHash
     {
         return new IntegrityHash
         {
-            Algorithm = HashAlgorithmType.SHA256,
+            Algorithm = HashAlgorithmType.Sha256,
             HashValue = string.Empty,
             ComputedAt = DateTimeOffset.UtcNow
         };

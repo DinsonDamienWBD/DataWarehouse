@@ -709,7 +709,7 @@ namespace DataWarehouse.SDK.Security.SupplyChain
         public async Task<DependencyScanResult> ScanAsync(CancellationToken ct = default)
         {
             var sbom = await _sbomProvider
-                .GenerateAsync(SbomFormat.CycloneDX_1_5_Json, null, ct)
+                .GenerateAsync(SbomFormat.CycloneDx15Json, null, ct)
                 .ConfigureAwait(false);
 
             return await ScanAsync(sbom, ct).ConfigureAwait(false);

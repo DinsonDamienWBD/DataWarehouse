@@ -21,7 +21,7 @@ public sealed class QuantumSafeIntegrity
     /// </summary>
     public DataWarehouse.SDK.Contracts.IMessageBus? MessageBus { get; set; }
 
-    public QuantumSafeIntegrity(HashAlgorithmType defaultAlgorithm = HashAlgorithmType.SHA3_256)
+    public QuantumSafeIntegrity(HashAlgorithmType defaultAlgorithm = HashAlgorithmType.Sha3256)
     {
         _defaultAlgorithm = defaultAlgorithm;
     }
@@ -38,12 +38,12 @@ public sealed class QuantumSafeIntegrity
 
         var hash = algorithm switch
         {
-            HashAlgorithmType.SHA3_256 => CalculateSHA3_256(data),
-            HashAlgorithmType.SHA3_512 => CalculateSHA3_512(data),
-            HashAlgorithmType.SHAKE256 => CalculateSHAKE256(data),
-            HashAlgorithmType.BLAKE3 => CalculateBLAKE3(data),
+            HashAlgorithmType.Sha3256 => CalculateSHA3_256(data),
+            HashAlgorithmType.Sha3512 => CalculateSHA3_512(data),
+            HashAlgorithmType.Shake256 => CalculateSHAKE256(data),
+            HashAlgorithmType.Blake3 => CalculateBLAKE3(data),
             HashAlgorithmType.Dilithium => CalculateDilithiumHash(data),
-            HashAlgorithmType.SPHINCS => CalculateSPHINCSHash(data),
+            HashAlgorithmType.Sphincs => CalculateSPHINCSHash(data),
             // LOW-3663: Throw on unknown algorithm values to prevent silent algorithm mismatch
             // where VerifyChecksum computes a different hash than what was stored.
             _ => throw new ArgumentOutOfRangeException(nameof(algorithm), algorithm,
@@ -77,7 +77,7 @@ public sealed class QuantumSafeIntegrity
     public MerkleTree BuildMerkleTree(
         string arrayId,
         IEnumerable<byte[]> dataBlocks,
-        HashAlgorithmType algorithm = HashAlgorithmType.SHA3_256)
+        HashAlgorithmType algorithm = HashAlgorithmType.Sha3256)
     {
         var blocks = dataBlocks.ToList();
         var leafHashes = blocks.Select(b => CalculateChecksum(b, algorithm).Hash).ToList();
@@ -470,12 +470,12 @@ public sealed class QuantumSafeIntegrity
 public enum HashAlgorithmType
 {
     Default,
-    SHA3_256,
-    SHA3_512,
-    SHAKE256,
-    BLAKE3,
+    Sha3256,
+    Sha3512,
+    Shake256,
+    Blake3,
     Dilithium,
-    SPHINCS
+    Sphincs
 }
 
 /// <summary>

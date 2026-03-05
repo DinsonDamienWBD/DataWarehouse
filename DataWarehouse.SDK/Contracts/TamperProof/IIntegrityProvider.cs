@@ -174,7 +174,7 @@ public abstract class IntegrityProviderPluginBase : IntegrityPluginBase, IIntegr
     /// <summary>
     /// Default hash algorithm used when none is specified.
     /// </summary>
-    protected virtual HashAlgorithmType DefaultAlgorithm => HashAlgorithmType.SHA256;
+    protected virtual HashAlgorithmType DefaultAlgorithm => HashAlgorithmType.Sha256;
 
     /// <summary>
     /// Gets the list of supported hash algorithms.

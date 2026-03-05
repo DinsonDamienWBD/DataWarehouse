@@ -183,7 +183,7 @@ public class PerformanceBenchmarkTests
                     Blockchain = new StorageInstanceConfig { InstanceId = "blockchain", PluginId = "local" }
                 },
                 Raid = new RaidConfig { DataShards = 4, ParityShards = 2 },
-                HashAlgorithm = HashAlgorithmType.SHA256,
+                HashAlgorithm = HashAlgorithmType.Sha256,
                 ConsensusMode = ConsensusMode.SingleWriter,
                 WormMode = WormEnforcementMode.HardwareIntegrated,
                 DefaultRetentionPeriod = TimeSpan.FromDays(7 * 365)
@@ -260,7 +260,7 @@ public class PerformanceBenchmarkTests
         var sw = Stopwatch.StartNew();
         for (int i = 0; i < 10000; i++)
         {
-            var hash = IntegrityHash.Create(HashAlgorithmType.SHA256, $"hash-{i}");
+            var hash = IntegrityHash.Create(HashAlgorithmType.Sha256, $"hash-{i}");
             var str = hash.ToString();
             IntegrityHash.Parse(str);
         }
@@ -308,7 +308,7 @@ public class PerformanceBenchmarkTests
                 SourceSystem = "benchmark-suite",
                 ClientIp = "127.0.0.1"
             },
-            HashAlgorithm = HashAlgorithmType.SHA256,
+            HashAlgorithm = HashAlgorithmType.Sha256,
             OriginalContentHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("original"))),
             OriginalContentSize = 262144,
             FinalContentHash = Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes("final"))),

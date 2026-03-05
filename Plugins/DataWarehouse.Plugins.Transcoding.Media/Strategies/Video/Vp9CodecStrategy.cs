@@ -50,16 +50,16 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
     public Vp9CodecStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI,
-            MediaFormat.WebM, MediaFormat.FLV
+            MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.Mov, MediaFormat.Avi,
+            MediaFormat.WebM, MediaFormat.Flv
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.WebM, MediaFormat.MKV
+            MediaFormat.WebM, MediaFormat.Mkv
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
-        MaxResolution: Resolution.UHD,
+        MaxResolution: Resolution.Uhd,
         MaxBitrate: 50_000_000,
         SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -129,7 +129,7 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
             cqLevel = EstimateCqFromBitrate(options.TargetBitrate.Value.BitsPerSecond, options.TargetResolution);
         }
 
-        var resolution = options.TargetResolution ?? Resolution.FullHD;
+        var resolution = options.TargetResolution ?? Resolution.FullHd;
         var frameRate = options.FrameRate ?? 30.0;
         var audioCodec = options.AudioCodec ?? "libopus"; // Opus preferred for WebM
 
@@ -165,7 +165,7 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
             Format: MediaFormat.WebM,
             VideoCodec: "vp9",
             AudioCodec: "opus",
-            Resolution: Resolution.FullHD,
+            Resolution: Resolution.FullHd,
             Bitrate: new Bitrate(2_500_000),
             FrameRate: 30.0,
             AudioChannels: 2,
@@ -235,7 +235,7 @@ internal sealed class Vp9CodecStrategy : MediaStrategyBase
     {
         var pixels = resolution.HasValue
             ? (long)resolution.Value.Width * resolution.Value.Height
-            : (long)Resolution.FullHD.Width * Resolution.FullHD.Height;
+            : (long)Resolution.FullHd.Width * Resolution.FullHd.Height;
 
         var bitsPerPixelPerFrame = targetBps / (pixels * 30.0);
 

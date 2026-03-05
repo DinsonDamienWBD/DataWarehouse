@@ -11,16 +11,16 @@ namespace DataWarehouse.SDK.Security.SupplyChain
     public enum SbomFormat
     {
         /// <summary>CycloneDX 1.5 JSON format (OWASP standard).</summary>
-        CycloneDX_1_5_Json,
+        CycloneDx15Json,
 
         /// <summary>CycloneDX 1.5 XML format.</summary>
-        CycloneDX_1_5_Xml,
+        CycloneDx15Xml,
 
         /// <summary>SPDX 2.3 JSON format (Linux Foundation standard).</summary>
-        SPDX_2_3_Json,
+        Spdx23Json,
 
         /// <summary>SPDX 2.3 Tag-Value format.</summary>
-        SPDX_2_3_TagValue
+        Spdx23TagValue
     }
 
     /// <summary>

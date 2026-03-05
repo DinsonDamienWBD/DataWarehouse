@@ -32,7 +32,7 @@ public class TamperProofConfiguration
     /// Cannot be changed after the first write operation.
     /// Default: SHA256.
     /// </summary>
-    public HashAlgorithmType HashAlgorithm { get; init; } = HashAlgorithmType.SHA256;
+    public HashAlgorithmType HashAlgorithm { get; init; } = HashAlgorithmType.Sha256;
 
     /// <summary>
     /// Consensus mode for distributed deployments.

@@ -40,26 +40,26 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <summary>
         /// Success return code for OpenCl operations.
         /// </summary>
-        internal const int CL_SUCCESS = 0;
+        internal const int ClSuccess = 0;
 
         /// <summary>
         /// OpenCl error codes (minimal subset).
         /// </summary>
         internal enum ClError
         {
-            CL_SUCCESS = 0,
-            CL_DEVICE_NOT_FOUND = -1,
-            CL_DEVICE_NOT_AVAILABLE = -2,
-            CL_COMPILER_NOT_AVAILABLE = -3,
-            CL_MEM_OBJECT_ALLOCATION_FAILURE = -4,
-            CL_OUT_OF_RESOURCES = -5,
-            CL_OUT_OF_HOST_MEMORY = -6,
-            CL_BUILD_PROGRAM_FAILURE = -11,
-            CL_INVALID_VALUE = -30,
-            CL_INVALID_PLATFORM = -32,
-            CL_INVALID_DEVICE = -33,
-            CL_INVALID_CONTEXT = -34,
-            CL_INVALID_COMMAND_QUEUE = -36,
+            ClSuccess = 0,
+            ClDeviceNotFound = -1,
+            ClDeviceNotAvailable = -2,
+            ClCompilerNotAvailable = -3,
+            ClMemObjectAllocationFailure = -4,
+            ClOutOfResources = -5,
+            ClOutOfHostMemory = -6,
+            ClBuildProgramFailure = -11,
+            ClInvalidValue = -30,
+            ClInvalidPlatform = -32,
+            ClInvalidDevice = -33,
+            ClInvalidContext = -34,
+            ClInvalidCommandQueue = -36,
             CL_INVALID_MEM_OBJECT = -38,
             CL_INVALID_PROGRAM = -44,
             CL_INVALID_KERNEL = -48,
@@ -368,7 +368,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
                         // Enumerate platforms
                         int result = OpenClInterop.GetPlatformIDs(0, null!, out uint platformCount);
-                        if (result != OpenClInterop.CL_SUCCESS || platformCount == 0)
+                        if (result != OpenClInterop.ClSuccess || platformCount == 0)
                         {
                             _isAvailable = false;
                             _initialized = true;
@@ -377,7 +377,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
                         var platforms = new IntPtr[platformCount];
                         result = OpenClInterop.GetPlatformIDs(platformCount, platforms, out _);
-                        if (result != OpenClInterop.CL_SUCCESS)
+                        if (result != OpenClInterop.ClSuccess)
                         {
                             _isAvailable = false;
                             _initialized = true;
@@ -393,7 +393,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                             int devResult = OpenClInterop.GetDeviceIDs(
                                 platform, OpenClInterop.CL_DEVICE_TYPE_GPU, 0, null!, out uint devCount);
 
-                            if (devResult == OpenClInterop.CL_SUCCESS && devCount > 0)
+                            if (devResult == OpenClInterop.ClSuccess && devCount > 0)
                             {
                                 totalDevices += (int)devCount;
 
@@ -418,12 +418,12 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                             _context = OpenClInterop.CreateContext(
                                 IntPtr.Zero, 1, deviceArray, IntPtr.Zero, IntPtr.Zero, out int ctxErr);
 
-                            if (ctxErr == OpenClInterop.CL_SUCCESS && _context != IntPtr.Zero)
+                            if (ctxErr == OpenClInterop.ClSuccess && _context != IntPtr.Zero)
                             {
                                 _commandQueue = OpenClInterop.CreateCommandQueue(
                                     _context, firstDevice, 0, out int queueErr);
 
-                                if (queueErr != OpenClInterop.CL_SUCCESS)
+                                if (queueErr != OpenClInterop.ClSuccess)
                                 {
                                     OpenClInterop.ReleaseContext(_context);
                                     _context = IntPtr.Zero;

@@ -42,11 +42,11 @@ internal sealed class PngImageStrategy : MediaStrategyBase
     public PngImageStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.PNG, MediaFormat.JPEG, MediaFormat.WebP, MediaFormat.AVIF
+            MediaFormat.Png, MediaFormat.Jpeg, MediaFormat.WebP, MediaFormat.Avif
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.PNG
+            MediaFormat.Png
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
@@ -284,7 +284,7 @@ internal sealed class PngImageStrategy : MediaStrategyBase
 
         return new MediaMetadata(
             Duration: TimeSpan.Zero,
-            Format: MediaFormat.PNG,
+            Format: MediaFormat.Png,
             VideoCodec: null,
             AudioCodec: null,
             Resolution: new Resolution(width, height),

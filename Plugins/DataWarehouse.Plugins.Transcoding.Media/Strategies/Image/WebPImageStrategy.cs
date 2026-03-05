@@ -45,7 +45,7 @@ internal sealed class WebPImageStrategy : MediaStrategyBase
     public WebPImageStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.WebP, MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF
+            MediaFormat.WebP, MediaFormat.Jpeg, MediaFormat.Png, MediaFormat.Avif
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {

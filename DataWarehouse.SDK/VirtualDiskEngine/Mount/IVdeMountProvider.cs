@@ -23,10 +23,10 @@ public enum PlatformFlags
     Linux = 2,
 
     /// <summary>macOS (via macFUSE/OSXFUSE).</summary>
-    MacOS = 4,
+    MacOs = 4,
 
     /// <summary>FreeBSD (via FUSE).</summary>
-    FreeBSD = 8
+    FreeBsd = 8
 }
 
 /// <summary>

@@ -60,7 +60,7 @@ public class CorrectionWorkflowTests
             Version = 2,
             CreatedAt = now,
             WriteContext = new WriteContextRecord { Author = "corrector", Comment = "fix typo", Timestamp = now },
-            HashAlgorithm = HashAlgorithmType.SHA256,
+            HashAlgorithm = HashAlgorithmType.Sha256,
             OriginalContentHash = "corrected-hash",
             OriginalContentSize = 1024,
             FinalContentHash = "corrected-final",
@@ -98,11 +98,11 @@ public class CorrectionWorkflowTests
         {
             AuditChainEntry.Create(originalId, 1,
                 new WriteContextRecord { Author = "creator", Comment = "initial", Timestamp = DateTimeOffset.UtcNow.AddDays(-1) },
-                IntegrityHash.Create(HashAlgorithmType.SHA256, "v1-hash"),
+                IntegrityHash.Create(HashAlgorithmType.Sha256, "v1-hash"),
                 "m1", "w1", 1000),
             AuditChainEntry.Create(newId, 2,
                 new WriteContextRecord { Author = "corrector", Comment = "fix", Timestamp = DateTimeOffset.UtcNow },
-                IntegrityHash.Create(HashAlgorithmType.SHA256, "v2-hash"),
+                IntegrityHash.Create(HashAlgorithmType.Sha256, "v2-hash"),
                 "m2", "w2", 1000,
                 previousObjectId: originalId,
                 correctionContext: new CorrectionContextRecord
@@ -295,7 +295,7 @@ public class CorrectionWorkflowTests
     {
         return SecureWriteResult.CreateSuccess(
             objectId, version,
-            IntegrityHash.Create(HashAlgorithmType.SHA256, $"hash-v{version}"),
+            IntegrityHash.Create(HashAlgorithmType.Sha256, $"hash-v{version}"),
             $"manifest-v{version}", $"worm-v{version}",
             new WriteContextRecord { Author = "test", Comment = "test", Timestamp = DateTimeOffset.UtcNow },
             4, 1000, 1024);
@@ -323,7 +323,7 @@ public class CorrectionWorkflowTests
             Version = version,
             CreatedAt = now,
             WriteContext = new WriteContextRecord { Author = "test", Comment = $"v{version}", Timestamp = now },
-            HashAlgorithm = HashAlgorithmType.SHA256,
+            HashAlgorithm = HashAlgorithmType.Sha256,
             OriginalContentHash = $"hash-v{version}",
             OriginalContentSize = 1000,
             FinalContentHash = $"final-v{version}",

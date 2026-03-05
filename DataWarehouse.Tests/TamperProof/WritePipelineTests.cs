@@ -174,7 +174,7 @@ public class WritePipelineTests
     public void SecureWriteResult_CreateSuccess_ShouldPopulateAllFields()
     {
         var objectId = Guid.NewGuid();
-        var integrityHash = IntegrityHash.Create(HashAlgorithmType.SHA256, "AABBCCDD");
+        var integrityHash = IntegrityHash.Create(HashAlgorithmType.Sha256, "AABBCCDD");
         var writeContext = new WriteContextRecord
         {
             Author = "test",
@@ -212,7 +212,7 @@ public class WritePipelineTests
     public void SecureWriteResult_CreateSuccess_WithWarnings_ShouldIncludeWarnings()
     {
         var warnings = new List<string> { "WORM write succeeded but blockchain anchor pending" };
-        var integrityHash = IntegrityHash.Create(HashAlgorithmType.SHA256, "AABB");
+        var integrityHash = IntegrityHash.Create(HashAlgorithmType.Sha256, "AABB");
         var writeContext = new WriteContextRecord
         {
             Author = "test",
@@ -382,7 +382,7 @@ public class WritePipelineTests
             Version = 1,
             CreatedAt = now,
             WriteContext = new WriteContextRecord { Author = "test", Comment = "test", Timestamp = now },
-            HashAlgorithm = HashAlgorithmType.SHA256,
+            HashAlgorithm = HashAlgorithmType.Sha256,
             OriginalContentHash = "AABB",
             OriginalContentSize = 1000,
             FinalContentHash = "CCDD",
@@ -411,7 +411,7 @@ public class WritePipelineTests
             Version = 1,
             CreatedAt = now,
             WriteContext = new WriteContextRecord { Author = "test", Comment = "test", Timestamp = now },
-            HashAlgorithm = HashAlgorithmType.SHA256,
+            HashAlgorithm = HashAlgorithmType.Sha256,
             OriginalContentHash = "AABB",
             OriginalContentSize = 1000,
             FinalContentHash = "CCDD",

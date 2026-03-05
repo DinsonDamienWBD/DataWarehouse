@@ -43,11 +43,11 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
     public GpuAccelerationStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM
+            MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.Mov, MediaFormat.Avi, MediaFormat.WebM
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV, MediaFormat.WebM
+            MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.WebM
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
@@ -370,7 +370,7 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
         IncrementCounter("gpu.transcode");
         // Build FFmpeg command with GPU-accelerated encoder (finding 1097).
         var encoderArgs = GetEncoderArgs(options.VideoCodec ?? "h264");
-        var resolution = options.TargetResolution ?? Resolution.UHD;
+        var resolution = options.TargetResolution ?? Resolution.Uhd;
         var frameRate = options.FrameRate ?? 30.0;
         var audioArgs = options.AudioCodec != null ? $"-c:a {options.AudioCodec}" : "-c:a aac";
         var ffmpegArgs = $"-f rawvideo -r {frameRate} -i pipe:0 {encoderArgs} {audioArgs} " +
@@ -397,11 +397,11 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
         IncrementCounter("gpu.metadata");
         return Task.FromResult(new MediaMetadata(
             Duration: TimeSpan.Zero,
-            Format: MediaFormat.MP4,
+            Format: MediaFormat.Mp4,
             VideoCodec: null,
             AudioCodec: null,
             Resolution: null,
-            Bitrate: Bitrate.VideoHD,
+            Bitrate: Bitrate.VideoHd,
             FrameRate: null,
             AudioChannels: null,
             SampleRate: null,

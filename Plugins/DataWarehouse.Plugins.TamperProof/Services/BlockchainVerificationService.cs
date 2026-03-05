@@ -198,7 +198,7 @@ public class BlockchainVerificationService
                 Hash = new IntegrityHash
                 {
                     HashValue = merkleRoot,
-                    Algorithm = HashAlgorithmType.SHA256,
+                    Algorithm = HashAlgorithmType.Sha256,
                     ComputedAt = DateTimeOffset.UtcNow
                 },
                 WriteContext = new WriteContextRecord

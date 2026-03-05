@@ -9,11 +9,11 @@ namespace DataWarehouse.SDK.Hardware.NVMe;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Provides P/Invoke declarations for NVMe passthrough on Windows (IOCTL_STORAGE_PROTOCOL_COMMAND)
+/// Provides P/Invoke declarations for NVMe passthrough on Windows (IoctlStorageProtocolCommand)
 /// and Linux (/dev/nvmeX ioctl).
 /// </para>
 /// <para>
-/// <strong>Windows:</strong> Uses DeviceIoControl with IOCTL_STORAGE_PROTOCOL_COMMAND to submit
+/// <strong>Windows:</strong> Uses DeviceIoControl with IoctlStorageProtocolCommand to submit
 /// NVMe commands to the controller via the StorNVMe driver.
 /// </para>
 /// <para>
@@ -24,16 +24,16 @@ namespace DataWarehouse.SDK.Hardware.NVMe;
 [SdkCompatibility("3.0.0", Notes = "Phase 35: NVMe platform interop (HW-07)")]
 internal static partial class NvmeInterop
 {
-    #region Windows NVMe Passthrough (IOCTL_STORAGE_PROTOCOL_COMMAND)
+    #region Windows NVMe Passthrough (IoctlStorageProtocolCommand)
 
     /// <summary>
     /// Windows IOCTL for NVMe command passthrough via StorNVMe driver.
     /// </summary>
     /// <remarks>
-    /// IOCTL_STORAGE_PROTOCOL_COMMAND (0x004D4480) is the primary interface for NVMe passthrough
+    /// IoctlStorageProtocolCommand (0x004D4480) is the primary interface for NVMe passthrough
     /// on Windows 8+. Requires Administrator privileges.
     /// </remarks>
-    internal const uint IOCTL_STORAGE_PROTOCOL_COMMAND = 0x004D4480;
+    internal const uint IoctlStorageProtocolCommand = 0x004D4480;
 
     /// <summary>
     /// Windows storage protocol command structure for NVMe passthrough.
@@ -53,12 +53,12 @@ internal static partial class NvmeInterop
     /// </para>
     /// </remarks>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct STORAGE_PROTOCOL_COMMAND
+    internal struct StorageProtocolCommand
     {
-        /// <summary>Version = 1 (STORAGE_PROTOCOL_STRUCTURE_VERSION).</summary>
+        /// <summary>Version = 1 (StorageProtocolStructureVersion).</summary>
         public uint Version;
 
-        /// <summary>Structure length = sizeof(STORAGE_PROTOCOL_COMMAND).</summary>
+        /// <summary>Structure length = sizeof(StorageProtocolCommand).</summary>
         public uint Length;
 
         /// <summary>Protocol type: ProtocolTypeNvme = 3.</summary>
@@ -108,7 +108,7 @@ internal static partial class NvmeInterop
     internal const uint ProtocolTypeNvme = 3;
 
     /// <summary>Storage protocol structure version.</summary>
-    internal const uint STORAGE_PROTOCOL_STRUCTURE_VERSION = 1;
+    internal const uint StorageProtocolStructureVersion = 1;
 
     /// <summary>
     /// Windows DeviceIoControl for device I/O operations.
@@ -146,25 +146,25 @@ internal static partial class NvmeInterop
     internal static partial bool CloseHandle(IntPtr hObject);
 
     /// <summary>Generic read access.</summary>
-    internal const uint GENERIC_READ = 0x80000000;
+    internal const uint GenericRead = 0x80000000;
 
     /// <summary>Generic write access.</summary>
-    internal const uint GENERIC_WRITE = 0x40000000;
+    internal const uint GenericWrite = 0x40000000;
 
     /// <summary>Share read access.</summary>
-    internal const uint FILE_SHARE_READ = 0x00000001;
+    internal const uint FileShareRead = 0x00000001;
 
     /// <summary>Share write access.</summary>
-    internal const uint FILE_SHARE_WRITE = 0x00000002;
+    internal const uint FileShareWrite = 0x00000002;
 
     /// <summary>Open existing file/device.</summary>
-    internal const uint OPEN_EXISTING = 3;
+    internal const uint OpenExisting = 3;
 
     /// <summary>Normal file attributes.</summary>
-    internal const uint FILE_ATTRIBUTE_NORMAL = 0x80;
+    internal const uint FileAttributeNormal = 0x80;
 
     /// <summary>Invalid handle value.</summary>
-    internal static readonly IntPtr INVALID_HANDLE_VALUE = new IntPtr(-1);
+    internal static readonly IntPtr InvalidHandleValue = new IntPtr(-1);
 
     #endregion
 
@@ -174,17 +174,17 @@ internal static partial class NvmeInterop
     /// Linux ioctl command code for NVMe admin command passthrough.
     /// </summary>
     /// <remarks>
-    /// NVME_IOCTL_ADMIN_CMD is defined in linux/nvme_ioctl.h. Used with ioctl() on /dev/nvme0, /dev/nvme1, etc.
+    /// NvmeIoctlAdminCmd is defined in linux/nvme_ioctl.h. Used with ioctl() on /dev/nvme0, /dev/nvme1, etc.
     /// </remarks>
-    internal const int NVME_IOCTL_ADMIN_CMD = unchecked((int)0xC0484E41);
+    internal const int NvmeIoctlAdminCmd = unchecked((int)0xC0484E41);
 
     /// <summary>
     /// Linux ioctl command code for NVMe I/O command passthrough.
     /// </summary>
     /// <remarks>
-    /// NVME_IOCTL_IO_CMD is defined in linux/nvme_ioctl.h. Used with ioctl() on /dev/nvme0n1, /dev/nvme0n2, etc.
+    /// NvmeIoctlIoCmd is defined in linux/nvme_ioctl.h. Used with ioctl() on /dev/nvme0n1, /dev/nvme0n2, etc.
     /// </remarks>
-    internal const int NVME_IOCTL_IO_CMD = unchecked((int)0xC0484E43);
+    internal const int NvmeIoctlIoCmd = unchecked((int)0xC0484E43);
 
     /// <summary>
     /// Linux NVMe admin command structure for ioctl passthrough.

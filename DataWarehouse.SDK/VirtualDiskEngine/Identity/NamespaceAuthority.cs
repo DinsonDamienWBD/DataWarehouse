@@ -70,9 +70,10 @@ public sealed class HmacSignatureProvider : INamespaceSignatureProvider
         if (privateKey.Length < KeySize)
             throw new ArgumentException($"Private key must be at least {KeySize} bytes.", nameof(privateKey));
 
-        // Signature = HMAC-SHA512(privateKey, data), producing 64 bytes
-        var keyBytes = privateKey.Slice(0, KeySize).ToArray();
-        using var hmac = new HMACSHA512(keyBytes);
+        // Derive the public key from the private key (same as GenerateKeyPair) so that
+        // Sign and Verify use the same HMAC key (finding #1463: sign used privateKey, verify used publicKey).
+        var derivedPublicKey = SHA512.HashData(privateKey.ToArray()).AsSpan(0, KeySize).ToArray();
+        using var hmac = new HMACSHA512(derivedPublicKey);
         var hash = hmac.ComputeHash(data.ToArray());
 
         // Ensure exactly SignatureOutputSize bytes

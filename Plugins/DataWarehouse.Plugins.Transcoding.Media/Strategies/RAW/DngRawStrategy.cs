@@ -55,11 +55,11 @@ internal sealed class DngRawStrategy : MediaStrategyBase
     public DngRawStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.DNG
+            MediaFormat.Dng
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF, MediaFormat.DNG
+            MediaFormat.Jpeg, MediaFormat.Png, MediaFormat.Avif, MediaFormat.Dng
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
@@ -197,7 +197,7 @@ internal sealed class DngRawStrategy : MediaStrategyBase
 
         return new MediaMetadata(
             Duration: TimeSpan.Zero,
-            Format: MediaFormat.DNG,
+            Format: MediaFormat.Dng,
             VideoCodec: null,
             AudioCodec: null,
             Resolution: new Resolution(width, height),

@@ -335,7 +335,7 @@ public abstract class IntelligenceStrategyBase : StrategyBase, IIntelligenceStra
             CapabilityId = $"intelligence.strategy.{StrategyId}",
             DisplayName = StrategyName,
             Description = Info.Description,
-            Category = SDK.Contracts.CapabilityCategory.AI,
+            Category = SDK.Contracts.CapabilityCategory.Ai,
             SubCategory = Category.ToString(),
             PluginId = "com.datawarehouse.intelligence.ultimate",
             PluginName = "Ultimate Intelligence",

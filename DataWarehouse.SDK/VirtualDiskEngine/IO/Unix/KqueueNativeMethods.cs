@@ -40,7 +40,7 @@ internal static class KqueueNativeMethods
     [DllImport(Libc, EntryPoint = "close", SetLastError = true)]
     internal static extern int Close(int fd);
 
-    /// <summary>Applies file control commands (e.g., F_NOCACHE on macOS).</summary>
+    /// <summary>Applies file control commands (e.g., FNocache on macOS).</summary>
     [DllImport(Libc, EntryPoint = "fcntl", SetLastError = true)]
     internal static extern int Fcntl(int fd, int cmd, int arg);
 
@@ -89,7 +89,7 @@ internal static class KqueueNativeMethods
 
     /// <summary>
     /// Returns the error status of an asynchronous I/O operation.
-    /// Returns 0 if complete, EINPROGRESS if still pending, or an error code.
+    /// Returns 0 if complete, Einprogress if still pending, or an error code.
     /// </summary>
     [DllImport(Libc, EntryPoint = "aio_error", SetLastError = true)]
     internal static extern unsafe int AioError(Aiocb* cb);
@@ -114,7 +114,7 @@ internal static class KqueueNativeMethods
     internal const int OCreat = 0x0200;
 
     /// <summary>Error if OCreat and file already exists.</summary>
-    internal const int O_EXCL = 0x0800;
+    internal const int OExcl = 0x0800;
 
     // --- fcntl commands ---
 
@@ -122,48 +122,48 @@ internal static class KqueueNativeMethods
     /// macOS-specific fcntl command to disable the unified buffer cache for a file descriptor.
     /// Equivalent to ODirect on Linux. When set to 1, the OS page cache is bypassed.
     /// </summary>
-    internal const int F_NOCACHE = 48;
+    internal const int FNocache = 48;
 
     /// <summary>Set file status flags.</summary>
-    internal const int F_SETFL = 4;
+    internal const int FSetfl = 4;
 
     // --- kqueue event filter and flags ---
 
     /// <summary>Kqueue filter for asynchronous I/O events (aio completion).</summary>
-    internal const short EVFILT_AIO = -3;
+    internal const short EvfiltAio = -3;
 
     /// <summary>Add event to kqueue.</summary>
-    internal const ushort EV_ADD = 0x0001;
+    internal const ushort EvAdd = 0x0001;
 
     /// <summary>Enable event reporting.</summary>
-    internal const ushort EV_ENABLE = 0x0004;
+    internal const ushort EvEnable = 0x0004;
 
     /// <summary>Remove event after first trigger.</summary>
-    internal const ushort EV_ONESHOT = 0x0010;
+    internal const ushort EvOneshot = 0x0010;
 
     /// <summary>Indicates an error occurred for this event.</summary>
-    internal const ushort EV_ERROR = 0x4000;
+    internal const ushort EvError = 0x4000;
 
     // --- AIO signal notification modes ---
 
     /// <summary>No notification on AIO completion. Use polling instead.</summary>
-    internal const int SIGEV_NONE = 0;
+    internal const int SigevNone = 0;
 
     /// <summary>
     /// FreeBSD-specific: deliver AIO completion as a kevent. Not available on macOS;
-    /// use SIGEV_NONE with explicit polling on macOS.
+    /// use SigevNone with explicit polling on macOS.
     /// </summary>
-    internal const int SIGEV_KEVENT = 3;
+    internal const int SigevKevent = 3;
 
     // --- AIO error codes ---
 
     /// <summary>AIO operation is still in progress (not yet complete).</summary>
-    internal const int EINPROGRESS = 36;
+    internal const int Einprogress = 36;
 
     // --- File permissions ---
 
     /// <summary>Owner read/write permission (0600).</summary>
-    internal const int S_IRUSR_IWUSR = 0x180; // 0600 octal
+    internal const int SIrusrIwusr = 0x180; // 0600 octal
 
     // --- Structs ---
 
@@ -174,13 +174,13 @@ internal static class KqueueNativeMethods
     [StructLayout(LayoutKind.Sequential)]
     internal struct KqueueEvent
     {
-        /// <summary>Event identifier (e.g., pointer to aiocb for EVFILT_AIO).</summary>
+        /// <summary>Event identifier (e.g., pointer to aiocb for EvfiltAio).</summary>
         internal nuint Ident;
 
-        /// <summary>Event filter type (e.g., EVFILT_AIO).</summary>
+        /// <summary>Event filter type (e.g., EvfiltAio).</summary>
         internal short Filter;
 
-        /// <summary>Action flags (e.g., EV_ADD | EV_ENABLE | EV_ONESHOT).</summary>
+        /// <summary>Action flags (e.g., EvAdd | EvEnable | EvOneshot).</summary>
         internal ushort Flags;
 
         /// <summary>Filter-specific flags.</summary>
@@ -208,18 +208,18 @@ internal static class KqueueNativeMethods
 
     /// <summary>
     /// POSIX sigevent structure for AIO completion notification configuration.
-    /// On macOS, only SIGEV_NONE is reliably supported for AIO.
+    /// On macOS, only SigevNone is reliably supported for AIO.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
     internal struct Sigevent
     {
-        /// <summary>Notification type (SIGEV_NONE or SIGEV_KEVENT).</summary>
+        /// <summary>Notification type (SigevNone or SigevKevent).</summary>
         internal int Notify;
 
-        /// <summary>Signal number (unused when Notify is SIGEV_NONE).</summary>
+        /// <summary>Signal number (unused when Notify is SigevNone).</summary>
         internal int Signo;
 
-        /// <summary>Signal value / user data (unused when Notify is SIGEV_NONE).</summary>
+        /// <summary>Signal value / user data (unused when Notify is SigevNone).</summary>
         internal IntPtr Value;
 
         /// <summary>Notification function pointer (unused in this implementation).</summary>
@@ -303,7 +303,7 @@ internal static class KqueueNativeMethods
     }
 
     /// <summary>
-    /// Returns <c>true</c> if running on macOS (for F_NOCACHE and macOS-specific struct layouts).
+    /// Returns <c>true</c> if running on macOS (for FNocache and macOS-specific struct layouts).
     /// </summary>
-    internal static bool IsMacOS => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
+    internal static bool IsMacOs => RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
 }

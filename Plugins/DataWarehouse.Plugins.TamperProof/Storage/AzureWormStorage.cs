@@ -427,7 +427,7 @@ public class AzureWormStorage : WormStorageProviderPluginBase
         {
             StorageKey = azureResult.BlobName,
             ContentHash = azureResult.ContentHash!,
-            HashAlgorithm = HashAlgorithmType.SHA256,
+            HashAlgorithm = HashAlgorithmType.Sha256,
             SizeBytes = azureResult.SizeBytes,
             WrittenAt = DateTimeOffset.UtcNow,
             RetentionExpiry = azureResult.ImmutabilityPolicyExpiry,

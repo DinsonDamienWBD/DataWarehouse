@@ -81,7 +81,7 @@ public sealed class MacFuseMountProvider : IVdeMountProvider
     }
 
     /// <inheritdoc />
-    public PlatformFlags SupportedPlatforms => PlatformFlags.MacOS;
+    public PlatformFlags SupportedPlatforms => PlatformFlags.MacOs;
 
     /// <inheritdoc />
     public bool IsAvailable => MacFuseNative.IsAvailable() && RuntimeInformation.IsOSPlatform(OSPlatform.OSX);
@@ -328,10 +328,10 @@ public sealed class MacFuseMountProvider : IVdeMountProvider
     {
         return type switch
         {
-            InodeType.File => MacFuseNative.S_IFREG,
-            InodeType.Directory => MacFuseNative.S_IFDIR,
-            InodeType.SymLink => MacFuseNative.S_IFLNK,
-            _ => MacFuseNative.S_IFREG
+            InodeType.File => MacFuseNative.SIfreg,
+            InodeType.Directory => MacFuseNative.SIfdir,
+            InodeType.SymLink => MacFuseNative.SIflnk,
+            _ => MacFuseNative.SIfreg
         };
     }
 
@@ -357,17 +357,17 @@ public sealed class MacFuseMountProvider : IVdeMountProvider
     {
         return ex switch
         {
-            FileNotFoundException => MacFuseNative.ENOENT,
-            DirectoryNotFoundException => MacFuseNative.ENOENT,
-            UnauthorizedAccessException => MacFuseNative.EACCES,
-            InvalidOperationException e when e.Message.Contains("read-only", StringComparison.OrdinalIgnoreCase) => MacFuseNative.EROFS,
-            InvalidOperationException e when e.Message.Contains("not empty", StringComparison.OrdinalIgnoreCase) => MacFuseNative.ENOTEMPTY,
+            FileNotFoundException => MacFuseNative.Enoent,
+            DirectoryNotFoundException => MacFuseNative.Enoent,
+            UnauthorizedAccessException => MacFuseNative.Eacces,
+            InvalidOperationException e when e.Message.Contains("read-only", StringComparison.OrdinalIgnoreCase) => MacFuseNative.Erofs,
+            InvalidOperationException e when e.Message.Contains("not empty", StringComparison.OrdinalIgnoreCase) => MacFuseNative.Enotempty,
             IOException e when e.Message.Contains("disk full", StringComparison.OrdinalIgnoreCase)
-                            || e.Message.Contains("no space", StringComparison.OrdinalIgnoreCase) => MacFuseNative.ENOSPC,
-            IOException e when e.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase) => MacFuseNative.EEXIST,
-            ArgumentException => MacFuseNative.EINVAL,
-            NotSupportedException => MacFuseNative.ENOTSUP,
-            _ => MacFuseNative.EIO
+                            || e.Message.Contains("no space", StringComparison.OrdinalIgnoreCase) => MacFuseNative.Enospc,
+            IOException e when e.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase) => MacFuseNative.Eexist,
+            ArgumentException => MacFuseNative.Einval,
+            NotSupportedException => MacFuseNative.Enotsup,
+            _ => MacFuseNative.Eio
         };
     }
 
@@ -387,7 +387,7 @@ public sealed class MacFuseMountProvider : IVdeMountProvider
 
             if (!result.Found)
             {
-                MacFuseNative.fuse_reply_err(req, MacFuseNative.ENOENT);
+                MacFuseNative.fuse_reply_err(req, MacFuseNative.Enoent);
                 return;
             }
 
@@ -687,7 +687,7 @@ public sealed class MacFuseMountProvider : IVdeMountProvider
             var attrs = adapter.GetattrAsync((long)ino, CancellationToken.None).GetAwaiter().GetResult();
             if (attrs.Type != InodeType.Directory)
             {
-                MacFuseNative.fuse_reply_err(req, MacFuseNative.ENOTDIR);
+                MacFuseNative.fuse_reply_err(req, MacFuseNative.Enotdir);
                 return;
             }
 
@@ -884,7 +884,7 @@ public sealed class MacFuseMountProvider : IVdeMountProvider
 
             if (data == null)
             {
-                MacFuseNative.fuse_reply_err(req, MacFuseNative.ENOATTR);
+                MacFuseNative.fuse_reply_err(req, MacFuseNative.Enoattr);
                 return;
             }
 

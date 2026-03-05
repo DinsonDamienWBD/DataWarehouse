@@ -20,15 +20,15 @@ internal sealed class Stereo3DVideoStrategy : MediaStrategyBase
     public Stereo3DVideoStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV
+            MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.Mov
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV
+            MediaFormat.Mp4, MediaFormat.Mkv
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
-        MaxResolution: Resolution.UHD,
+        MaxResolution: Resolution.Uhd,
         MaxBitrate: Bitrate.Video4K.BitsPerSecond,
         SupportedCodecs: new HashSet<string> { "stereo3d", "h264", "h265", "av1" },
         SupportsThumbnailGeneration: false,
@@ -102,9 +102,9 @@ internal sealed class Stereo3DVideoStrategy : MediaStrategyBase
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
-            Duration: TimeSpan.Zero, Format: MediaFormat.MP4,
+            Duration: TimeSpan.Zero, Format: MediaFormat.Mp4,
             VideoCodec: "h264", AudioCodec: null,
-            Resolution: Resolution.FullHD, Bitrate: Bitrate.VideoHD,
+            Resolution: Resolution.FullHd, Bitrate: Bitrate.VideoHd,
             FrameRate: 30, AudioChannels: null, SampleRate: null,
             FileSize: inputStream.Length,
             CustomMetadata: new Dictionary<string, string> { ["StereoMode"] = "SideBySide" }));
@@ -134,11 +134,11 @@ internal sealed class Video360Strategy : MediaStrategyBase
     public Video360Strategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV, MediaFormat.WebM
+            MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.WebM
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV
+            MediaFormat.Mp4, MediaFormat.Mkv
         },
         SupportsStreaming: true,
         SupportsAdaptiveBitrate: true,
@@ -211,9 +211,9 @@ internal sealed class Video360Strategy : MediaStrategyBase
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
-            Duration: TimeSpan.Zero, Format: MediaFormat.MP4,
+            Duration: TimeSpan.Zero, Format: MediaFormat.Mp4,
             VideoCodec: "h265", AudioCodec: null,
-            Resolution: Resolution.UHD, Bitrate: Bitrate.Video4K,
+            Resolution: Resolution.Uhd, Bitrate: Bitrate.Video4K,
             FrameRate: 30, AudioChannels: null, SampleRate: null,
             FileSize: inputStream.Length,
             CustomMetadata: new Dictionary<string, string>
@@ -247,11 +247,11 @@ internal sealed class VrVideoStrategy : MediaStrategyBase
     public VrVideoStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV
+            MediaFormat.Mp4, MediaFormat.Mkv
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV
+            MediaFormat.Mp4, MediaFormat.Mkv
         },
         SupportsStreaming: true,
         SupportsAdaptiveBitrate: true,
@@ -330,9 +330,9 @@ internal sealed class VrVideoStrategy : MediaStrategyBase
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
-            Duration: TimeSpan.Zero, Format: MediaFormat.MP4,
+            Duration: TimeSpan.Zero, Format: MediaFormat.Mp4,
             VideoCodec: "h265", AudioCodec: null,
-            Resolution: Resolution.UHD, Bitrate: Bitrate.Video4K,
+            Resolution: Resolution.Uhd, Bitrate: Bitrate.Video4K,
             FrameRate: 90, AudioChannels: null, SampleRate: null,
             FileSize: inputStream.Length,
             CustomMetadata: new Dictionary<string, string>
@@ -367,11 +367,11 @@ internal sealed class HdrToneMappingStrategy : MediaStrategyBase
     public HdrToneMappingStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV
+            MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.Mov
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV
+            MediaFormat.Mp4, MediaFormat.Mkv
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
@@ -444,9 +444,9 @@ internal sealed class HdrToneMappingStrategy : MediaStrategyBase
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
-            Duration: TimeSpan.Zero, Format: MediaFormat.MP4,
+            Duration: TimeSpan.Zero, Format: MediaFormat.Mp4,
             VideoCodec: "h265", AudioCodec: null,
-            Resolution: Resolution.UHD, Bitrate: Bitrate.Video4K,
+            Resolution: Resolution.Uhd, Bitrate: Bitrate.Video4K,
             FrameRate: null, AudioChannels: null, SampleRate: null,
             FileSize: inputStream.Length,
             CustomMetadata: new Dictionary<string, string>
@@ -493,7 +493,7 @@ public sealed class VrRenderConfig
     public bool EnableFoveation { get; init; } = true;
     public float TargetFrameRate { get; init; } = 90;
     public float MaxMotionToPhotonMs { get; init; } = 20;
-    public Resolution EyeBufferResolution { get; init; } = Resolution.UHD;
+    public Resolution EyeBufferResolution { get; init; } = Resolution.Uhd;
 }
 
 public sealed class VrFrameResult

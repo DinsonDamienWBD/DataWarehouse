@@ -44,11 +44,11 @@ internal sealed class NefRawStrategy : MediaStrategyBase
     public NefRawStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.NEF
+            MediaFormat.Nef
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF
+            MediaFormat.Jpeg, MediaFormat.Png, MediaFormat.Avif
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
@@ -185,7 +185,7 @@ internal sealed class NefRawStrategy : MediaStrategyBase
 
         return new MediaMetadata(
             Duration: TimeSpan.Zero,
-            Format: MediaFormat.NEF,
+            Format: MediaFormat.Nef,
             VideoCodec: null,
             AudioCodec: null,
             Resolution: new Resolution(width, height),

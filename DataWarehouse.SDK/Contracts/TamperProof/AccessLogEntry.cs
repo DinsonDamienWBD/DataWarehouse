@@ -117,7 +117,7 @@ public sealed class AccessLogEntry
     /// </summary>
     /// <param name="algorithm">Hash algorithm to use (default: SHA256).</param>
     /// <returns>Base64-encoded hash of the entry.</returns>
-    public string ComputeEntryHash(HashAlgorithmType algorithm = HashAlgorithmType.SHA256)
+    public string ComputeEntryHash(HashAlgorithmType algorithm = HashAlgorithmType.Sha256)
     {
         var sb = new StringBuilder();
         sb.Append(EntryId.ToString("N"));
@@ -150,9 +150,9 @@ public sealed class AccessLogEntry
 
         return algorithm switch
         {
-            HashAlgorithmType.SHA256 => Convert.ToBase64String(SHA256.HashData(data)),
-            HashAlgorithmType.SHA384 => Convert.ToBase64String(SHA384.HashData(data)),
-            HashAlgorithmType.SHA512 => Convert.ToBase64String(SHA512.HashData(data)),
+            HashAlgorithmType.Sha256 => Convert.ToBase64String(SHA256.HashData(data)),
+            HashAlgorithmType.Sha384 => Convert.ToBase64String(SHA384.HashData(data)),
+            HashAlgorithmType.Sha512 => Convert.ToBase64String(SHA512.HashData(data)),
             HashAlgorithmType.Blake3 => ComputeBlake3Hash(data),
             _ => throw new ArgumentException($"Unsupported hash algorithm: {algorithm}", nameof(algorithm))
         };

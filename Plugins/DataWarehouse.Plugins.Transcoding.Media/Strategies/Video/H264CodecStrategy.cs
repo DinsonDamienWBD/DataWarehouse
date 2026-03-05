@@ -58,16 +58,16 @@ internal sealed class H264CodecStrategy : MediaStrategyBase
     public H264CodecStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI,
-            MediaFormat.WebM, MediaFormat.FLV
+            MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.Mov, MediaFormat.Avi,
+            MediaFormat.WebM, MediaFormat.Flv
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.FLV, MediaFormat.HLS
+            MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.Mov, MediaFormat.Flv, MediaFormat.Hls
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
-        MaxResolution: Resolution.UHD,
+        MaxResolution: Resolution.Uhd,
         MaxBitrate: 50_000_000,
         SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
@@ -173,7 +173,7 @@ internal sealed class H264CodecStrategy : MediaStrategyBase
                 crf = EstimateCrfFromBitrate(options.TargetBitrate.Value.BitsPerSecond, options.TargetResolution);
             }
 
-            var resolution = options.TargetResolution ?? Resolution.FullHD;
+            var resolution = options.TargetResolution ?? Resolution.FullHd;
             var frameRate = options.FrameRate ?? 30.0;
             var audioCodec = options.AudioCodec ?? "aac";
 
@@ -225,7 +225,7 @@ internal sealed class H264CodecStrategy : MediaStrategyBase
             Format: format,
             VideoCodec: "h264",
             AudioCodec: "aac",
-            Resolution: Resolution.FullHD,
+            Resolution: Resolution.FullHd,
             Bitrate: new Bitrate(5_000_000),
             FrameRate: 30.0,
             AudioChannels: 2,
@@ -319,7 +319,7 @@ internal sealed class H264CodecStrategy : MediaStrategyBase
     {
         var pixels = resolution.HasValue
             ? (long)resolution.Value.Width * resolution.Value.Height
-            : (long)Resolution.FullHD.Width * Resolution.FullHD.Height;
+            : (long)Resolution.FullHd.Width * Resolution.FullHd.Height;
 
         // Bits per pixel per frame at 30fps
         var bitsPerPixelPerFrame = targetBps / (pixels * 30.0);
@@ -475,7 +475,7 @@ internal sealed class H264CodecStrategy : MediaStrategyBase
     private static MediaFormat DetectContainerFormat(byte[] data)
     {
         var detected = MediaFormatDetector.DetectFormat(data);
-        return detected != MediaFormat.Unknown ? detected : MediaFormat.MP4;
+        return detected != MediaFormat.Unknown ? detected : MediaFormat.Mp4;
     }
 
     /// <summary>

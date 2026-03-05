@@ -247,10 +247,10 @@ namespace DataWarehouse.SDK.Contracts
 
     public enum MatchType { Exact, Keyword, Fuzzy, Semantic, AiInferred }
 
-    public enum ComplianceMode { None, HIPAA, Financial, Government, GDPR, Custom }
+    public enum ComplianceMode { None, Hipaa, Financial, Government, Gdpr, Custom }
 
-    public enum EncryptionLevel { None, AES128, AES256, AES256WithHSM, Custom }
-    public enum HashAlgorithmType { SHA256, SHA384, SHA512, BLAKE2, BLAKE3 }
+    public enum EncryptionLevel { None, Aes128, Aes256, Aes256WithHsm, Custom }
+    public enum HashAlgorithmType { Sha256, Sha384, Sha512, Blake2, Blake3 }
 
     public class AuditEntry
     {

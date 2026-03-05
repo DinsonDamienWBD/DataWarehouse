@@ -900,18 +900,14 @@ public sealed class JepsenTestHarness
 
     private static async Task RunDockerCommandAsync(string arguments, CancellationToken ct)
     {
-        using var process = new Process
-        {
-            StartInfo = new ProcessStartInfo
-            {
-                FileName = "docker",
-                Arguments = arguments,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true
-            }
-        };
+        // Finding #1292-1293: Do not use object initializer for 'using' variable.
+        using var process = new Process();
+        process.StartInfo.FileName = "docker";
+        process.StartInfo.Arguments = arguments;
+        process.StartInfo.RedirectStandardOutput = true;
+        process.StartInfo.RedirectStandardError = true;
+        process.StartInfo.UseShellExecute = false;
+        process.StartInfo.CreateNoWindow = true;
 
         process.Start();
         var stdout = await process.StandardOutput.ReadToEndAsync(ct).ConfigureAwait(false);

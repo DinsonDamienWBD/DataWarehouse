@@ -68,29 +68,29 @@ namespace DataWarehouse.Tests.Infrastructure
         public void MediaFormat_ContainsVideoFormats()
         {
             var values = Enum.GetValues<MediaFormat>();
-            Assert.Contains(MediaFormat.MP4, values);
+            Assert.Contains(MediaFormat.Mp4, values);
             Assert.Contains(MediaFormat.WebM, values);
-            Assert.Contains(MediaFormat.MKV, values);
-            Assert.Contains(MediaFormat.AVI, values);
-            Assert.Contains(MediaFormat.MOV, values);
+            Assert.Contains(MediaFormat.Mkv, values);
+            Assert.Contains(MediaFormat.Avi, values);
+            Assert.Contains(MediaFormat.Mov, values);
         }
 
         [Fact]
         public void MediaFormat_ContainsStreamingFormats()
         {
             var values = Enum.GetValues<MediaFormat>();
-            Assert.Contains(MediaFormat.HLS, values);
-            Assert.Contains(MediaFormat.DASH, values);
+            Assert.Contains(MediaFormat.Hls, values);
+            Assert.Contains(MediaFormat.Dash, values);
         }
 
         [Fact]
         public void MediaFormat_ContainsAudioFormats()
         {
             var values = Enum.GetValues<MediaFormat>();
-            Assert.Contains(MediaFormat.MP3, values);
-            Assert.Contains(MediaFormat.AAC, values);
-            Assert.Contains(MediaFormat.FLAC, values);
-            Assert.Contains(MediaFormat.WAV, values);
+            Assert.Contains(MediaFormat.Mp3, values);
+            Assert.Contains(MediaFormat.Aac, values);
+            Assert.Contains(MediaFormat.Flac, values);
+            Assert.Contains(MediaFormat.Wav, values);
             Assert.Contains(MediaFormat.Opus, values);
         }
 
@@ -98,8 +98,8 @@ namespace DataWarehouse.Tests.Infrastructure
         public void MediaFormat_ContainsImageFormats()
         {
             var values = Enum.GetValues<MediaFormat>();
-            Assert.Contains(MediaFormat.JPEG, values);
-            Assert.Contains(MediaFormat.PNG, values);
+            Assert.Contains(MediaFormat.Jpeg, values);
+            Assert.Contains(MediaFormat.Png, values);
             Assert.Contains(MediaFormat.WebP, values);
         }
 
@@ -127,24 +127,24 @@ namespace DataWarehouse.Tests.Infrastructure
         [Fact]
         public void MediaCapabilities_SupportsTranscode_ChecksBothFormats()
         {
-            var inputFormats = new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.WebM };
-            var outputFormats = new HashSet<MediaFormat> { MediaFormat.HLS, MediaFormat.DASH };
+            var inputFormats = new HashSet<MediaFormat> { MediaFormat.Mp4, MediaFormat.WebM };
+            var outputFormats = new HashSet<MediaFormat> { MediaFormat.Hls, MediaFormat.Dash };
 
             var caps = new MediaCapabilities(
                 SupportedInputFormats: inputFormats,
                 SupportedOutputFormats: outputFormats,
                 SupportsStreaming: true,
                 SupportsAdaptiveBitrate: true,
-                MaxResolution: Resolution.UHD,
+                MaxResolution: Resolution.Uhd,
                 MaxBitrate: 50_000_000,
                 SupportedCodecs: new HashSet<string> { "h264", "h265" },
                 SupportsThumbnailGeneration: true,
                 SupportsMetadataExtraction: true,
                 SupportsHardwareAcceleration: false);
 
-            Assert.True(caps.SupportsTranscode(MediaFormat.MP4, MediaFormat.HLS));
-            Assert.False(caps.SupportsTranscode(MediaFormat.AVI, MediaFormat.HLS));
-            Assert.False(caps.SupportsTranscode(MediaFormat.MP4, MediaFormat.MP3));
+            Assert.True(caps.SupportsTranscode(MediaFormat.Mp4, MediaFormat.Hls));
+            Assert.False(caps.SupportsTranscode(MediaFormat.Avi, MediaFormat.Hls));
+            Assert.False(caps.SupportsTranscode(MediaFormat.Mp4, MediaFormat.Mp3));
         }
 
         [Fact]
@@ -155,16 +155,16 @@ namespace DataWarehouse.Tests.Infrastructure
                 SupportedOutputFormats: new HashSet<MediaFormat>(),
                 SupportsStreaming: false,
                 SupportsAdaptiveBitrate: false,
-                MaxResolution: Resolution.FullHD,
+                MaxResolution: Resolution.FullHd,
                 MaxBitrate: null,
                 SupportedCodecs: new HashSet<string>(),
                 SupportsThumbnailGeneration: false,
                 SupportsMetadataExtraction: false,
                 SupportsHardwareAcceleration: false);
 
-            Assert.True(caps.SupportsResolution(Resolution.HD));
-            Assert.True(caps.SupportsResolution(Resolution.FullHD));
-            Assert.False(caps.SupportsResolution(Resolution.UHD));
+            Assert.True(caps.SupportsResolution(Resolution.Hd));
+            Assert.True(caps.SupportsResolution(Resolution.FullHd));
+            Assert.False(caps.SupportsResolution(Resolution.Uhd));
         }
 
         [Fact]
@@ -214,12 +214,12 @@ namespace DataWarehouse.Tests.Infrastructure
         [Fact]
         public void Resolution_StandardPresets_HaveCorrectDimensions()
         {
-            Assert.Equal(640, Resolution.SD.Width);
-            Assert.Equal(480, Resolution.SD.Height);
-            Assert.Equal(1920, Resolution.FullHD.Width);
-            Assert.Equal(1080, Resolution.FullHD.Height);
-            Assert.Equal(3840, Resolution.UHD.Width);
-            Assert.Equal(2160, Resolution.UHD.Height);
+            Assert.Equal(640, Resolution.Sd.Width);
+            Assert.Equal(480, Resolution.Sd.Height);
+            Assert.Equal(1920, Resolution.FullHd.Width);
+            Assert.Equal(1080, Resolution.FullHd.Height);
+            Assert.Equal(3840, Resolution.Uhd.Width);
+            Assert.Equal(2160, Resolution.Uhd.Height);
         }
 
         [Fact]
@@ -265,7 +265,7 @@ namespace DataWarehouse.Tests.Infrastructure
         public void Bitrate_Presets_HaveCorrectValues()
         {
             Assert.Equal(128_000, Bitrate.AudioLow.BitsPerSecond);
-            Assert.Equal(2_000_000, Bitrate.VideoSD.BitsPerSecond);
+            Assert.Equal(2_000_000, Bitrate.VideoSd.BitsPerSecond);
             Assert.Equal(25_000_000, Bitrate.Video4K.BitsPerSecond);
         }
 
@@ -277,16 +277,16 @@ namespace DataWarehouse.Tests.Infrastructure
         public void TranscodeOptions_Construction_SetsProperties()
         {
             var options = new TranscodeOptions(
-                TargetFormat: MediaFormat.HLS,
+                TargetFormat: MediaFormat.Hls,
                 VideoCodec: "h265",
                 AudioCodec: "aac",
-                TargetResolution: Resolution.FullHD,
-                TargetBitrate: Bitrate.VideoFullHD);
+                TargetResolution: Resolution.FullHd,
+                TargetBitrate: Bitrate.VideoFullHd);
 
-            Assert.Equal(MediaFormat.HLS, options.TargetFormat);
+            Assert.Equal(MediaFormat.Hls, options.TargetFormat);
             Assert.Equal("h265", options.VideoCodec);
             Assert.Equal("aac", options.AudioCodec);
-            Assert.Equal(Resolution.FullHD, options.TargetResolution);
+            Assert.Equal(Resolution.FullHd, options.TargetResolution);
             Assert.False(options.TwoPass);
         }
 
@@ -299,18 +299,18 @@ namespace DataWarehouse.Tests.Infrastructure
         {
             var metadata = new MediaMetadata(
                 Duration: TimeSpan.FromMinutes(5),
-                Format: MediaFormat.MP4,
+                Format: MediaFormat.Mp4,
                 VideoCodec: "h264",
                 AudioCodec: "aac",
-                Resolution: Resolution.FullHD,
-                Bitrate: Bitrate.VideoFullHD,
+                Resolution: Resolution.FullHd,
+                Bitrate: Bitrate.VideoFullHd,
                 FrameRate: 30.0,
                 AudioChannels: 2,
                 SampleRate: 44100,
                 FileSize: 50_000_000);
 
             Assert.Equal(TimeSpan.FromMinutes(5), metadata.Duration);
-            Assert.Equal(MediaFormat.MP4, metadata.Format);
+            Assert.Equal(MediaFormat.Mp4, metadata.Format);
             Assert.True(metadata.IsVideo);
             Assert.False(metadata.IsAudioOnly);
         }
@@ -320,7 +320,7 @@ namespace DataWarehouse.Tests.Infrastructure
         {
             var metadata = new MediaMetadata(
                 Duration: TimeSpan.FromMinutes(3),
-                Format: MediaFormat.MP3,
+                Format: MediaFormat.Mp3,
                 VideoCodec: null,
                 AudioCodec: "mp3",
                 Resolution: null,

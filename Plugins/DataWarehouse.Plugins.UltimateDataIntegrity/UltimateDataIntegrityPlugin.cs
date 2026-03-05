@@ -57,12 +57,12 @@ public sealed class UltimateDataIntegrityPlugin : IntegrityProviderPluginBase
     /// </remarks>
     public override IReadOnlyList<HashAlgorithmType> SupportedAlgorithms { get; } = new[]
     {
-        HashAlgorithmType.SHA256,
-        HashAlgorithmType.SHA384,
-        HashAlgorithmType.SHA512,
-        HashAlgorithmType.SHA3_256,
-        HashAlgorithmType.SHA3_384,
-        HashAlgorithmType.SHA3_512,
+        HashAlgorithmType.Sha256,
+        HashAlgorithmType.Sha384,
+        HashAlgorithmType.Sha512,
+        HashAlgorithmType.Sha3256,
+        HashAlgorithmType.Sha3384,
+        HashAlgorithmType.Sha3512,
         HashAlgorithmType.Keccak256,
         HashAlgorithmType.Keccak384,
         HashAlgorithmType.Keccak512
@@ -111,24 +111,24 @@ public sealed class UltimateDataIntegrityPlugin : IntegrityProviderPluginBase
     {
         IHashProvider provider = algorithm switch
         {
-            HashAlgorithmType.SHA256 => new Sha256Provider(),
-            HashAlgorithmType.SHA384 => new Sha384Provider(),
-            HashAlgorithmType.SHA512 => new Sha512Provider(),
-            HashAlgorithmType.SHA3_256 => new Sha3_256Provider(),
-            HashAlgorithmType.SHA3_384 => new Sha3_384Provider(),
-            HashAlgorithmType.SHA3_512 => new Sha3_512Provider(),
+            HashAlgorithmType.Sha256 => new Sha256Provider(),
+            HashAlgorithmType.Sha384 => new Sha384Provider(),
+            HashAlgorithmType.Sha512 => new Sha512Provider(),
+            HashAlgorithmType.Sha3256 => new Sha3_256Provider(),
+            HashAlgorithmType.Sha3384 => new Sha3_384Provider(),
+            HashAlgorithmType.Sha3512 => new Sha3_512Provider(),
             HashAlgorithmType.Keccak256 => new Keccak256Provider(),
             HashAlgorithmType.Keccak384 => new Keccak384Provider(),
             HashAlgorithmType.Keccak512 => new Keccak512Provider(),
             // HMAC algorithms require a key, which we don't have in this method signature.
             // For HMAC, callers should use the async methods with explicit key material.
             // For now, throw for HMAC algorithms in the span-based API.
-            HashAlgorithmType.HMAC_SHA256 or
-            HashAlgorithmType.HMAC_SHA384 or
-            HashAlgorithmType.HMAC_SHA512 or
-            HashAlgorithmType.HMAC_SHA3_256 or
-            HashAlgorithmType.HMAC_SHA3_384 or
-            HashAlgorithmType.HMAC_SHA3_512 =>
+            HashAlgorithmType.HmacSha256 or
+            HashAlgorithmType.HmacSha384 or
+            HashAlgorithmType.HmacSha512 or
+            HashAlgorithmType.HmacSha3256 or
+            HashAlgorithmType.HmacSha3384 or
+            HashAlgorithmType.HmacSha3512 =>
                 throw new NotSupportedException($"HMAC algorithm {algorithm} requires key material. Use ComputeHashAsync with key."),
             _ => throw new NotSupportedException($"Hash algorithm {algorithm} is not supported.")
         };
@@ -181,7 +181,7 @@ public sealed class UltimateDataIntegrityPlugin : IntegrityProviderPluginBase
                 return;
             }
 
-            var algorithm = HashAlgorithmType.SHA256;
+            var algorithm = HashAlgorithmType.Sha256;
             if (message.Payload.TryGetValue("algorithm", out var algObj) && algObj is string algStr)
             {
                 if (Enum.TryParse<HashAlgorithmType>(algStr, true, out var parsedAlg))
@@ -230,7 +230,7 @@ public sealed class UltimateDataIntegrityPlugin : IntegrityProviderPluginBase
                 return;
             }
 
-            var algorithm = HashAlgorithmType.SHA256;
+            var algorithm = HashAlgorithmType.Sha256;
             if (message.Payload.TryGetValue("algorithm", out var algObj) && algObj is string algStr)
             {
                 if (Enum.TryParse<HashAlgorithmType>(algStr, true, out var parsedAlg))

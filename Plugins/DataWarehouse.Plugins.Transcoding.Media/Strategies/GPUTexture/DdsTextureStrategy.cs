@@ -49,11 +49,11 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
     public DdsTextureStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.DDS, MediaFormat.PNG, MediaFormat.JPEG
+            MediaFormat.Dds, MediaFormat.Png, MediaFormat.Jpeg
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.DDS
+            MediaFormat.Dds
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
@@ -153,7 +153,7 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
 
         return new MediaMetadata(
             Duration: TimeSpan.Zero,
-            Format: MediaFormat.DDS,
+            Format: MediaFormat.Dds,
             VideoCodec: null,
             AudioCodec: null,
             Resolution: new Resolution(width, height),

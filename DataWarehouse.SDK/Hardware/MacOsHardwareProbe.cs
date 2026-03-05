@@ -72,12 +72,14 @@ namespace DataWarehouse.SDK.Hardware
         /// <inheritdoc />
         public async Task<HardwareDevice?> GetDeviceAsync(string deviceId, CancellationToken ct = default)
         {
-            if (_lastDiscovery == null)
+            // Finding #1381: TOCTOU race — snapshot volatile field once to avoid duplicate discovery calls.
+            var cached = _lastDiscovery;
+            if (cached == null)
             {
-                await DiscoverAsync(null, ct);
+                cached = await DiscoverAsync(null, ct);
             }
 
-            return _lastDiscovery?.FirstOrDefault(d => d.DeviceId == deviceId);
+            return cached?.FirstOrDefault(d => d.DeviceId == deviceId);
         }
 
         /// <inheritdoc />

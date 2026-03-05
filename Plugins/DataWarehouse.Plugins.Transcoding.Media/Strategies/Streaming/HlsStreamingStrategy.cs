@@ -42,19 +42,19 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
     {
         (new Resolution(640, 360), 800, "360p"),
         (new Resolution(854, 480), 1400, "480p"),
-        (Resolution.HD, 2800, "720p"),
-        (Resolution.FullHD, 5000, "1080p"),
+        (Resolution.Hd, 2800, "720p"),
+        (Resolution.FullHd, 5000, "1080p"),
     };
 
     /// <summary>
     /// Initializes a new instance of the <see cref="HlsStreamingStrategy"/> class.
     /// </summary>
     public HlsStreamingStrategy() : base(new MediaCapabilities(
-        SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM },
-        SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.HLS },
+        SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.Mov, MediaFormat.Avi, MediaFormat.WebM },
+        SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.Hls },
         SupportsStreaming: true,
         SupportsAdaptiveBitrate: true,
-        MaxResolution: Resolution.UHD,
+        MaxResolution: Resolution.Uhd,
         MaxBitrate: 25_000_000,
         SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "h264", "aac", "h265", "ac3" },
         SupportsThumbnailGeneration: false,
@@ -152,7 +152,7 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
             segmentDuration = segDur;
         }
 
-        var targetResolution = options.TargetResolution ?? Resolution.FullHD;
+        var targetResolution = options.TargetResolution ?? Resolution.FullHd;
         var targetBitrateKbps = options.TargetBitrate.HasValue
             ? (int)(options.TargetBitrate.Value.BitsPerSecond / 1000)
             : 5000;
@@ -234,13 +234,13 @@ internal sealed class HlsStreamingStrategy : MediaStrategyBase
     /// Generates a streaming manifest URI for HLS adaptive bitrate delivery.
     /// </summary>
     /// <param name="mediaStream">The source media stream to prepare for streaming.</param>
-    /// <param name="targetFormat">Must be <see cref="SDK.Contracts.Media.MediaFormat.HLS"/>.</param>
+    /// <param name="targetFormat">Must be <see cref="SDK.Contracts.Media.MediaFormat.Hls"/>.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>A URI pointing to the generated m3u8 master playlist.</returns>
     protected override async Task<Uri> StreamAsyncCore(
         Stream mediaStream, SDK.Contracts.Media.MediaFormat targetFormat, CancellationToken cancellationToken)
     {
-        if (targetFormat != SDK.Contracts.Media.MediaFormat.HLS)
+        if (targetFormat != SDK.Contracts.Media.MediaFormat.Hls)
             throw new NotSupportedException($"HLS strategy only supports HLS format, not {targetFormat}.");
 
         // Generate a unique stream identifier for manifest addressing

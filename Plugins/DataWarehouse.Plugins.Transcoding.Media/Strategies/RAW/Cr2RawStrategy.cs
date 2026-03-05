@@ -53,11 +53,11 @@ internal sealed class Cr2RawStrategy : MediaStrategyBase
     public Cr2RawStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.CR2
+            MediaFormat.Cr2
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.AVIF
+            MediaFormat.Jpeg, MediaFormat.Png, MediaFormat.Avif
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
@@ -208,7 +208,7 @@ internal sealed class Cr2RawStrategy : MediaStrategyBase
 
         return new MediaMetadata(
             Duration: TimeSpan.Zero,
-            Format: MediaFormat.CR2,
+            Format: MediaFormat.Cr2,
             VideoCodec: null,
             AudioCodec: null,
             Resolution: new Resolution(width, height),

@@ -125,10 +125,10 @@ public sealed class KqueueBlockDevice : IBatchBlockDevice
         int openFlags = KqueueNativeMethods.ORdwr;
         if (createNew)
         {
-            openFlags |= KqueueNativeMethods.OCreat | KqueueNativeMethods.O_EXCL;
+            openFlags |= KqueueNativeMethods.OCreat | KqueueNativeMethods.OExcl;
         }
 
-        _fileFd = KqueueNativeMethods.Open(path, openFlags, KqueueNativeMethods.S_IRUSR_IWUSR);
+        _fileFd = KqueueNativeMethods.Open(path, openFlags, KqueueNativeMethods.SIrusrIwusr);
         if (_fileFd < 0)
         {
             int errno = Marshal.GetLastPInvokeError();
@@ -140,9 +140,9 @@ public sealed class KqueueBlockDevice : IBatchBlockDevice
         try
         {
             // Apply F_NOCACHE on macOS for page cache bypass
-            if (KqueueNativeMethods.IsMacOS)
+            if (KqueueNativeMethods.IsMacOs)
             {
-                int result = KqueueNativeMethods.Fcntl(_fileFd, KqueueNativeMethods.F_NOCACHE, 1);
+                int result = KqueueNativeMethods.Fcntl(_fileFd, KqueueNativeMethods.FNocache, 1);
                 IsDirectIo = result == 0;
             }
 
@@ -459,7 +459,7 @@ public sealed class KqueueBlockDevice : IBatchBlockDevice
         aiocb->Buffer = (IntPtr)pinHandle.Pointer;
         aiocb->ByteCount = (nuint)byteCount;
         aiocb->RequestPriority = 0;
-        aiocb->SigEvent = new KqueueNativeMethods.Sigevent { Notify = KqueueNativeMethods.SIGEV_NONE };
+        aiocb->SigEvent = new KqueueNativeMethods.Sigevent { Notify = KqueueNativeMethods.SigevNone };
         aiocb->LioOpcode = 0;
 
         return ptr;
@@ -529,7 +529,7 @@ public sealed class KqueueBlockDevice : IBatchBlockDevice
             return true;
         }
 
-        if (error != KqueueNativeMethods.EINPROGRESS)
+        if (error != KqueueNativeMethods.Einprogress)
         {
             string op = isRead ? "read" : "write";
             throw new IOException(

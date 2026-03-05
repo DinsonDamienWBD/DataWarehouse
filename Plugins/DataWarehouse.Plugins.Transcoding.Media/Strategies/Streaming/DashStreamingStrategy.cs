@@ -43,8 +43,8 @@ internal sealed class DashStreamingStrategy : MediaStrategyBase
     {
         (new Resolution(640, 360), 800, "v360", "360p"),
         (new Resolution(854, 480), 1400, "v480", "480p"),
-        (Resolution.HD, 2800, "v720", "720p"),
-        (Resolution.FullHD, 5000, "v1080", "1080p"),
+        (Resolution.Hd, 2800, "v720", "720p"),
+        (Resolution.FullHd, 5000, "v1080", "1080p"),
     };
 
     /// <summary>Audio representation presets for multi-quality audio adaptation.</summary>
@@ -59,11 +59,11 @@ internal sealed class DashStreamingStrategy : MediaStrategyBase
     /// Initializes a new instance of the <see cref="DashStreamingStrategy"/> class.
     /// </summary>
     public DashStreamingStrategy() : base(new MediaCapabilities(
-        SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM },
-        SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.DASH },
+        SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.Mov, MediaFormat.Avi, MediaFormat.WebM },
+        SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.Dash },
         SupportsStreaming: true,
         SupportsAdaptiveBitrate: true,
-        MaxResolution: Resolution.UHD,
+        MaxResolution: Resolution.Uhd,
         MaxBitrate: 25_000_000,
         SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "h264", "h265", "vp9", "av1", "aac", "opus", "ac3", "eac3" },
         SupportsThumbnailGeneration: false,
@@ -151,7 +151,7 @@ internal sealed class DashStreamingStrategy : MediaStrategyBase
 
             var outputStream = new MemoryStream(1024 * 1024);
 
-        var targetResolution = options.TargetResolution ?? Resolution.FullHD;
+        var targetResolution = options.TargetResolution ?? Resolution.FullHd;
         var targetBitrateKbps = options.TargetBitrate.HasValue
             ? (int)(options.TargetBitrate.Value.BitsPerSecond / 1000)
             : 5000;
@@ -224,13 +224,13 @@ internal sealed class DashStreamingStrategy : MediaStrategyBase
     /// Generates a streaming manifest URI for DASH adaptive bitrate delivery.
     /// </summary>
     /// <param name="mediaStream">The source media stream to prepare for streaming.</param>
-    /// <param name="targetFormat">Must be <see cref="SDK.Contracts.Media.MediaFormat.DASH"/>.</param>
+    /// <param name="targetFormat">Must be <see cref="SDK.Contracts.Media.MediaFormat.Dash"/>.</param>
     /// <param name="cancellationToken">Token to cancel the operation.</param>
     /// <returns>A URI pointing to the generated MPD manifest.</returns>
     protected override async Task<Uri> StreamAsyncCore(
         Stream mediaStream, SDK.Contracts.Media.MediaFormat targetFormat, CancellationToken cancellationToken)
     {
-        if (targetFormat != SDK.Contracts.Media.MediaFormat.DASH)
+        if (targetFormat != SDK.Contracts.Media.MediaFormat.Dash)
             throw new NotSupportedException($"DASH strategy only supports DASH format, not {targetFormat}.");
 
         var sourceBytes = await ReadStreamFullyAsync(mediaStream, cancellationToken).ConfigureAwait(false);

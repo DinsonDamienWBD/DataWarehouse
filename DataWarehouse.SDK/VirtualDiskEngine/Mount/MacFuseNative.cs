@@ -33,12 +33,12 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Mount;
 [SupportedOSPlatform("osx")]
 internal static class MacFuseNative
 {
-    private static readonly Lazy<IntPtr> _libraryHandle = new(LoadMacFuseLibrary);
+    private static readonly Lazy<IntPtr> LibraryHandle = new(LoadMacFuseLibrary);
 
     /// <summary>
     /// Returns true if a macFUSE-compatible library (libfuse-t or libfuse) can be loaded on macOS.
     /// </summary>
-    public static bool IsAvailable() => RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && _libraryHandle.Value != IntPtr.Zero;
+    public static bool IsAvailable() => RuntimeInformation.IsOSPlatform(OSPlatform.OSX) && LibraryHandle.Value != IntPtr.Zero;
 
     private static IntPtr LoadMacFuseLibrary()
     {
@@ -61,7 +61,7 @@ internal static class MacFuseNative
     /// </summary>
     internal static IntPtr GetExport(string name)
     {
-        var lib = _libraryHandle.Value;
+        var lib = LibraryHandle.Value;
         if (lib == IntPtr.Zero)
             throw new InvalidOperationException("macFUSE library is not loaded.");
 
@@ -76,40 +76,40 @@ internal static class MacFuseNative
     // ---------------------------------------------------------------
 
     /// <summary>No such file or directory.</summary>
-    public const int ENOENT = 2;
+    public const int Enoent = 2;
 
     /// <summary>Input/output error.</summary>
-    public const int EIO = 5;
+    public const int Eio = 5;
 
     /// <summary>Permission denied.</summary>
-    public const int EACCES = 13;
+    public const int Eacces = 13;
 
     /// <summary>File exists.</summary>
-    public const int EEXIST = 17;
+    public const int Eexist = 17;
 
     /// <summary>Not a directory.</summary>
-    public const int ENOTDIR = 20;
+    public const int Enotdir = 20;
 
     /// <summary>Is a directory.</summary>
-    public const int EISDIR = 21;
+    public const int Eisdir = 21;
 
     /// <summary>Invalid argument.</summary>
-    public const int EINVAL = 22;
+    public const int Einval = 22;
 
     /// <summary>No space left on device.</summary>
-    public const int ENOSPC = 28;
+    public const int Enospc = 28;
 
     /// <summary>Read-only file system.</summary>
-    public const int EROFS = 30;
+    public const int Erofs = 30;
 
     /// <summary>Operation not supported (macOS).</summary>
-    public const int ENOTSUP = 45;
+    public const int Enotsup = 45;
 
     /// <summary>Directory not empty (macOS: 66, Linux: 39).</summary>
-    public const int ENOTEMPTY = 66;
+    public const int Enotempty = 66;
 
     /// <summary>Attribute not found (macOS-specific, replaces Linux ENODATA=61).</summary>
-    public const int ENOATTR = 93;
+    public const int Enoattr = 93;
 
     // ---------------------------------------------------------------
     // Structs matching macOS C headers
@@ -619,27 +619,27 @@ internal static class MacFuseNative
         return Marshal.GetDelegateForFunctionPointer<T>(ptr);
     }
 
-    private static readonly Lazy<FuseSessionNewDelegate> _fuse_session_new = new(() => LoadFunction<FuseSessionNewDelegate>("fuse_session_new"));
-    private static readonly Lazy<FuseSessionMountDelegate> _fuse_session_mount = new(() => LoadFunction<FuseSessionMountDelegate>("fuse_session_mount"));
-    private static readonly Lazy<FuseSessionLoopMtDelegate> _fuse_session_loop_mt = new(() => LoadFunction<FuseSessionLoopMtDelegate>("fuse_session_loop_mt"));
-    private static readonly Lazy<FuseSessionUnmountDelegate> _fuse_session_unmount = new(() => LoadFunction<FuseSessionUnmountDelegate>("fuse_session_unmount"));
-    private static readonly Lazy<FuseSessionDestroyDelegate> _fuse_session_destroy = new(() => LoadFunction<FuseSessionDestroyDelegate>("fuse_session_destroy"));
-    private static readonly Lazy<FuseSessionExitDelegate> _fuse_session_exit = new(() => LoadFunction<FuseSessionExitDelegate>("fuse_session_exit"));
-    private static readonly Lazy<FuseReplyEntryDelegate> _fuse_reply_entry = new(() => LoadFunction<FuseReplyEntryDelegate>("fuse_reply_entry"));
-    private static readonly Lazy<FuseReplyAttrDelegate> _fuse_reply_attr = new(() => LoadFunction<FuseReplyAttrDelegate>("fuse_reply_attr"));
-    private static readonly Lazy<FuseReplyReadlinkDelegate> _fuse_reply_readlink = new(() => LoadFunction<FuseReplyReadlinkDelegate>("fuse_reply_readlink"));
-    private static readonly Lazy<FuseReplyOpenDelegate> _fuse_reply_open = new(() => LoadFunction<FuseReplyOpenDelegate>("fuse_reply_open"));
-    private static readonly Lazy<FuseReplyBufDelegate> _fuse_reply_buf = new(() => LoadFunction<FuseReplyBufDelegate>("fuse_reply_buf"));
-    private static readonly Lazy<FuseReplyWriteDelegate> _fuse_reply_write = new(() => LoadFunction<FuseReplyWriteDelegate>("fuse_reply_write"));
-    private static readonly Lazy<FuseReplyErrDelegate> _fuse_reply_err = new(() => LoadFunction<FuseReplyErrDelegate>("fuse_reply_err"));
-    private static readonly Lazy<FuseReplyNoneDelegate> _fuse_reply_none = new(() => LoadFunction<FuseReplyNoneDelegate>("fuse_reply_none"));
-    private static readonly Lazy<FuseReplyStatfsDelegate> _fuse_reply_statfs = new(() => LoadFunction<FuseReplyStatfsDelegate>("fuse_reply_statfs"));
-    private static readonly Lazy<FuseReplyXattrDelegate> _fuse_reply_xattr = new(() => LoadFunction<FuseReplyXattrDelegate>("fuse_reply_xattr"));
-    private static readonly Lazy<FuseReqUserdataDelegate> _fuse_req_userdata = new(() => LoadFunction<FuseReqUserdataDelegate>("fuse_req_userdata"));
-    private static readonly Lazy<FuseAddDirentryPlusDelegate> _fuse_add_direntry_plus = new(() => LoadFunction<FuseAddDirentryPlusDelegate>("fuse_add_direntry_plus"));
-    private static readonly Lazy<FuseReplyCreateDelegate> _fuse_reply_create = new(() => LoadFunction<FuseReplyCreateDelegate>("fuse_reply_create"));
-    private static readonly Lazy<FuseOptAddArgDelegate> _fuse_opt_add_arg = new(() => LoadFunction<FuseOptAddArgDelegate>("fuse_opt_add_arg"));
-    private static readonly Lazy<FuseOptFreeArgsDelegate> _fuse_opt_free_args = new(() => LoadFunction<FuseOptFreeArgsDelegate>("fuse_opt_free_args"));
+    private static readonly Lazy<FuseSessionNewDelegate> FuseSessionNew = new(() => LoadFunction<FuseSessionNewDelegate>("fuse_session_new"));
+    private static readonly Lazy<FuseSessionMountDelegate> FuseSessionMount = new(() => LoadFunction<FuseSessionMountDelegate>("fuse_session_mount"));
+    private static readonly Lazy<FuseSessionLoopMtDelegate> FuseSessionLoopMt = new(() => LoadFunction<FuseSessionLoopMtDelegate>("fuse_session_loop_mt"));
+    private static readonly Lazy<FuseSessionUnmountDelegate> FuseSessionUnmount = new(() => LoadFunction<FuseSessionUnmountDelegate>("fuse_session_unmount"));
+    private static readonly Lazy<FuseSessionDestroyDelegate> FuseSessionDestroy = new(() => LoadFunction<FuseSessionDestroyDelegate>("fuse_session_destroy"));
+    private static readonly Lazy<FuseSessionExitDelegate> FuseSessionExit = new(() => LoadFunction<FuseSessionExitDelegate>("fuse_session_exit"));
+    private static readonly Lazy<FuseReplyEntryDelegate> FuseReplyEntry = new(() => LoadFunction<FuseReplyEntryDelegate>("fuse_reply_entry"));
+    private static readonly Lazy<FuseReplyAttrDelegate> FuseReplyAttr = new(() => LoadFunction<FuseReplyAttrDelegate>("fuse_reply_attr"));
+    private static readonly Lazy<FuseReplyReadlinkDelegate> FuseReplyReadlink = new(() => LoadFunction<FuseReplyReadlinkDelegate>("fuse_reply_readlink"));
+    private static readonly Lazy<FuseReplyOpenDelegate> FuseReplyOpen = new(() => LoadFunction<FuseReplyOpenDelegate>("fuse_reply_open"));
+    private static readonly Lazy<FuseReplyBufDelegate> FuseReplyBuf = new(() => LoadFunction<FuseReplyBufDelegate>("fuse_reply_buf"));
+    private static readonly Lazy<FuseReplyWriteDelegate> FuseReplyWrite = new(() => LoadFunction<FuseReplyWriteDelegate>("fuse_reply_write"));
+    private static readonly Lazy<FuseReplyErrDelegate> FuseReplyErr = new(() => LoadFunction<FuseReplyErrDelegate>("fuse_reply_err"));
+    private static readonly Lazy<FuseReplyNoneDelegate> FuseReplyNone = new(() => LoadFunction<FuseReplyNoneDelegate>("fuse_reply_none"));
+    private static readonly Lazy<FuseReplyStatfsDelegate> FuseReplyStatfs = new(() => LoadFunction<FuseReplyStatfsDelegate>("fuse_reply_statfs"));
+    private static readonly Lazy<FuseReplyXattrDelegate> FuseReplyXattr = new(() => LoadFunction<FuseReplyXattrDelegate>("fuse_reply_xattr"));
+    private static readonly Lazy<FuseReqUserdataDelegate> FuseReqUserdata = new(() => LoadFunction<FuseReqUserdataDelegate>("fuse_req_userdata"));
+    private static readonly Lazy<FuseAddDirentryPlusDelegate> FuseAddDirentryPlus = new(() => LoadFunction<FuseAddDirentryPlusDelegate>("fuse_add_direntry_plus"));
+    private static readonly Lazy<FuseReplyCreateDelegate> FuseReplyCreate = new(() => LoadFunction<FuseReplyCreateDelegate>("fuse_reply_create"));
+    private static readonly Lazy<FuseOptAddArgDelegate> FuseOptAddArg = new(() => LoadFunction<FuseOptAddArgDelegate>("fuse_opt_add_arg"));
+    private static readonly Lazy<FuseOptFreeArgsDelegate> FuseOptFreeArgs = new(() => LoadFunction<FuseOptFreeArgsDelegate>("fuse_opt_free_args"));
 
     // ---------------------------------------------------------------
     // Public API (same signatures as Fuse3Native for consistency)
@@ -647,99 +647,99 @@ internal static class MacFuseNative
 
     /// <summary>Create a new FUSE session with low-level operations.</summary>
     public static IntPtr fuse_session_new(ref FuseArgs args, ref FuseLowlevelOps ops, nuint opSize, IntPtr userData)
-        => _fuse_session_new.Value(ref args, ref ops, opSize, userData);
+        => FuseSessionNew.Value(ref args, ref ops, opSize, userData);
 
     /// <summary>Mount a FUSE session at the specified directory.</summary>
     public static int fuse_session_mount(IntPtr session, string mountpoint)
-        => _fuse_session_mount.Value(session, mountpoint);
+        => FuseSessionMount.Value(session, mountpoint);
 
     /// <summary>Run the multi-threaded FUSE event loop.</summary>
     public static int fuse_session_loop_mt(IntPtr session, ref FuseLoopConfig config)
-        => _fuse_session_loop_mt.Value(session, ref config);
+        => FuseSessionLoopMt.Value(session, ref config);
 
     /// <summary>Unmount a FUSE session.</summary>
     public static void fuse_session_unmount(IntPtr session)
-        => _fuse_session_unmount.Value(session);
+        => FuseSessionUnmount.Value(session);
 
     /// <summary>Destroy a FUSE session and free its resources.</summary>
     public static void fuse_session_destroy(IntPtr session)
-        => _fuse_session_destroy.Value(session);
+        => FuseSessionDestroy.Value(session);
 
     /// <summary>Signal a FUSE session to exit the event loop.</summary>
     public static void fuse_session_exit(IntPtr session)
-        => _fuse_session_exit.Value(session);
+        => FuseSessionExit.Value(session);
 
     /// <summary>Reply to a lookup/create request with entry information.</summary>
     public static int fuse_reply_entry(IntPtr req, ref FuseEntryParam entry)
-        => _fuse_reply_entry.Value(req, ref entry);
+        => FuseReplyEntry.Value(req, ref entry);
 
     /// <summary>Reply to a getattr/setattr request with file attributes.</summary>
     public static int fuse_reply_attr(IntPtr req, ref Stat attr, double timeout)
-        => _fuse_reply_attr.Value(req, ref attr, timeout);
+        => FuseReplyAttr.Value(req, ref attr, timeout);
 
     /// <summary>Reply to a readlink request with the symlink target.</summary>
     public static int fuse_reply_readlink(IntPtr req, string link)
-        => _fuse_reply_readlink.Value(req, link);
+        => FuseReplyReadlink.Value(req, link);
 
     /// <summary>Reply to an open/opendir request with file info.</summary>
     public static int fuse_reply_open(IntPtr req, ref FuseFileInfo fi)
-        => _fuse_reply_open.Value(req, ref fi);
+        => FuseReplyOpen.Value(req, ref fi);
 
     /// <summary>Reply to a read/readdir request with a data buffer.</summary>
     public static int fuse_reply_buf(IntPtr req, IntPtr buf, nuint size)
-        => _fuse_reply_buf.Value(req, buf, size);
+        => FuseReplyBuf.Value(req, buf, size);
 
     /// <summary>Reply to a write request with the number of bytes written.</summary>
     public static int fuse_reply_write(IntPtr req, nuint count)
-        => _fuse_reply_write.Value(req, count);
+        => FuseReplyWrite.Value(req, count);
 
     /// <summary>Reply to a request with an error code (0 = success).</summary>
     public static int fuse_reply_err(IntPtr req, int err)
-        => _fuse_reply_err.Value(req, err);
+        => FuseReplyErr.Value(req, err);
 
     /// <summary>Reply to a forget request (no response sent to caller).</summary>
     public static void fuse_reply_none(IntPtr req)
-        => _fuse_reply_none.Value(req);
+        => FuseReplyNone.Value(req);
 
     /// <summary>Reply to a statfs request with filesystem statistics.</summary>
     public static int fuse_reply_statfs(IntPtr req, ref Statvfs stbuf)
-        => _fuse_reply_statfs.Value(req, ref stbuf);
+        => FuseReplyStatfs.Value(req, ref stbuf);
 
     /// <summary>Reply to a getxattr/listxattr size query with the attribute size.</summary>
     public static int fuse_reply_xattr(IntPtr req, nuint count)
-        => _fuse_reply_xattr.Value(req, count);
+        => FuseReplyXattr.Value(req, count);
 
     /// <summary>Get the userdata pointer from a FUSE request.</summary>
     public static IntPtr fuse_req_userdata(IntPtr req)
-        => _fuse_req_userdata.Value(req);
+        => FuseReqUserdata.Value(req);
 
     /// <summary>Add a directory entry to a readdirplus buffer.</summary>
     public static nuint fuse_add_direntry_plus(IntPtr req, IntPtr buf, nuint bufsize,
         string name, ref FuseEntryParam entry, long off)
-        => _fuse_add_direntry_plus.Value(req, buf, bufsize, name, ref entry, off);
+        => FuseAddDirentryPlus.Value(req, buf, bufsize, name, ref entry, off);
 
     /// <summary>Reply to a create request with entry and file info.</summary>
     public static int fuse_reply_create(IntPtr req, ref FuseEntryParam entry, ref FuseFileInfo fi)
-        => _fuse_reply_create.Value(req, ref entry, ref fi);
+        => FuseReplyCreate.Value(req, ref entry, ref fi);
 
     /// <summary>Add an argument to fuse_args.</summary>
     public static int fuse_opt_add_arg(ref FuseArgs args, string arg)
-        => _fuse_opt_add_arg.Value(ref args, arg);
+        => FuseOptAddArg.Value(ref args, arg);
 
     /// <summary>Free fuse_args resources.</summary>
     public static void fuse_opt_free_args(ref FuseArgs args)
-        => _fuse_opt_free_args.Value(ref args);
+        => FuseOptFreeArgs.Value(ref args);
 
     // ---------------------------------------------------------------
     // macOS mode constants (same values as Linux S_IF*)
     // ---------------------------------------------------------------
 
     /// <summary>Regular file mode bit.</summary>
-    public const uint S_IFREG = 0x8000;
+    public const uint SIfreg = 0x8000;
 
     /// <summary>Directory mode bit.</summary>
-    public const uint S_IFDIR = 0x4000;
+    public const uint SIfdir = 0x4000;
 
     /// <summary>Symbolic link mode bit.</summary>
-    public const uint S_IFLNK = 0xA000;
+    public const uint SIflnk = 0xA000;
 }

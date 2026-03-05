@@ -52,7 +52,7 @@ public class BlockchainProviderTests
     {
         var objectId = Guid.NewGuid();
         var now = DateTimeOffset.UtcNow;
-        var integrityHash = IntegrityHash.Create(HashAlgorithmType.SHA256, "AABBCCDD");
+        var integrityHash = IntegrityHash.Create(HashAlgorithmType.Sha256, "AABBCCDD");
 
         var anchor = new BlockchainAnchor
         {
@@ -349,7 +349,7 @@ public class BlockchainProviderTests
                 AnchorId = "anc-1",
                 ObjectId = Guid.NewGuid(),
                 Version = 1,
-                IntegrityHash = IntegrityHash.Create(HashAlgorithmType.SHA256, "AABB"),
+                IntegrityHash = IntegrityHash.Create(HashAlgorithmType.Sha256, "AABB"),
                 AnchoredAt = DateTimeOffset.UtcNow
             }
         };

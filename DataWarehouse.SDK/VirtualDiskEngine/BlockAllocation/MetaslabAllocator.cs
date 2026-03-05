@@ -15,23 +15,23 @@ public enum MorphLevel : byte
     /// <summary>
     /// &lt;128 MB: Single flat bitmap. Delegates to <see cref="BitmapAllocator"/>.
     /// </summary>
-    Level0_FlatBitmap = 0,
+    Level0FlatBitmap = 0,
 
     /// <summary>
     /// 128 MB–1 TB: Flat sharded allocation groups. Delegates to <see cref="AllocationGroupDescriptorTable"/>.
     /// </summary>
-    Level1_ShardedGroups = 1,
+    Level1ShardedGroups = 1,
 
     /// <summary>
     /// 1 TB–1 PB: Flat metaslab tree. Uses <see cref="MetaslabDirectory"/> without zone/region hierarchy.
     /// </summary>
-    Level2_MetaslabTree = 2,
+    Level2MetaslabTree = 2,
 
     /// <summary>
     /// &gt;1 PB: Full hierarchical metaslab with zone/region/AG structure.
     /// Uses <see cref="MetaslabDirectory"/> with full hierarchy.
     /// </summary>
-    Level3_HierarchicalMetaslab = 3
+    Level3HierarchicalMetaslab = 3
 }
 
 /// <summary>
@@ -111,10 +111,10 @@ public sealed class MetaslabAllocator : IBlockAllocator, IDisposable
         {
             return _currentLevel switch
             {
-                MorphLevel.Level0_FlatBitmap    => _bitmapAllocator!.AllocateBlock(),
-                MorphLevel.Level1_ShardedGroups => _agTable!.AllocateBlock(),
-                MorphLevel.Level2_MetaslabTree or
-                MorphLevel.Level3_HierarchicalMetaslab => AllocateBlockFromMetaslabs(1, ct),
+                MorphLevel.Level0FlatBitmap    => _bitmapAllocator!.AllocateBlock(),
+                MorphLevel.Level1ShardedGroups => _agTable!.AllocateBlock(),
+                MorphLevel.Level2MetaslabTree or
+                MorphLevel.Level3HierarchicalMetaslab => AllocateBlockFromMetaslabs(1, ct),
                 _ => throw new InvalidOperationException($"Unknown morph level: {_currentLevel}")
             };
         }
@@ -134,10 +134,10 @@ public sealed class MetaslabAllocator : IBlockAllocator, IDisposable
         {
             return _currentLevel switch
             {
-                MorphLevel.Level0_FlatBitmap    => _bitmapAllocator!.AllocateExtent(blockCount),
-                MorphLevel.Level1_ShardedGroups => _agTable!.AllocateExtent(blockCount),
-                MorphLevel.Level2_MetaslabTree or
-                MorphLevel.Level3_HierarchicalMetaslab => AllocateExtentFromMetaslabs(blockCount, ct),
+                MorphLevel.Level0FlatBitmap    => _bitmapAllocator!.AllocateExtent(blockCount),
+                MorphLevel.Level1ShardedGroups => _agTable!.AllocateExtent(blockCount),
+                MorphLevel.Level2MetaslabTree or
+                MorphLevel.Level3HierarchicalMetaslab => AllocateExtentFromMetaslabs(blockCount, ct),
                 _ => throw new InvalidOperationException($"Unknown morph level: {_currentLevel}")
             };
         }
@@ -155,14 +155,14 @@ public sealed class MetaslabAllocator : IBlockAllocator, IDisposable
         {
             switch (_currentLevel)
             {
-                case MorphLevel.Level0_FlatBitmap:
+                case MorphLevel.Level0FlatBitmap:
                     _bitmapAllocator!.FreeBlock(blockNumber);
                     break;
-                case MorphLevel.Level1_ShardedGroups:
+                case MorphLevel.Level1ShardedGroups:
                     _agTable!.FreeBlock(blockNumber);
                     break;
-                case MorphLevel.Level2_MetaslabTree:
-                case MorphLevel.Level3_HierarchicalMetaslab:
+                case MorphLevel.Level2MetaslabTree:
+                case MorphLevel.Level3HierarchicalMetaslab:
                     FreeBlockFromMetaslabs(blockNumber, 1);
                     break;
             }
@@ -183,14 +183,14 @@ public sealed class MetaslabAllocator : IBlockAllocator, IDisposable
         {
             switch (_currentLevel)
             {
-                case MorphLevel.Level0_FlatBitmap:
+                case MorphLevel.Level0FlatBitmap:
                     _bitmapAllocator!.FreeExtent(startBlock, blockCount);
                     break;
-                case MorphLevel.Level1_ShardedGroups:
+                case MorphLevel.Level1ShardedGroups:
                     _agTable!.FreeExtent(startBlock, blockCount);
                     break;
-                case MorphLevel.Level2_MetaslabTree:
-                case MorphLevel.Level3_HierarchicalMetaslab:
+                case MorphLevel.Level2MetaslabTree:
+                case MorphLevel.Level3HierarchicalMetaslab:
                     FreeBlockFromMetaslabs(startBlock, blockCount);
                     break;
             }
@@ -211,10 +211,10 @@ public sealed class MetaslabAllocator : IBlockAllocator, IDisposable
             {
                 return _currentLevel switch
                 {
-                    MorphLevel.Level0_FlatBitmap    => _bitmapAllocator!.FreeBlockCount,
-                    MorphLevel.Level1_ShardedGroups => _agTable!.TotalFreeBlocks,
-                    MorphLevel.Level2_MetaslabTree or
-                    MorphLevel.Level3_HierarchicalMetaslab => _metaslabDirectory!.GetTotalFreeBlocks(),
+                    MorphLevel.Level0FlatBitmap    => _bitmapAllocator!.FreeBlockCount,
+                    MorphLevel.Level1ShardedGroups => _agTable!.TotalFreeBlocks,
+                    MorphLevel.Level2MetaslabTree or
+                    MorphLevel.Level3HierarchicalMetaslab => _metaslabDirectory!.GetTotalFreeBlocks(),
                     _ => 0L
                 };
             }
@@ -237,8 +237,8 @@ public sealed class MetaslabAllocator : IBlockAllocator, IDisposable
             try
             {
                 // For level 0: not directly exposed by BitmapAllocator (treated as 0 for small volumes)
-                if (_currentLevel == MorphLevel.Level0_FlatBitmap) return 0.0;
-                if (_currentLevel == MorphLevel.Level1_ShardedGroups) return 0.0;
+                if (_currentLevel == MorphLevel.Level0FlatBitmap) return 0.0;
+                if (_currentLevel == MorphLevel.Level1ShardedGroups) return 0.0;
 
                 // Level 2/3: return a lightweight estimate without loading bitmaps
                 return 0.0;
@@ -258,10 +258,10 @@ public sealed class MetaslabAllocator : IBlockAllocator, IDisposable
         {
             return _currentLevel switch
             {
-                MorphLevel.Level0_FlatBitmap    => _bitmapAllocator!.IsAllocated(blockNumber),
-                MorphLevel.Level1_ShardedGroups => IsAllocatedInAgTable(blockNumber),
-                MorphLevel.Level2_MetaslabTree or
-                MorphLevel.Level3_HierarchicalMetaslab => IsAllocatedInMetaslabs(blockNumber),
+                MorphLevel.Level0FlatBitmap    => _bitmapAllocator!.IsAllocated(blockNumber),
+                MorphLevel.Level1ShardedGroups => IsAllocatedInAgTable(blockNumber),
+                MorphLevel.Level2MetaslabTree or
+                MorphLevel.Level3HierarchicalMetaslab => IsAllocatedInMetaslabs(blockNumber),
                 _ => false
             };
         }
@@ -279,15 +279,15 @@ public sealed class MetaslabAllocator : IBlockAllocator, IDisposable
         {
             switch (_currentLevel)
             {
-                case MorphLevel.Level0_FlatBitmap:
+                case MorphLevel.Level0FlatBitmap:
                     await _bitmapAllocator!.PersistAsync(device, bitmapStartBlock, ct).ConfigureAwait(false);
                     break;
-                case MorphLevel.Level1_ShardedGroups:
+                case MorphLevel.Level1ShardedGroups:
                     // AllocationGroupDescriptorTable doesn't have a unified PersistAsync — no-op here
                     // (individual groups are persisted by the caller via region serialization)
                     break;
-                case MorphLevel.Level2_MetaslabTree:
-                case MorphLevel.Level3_HierarchicalMetaslab:
+                case MorphLevel.Level2MetaslabTree:
+                case MorphLevel.Level3HierarchicalMetaslab:
                     await _metaslabDirectory!.PersistDirectoryAsync(ct).ConfigureAwait(false);
                     break;
             }
@@ -323,29 +323,29 @@ public sealed class MetaslabAllocator : IBlockAllocator, IDisposable
 
             switch (currentLevel)
             {
-                case MorphLevel.Level0_FlatBitmap when targetLevel >= MorphLevel.Level1_ShardedGroups:
+                case MorphLevel.Level0FlatBitmap when targetLevel >= MorphLevel.Level1ShardedGroups:
                     // Level 0 -> 1: shard existing bitmap into allocation groups (background operation)
                     // Build AG table from existing free block distribution
                     var newAgTable = new AllocationGroupDescriptorTable(_totalBlocks, _blockSize);
                     _agTable = newAgTable;
                     _bitmapAllocator = null;
-                    _currentLevel = MorphLevel.Level1_ShardedGroups;
+                    _currentLevel = MorphLevel.Level1ShardedGroups;
                     break;
 
-                case MorphLevel.Level1_ShardedGroups when targetLevel >= MorphLevel.Level2_MetaslabTree:
+                case MorphLevel.Level1ShardedGroups when targetLevel >= MorphLevel.Level2MetaslabTree:
                     // Level 1 -> 2: build metaslab directory lazily
                     var dir2 = new MetaslabDirectory(_device, _bitmapStartBlock, _blockSize, _totalBlocks);
                     await dir2.LoadDirectoryAsync(ct).ConfigureAwait(false);
                     _metaslabDirectory = dir2;
                     _agTable?.Dispose();
                     _agTable = null;
-                    _currentLevel = MorphLevel.Level2_MetaslabTree;
+                    _currentLevel = MorphLevel.Level2MetaslabTree;
                     break;
 
-                case MorphLevel.Level2_MetaslabTree when targetLevel >= MorphLevel.Level3_HierarchicalMetaslab:
+                case MorphLevel.Level2MetaslabTree when targetLevel >= MorphLevel.Level3HierarchicalMetaslab:
                     // Level 2 -> 3: partition into zones (directory already loaded; zone ids already encoded)
                     // The MetaslabDirectory already carries zone/region info, so this is a logical upgrade
-                    _currentLevel = MorphLevel.Level3_HierarchicalMetaslab;
+                    _currentLevel = MorphLevel.Level3HierarchicalMetaslab;
                     break;
             }
 
@@ -378,10 +378,10 @@ public sealed class MetaslabAllocator : IBlockAllocator, IDisposable
         long volumeBytes = totalBlocks * (long)blockSize;
         return volumeBytes switch
         {
-            < Level0MaxBytes   => MorphLevel.Level0_FlatBitmap,
-            < Level1MaxBytes   => MorphLevel.Level1_ShardedGroups,
-            < Level2MaxBytes   => MorphLevel.Level2_MetaslabTree,
-            _                  => MorphLevel.Level3_HierarchicalMetaslab
+            < Level0MaxBytes   => MorphLevel.Level0FlatBitmap,
+            < Level1MaxBytes   => MorphLevel.Level1ShardedGroups,
+            < Level2MaxBytes   => MorphLevel.Level2MetaslabTree,
+            _                  => MorphLevel.Level3HierarchicalMetaslab
         };
     }
 
@@ -389,16 +389,16 @@ public sealed class MetaslabAllocator : IBlockAllocator, IDisposable
     {
         switch (level)
         {
-            case MorphLevel.Level0_FlatBitmap:
+            case MorphLevel.Level0FlatBitmap:
                 _bitmapAllocator = new BitmapAllocator(_totalBlocks);
                 break;
 
-            case MorphLevel.Level1_ShardedGroups:
+            case MorphLevel.Level1ShardedGroups:
                 _agTable = new AllocationGroupDescriptorTable(_totalBlocks, _blockSize);
                 break;
 
-            case MorphLevel.Level2_MetaslabTree:
-            case MorphLevel.Level3_HierarchicalMetaslab:
+            case MorphLevel.Level2MetaslabTree:
+            case MorphLevel.Level3HierarchicalMetaslab:
                 _metaslabDirectory = new MetaslabDirectory(_device, _bitmapStartBlock, _blockSize, _totalBlocks);
                 break;
         }

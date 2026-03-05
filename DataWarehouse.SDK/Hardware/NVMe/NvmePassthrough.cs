@@ -139,14 +139,14 @@ public sealed class NvmePassthrough : INvmePassthrough
             {
                 _deviceHandle = NvmeInterop.CreateFile(
                     _devicePath,
-                    NvmeInterop.GENERIC_READ | NvmeInterop.GENERIC_WRITE,
-                    NvmeInterop.FILE_SHARE_READ | NvmeInterop.FILE_SHARE_WRITE,
+                    NvmeInterop.GenericRead | NvmeInterop.GenericWrite,
+                    NvmeInterop.FileShareRead | NvmeInterop.FileShareWrite,
                     IntPtr.Zero,
-                    NvmeInterop.OPEN_EXISTING,
-                    NvmeInterop.FILE_ATTRIBUTE_NORMAL,
+                    NvmeInterop.OpenExisting,
+                    NvmeInterop.FileAttributeNormal,
                     IntPtr.Zero);
 
-                _isAvailable = _deviceHandle != NvmeInterop.INVALID_HANDLE_VALUE;
+                _isAvailable = _deviceHandle != NvmeInterop.InvalidHandleValue;
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
@@ -253,7 +253,7 @@ public sealed class NvmePassthrough : INvmePassthrough
         uint[] commandDwords)
     {
         // Verify device handle is valid
-        if (_deviceHandle == IntPtr.Zero || _deviceHandle == NvmeInterop.INVALID_HANDLE_VALUE)
+        if (_deviceHandle == IntPtr.Zero || _deviceHandle == NvmeInterop.InvalidHandleValue)
         {
             throw new InvalidOperationException(
                 "NVMe device not accessible. Ensure the device path is valid and you have sufficient permissions.");
@@ -261,7 +261,7 @@ public sealed class NvmePassthrough : INvmePassthrough
 
         // Allocate buffer: sizeof(STORAGE_PROTOCOL_COMMAND) + 64 bytes for NVMe command + data buffer
         int dataBufferLength = dataBuffer?.Length ?? 0;
-        int totalSize = Marshal.SizeOf<NvmeInterop.STORAGE_PROTOCOL_COMMAND>() + 64 + dataBufferLength;
+        int totalSize = Marshal.SizeOf<NvmeInterop.StorageProtocolCommand>() + 64 + dataBufferLength;
         IntPtr buffer = Marshal.AllocHGlobal(totalSize);
 
         try
@@ -273,10 +273,10 @@ public sealed class NvmePassthrough : INvmePassthrough
             }
 
             // Fill STORAGE_PROTOCOL_COMMAND structure
-            var protocolCommand = new NvmeInterop.STORAGE_PROTOCOL_COMMAND
+            var protocolCommand = new NvmeInterop.StorageProtocolCommand
             {
                 Version = 1,
-                Length = (uint)Marshal.SizeOf<NvmeInterop.STORAGE_PROTOCOL_COMMAND>(),
+                Length = (uint)Marshal.SizeOf<NvmeInterop.StorageProtocolCommand>(),
                 ProtocolType = 3, // NVMe
                 Flags = 0,
                 CommandLength = 64,
@@ -285,7 +285,7 @@ public sealed class NvmePassthrough : INvmePassthrough
                 DataFromDeviceTransferLength = 0,
                 TimeOutValue = 30, // 30 seconds
                 ErrorInfoOffset = 0,
-                DataToDeviceBufferOffset = (uint)(Marshal.SizeOf<NvmeInterop.STORAGE_PROTOCOL_COMMAND>() + 64),
+                DataToDeviceBufferOffset = (uint)(Marshal.SizeOf<NvmeInterop.StorageProtocolCommand>() + 64),
                 DataFromDeviceBufferOffset = 0,
                 CommandSpecificLength = 0,
                 Reserved0 = 0
@@ -294,7 +294,7 @@ public sealed class NvmePassthrough : INvmePassthrough
             Marshal.StructureToPtr(protocolCommand, buffer, false);
 
             // Build NVMe command packet at offset sizeof(STORAGE_PROTOCOL_COMMAND)
-            IntPtr commandPacket = IntPtr.Add(buffer, Marshal.SizeOf<NvmeInterop.STORAGE_PROTOCOL_COMMAND>());
+            IntPtr commandPacket = IntPtr.Add(buffer, Marshal.SizeOf<NvmeInterop.StorageProtocolCommand>());
             Marshal.WriteByte(commandPacket, 0, (byte)opcode); // Opcode
             Marshal.WriteInt32(commandPacket, 4, (int)nsid); // Namespace ID
 
@@ -307,7 +307,7 @@ public sealed class NvmePassthrough : INvmePassthrough
             // Copy data buffer if provided
             if (dataBuffer is not null && dataBufferLength > 0)
             {
-                IntPtr dataPtr = IntPtr.Add(buffer, Marshal.SizeOf<NvmeInterop.STORAGE_PROTOCOL_COMMAND>() + 64);
+                IntPtr dataPtr = IntPtr.Add(buffer, Marshal.SizeOf<NvmeInterop.StorageProtocolCommand>() + 64);
                 Marshal.Copy(dataBuffer, 0, dataPtr, dataBufferLength);
             }
 
@@ -315,7 +315,7 @@ public sealed class NvmePassthrough : INvmePassthrough
             uint bytesReturned = 0;
             bool success = NvmeInterop.DeviceIoControl(
                 _deviceHandle,
-                NvmeInterop.IOCTL_STORAGE_PROTOCOL_COMMAND,
+                NvmeInterop.IoctlStorageProtocolCommand,
                 buffer,
                 (uint)totalSize,
                 buffer,
@@ -340,7 +340,7 @@ public sealed class NvmePassthrough : INvmePassthrough
             //   [0]    STORAGE_PROTOCOL_COMMAND
             //   [+64]  NVMe command packet
             //   [+128] NVMe completion (returned by driver)
-            int completionOffset = Marshal.SizeOf<NvmeInterop.STORAGE_PROTOCOL_COMMAND>() + 64;
+            int completionOffset = Marshal.SizeOf<NvmeInterop.StorageProtocolCommand>() + 64;
             if (bytesReturned >= completionOffset + Marshal.SizeOf<NvmeCompletion>())
             {
                 IntPtr completionPtr = IntPtr.Add(buffer, completionOffset);
@@ -426,7 +426,7 @@ public sealed class NvmePassthrough : INvmePassthrough
             }
 
             // Call ioctl with NVME_IOCTL_ADMIN_CMD
-            int result = NvmeInterop.Ioctl(_deviceFd, NvmeInterop.NVME_IOCTL_ADMIN_CMD, ref cmd);
+            int result = NvmeInterop.Ioctl(_deviceFd, NvmeInterop.NvmeIoctlAdminCmd, ref cmd);
 
             if (result != 0)
             {
@@ -573,7 +573,7 @@ public sealed class NvmePassthrough : INvmePassthrough
             }
 
             // Call ioctl with NVME_IOCTL_IO_CMD
-            int result = NvmeInterop.Ioctl(_deviceFd, NvmeInterop.NVME_IOCTL_IO_CMD, ref cmd);
+            int result = NvmeInterop.Ioctl(_deviceFd, NvmeInterop.NvmeIoctlIoCmd, ref cmd);
 
             if (result != 0)
             {
@@ -608,7 +608,7 @@ public sealed class NvmePassthrough : INvmePassthrough
 
         lock (_lock)
         {
-            if (_deviceHandle != IntPtr.Zero && _deviceHandle != NvmeInterop.INVALID_HANDLE_VALUE)
+            if (_deviceHandle != IntPtr.Zero && _deviceHandle != NvmeInterop.InvalidHandleValue)
             {
                 NvmeInterop.CloseHandle(_deviceHandle);
                 _deviceHandle = IntPtr.Zero;

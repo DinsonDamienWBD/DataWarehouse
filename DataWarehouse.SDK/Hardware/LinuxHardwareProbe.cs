@@ -77,7 +77,7 @@ namespace DataWarehouse.SDK.Hardware
                 // I2C buses
                 if (ShouldDiscover(typeFilter, HardwareDeviceType.I2CBus))
                 {
-                    devices.AddRange(await DiscoverI2cBusesAsync(ct));
+                    devices.AddRange(await DiscoverI2CBusesAsync(ct));
                 }
 
                 // SPI buses
@@ -397,7 +397,7 @@ namespace DataWarehouse.SDK.Hardware
             return devices;
         }
 
-        private static async Task<IEnumerable<HardwareDevice>> DiscoverI2cBusesAsync(CancellationToken ct)
+        private static async Task<IEnumerable<HardwareDevice>> DiscoverI2CBusesAsync(CancellationToken ct)
         {
             var devices = new List<HardwareDevice>();
             const string i2cBasePath = "/sys/class/i2c-adapter";
@@ -426,7 +426,7 @@ namespace DataWarehouse.SDK.Hardware
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[LinuxHardwareProbe.DiscoverI2cBusesAsync] {ex.GetType().Name}: {ex.Message}");
+                System.Diagnostics.Debug.WriteLine($"[LinuxHardwareProbe.DiscoverI2CBusesAsync] {ex.GetType().Name}: {ex.Message}");
             }
 
             return devices;

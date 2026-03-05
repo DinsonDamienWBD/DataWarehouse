@@ -238,7 +238,7 @@ public class SecurityContractTests
     {
         var doc = new SbomDocument
         {
-            Format = SbomFormat.CycloneDX_1_5_Json,
+            Format = SbomFormat.CycloneDx15Json,
             Content = "{\"bomFormat\":\"CycloneDX\"}",
             ComponentCount = 2,
             GeneratedAt = DateTimeOffset.UtcNow,
@@ -249,7 +249,7 @@ public class SecurityContractTests
             }
         };
 
-        doc.Format.Should().Be(SbomFormat.CycloneDX_1_5_Json);
+        doc.Format.Should().Be(SbomFormat.CycloneDx15Json);
         doc.Components.Should().HaveCount(2);
         doc.Components[0].Name.Should().Be("xunit");
     }
@@ -318,10 +318,10 @@ public class SecurityContractTests
     #region SbomFormat Enum
 
     [Theory]
-    [InlineData(SbomFormat.CycloneDX_1_5_Json)]
-    [InlineData(SbomFormat.CycloneDX_1_5_Xml)]
-    [InlineData(SbomFormat.SPDX_2_3_Json)]
-    [InlineData(SbomFormat.SPDX_2_3_TagValue)]
+    [InlineData(SbomFormat.CycloneDx15Json)]
+    [InlineData(SbomFormat.CycloneDx15Xml)]
+    [InlineData(SbomFormat.Spdx23Json)]
+    [InlineData(SbomFormat.Spdx23TagValue)]
     public void SbomFormat_AllValues_ShouldBeDefined(SbomFormat format)
     {
         Enum.IsDefined(format).Should().BeTrue();

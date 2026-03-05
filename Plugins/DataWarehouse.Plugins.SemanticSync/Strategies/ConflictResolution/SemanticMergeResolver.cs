@@ -89,7 +89,7 @@ public sealed class SemanticMergeResolver : SemanticSyncStrategyBase, ISemanticC
             ConflictType.PartialOverlap,
             ConflictType.Irreconcilable
         },
-        RequiresAI: false);
+        RequiresAi: false);
 
     /// <summary>
     /// Detects whether a semantic conflict exists between local and remote data versions.

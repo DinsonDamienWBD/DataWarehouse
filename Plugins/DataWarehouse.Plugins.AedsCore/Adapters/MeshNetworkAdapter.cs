@@ -54,7 +54,7 @@ public sealed class MeshNetworkAdapter : IDisposable, IAsyncDisposable
         {
             MeshProtocol.Zigbee => new ZigbeeMesh(),
             MeshProtocol.LoRa => new LoRaMesh(),
-            MeshProtocol.BLE => new BleMesh(),
+            MeshProtocol.Ble => new BleMesh(),
             _ => throw new ArgumentException($"Unsupported mesh protocol: {settings.Protocol}")
         };
 

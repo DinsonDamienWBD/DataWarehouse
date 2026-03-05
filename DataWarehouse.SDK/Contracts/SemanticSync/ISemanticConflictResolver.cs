@@ -60,9 +60,9 @@ public interface ISemanticConflictResolver
 /// </summary>
 /// <param name="SupportsAutoMerge">Whether the resolver can automatically merge conflicting data.</param>
 /// <param name="SupportedTypes">The conflict types this resolver can handle.</param>
-/// <param name="RequiresAI">Whether the resolver requires an AI provider for resolution.</param>
+/// <param name="RequiresAi">Whether the resolver requires an AI provider for resolution.</param>
 [SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic sync types")]
 public sealed record ConflictResolverCapabilities(
     bool SupportsAutoMerge,
     ConflictType[] SupportedTypes,
-    bool RequiresAI);
+    bool RequiresAi);

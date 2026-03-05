@@ -754,7 +754,7 @@ public sealed class MemoryStats
     /// <summary>GC generation 2 collection count.</summary>
     public int Gen2Collections { get; init; }
     /// <summary>Time spent in GC as a percentage.</summary>
-    public double GCTimePercent { get; init; }
+    public double GcTimePercent { get; init; }
     /// <summary>Current pressure level.</summary>
     public MemoryPressureLevel Level { get; init; }
 }
@@ -834,7 +834,7 @@ public sealed class MemoryPressureMonitor : IMemoryPressureMonitor, IDisposable
             Gen0Collections = GC.CollectionCount(0),
             Gen1Collections = GC.CollectionCount(1),
             Gen2Collections = GC.CollectionCount(2),
-            GCTimePercent = gcInfo.PauseTimePercentage,
+            GcTimePercent = gcInfo.PauseTimePercentage,
             Level = _currentLevel
         };
     }
@@ -1675,7 +1675,7 @@ public sealed class ConfigurationHotReloader : IConfigurationChangeNotifier, IAs
 /// Capabilities supported by AI providers.
 /// </summary>
 [Flags]
-public enum AICapability
+public enum AiCapability
 {
     /// <summary>No capabilities.</summary>
     None = 0,
@@ -1704,7 +1704,7 @@ public enum AICapability
 /// <summary>
 /// Metadata about an AI provider.
 /// </summary>
-public sealed class AIProviderInfo
+public sealed class AiProviderInfo
 {
     /// <summary>Unique provider identifier.</summary>
     public required string ProviderId { get; init; }
@@ -1713,7 +1713,7 @@ public sealed class AIProviderInfo
     public required string Name { get; init; }
 
     /// <summary>Provider capabilities.</summary>
-    public AICapability Capabilities { get; init; }
+    public AiCapability Capabilities { get; init; }
 
     /// <summary>Relative cost tier (1=cheapest, 5=most expensive).</summary>
     public int CostTier { get; init; } = 3;
@@ -1738,10 +1738,10 @@ public sealed class AIProviderInfo
 /// <summary>
 /// Interface for AI providers to implement.
 /// </summary>
-public interface IAIProviderRegistration
+public interface IAiProviderRegistration
 {
     /// <summary>Gets the provider information.</summary>
-    AIProviderInfo Info { get; }
+    AiProviderInfo Info { get; }
 
     /// <summary>Checks if the provider is currently available.</summary>
     Task<bool> CheckAvailabilityAsync(CancellationToken ct = default);
@@ -1750,10 +1750,10 @@ public interface IAIProviderRegistration
 /// <summary>
 /// Options for selecting an AI provider.
 /// </summary>
-public sealed class AIProviderSelectionOptions
+public sealed class AiProviderSelectionOptions
 {
     /// <summary>Required capabilities.</summary>
-    public AICapability RequiredCapabilities { get; set; } = AICapability.None;
+    public AiCapability RequiredCapabilities { get; set; } = AiCapability.None;
 
     /// <summary>Maximum cost tier (1-5).</summary>
     public int? MaxCostTier { get; set; }
@@ -1781,7 +1781,7 @@ public interface IAiProviderRegistry
     /// Registers an AI provider.
     /// </summary>
     /// <param name="provider">Provider to register.</param>
-    void Register(IAIProviderRegistration provider);
+    void Register(IAiProviderRegistration provider);
 
     /// <summary>
     /// Unregisters an AI provider.
@@ -1794,33 +1794,33 @@ public interface IAiProviderRegistry
     /// </summary>
     /// <param name="providerId">The provider ID.</param>
     /// <returns>The provider or null if not found.</returns>
-    IAIProviderRegistration? GetProvider(string providerId);
+    IAiProviderRegistration? GetProvider(string providerId);
 
     /// <summary>
     /// Gets the best provider matching the required capabilities.
     /// </summary>
     /// <param name="options">Selection options.</param>
     /// <returns>Best matching provider or null.</returns>
-    IAIProviderRegistration? GetBestProvider(AIProviderSelectionOptions options);
+    IAiProviderRegistration? GetBestProvider(AiProviderSelectionOptions options);
 
     /// <summary>
     /// Gets all providers matching the required capabilities.
     /// </summary>
     /// <param name="capability">Required capability.</param>
     /// <returns>Matching providers ordered by priority.</returns>
-    IEnumerable<IAIProviderRegistration> GetProviders(AICapability capability);
+    IEnumerable<IAiProviderRegistration> GetProviders(AiCapability capability);
 
     /// <summary>
     /// Gets a fallback chain of providers for a capability.
     /// </summary>
     /// <param name="capability">Required capability.</param>
     /// <returns>Providers in fallback order.</returns>
-    IEnumerable<IAIProviderRegistration> GetFallbackChain(AICapability capability);
+    IEnumerable<IAiProviderRegistration> GetFallbackChain(AiCapability capability);
 
     /// <summary>
     /// Event fired when a provider is registered.
     /// </summary>
-    event Action<AIProviderInfo>? OnProviderRegistered;
+    event Action<AiProviderInfo>? OnProviderRegistered;
 
     /// <summary>
     /// Event fired when a provider is unregistered.
@@ -1836,15 +1836,15 @@ public interface IAiProviderRegistry
 /// <summary>
 /// Default implementation of the AI Provider Registry.
 /// </summary>
-public sealed class AIProviderRegistry : IAiProviderRegistry, IAsyncDisposable
+public sealed class AiProviderRegistry : IAiProviderRegistry, IAsyncDisposable
 {
-    private readonly BoundedDictionary<string, IAIProviderRegistration> _providers = new BoundedDictionary<string, IAIProviderRegistration>(1000);
+    private readonly BoundedDictionary<string, IAiProviderRegistration> _providers = new BoundedDictionary<string, IAiProviderRegistration>(1000);
     private readonly Timer _availabilityCheckTimer;
     private readonly TimeSpan _availabilityCheckInterval;
     private volatile bool _disposed;
 
     /// <inheritdoc/>
-    public event Action<AIProviderInfo>? OnProviderRegistered;
+    public event Action<AiProviderInfo>? OnProviderRegistered;
 
     /// <inheritdoc/>
     public event Action<string>? OnProviderUnregistered;
@@ -1853,17 +1853,17 @@ public sealed class AIProviderRegistry : IAiProviderRegistry, IAsyncDisposable
     public event Action<string>? OnProviderUnavailable;
 
     /// <summary>
-    /// Creates a new AIProviderRegistry.
+    /// Creates a new AiProviderRegistry.
     /// </summary>
     /// <param name="availabilityCheckInterval">Interval for checking provider availability.</param>
-    public AIProviderRegistry(TimeSpan? availabilityCheckInterval = null)
+    public AiProviderRegistry(TimeSpan? availabilityCheckInterval = null)
     {
         _availabilityCheckInterval = availabilityCheckInterval ?? TimeSpan.FromMinutes(1);
         _availabilityCheckTimer = new Timer(CheckAvailability, null, _availabilityCheckInterval, _availabilityCheckInterval);
     }
 
     /// <inheritdoc/>
-    public void Register(IAIProviderRegistration provider)
+    public void Register(IAiProviderRegistration provider)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
 
@@ -1881,13 +1881,13 @@ public sealed class AIProviderRegistry : IAiProviderRegistry, IAsyncDisposable
     }
 
     /// <inheritdoc/>
-    public IAIProviderRegistration? GetProvider(string providerId)
+    public IAiProviderRegistration? GetProvider(string providerId)
     {
         return _providers.TryGetValue(providerId, out var provider) ? provider : null;
     }
 
     /// <inheritdoc/>
-    public IAIProviderRegistration? GetBestProvider(AIProviderSelectionOptions options)
+    public IAiProviderRegistration? GetBestProvider(AiProviderSelectionOptions options)
     {
         var candidates = _providers.Values
             .Where(p => p.Info.IsAvailable)
@@ -1920,7 +1920,7 @@ public sealed class AIProviderRegistry : IAiProviderRegistry, IAsyncDisposable
     }
 
     /// <inheritdoc/>
-    public IEnumerable<IAIProviderRegistration> GetProviders(AICapability capability)
+    public IEnumerable<IAiProviderRegistration> GetProviders(AiCapability capability)
     {
         return _providers.Values
             .Where(p => p.Info.IsAvailable)
@@ -1930,7 +1930,7 @@ public sealed class AIProviderRegistry : IAiProviderRegistry, IAsyncDisposable
     }
 
     /// <inheritdoc/>
-    public IEnumerable<IAIProviderRegistration> GetFallbackChain(AICapability capability)
+    public IEnumerable<IAiProviderRegistration> GetFallbackChain(AiCapability capability)
     {
         return _providers.Values
             .Where(p => (p.Info.Capabilities & capability) == capability)

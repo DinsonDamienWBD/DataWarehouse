@@ -9,25 +9,25 @@ namespace DataWarehouse.SDK.Contracts.TamperProof;
 public enum HashAlgorithmType
 {
     /// <summary>SHA-256 hash algorithm (256-bit output).</summary>
-    SHA256,
+    Sha256,
 
     /// <summary>SHA-384 hash algorithm (384-bit output).</summary>
-    SHA384,
+    Sha384,
 
     /// <summary>SHA-512 hash algorithm (512-bit output).</summary>
-    SHA512,
+    Sha512,
 
     /// <summary>Blake3 hash algorithm (256-bit output, faster than SHA).</summary>
     Blake3,
 
     /// <summary>SHA3-256 hash algorithm (256-bit output, NIST SHA-3 standard).</summary>
-    SHA3_256,
+    Sha3256,
 
     /// <summary>SHA3-384 hash algorithm (384-bit output, NIST SHA-3 standard).</summary>
-    SHA3_384,
+    Sha3384,
 
     /// <summary>SHA3-512 hash algorithm (512-bit output, NIST SHA-3 standard).</summary>
-    SHA3_512,
+    Sha3512,
 
     /// <summary>Keccak-256 hash algorithm (256-bit output, original Keccak, used by Ethereum).</summary>
     Keccak256,
@@ -39,22 +39,22 @@ public enum HashAlgorithmType
     Keccak512,
 
     /// <summary>HMAC-SHA256 keyed hash algorithm (256-bit output).</summary>
-    HMAC_SHA256,
+    HmacSha256,
 
     /// <summary>HMAC-SHA384 keyed hash algorithm (384-bit output).</summary>
-    HMAC_SHA384,
+    HmacSha384,
 
     /// <summary>HMAC-SHA512 keyed hash algorithm (512-bit output).</summary>
-    HMAC_SHA512,
+    HmacSha512,
 
     /// <summary>HMAC-SHA3-256 keyed hash algorithm (256-bit output).</summary>
-    HMAC_SHA3_256,
+    HmacSha3256,
 
     /// <summary>HMAC-SHA3-384 keyed hash algorithm (384-bit output).</summary>
-    HMAC_SHA3_384,
+    HmacSha3384,
 
     /// <summary>HMAC-SHA3-512 keyed hash algorithm (512-bit output).</summary>
-    HMAC_SHA3_512
+    HmacSha3512
 }
 
 /// <summary>

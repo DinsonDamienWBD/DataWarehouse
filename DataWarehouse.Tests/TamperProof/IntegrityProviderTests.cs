@@ -23,22 +23,22 @@ public class IntegrityProviderTests
     {
         // Verify all expected hash algorithm types are present
         var values = Enum.GetValues<HashAlgorithmType>();
-        values.Should().Contain(HashAlgorithmType.SHA256);
-        values.Should().Contain(HashAlgorithmType.SHA384);
-        values.Should().Contain(HashAlgorithmType.SHA512);
+        values.Should().Contain(HashAlgorithmType.Sha256);
+        values.Should().Contain(HashAlgorithmType.Sha384);
+        values.Should().Contain(HashAlgorithmType.Sha512);
         values.Should().Contain(HashAlgorithmType.Blake3);
-        values.Should().Contain(HashAlgorithmType.SHA3_256);
-        values.Should().Contain(HashAlgorithmType.SHA3_384);
-        values.Should().Contain(HashAlgorithmType.SHA3_512);
+        values.Should().Contain(HashAlgorithmType.Sha3256);
+        values.Should().Contain(HashAlgorithmType.Sha3384);
+        values.Should().Contain(HashAlgorithmType.Sha3512);
         values.Should().Contain(HashAlgorithmType.Keccak256);
         values.Should().Contain(HashAlgorithmType.Keccak384);
         values.Should().Contain(HashAlgorithmType.Keccak512);
-        values.Should().Contain(HashAlgorithmType.HMAC_SHA256);
-        values.Should().Contain(HashAlgorithmType.HMAC_SHA384);
-        values.Should().Contain(HashAlgorithmType.HMAC_SHA512);
-        values.Should().Contain(HashAlgorithmType.HMAC_SHA3_256);
-        values.Should().Contain(HashAlgorithmType.HMAC_SHA3_384);
-        values.Should().Contain(HashAlgorithmType.HMAC_SHA3_512);
+        values.Should().Contain(HashAlgorithmType.HmacSha256);
+        values.Should().Contain(HashAlgorithmType.HmacSha384);
+        values.Should().Contain(HashAlgorithmType.HmacSha512);
+        values.Should().Contain(HashAlgorithmType.HmacSha3256);
+        values.Should().Contain(HashAlgorithmType.HmacSha3384);
+        values.Should().Contain(HashAlgorithmType.HmacSha3512);
     }
 
     [Fact]
@@ -50,11 +50,11 @@ public class IntegrityProviderTests
     }
 
     [Theory]
-    [InlineData(HashAlgorithmType.SHA256, "SHA256")]
-    [InlineData(HashAlgorithmType.SHA3_256, "SHA3_256")]
+    [InlineData(HashAlgorithmType.Sha256, "SHA256")]
+    [InlineData(HashAlgorithmType.Sha3256, "SHA3_256")]
     [InlineData(HashAlgorithmType.Keccak256, "Keccak256")]
-    [InlineData(HashAlgorithmType.HMAC_SHA256, "HMAC_SHA256")]
-    [InlineData(HashAlgorithmType.HMAC_SHA3_512, "HMAC_SHA3_512")]
+    [InlineData(HashAlgorithmType.HmacSha256, "HMAC_SHA256")]
+    [InlineData(HashAlgorithmType.HmacSha3512, "HMAC_SHA3_512")]
     public void HashAlgorithmType_ShouldHaveCorrectNames(HashAlgorithmType algorithm, string expectedName)
     {
         algorithm.ToString().Should().Be(expectedName);
@@ -136,7 +136,7 @@ public class IntegrityProviderTests
         var data = Encoding.UTF8.GetBytes("known content for hash verification");
         var hashValue = Convert.ToHexString(SHA256.HashData(data));
 
-        var integrityHash = IntegrityHash.Create(HashAlgorithmType.SHA256, hashValue);
+        var integrityHash = IntegrityHash.Create(HashAlgorithmType.Sha256, hashValue);
 
         // Recompute and verify
         var recomputedHash = Convert.ToHexString(SHA256.HashData(data));
@@ -159,7 +159,7 @@ public class IntegrityProviderTests
     [Fact]
     public void IntegrityHash_ShouldFormatAsAlgorithmColonHash()
     {
-        var hash = IntegrityHash.Create(HashAlgorithmType.SHA256, "AABBCCDD");
+        var hash = IntegrityHash.Create(HashAlgorithmType.Sha256, "AABBCCDD");
 
         hash.ToString().Should().Be("SHA256:AABBCCDD");
     }
@@ -169,7 +169,7 @@ public class IntegrityProviderTests
     {
         var parsed = IntegrityHash.Parse("SHA512:AABBCCDDEE");
 
-        parsed.Algorithm.Should().Be(HashAlgorithmType.SHA512);
+        parsed.Algorithm.Should().Be(HashAlgorithmType.Sha512);
         parsed.HashValue.Should().Be("AABBCCDDEE");
     }
 
@@ -186,7 +186,7 @@ public class IntegrityProviderTests
     {
         var empty = IntegrityHash.Empty();
 
-        empty.Algorithm.Should().Be(HashAlgorithmType.SHA256);
+        empty.Algorithm.Should().Be(HashAlgorithmType.Sha256);
         empty.HashValue.Should().BeEmpty();
     }
 
@@ -276,7 +276,7 @@ public class IntegrityProviderTests
                 Comment = "test write",
                 Timestamp = now
             },
-            HashAlgorithm = HashAlgorithmType.SHA256,
+            HashAlgorithm = HashAlgorithmType.Sha256,
             OriginalContentHash = hash,
             OriginalContentSize = originalContentSize,
             FinalContentHash = fHash,

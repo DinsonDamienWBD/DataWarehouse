@@ -136,7 +136,7 @@ public abstract class MediaPluginBase : FeaturePluginBase
 
                 var targetFormat = media.TryGetValue("targetFormat", out var tf) && tf is Media.MediaFormat fmt
                     ? fmt
-                    : Media.MediaFormat.MP4;
+                    : Media.MediaFormat.Mp4;
 
                 var options = new Media.TranscodeOptions(TargetFormat: targetFormat);
 

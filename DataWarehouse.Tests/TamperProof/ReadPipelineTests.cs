@@ -57,8 +57,8 @@ public class ReadPipelineTests
     {
         var objectId = Guid.NewGuid();
         var data = new byte[] { 1, 2, 3, 4 };
-        var expectedHash = IntegrityHash.Create(HashAlgorithmType.SHA256, "AABB");
-        var actualHash = IntegrityHash.Create(HashAlgorithmType.SHA256, "AABB");
+        var expectedHash = IntegrityHash.Create(HashAlgorithmType.Sha256, "AABB");
+        var actualHash = IntegrityHash.Create(HashAlgorithmType.Sha256, "AABB");
         var verification = IntegrityVerificationResult.CreateValid(expectedHash, actualHash);
 
         var result = SecureReadResult.CreateSuccess(
@@ -90,8 +90,8 @@ public class ReadPipelineTests
     {
         var objectId = Guid.NewGuid();
         var verification = IntegrityVerificationResult.CreateValid(
-            IntegrityHash.Create(HashAlgorithmType.SHA256, "AABB"),
-            IntegrityHash.Create(HashAlgorithmType.SHA256, "AABB"));
+            IntegrityHash.Create(HashAlgorithmType.Sha256, "AABB"),
+            IntegrityHash.Create(HashAlgorithmType.Sha256, "AABB"));
         var recovery = RecoveryResult.CreateSuccess(objectId, 1, "WORM", "Recovered 2 corrupted shards");
 
         var result = SecureReadResult.CreateSuccess(
@@ -108,8 +108,8 @@ public class ReadPipelineTests
     {
         var objectId = Guid.NewGuid();
         var verification = IntegrityVerificationResult.CreateValid(
-            IntegrityHash.Create(HashAlgorithmType.SHA256, "AABB"),
-            IntegrityHash.Create(HashAlgorithmType.SHA256, "AABB"),
+            IntegrityHash.Create(HashAlgorithmType.Sha256, "AABB"),
+            IntegrityHash.Create(HashAlgorithmType.Sha256, "AABB"),
             blockchainVerified: true);
         var bcDetails = BlockchainVerificationDetails.CreateSuccess(
             19000000, DateTimeOffset.UtcNow.AddDays(-1), 12);
@@ -131,8 +131,8 @@ public class ReadPipelineTests
     [Fact]
     public void IntegrityVerificationResult_CreateValid_ShouldIndicateSuccess()
     {
-        var expected = IntegrityHash.Create(HashAlgorithmType.SHA256, "AABB");
-        var actual = IntegrityHash.Create(HashAlgorithmType.SHA256, "AABB");
+        var expected = IntegrityHash.Create(HashAlgorithmType.Sha256, "AABB");
+        var actual = IntegrityHash.Create(HashAlgorithmType.Sha256, "AABB");
 
         var result = IntegrityVerificationResult.CreateValid(expected, actual);
 
@@ -157,12 +157,12 @@ public class ReadPipelineTests
         var shardResults = new[]
         {
             ShardVerificationResult.CreateValid(0,
-                IntegrityHash.Create(HashAlgorithmType.SHA256, "s0"),
-                IntegrityHash.Create(HashAlgorithmType.SHA256, "s0")),
+                IntegrityHash.Create(HashAlgorithmType.Sha256, "s0"),
+                IntegrityHash.Create(HashAlgorithmType.Sha256, "s0")),
             ShardVerificationResult.CreateFailed(1, "Shard 1 corrupted"),
             ShardVerificationResult.CreateValid(2,
-                IntegrityHash.Create(HashAlgorithmType.SHA256, "s2"),
-                IntegrityHash.Create(HashAlgorithmType.SHA256, "s2")),
+                IntegrityHash.Create(HashAlgorithmType.Sha256, "s2"),
+                IntegrityHash.Create(HashAlgorithmType.Sha256, "s2")),
         };
 
         var result = IntegrityVerificationResult.CreateFailed(
@@ -182,8 +182,8 @@ public class ReadPipelineTests
     [Fact]
     public void ShardVerificationResult_CreateValid_ShouldIndicateSuccess()
     {
-        var expected = IntegrityHash.Create(HashAlgorithmType.SHA256, "shard-hash");
-        var actual = IntegrityHash.Create(HashAlgorithmType.SHA256, "shard-hash");
+        var expected = IntegrityHash.Create(HashAlgorithmType.Sha256, "shard-hash");
+        var actual = IntegrityHash.Create(HashAlgorithmType.Sha256, "shard-hash");
 
         var result = ShardVerificationResult.CreateValid(0, expected, actual);
 

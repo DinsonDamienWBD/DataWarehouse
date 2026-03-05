@@ -29,15 +29,15 @@ internal sealed class OnnxInferenceStrategy : MediaStrategyBase
     public OnnxInferenceStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV, MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.WAV
+            MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.Jpeg, MediaFormat.Png, MediaFormat.Wav
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.JPEG, MediaFormat.PNG
+            MediaFormat.Jpeg, MediaFormat.Png
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
-        MaxResolution: Resolution.UHD,
+        MaxResolution: Resolution.Uhd,
         MaxBitrate: null,
         SupportedCodecs: new HashSet<string> { "onnx-inference" },
         SupportsThumbnailGeneration: false,
@@ -161,7 +161,7 @@ internal sealed class OnnxInferenceStrategy : MediaStrategyBase
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
-            Duration: TimeSpan.Zero, Format: MediaFormat.JPEG,
+            Duration: TimeSpan.Zero, Format: MediaFormat.Jpeg,
             VideoCodec: null, AudioCodec: null, Resolution: null,
             Bitrate: default, FrameRate: null, AudioChannels: null,
             SampleRate: null, FileSize: inputStream.Length));
@@ -196,11 +196,11 @@ internal sealed class AiUpscalingStrategy : MediaStrategyBase
     public AiUpscalingStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.WebP
+            MediaFormat.Jpeg, MediaFormat.Png, MediaFormat.WebP
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.PNG, MediaFormat.JPEG
+            MediaFormat.Png, MediaFormat.Jpeg
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
@@ -275,7 +275,7 @@ internal sealed class AiUpscalingStrategy : MediaStrategyBase
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
-            Duration: TimeSpan.Zero, Format: MediaFormat.PNG,
+            Duration: TimeSpan.Zero, Format: MediaFormat.Png,
             VideoCodec: null, AudioCodec: null, Resolution: null,
             Bitrate: default, FrameRate: null, AudioChannels: null,
             SampleRate: null, FileSize: inputStream.Length));
@@ -310,15 +310,15 @@ internal sealed class ObjectDetectionStrategy : MediaStrategyBase
     public ObjectDetectionStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.MP4
+            MediaFormat.Jpeg, MediaFormat.Png, MediaFormat.Mp4
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.JPEG, MediaFormat.PNG
+            MediaFormat.Jpeg, MediaFormat.Png
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
-        MaxResolution: Resolution.UHD,
+        MaxResolution: Resolution.Uhd,
         MaxBitrate: null,
         SupportedCodecs: new HashSet<string> { "yolo-detection" },
         SupportsThumbnailGeneration: false,
@@ -440,7 +440,7 @@ internal sealed class ObjectDetectionStrategy : MediaStrategyBase
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
-            Duration: TimeSpan.Zero, Format: MediaFormat.JPEG,
+            Duration: TimeSpan.Zero, Format: MediaFormat.Jpeg,
             VideoCodec: null, AudioCodec: null, Resolution: null,
             Bitrate: default, FrameRate: null, AudioChannels: null,
             SampleRate: null, FileSize: inputStream.Length));
@@ -472,15 +472,15 @@ internal sealed class FaceDetectionStrategy : MediaStrategyBase
     public FaceDetectionStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.JPEG, MediaFormat.PNG
+            MediaFormat.Jpeg, MediaFormat.Png
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.JPEG, MediaFormat.PNG
+            MediaFormat.Jpeg, MediaFormat.Png
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
-        MaxResolution: Resolution.UHD,
+        MaxResolution: Resolution.Uhd,
         MaxBitrate: null,
         SupportedCodecs: new HashSet<string> { "face-detection" },
         SupportsThumbnailGeneration: false,
@@ -540,7 +540,7 @@ internal sealed class FaceDetectionStrategy : MediaStrategyBase
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
-            Duration: TimeSpan.Zero, Format: MediaFormat.JPEG,
+            Duration: TimeSpan.Zero, Format: MediaFormat.Jpeg,
             VideoCodec: null, AudioCodec: null, Resolution: null,
             Bitrate: default, FrameRate: null, AudioChannels: null,
             SampleRate: null, FileSize: inputStream.Length));
@@ -573,8 +573,8 @@ internal sealed class SpeechToTextStrategy : MediaStrategyBase
     public SpeechToTextStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.WAV, MediaFormat.MP3, MediaFormat.FLAC, MediaFormat.Opus, MediaFormat.AAC,
-            MediaFormat.MP4, MediaFormat.MKV
+            MediaFormat.Wav, MediaFormat.Mp3, MediaFormat.Flac, MediaFormat.Opus, MediaFormat.Aac,
+            MediaFormat.Mp4, MediaFormat.Mkv
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
@@ -647,7 +647,7 @@ internal sealed class SpeechToTextStrategy : MediaStrategyBase
         Stream inputStream, CancellationToken cancellationToken)
     {
         return Task.FromResult(new MediaMetadata(
-            Duration: TimeSpan.Zero, Format: MediaFormat.WAV,
+            Duration: TimeSpan.Zero, Format: MediaFormat.Wav,
             VideoCodec: null, AudioCodec: "pcm_s16le", Resolution: null,
             Bitrate: default, FrameRate: null, AudioChannels: 1,
             SampleRate: 16000, FileSize: inputStream.Length));

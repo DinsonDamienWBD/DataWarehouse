@@ -273,11 +273,11 @@ public class TamperProofManifest
         // Use the manifest's configured hash algorithm instead of hardcoded SHA-256
         byte[] hash = HashAlgorithm switch
         {
-            HashAlgorithmType.SHA256 => System.Security.Cryptography.SHA256.HashData(bytes),
-            HashAlgorithmType.SHA384 => System.Security.Cryptography.SHA384.HashData(bytes),
-            HashAlgorithmType.SHA512 => System.Security.Cryptography.SHA512.HashData(bytes),
-            HashAlgorithmType.SHA3_256 => System.Security.Cryptography.SHA256.HashData(bytes), // Fallback — .NET lacks SHA3 natively
-            HashAlgorithmType.SHA3_512 => System.Security.Cryptography.SHA512.HashData(bytes), // Fallback
+            HashAlgorithmType.Sha256 => System.Security.Cryptography.SHA256.HashData(bytes),
+            HashAlgorithmType.Sha384 => System.Security.Cryptography.SHA384.HashData(bytes),
+            HashAlgorithmType.Sha512 => System.Security.Cryptography.SHA512.HashData(bytes),
+            HashAlgorithmType.Sha3256 => System.Security.Cryptography.SHA256.HashData(bytes), // Fallback — .NET lacks SHA3 natively
+            HashAlgorithmType.Sha3512 => System.Security.Cryptography.SHA512.HashData(bytes), // Fallback
             _ => System.Security.Cryptography.SHA256.HashData(bytes)
         };
         return Convert.ToHexString(hash);

@@ -48,11 +48,11 @@ internal sealed class UsdModelStrategy : MediaStrategyBase
     public UsdModelStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.USD
+            MediaFormat.Usd
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.USD, MediaFormat.GLTF
+            MediaFormat.Usd, MediaFormat.Gltf
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
@@ -163,7 +163,7 @@ internal sealed class UsdModelStrategy : MediaStrategyBase
 
         return new MediaMetadata(
             Duration: sceneInfo.HasAnimation ? TimeSpan.FromSeconds(sceneInfo.AnimationEndFrame / 24.0) : TimeSpan.Zero,
-            Format: MediaFormat.USD,
+            Format: MediaFormat.Usd,
             VideoCodec: null,
             AudioCodec: null,
             Resolution: null,

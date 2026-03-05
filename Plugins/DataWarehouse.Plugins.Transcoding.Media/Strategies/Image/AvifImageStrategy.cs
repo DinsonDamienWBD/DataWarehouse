@@ -46,11 +46,11 @@ internal sealed class AvifImageStrategy : MediaStrategyBase
     public AvifImageStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.AVIF, MediaFormat.JPEG, MediaFormat.PNG, MediaFormat.WebP
+            MediaFormat.Avif, MediaFormat.Jpeg, MediaFormat.Png, MediaFormat.WebP
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.AVIF
+            MediaFormat.Avif
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
@@ -165,7 +165,7 @@ internal sealed class AvifImageStrategy : MediaStrategyBase
 
         return new MediaMetadata(
             Duration: TimeSpan.Zero,
-            Format: MediaFormat.AVIF,
+            Format: MediaFormat.Avif,
             VideoCodec: "av1",
             AudioCodec: null,
             Resolution: new Resolution(width, height),

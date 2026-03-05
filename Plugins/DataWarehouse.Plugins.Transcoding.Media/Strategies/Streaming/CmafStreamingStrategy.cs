@@ -45,19 +45,19 @@ internal sealed class CmafStreamingStrategy : MediaStrategyBase
     {
         (new Resolution(640, 360), 800, "v360"),
         (new Resolution(854, 480), 1400, "v480"),
-        (Resolution.HD, 2800, "v720"),
-        (Resolution.FullHD, 5000, "v1080"),
+        (Resolution.Hd, 2800, "v720"),
+        (Resolution.FullHd, 5000, "v1080"),
     };
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CmafStreamingStrategy"/> class.
     /// </summary>
     public CmafStreamingStrategy() : base(new MediaCapabilities(
-        SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM },
-        SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.CMAF, MediaFormat.HLS, MediaFormat.DASH },
+        SupportedInputFormats: new HashSet<MediaFormat> { MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.Mov, MediaFormat.Avi, MediaFormat.WebM },
+        SupportedOutputFormats: new HashSet<MediaFormat> { MediaFormat.Cmaf, MediaFormat.Hls, MediaFormat.Dash },
         SupportsStreaming: true,
         SupportsAdaptiveBitrate: true,
-        MaxResolution: Resolution.UHD,
+        MaxResolution: Resolution.Uhd,
         MaxBitrate: 25_000_000,
         SupportedCodecs: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "h264", "h265", "vp9", "av1", "aac", "opus" },
         SupportsThumbnailGeneration: false,
@@ -93,7 +93,7 @@ internal sealed class CmafStreamingStrategy : MediaStrategyBase
     {
         var outputStream = new MemoryStream(1024 * 1024);
 
-        var targetResolution = options.TargetResolution ?? Resolution.FullHD;
+        var targetResolution = options.TargetResolution ?? Resolution.FullHd;
         var targetBitrateKbps = options.TargetBitrate.HasValue
             ? (int)(options.TargetBitrate.Value.BitsPerSecond / 1000)
             : 5000;
@@ -175,9 +175,9 @@ internal sealed class CmafStreamingStrategy : MediaStrategyBase
 
         return targetFormat switch
         {
-            MediaFormat.DASH => new Uri($"/streams/cmaf/{streamHash}/manifest.mpd", UriKind.Relative),
-            MediaFormat.HLS => new Uri($"/streams/cmaf/{streamHash}/master.m3u8", UriKind.Relative),
-            MediaFormat.CMAF => new Uri($"/streams/cmaf/{streamHash}/master.m3u8", UriKind.Relative),
+            MediaFormat.Dash => new Uri($"/streams/cmaf/{streamHash}/manifest.mpd", UriKind.Relative),
+            MediaFormat.Hls => new Uri($"/streams/cmaf/{streamHash}/master.m3u8", UriKind.Relative),
+            MediaFormat.Cmaf => new Uri($"/streams/cmaf/{streamHash}/master.m3u8", UriKind.Relative),
             _ => throw new NotSupportedException($"CMAF strategy supports HLS, DASH, and CMAF formats, not {targetFormat}.")
         };
     }

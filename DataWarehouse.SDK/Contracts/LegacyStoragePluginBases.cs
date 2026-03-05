@@ -171,11 +171,19 @@ namespace DataWarehouse.SDK.Contracts
 
         protected CacheableStoragePluginBase()
         {
-            _cacheOptions = DefaultCacheOptions;
+            // Finding #1333: Avoid virtual member call in constructor — use concrete default instead.
+            _cacheOptions = new CacheOptions
+            {
+                DefaultTtl = TimeSpan.FromHours(1),
+                MaxEntries = 10000,
+                EvictionPolicy = CacheEvictionPolicy.Lru,
+                EnableStatistics = true
+            };
             if (_cacheOptions.CleanupInterval > TimeSpan.Zero)
             {
+                // Finding #1334: Avoid async void lambda — observe the task to prevent unhandled exceptions.
                 _cleanupTimer = new Timer(
-                    async _ => await CleanupExpiredAsync(),
+                    _ => { _ = CleanupExpiredAsync(); },
                     null,
                     _cacheOptions.CleanupInterval,
                     _cacheOptions.CleanupInterval);

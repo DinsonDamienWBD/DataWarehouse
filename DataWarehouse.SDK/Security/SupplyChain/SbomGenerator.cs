@@ -30,10 +30,10 @@ namespace DataWarehouse.SDK.Security.SupplyChain
         /// <inheritdoc />
         public IReadOnlyList<SbomFormat> SupportedFormats { get; } = new[]
         {
-            SbomFormat.CycloneDX_1_5_Json,
-            SbomFormat.CycloneDX_1_5_Xml,
-            SbomFormat.SPDX_2_3_Json,
-            SbomFormat.SPDX_2_3_TagValue
+            SbomFormat.CycloneDx15Json,
+            SbomFormat.CycloneDx15Xml,
+            SbomFormat.Spdx23Json,
+            SbomFormat.Spdx23TagValue
         };
 
         /// <summary>
@@ -80,10 +80,10 @@ namespace DataWarehouse.SDK.Security.SupplyChain
 
             var content = format switch
             {
-                SbomFormat.CycloneDX_1_5_Json => GenerateCycloneDxJson(components, options),
-                SbomFormat.CycloneDX_1_5_Xml => GenerateCycloneDxXml(components, options),
-                SbomFormat.SPDX_2_3_Json => GenerateSpdxJson(components, options),
-                SbomFormat.SPDX_2_3_TagValue => GenerateSpdxTagValue(components, options),
+                SbomFormat.CycloneDx15Json => GenerateCycloneDxJson(components, options),
+                SbomFormat.CycloneDx15Xml => GenerateCycloneDxXml(components, options),
+                SbomFormat.Spdx23Json => GenerateSpdxJson(components, options),
+                SbomFormat.Spdx23TagValue => GenerateSpdxTagValue(components, options),
                 _ => throw new ArgumentOutOfRangeException(nameof(format), format, "Unsupported SBOM format")
             };
 

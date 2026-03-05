@@ -42,11 +42,11 @@ internal sealed class H265CodecStrategy : MediaStrategyBase
     public H265CodecStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV, MediaFormat.AVI, MediaFormat.WebM
+            MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.Mov, MediaFormat.Avi, MediaFormat.WebM
         },
         SupportedOutputFormats: new HashSet<MediaFormat>
         {
-            MediaFormat.MP4, MediaFormat.MKV, MediaFormat.MOV
+            MediaFormat.Mp4, MediaFormat.Mkv, MediaFormat.Mov
         },
         SupportsStreaming: false,
         SupportsAdaptiveBitrate: false,
@@ -143,7 +143,7 @@ internal sealed class H265CodecStrategy : MediaStrategyBase
                 crf = EstimateCrfFromBitrate(options.TargetBitrate.Value.BitsPerSecond, options.TargetResolution);
             }
 
-            var resolution = options.TargetResolution ?? Resolution.UHD;
+            var resolution = options.TargetResolution ?? Resolution.Uhd;
             var frameRate = options.FrameRate ?? 30.0;
             var audioCodec = options.AudioCodec ?? "aac";
 
@@ -187,10 +187,10 @@ internal sealed class H265CodecStrategy : MediaStrategyBase
 
         return new MediaMetadata(
             Duration: estimatedDuration,
-            Format: MediaFormat.MP4,
+            Format: MediaFormat.Mp4,
             VideoCodec: "hevc",
             AudioCodec: "aac",
-            Resolution: Resolution.UHD,
+            Resolution: Resolution.Uhd,
             Bitrate: new Bitrate(3_000_000),
             FrameRate: 30.0,
             AudioChannels: 2,
@@ -279,7 +279,7 @@ internal sealed class H265CodecStrategy : MediaStrategyBase
     {
         var pixels = resolution.HasValue
             ? (long)resolution.Value.Width * resolution.Value.Height
-            : (long)Resolution.UHD.Width * Resolution.UHD.Height;
+            : (long)Resolution.Uhd.Width * Resolution.Uhd.Height;
 
         var bitsPerPixelPerFrame = targetBps / (pixels * 30.0);
 

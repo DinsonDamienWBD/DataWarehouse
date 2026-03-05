@@ -111,17 +111,17 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <summary>
         /// Metal resource storage mode: shared (CPU + GPU accessible).
         /// </summary>
-        internal const nuint MTLResourceStorageModeShared = 0;
+        internal const nuint MtlResourceStorageModeShared = 0;
 
         /// <summary>
         /// Metal resource storage mode: private (GPU-only).
         /// </summary>
-        internal const nuint MTLResourceStorageModePrivate = 1 << 4;
+        internal const nuint MtlResourceStorageModePrivate = 1 << 4;
 
         /// <summary>
         /// Metal resource storage mode: managed (macOS only, explicit sync).
         /// </summary>
-        internal const nuint MTLResourceStorageModeManaged = 2 << 4;
+        internal const nuint MtlResourceStorageModeManaged = 2 << 4;
 
         // --- Metal Dispatch Thread Grid ---
 
@@ -129,13 +129,13 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// Represents a Metal thread group size (width, height, depth).
         /// </summary>
         [StructLayout(LayoutKind.Sequential)]
-        internal struct MTLSize
+        internal struct MtlSize
         {
             public nuint Width;
             public nuint Height;
             public nuint Depth;
 
-            public MTLSize(nuint width, nuint height, nuint depth)
+            public MtlSize(nuint width, nuint height, nuint depth)
             {
                 Width = width;
                 Height = height;
@@ -178,7 +178,8 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
     [SdkCompatibility("3.0.0", Notes = "Phase 65: Apple Metal compute accelerator (HW-13)")]
     public sealed class MetalAccelerator : IGpuAccelerator, IDisposable
     {
-        private readonly IPlatformCapabilityRegistry _registry;
+        /// <summary>Platform capability registry for registering Metal capabilities (finding #1436).</summary>
+        internal IPlatformCapabilityRegistry Registry { get; }
         private IntPtr _device;
         private IntPtr _commandQueue;
         private volatile bool _isAvailable;
@@ -196,7 +197,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <exception cref="ArgumentNullException">Thrown when registry is null.</exception>
         public MetalAccelerator(IPlatformCapabilityRegistry registry)
         {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            Registry = registry ?? throw new ArgumentNullException(nameof(registry));
         }
 
         /// <inheritdoc/>
@@ -289,7 +290,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
             // Metal compute shader dispatch for element-wise multiplication:
             // 1. Create MTLBuffers with shared storage for a, b, result
-            //    [device newBufferWithLength:sizeof(float)*n options:MTLResourceStorageModeShared]
+            //    [device newBufferWithLength:sizeof(float)*n options:MtlResourceStorageModeShared]
             // 2. Compile MSL kernel:
             //    kernel void vec_mul(device float* a [[buffer(0)]],
             //                        device float* b [[buffer(1)]],
@@ -324,27 +325,27 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(a);
             ArgumentNullException.ThrowIfNull(b);
 
-            int M = a.GetLength(0), K = a.GetLength(1);
-            int K2 = b.GetLength(0), N = b.GetLength(1);
+            int m = a.GetLength(0), k = a.GetLength(1);
+            int k2 = b.GetLength(0), n = b.GetLength(1);
 
-            if (K != K2)
+            if (k != k2)
                 throw new ArgumentException("Matrix dimensions incompatible for multiplication");
 
             // Metal Performance Shaders (MPS) provides optimized GEMM via MPSMatrixMultiplication
             // For custom kernels, use threadgroup memory tiling in MSL
-            if (M > 4096 || N > 4096 || K > 4096)
-                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {M}x{K} * {K}x{N}. Max 4096 per dimension (finding P2-372).");
-            float[] result = new float[M * N];
+            if (m > 4096 || n > 4096 || k > 4096)
+                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {m}x{k} * {k}x{n}. Max 4096 per dimension (finding P2-372).");
+            float[] result = new float[m * n];
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             await Task.Run(() =>
             {
-                for (int i = 0; i < M; i++)
-                    for (int j = 0; j < N; j++)
+                for (int i = 0; i < m; i++)
+                    for (int j = 0; j < n; j++)
                     {
                         float sum = 0;
-                        for (int k = 0; k < K; k++)
-                            sum += a[i, k] * b[k, j];
-                        result[i * N + j] = sum;
+                        for (int ki = 0; ki < k; ki++)
+                            sum += a[i, ki] * b[ki, j];
+                        result[i * n + j] = sum;
                     }
             });
             Interlocked.Add(ref _totalProcessingTicks, System.Diagnostics.Stopwatch.GetTimestamp() - t0);
@@ -361,21 +362,21 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(input);
             ArgumentNullException.ThrowIfNull(weights);
 
-            int D = input.Length;
-            int D2 = weights.GetLength(0), E = weights.GetLength(1);
+            int d = input.Length;
+            int d2 = weights.GetLength(0), e = weights.GetLength(1);
 
-            if (D != D2)
+            if (d != d2)
                 throw new ArgumentException("Input dimension must match weight rows");
 
             // Metal GEMV: y = W^T * x via MPS or custom MSL kernel
-            float[] result = new float[E];
+            float[] result = new float[e];
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             await Task.Run(() =>
             {
-                for (int j = 0; j < E; j++)
+                for (int j = 0; j < e; j++)
                 {
                     float sum = 0;
-                    for (int i = 0; i < D; i++)
+                    for (int i = 0; i < d; i++)
                         sum += input[i] * weights[i, j];
                     result[j] = sum;
                 }

@@ -14,7 +14,7 @@ public enum MediaFormat
     /// <summary>
     /// MPEG-4 Part 14 container format (.mp4).
     /// </summary>
-    MP4 = 1,
+    Mp4 = 1,
 
     /// <summary>
     /// WebM container format (.webm).
@@ -24,33 +24,33 @@ public enum MediaFormat
     /// <summary>
     /// Matroska container format (.mkv).
     /// </summary>
-    MKV = 3,
+    Mkv = 3,
 
     /// <summary>
     /// Audio Video Interleave format (.avi).
     /// </summary>
-    AVI = 4,
+    Avi = 4,
 
     /// <summary>
     /// QuickTime file format (.mov).
     /// </summary>
-    MOV = 5,
+    Mov = 5,
 
     /// <summary>
     /// Flash Video format (.flv).
     /// </summary>
-    FLV = 6,
+    Flv = 6,
 
     // Streaming Formats
     /// <summary>
     /// HTTP Live Streaming format (Apple HLS with .m3u8 playlist).
     /// </summary>
-    HLS = 100,
+    Hls = 100,
 
     /// <summary>
     /// Dynamic Adaptive Streaming over HTTP (MPEG-DASH with .mpd manifest).
     /// </summary>
-    DASH = 101,
+    Dash = 101,
 
     /// <summary>
     /// Microsoft Smooth Streaming format.
@@ -60,18 +60,18 @@ public enum MediaFormat
     /// <summary>
     /// Common Media Application Format (CMAF) with fragmented MP4 segments.
     /// </summary>
-    CMAF = 103,
+    Cmaf = 103,
 
     // Audio Formats
     /// <summary>
     /// MPEG-1 or MPEG-2 Audio Layer III (.mp3).
     /// </summary>
-    MP3 = 200,
+    Mp3 = 200,
 
     /// <summary>
     /// Advanced Audio Coding (.aac, .m4a).
     /// </summary>
-    AAC = 201,
+    Aac = 201,
 
     /// <summary>
     /// Vorbis audio codec (typically in .ogg containers).
@@ -86,23 +86,23 @@ public enum MediaFormat
     /// <summary>
     /// Free Lossless Audio Codec (.flac).
     /// </summary>
-    FLAC = 204,
+    Flac = 204,
 
     /// <summary>
     /// Waveform Audio File Format (.wav).
     /// </summary>
-    WAV = 205,
+    Wav = 205,
 
     // Image Formats (for thumbnails)
     /// <summary>
     /// Joint Photographic Experts Group format (.jpg, .jpeg).
     /// </summary>
-    JPEG = 300,
+    Jpeg = 300,
 
     /// <summary>
     /// Portable Network Graphics format (.png).
     /// </summary>
-    PNG = 301,
+    Png = 301,
 
     /// <summary>
     /// WebP image format (.webp).
@@ -112,50 +112,50 @@ public enum MediaFormat
     /// <summary>
     /// AV1 Image File Format (.avif).
     /// </summary>
-    AVIF = 303,
+    Avif = 303,
 
     // RAW Camera Formats
     /// <summary>
     /// Canon RAW version 2 format (.cr2).
     /// </summary>
-    CR2 = 400,
+    Cr2 = 400,
 
     /// <summary>
     /// Nikon Electronic Format (.nef).
     /// </summary>
-    NEF = 401,
+    Nef = 401,
 
     /// <summary>
     /// Sony Alpha RAW format (.arw).
     /// </summary>
-    ARW = 402,
+    Arw = 402,
 
     /// <summary>
     /// Adobe Digital Negative format (.dng).
     /// </summary>
-    DNG = 403,
+    Dng = 403,
 
     // GPU Texture Formats
     /// <summary>
     /// DirectDraw Surface format (.dds).
     /// </summary>
-    DDS = 500,
+    Dds = 500,
 
     /// <summary>
     /// Khronos Texture format (.ktx, .ktx2).
     /// </summary>
-    KTX = 501,
+    Ktx = 501,
 
     // 3D Model Formats
     /// <summary>
     /// GL Transmission Format 2.0 (.gltf, .glb).
     /// </summary>
-    GLTF = 600,
+    Gltf = 600,
 
     /// <summary>
     /// Universal Scene Description format (.usd, .usda, .usdc).
     /// </summary>
-    USD = 601
+    Usd = 601
 }
 
 /// <summary>
@@ -182,15 +182,15 @@ public readonly record struct Resolution(int Width, int Height)
 
     // Common Resolutions
     /// <summary>Standard definition: 640x480 pixels.</summary>
-    public static readonly Resolution SD = new(640, 480);
+    public static readonly Resolution Sd = new(640, 480);
     /// <summary>High definition: 1280x720 pixels (720p).</summary>
-    public static readonly Resolution HD = new(1280, 720);
+    public static readonly Resolution Hd = new(1280, 720);
     /// <summary>Full high definition: 1920x1080 pixels (1080p).</summary>
-    public static readonly Resolution FullHD = new(1920, 1080);
+    public static readonly Resolution FullHd = new(1920, 1080);
     /// <summary>Quad high definition: 2560x1440 pixels (1440p).</summary>
-    public static readonly Resolution QHD = new(2560, 1440);
+    public static readonly Resolution Qhd = new(2560, 1440);
     /// <summary>Ultra high definition: 3840x2160 pixels (4K).</summary>
-    public static readonly Resolution UHD = new(3840, 2160);
+    public static readonly Resolution Uhd = new(3840, 2160);
     /// <summary>8K resolution: 7680x4320 pixels.</summary>
     public static readonly Resolution EightK = new(7680, 4320);
 }
@@ -233,11 +233,11 @@ public readonly record struct Bitrate(long BitsPerSecond)
     /// <summary>Low quality video: 500 kbps.</summary>
     public static readonly Bitrate VideoLow = new(500_000);
     /// <summary>Standard definition video: 2 Mbps.</summary>
-    public static readonly Bitrate VideoSD = new(2_000_000);
+    public static readonly Bitrate VideoSd = new(2_000_000);
     /// <summary>HD video: 5 Mbps.</summary>
-    public static readonly Bitrate VideoHD = new(5_000_000);
+    public static readonly Bitrate VideoHd = new(5_000_000);
     /// <summary>Full HD video: 8 Mbps.</summary>
-    public static readonly Bitrate VideoFullHD = new(8_000_000);
+    public static readonly Bitrate VideoFullHd = new(8_000_000);
     /// <summary>4K video: 25 Mbps.</summary>
     public static readonly Bitrate Video4K = new(25_000_000);
 }

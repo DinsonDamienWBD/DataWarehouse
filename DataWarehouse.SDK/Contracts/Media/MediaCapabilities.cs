@@ -45,8 +45,8 @@ namespace DataWarehouse.SDK.Contracts.Media;
 /// <strong>Example Usage:</strong>
 /// <code>
 /// var capabilities = new MediaCapabilities(
-///     SupportedInputFormats: new[] { MediaFormat.MP4, MediaFormat.WebM },
-///     SupportedOutputFormats: new[] { MediaFormat.HLS, MediaFormat.DASH },
+///     SupportedInputFormats: new[] { MediaFormat.Mp4, MediaFormat.WebM },
+///     SupportedOutputFormats: new[] { MediaFormat.Hls, MediaFormat.Dash },
 ///     SupportsStreaming: true,
 ///     SupportsAdaptiveBitrate: true,
 ///     MaxResolution: new Resolution(3840, 2160),

@@ -69,7 +69,7 @@ public sealed class NullGpioBusController : IGpioBusController
 public sealed class NullI2CBusController : II2CBusController
 {
     /// <inheritdoc/>
-    public II2CDevice OpenDevice(int busId, int deviceAddress) => new NullI2cDevice();
+    public II2CDevice OpenDevice(int busId, int deviceAddress) => new NullI2CDevice();
 
     /// <inheritdoc/>
     public void Dispose()
@@ -82,7 +82,7 @@ public sealed class NullI2CBusController : II2CBusController
 /// Null I2C device that provides graceful fallback.
 /// </summary>
 [SdkCompatibility("3.0.0", Notes = "Phase 36: Null I2C device (EDGE-01)")]
-public sealed class NullI2cDevice : II2CDevice
+public sealed class NullI2CDevice : II2CDevice
 {
     /// <inheritdoc/>
     public void Read(Span<byte> buffer) => buffer.Clear();

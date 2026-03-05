@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     {
         private string _originPath = string.Empty;
         private readonly List<EdgeTier> _edgeTiers = new();
-        private int _edgeCacheTTLSeconds = 3600;
+        private int _edgeCacheTtlSeconds = 3600;
         private long _edgeCacheMaxBytes = 10_000_000_000L;
         private bool _enableCacheWarming = true;
         private readonly SemaphoreSlim _initLock = new(1, 1);
@@ -67,7 +67,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     ?? throw new InvalidOperationException("OriginPath is required");
 
                 var edgePaths = GetConfiguration<string>("EdgePaths") ?? string.Empty;
-                _edgeCacheTTLSeconds = GetConfiguration("EdgeCacheTTLSeconds", 3600);
+                _edgeCacheTtlSeconds = GetConfiguration("EdgeCacheTtlSeconds", 3600);
                 _edgeCacheMaxBytes = GetConfiguration("EdgeCacheMaxBytes", 10_000_000_000L);
                 _enableCacheWarming = GetConfiguration("EnableCacheWarming", true);
 
@@ -120,7 +120,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 Key = key,
                 Data = dataBytes,
                 CachedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddSeconds(_edgeCacheTTLSeconds),
+                ExpiresAt = DateTime.UtcNow.AddSeconds(_edgeCacheTtlSeconds),
                 Size = dataBytes.Length
             };
 
@@ -160,7 +160,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                         Key = key,
                         Data = originCached.Data,
                         CachedAt = DateTime.UtcNow,
-                        ExpiresAt = DateTime.UtcNow.AddSeconds(_edgeCacheTTLSeconds),
+                        ExpiresAt = DateTime.UtcNow.AddSeconds(_edgeCacheTtlSeconds),
                         Size = originCached.Size
                     };
                 }
@@ -181,7 +181,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 Key = key,
                 Data = data,
                 CachedAt = DateTime.UtcNow,
-                ExpiresAt = DateTime.UtcNow.AddSeconds(_edgeCacheTTLSeconds),
+                ExpiresAt = DateTime.UtcNow.AddSeconds(_edgeCacheTtlSeconds),
                 Size = data.Length
             };
 
@@ -192,7 +192,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     Key = key,
                     Data = data,
                     CachedAt = DateTime.UtcNow,
-                    ExpiresAt = DateTime.UtcNow.AddSeconds(_edgeCacheTTLSeconds),
+                    ExpiresAt = DateTime.UtcNow.AddSeconds(_edgeCacheTtlSeconds),
                     Size = data.Length
                 };
             }

@@ -157,11 +157,14 @@ public abstract class TamperProofProviderPluginBase : IntegrityPluginBase, ITamp
         return await System.Security.Cryptography.SHA256.HashDataAsync(data, ct).ConfigureAwait(false);
     }
 
-    private readonly IIntegrityProvider _integrityProvider;
-    private readonly IBlockchainProvider _blockchainProvider;
+    /// <summary>Provider for hash computation and verification.</summary>
+    protected IIntegrityProvider IntegrityProvider { get; }
+    /// <summary>Provider for blockchain anchoring.</summary>
+    protected IBlockchainProvider BlockchainProvider { get; }
     private readonly IWormStorageProvider _wormStorageProvider;
     private readonly IAccessLogProvider _accessLogProvider;
-    private readonly IPipelineOrchestrator _pipelineOrchestrator;
+    /// <summary>Orchestrator for transformation pipeline (compression, encryption, etc.).</summary>
+    protected IPipelineOrchestrator PipelineOrchestrator { get; }
 
     private readonly Dictionary<string, InstanceDegradationState> _instanceStates = new();
     private bool _isSealed = false;
@@ -272,17 +275,13 @@ public abstract class TamperProofProviderPluginBase : IntegrityPluginBase, ITamp
         IAccessLogProvider accessLogProvider,
         IPipelineOrchestrator pipelineOrchestrator)
     {
-        _integrityProvider = integrityProvider ?? throw new ArgumentNullException(nameof(integrityProvider));
-        _blockchainProvider = blockchainProvider ?? throw new ArgumentNullException(nameof(blockchainProvider));
+        IntegrityProvider = integrityProvider ?? throw new ArgumentNullException(nameof(integrityProvider));
+        BlockchainProvider = blockchainProvider ?? throw new ArgumentNullException(nameof(blockchainProvider));
         _wormStorageProvider = wormStorageProvider ?? throw new ArgumentNullException(nameof(wormStorageProvider));
         _accessLogProvider = accessLogProvider ?? throw new ArgumentNullException(nameof(accessLogProvider));
-        _pipelineOrchestrator = pipelineOrchestrator ?? throw new ArgumentNullException(nameof(pipelineOrchestrator));
+        PipelineOrchestrator = pipelineOrchestrator ?? throw new ArgumentNullException(nameof(pipelineOrchestrator));
 
-        // Initialize instance states
-        foreach (var instance in Configuration.StorageInstances.AllInstances.Values)
-        {
-            _instanceStates[instance.InstanceId] = InstanceDegradationState.Healthy;
-        }
+        // Note: Instance states are initialized lazily to avoid calling virtual Configuration property in constructor (finding #1279).
     }
 
     /// <summary>
@@ -292,9 +291,32 @@ public abstract class TamperProofProviderPluginBase : IntegrityPluginBase, ITamp
     public abstract TamperProofConfiguration Configuration { get; }
 
     /// <summary>
-    /// Gets the current state of all storage instances.
+    /// Gets the current state of all storage instances. Lazy-initialized on first access (finding #1279).
     /// </summary>
-    public IReadOnlyDictionary<string, InstanceDegradationState> InstanceStates => _instanceStates;
+    public IReadOnlyDictionary<string, InstanceDegradationState> InstanceStates
+    {
+        get
+        {
+            EnsureInstanceStatesInitialized();
+            return _instanceStates;
+        }
+    }
+
+    private volatile bool _instanceStatesInitialized;
+
+    private void EnsureInstanceStatesInitialized()
+    {
+        if (_instanceStatesInitialized) return;
+        lock (_sealLock)
+        {
+            if (_instanceStatesInitialized) return;
+            foreach (var instance in Configuration.StorageInstances.AllInstances.Values)
+            {
+                _instanceStates[instance.InstanceId] = InstanceDegradationState.Healthy;
+            }
+            _instanceStatesInitialized = true;
+        }
+    }
 
     /// <summary>
     /// Gets whether the structural configuration is sealed.

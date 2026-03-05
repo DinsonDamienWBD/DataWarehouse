@@ -354,7 +354,7 @@ public sealed class MessagePackReader
             MessagePackFormatCode.UInt8 => _data[_offset++],
             MessagePackFormatCode.UInt16 => ReadBigEndianUInt16(),
             MessagePackFormatCode.UInt32 => ReadBigEndianUInt32(),
-            MessagePackFormatCode.UInt64 => (long)ReadBigEndianUInt64(),
+            MessagePackFormatCode.UInt64 => checked((long)ReadBigEndianUInt64()),
             MessagePackFormatCode.Int8 => (sbyte)_data[_offset++],
             MessagePackFormatCode.Int16 => ReadBigEndianInt16(),
             MessagePackFormatCode.Int32 => ReadBigEndianInt32(),
