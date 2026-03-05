@@ -2792,8 +2792,8 @@ Plans:
   4. `dotnet test` passes after each commit
 **Plans**: 11 plans
 Plans:
-- [ ] 099-01-PLAN.md -- UltimateStorage findings 1-250
-- [ ] 099-02-PLAN.md -- UltimateStorage findings 251-500
+- [x] 099-01-PLAN.md -- UltimateStorage findings 1-250
+- [x] 099-02-PLAN.md -- UltimateStorage findings 251-500
 - [ ] 099-03-PLAN.md -- UltimateStorage findings 501-750
 - [ ] 099-04-PLAN.md -- UltimateStorage findings 751-1000
 - [ ] 099-05-PLAN.md -- UltimateStorage findings 1001-1243
