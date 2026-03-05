@@ -114,20 +114,20 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
 #pragma warning restore S3869
 
         // Create the IoRing
-        var flags = new IoRingNativeMethods.IORING_CREATE_FLAGS
+        var flags = new IoRingNativeMethods.IoringCreateFlags
         {
-            Required = IoRingNativeMethods.IORING_CREATE_FLAGS_NONE,
-            Advisory = IoRingNativeMethods.IORING_CREATE_FLAGS_NONE
+            Required = IoRingNativeMethods.IoringCreateFlagsNone,
+            Advisory = IoRingNativeMethods.IoringCreateFlagsNone
         };
 
         int hr = IoRingNativeMethods.CreateIoRing(
-            IoRingNativeMethods.IORING_VERSION_3,
+            IoRingNativeMethods.IoringVersion3,
             flags,
             (uint)ringSize,
             (uint)ringSize,
             out _ioRingHandle);
 
-        if (hr != IoRingNativeMethods.S_OK || _ioRingHandle == nint.Zero)
+        if (hr != IoRingNativeMethods.SOk || _ioRingHandle == nint.Zero)
         {
             throw new PlatformNotSupportedException(
                 $"CreateIoRing failed with HRESULT 0x{hr:X8}. " +
@@ -180,9 +180,9 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
             await _ringLock.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                var handleRef = IoRingNativeMethods.IORING_HANDLE_REF.FromHandle(
+                var handleRef = IoRingNativeMethods.IoringHandleRef.FromHandle(
                     _rawFileHandle);
-                var bufferRef = IoRingNativeMethods.IORING_BUFFER_REF.FromAddress(
+                var bufferRef = IoRingNativeMethods.IoringBufferRef.FromAddress(
                     _bufferPointers[bufIndex]);
 
                 int hr = IoRingNativeMethods.BuildIoRingReadFile(
@@ -194,7 +194,7 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                     userData,
                     0);
 
-                if (hr != IoRingNativeMethods.S_OK)
+                if (hr != IoRingNativeMethods.SOk)
                 {
                     throw new IOException($"BuildIoRingReadFile failed with HRESULT 0x{hr:X8}.");
                 }
@@ -202,14 +202,14 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                 hr = IoRingNativeMethods.SubmitIoRing(
                     _ioRingHandle, 1, OverlappedNativeMethods.INFINITE, out _);
 
-                if (hr != IoRingNativeMethods.S_OK)
+                if (hr != IoRingNativeMethods.SOk)
                 {
                     throw new IOException($"SubmitIoRing failed with HRESULT 0x{hr:X8}.");
                 }
 
                 // Pop the completion
                 hr = IoRingNativeMethods.PopIoRingCompletion(_ioRingHandle, out var cqe);
-                if (hr != IoRingNativeMethods.S_OK)
+                if (hr != IoRingNativeMethods.SOk)
                 {
                     throw new IOException($"PopIoRingCompletion failed with HRESULT 0x{hr:X8}.");
                 }
@@ -273,9 +273,9 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
             await _ringLock.WaitAsync(ct).ConfigureAwait(false);
             try
             {
-                var handleRef = IoRingNativeMethods.IORING_HANDLE_REF.FromHandle(
+                var handleRef = IoRingNativeMethods.IoringHandleRef.FromHandle(
                     _rawFileHandle);
-                var bufferRef = IoRingNativeMethods.IORING_BUFFER_REF.FromAddress(
+                var bufferRef = IoRingNativeMethods.IoringBufferRef.FromAddress(
                     _bufferPointers[bufIndex]);
 
                 int hr = IoRingNativeMethods.BuildIoRingWriteFile(
@@ -287,7 +287,7 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                     userData,
                     0);
 
-                if (hr != IoRingNativeMethods.S_OK)
+                if (hr != IoRingNativeMethods.SOk)
                 {
                     throw new IOException($"BuildIoRingWriteFile failed with HRESULT 0x{hr:X8}.");
                 }
@@ -295,13 +295,13 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                 hr = IoRingNativeMethods.SubmitIoRing(
                     _ioRingHandle, 1, OverlappedNativeMethods.INFINITE, out _);
 
-                if (hr != IoRingNativeMethods.S_OK)
+                if (hr != IoRingNativeMethods.SOk)
                 {
                     throw new IOException($"SubmitIoRing failed with HRESULT 0x{hr:X8}.");
                 }
 
                 hr = IoRingNativeMethods.PopIoRingCompletion(_ioRingHandle, out var cqe);
-                if (hr != IoRingNativeMethods.S_OK)
+                if (hr != IoRingNativeMethods.SOk)
                 {
                     throw new IOException($"PopIoRingCompletion failed with HRESULT 0x{hr:X8}.");
                 }
@@ -360,9 +360,9 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                     var (blockNum, _, _) = flatOps[i];
                     uint userData = Interlocked.Increment(ref _nextUserData);
 
-                    var handleRef = IoRingNativeMethods.IORING_HANDLE_REF.FromHandle(
+                    var handleRef = IoRingNativeMethods.IoringHandleRef.FromHandle(
                         _rawFileHandle);
-                    var bufferRef = IoRingNativeMethods.IORING_BUFFER_REF.FromAddress(
+                    var bufferRef = IoRingNativeMethods.IoringBufferRef.FromAddress(
                         _bufferPointers[bufIndices[i]]);
 
                     int hr = IoRingNativeMethods.BuildIoRingReadFile(
@@ -374,7 +374,7 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                         userData,
                         0);
 
-                    if (hr != IoRingNativeMethods.S_OK)
+                    if (hr != IoRingNativeMethods.SOk)
                     {
                         throw new IOException($"BuildIoRingReadFile failed with HRESULT 0x{hr:X8} at op {i}.");
                     }
@@ -387,7 +387,7 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                     OverlappedNativeMethods.INFINITE,
                     out uint submitted);
 
-                if (submitHr != IoRingNativeMethods.S_OK)
+                if (submitHr != IoRingNativeMethods.SOk)
                 {
                     throw new IOException($"SubmitIoRing batch failed with HRESULT 0x{submitHr:X8}.");
                 }
@@ -397,7 +397,7 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                 for (int i = 0; i < flatOps.Count; i++)
                 {
                     int popHr = IoRingNativeMethods.PopIoRingCompletion(_ioRingHandle, out var cqe);
-                    if (popHr != IoRingNativeMethods.S_OK || cqe.ResultCode < 0)
+                    if (popHr != IoRingNativeMethods.SOk || cqe.ResultCode < 0)
                     {
                         allSucceeded = false;
                         break;
@@ -492,9 +492,9 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                     var (blockNum, _, _) = flatOps[i];
                     uint userData = Interlocked.Increment(ref _nextUserData);
 
-                    var handleRef = IoRingNativeMethods.IORING_HANDLE_REF.FromHandle(
+                    var handleRef = IoRingNativeMethods.IoringHandleRef.FromHandle(
                         _rawFileHandle);
-                    var bufferRef = IoRingNativeMethods.IORING_BUFFER_REF.FromAddress(
+                    var bufferRef = IoRingNativeMethods.IoringBufferRef.FromAddress(
                         _bufferPointers[bufIndices[i]]);
 
                     int hr = IoRingNativeMethods.BuildIoRingWriteFile(
@@ -506,7 +506,7 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                         userData,
                         0);
 
-                    if (hr != IoRingNativeMethods.S_OK)
+                    if (hr != IoRingNativeMethods.SOk)
                     {
                         throw new IOException($"BuildIoRingWriteFile failed with HRESULT 0x{hr:X8} at op {i}.");
                     }
@@ -518,7 +518,7 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                     OverlappedNativeMethods.INFINITE,
                     out _);
 
-                if (submitHr != IoRingNativeMethods.S_OK)
+                if (submitHr != IoRingNativeMethods.SOk)
                 {
                     throw new IOException($"SubmitIoRing write batch failed with HRESULT 0x{submitHr:X8}.");
                 }
@@ -527,7 +527,7 @@ public sealed class IoRingBlockDevice : IBatchBlockDevice
                 for (int i = 0; i < flatOps.Count; i++)
                 {
                     int popHr = IoRingNativeMethods.PopIoRingCompletion(_ioRingHandle, out var cqe);
-                    if (popHr != IoRingNativeMethods.S_OK || cqe.ResultCode < 0)
+                    if (popHr != IoRingNativeMethods.SOk || cqe.ResultCode < 0)
                     {
                         allSucceeded = false;
                         break;

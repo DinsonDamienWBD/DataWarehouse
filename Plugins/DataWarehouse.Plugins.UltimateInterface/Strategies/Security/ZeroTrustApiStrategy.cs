@@ -39,7 +39,7 @@ internal sealed class ZeroTrustApiStrategy : SdkInterface.InterfaceStrategyBase,
 
     // SDK contract properties
     public override bool IsProductionReady => false;
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
         SupportsAuthentication: true,
@@ -47,7 +47,7 @@ internal sealed class ZeroTrustApiStrategy : SdkInterface.InterfaceStrategyBase,
         MaxRequestSize: 10 * 1024 * 1024, // 10 MB
         MaxResponseSize: 50 * 1024 * 1024, // 50 MB
         DefaultTimeout: TimeSpan.FromSeconds(30),
-        RequiresTLS: true
+        RequiresTls: true
     );
 
     /// <summary>
@@ -267,11 +267,11 @@ internal sealed class ZeroTrustApiStrategy : SdkInterface.InterfaceStrategyBase,
     {
         return method switch
         {
-            SdkInterface.HttpMethod.GET => "read",
-            SdkInterface.HttpMethod.POST => "write",
-            SdkInterface.HttpMethod.PUT => "write",
-            SdkInterface.HttpMethod.PATCH => "write",
-            SdkInterface.HttpMethod.DELETE => "delete",
+            SdkInterface.HttpMethod.Get => "read",
+            SdkInterface.HttpMethod.Post => "write",
+            SdkInterface.HttpMethod.Put => "write",
+            SdkInterface.HttpMethod.Patch => "write",
+            SdkInterface.HttpMethod.Delete => "delete",
             _ => "read"
         };
     }

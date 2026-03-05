@@ -38,7 +38,7 @@ internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase
     public string[] Tags => new[] { "rest", "http", "crud", "content-negotiation" };
 
     // SDK contract properties
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => SdkInterface.InterfaceCapabilities.CreateRestDefaults();
 
     /// <summary>
@@ -94,12 +94,12 @@ internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase
             // Route based on HTTP method
             var result = method switch
             {
-                SdkInterface.HttpMethod.GET => await HandleGetAsync(path, queryParams, cancellationToken),
-                SdkInterface.HttpMethod.POST => await HandlePostAsync(path, request.Body, cancellationToken),
-                SdkInterface.HttpMethod.PUT => await HandlePutAsync(path, request.Body, cancellationToken),
-                SdkInterface.HttpMethod.DELETE => await HandleDeleteAsync(path, cancellationToken),
-                SdkInterface.HttpMethod.PATCH => await HandlePatchAsync(path, request.Body, cancellationToken),
-                SdkInterface.HttpMethod.OPTIONS => HandleOptions(),
+                SdkInterface.HttpMethod.Get => await HandleGetAsync(path, queryParams, cancellationToken),
+                SdkInterface.HttpMethod.Post => await HandlePostAsync(path, request.Body, cancellationToken),
+                SdkInterface.HttpMethod.Put => await HandlePutAsync(path, request.Body, cancellationToken),
+                SdkInterface.HttpMethod.Delete => await HandleDeleteAsync(path, cancellationToken),
+                SdkInterface.HttpMethod.Patch => await HandlePatchAsync(path, request.Body, cancellationToken),
+                SdkInterface.HttpMethod.Options => HandleOptions(),
                 _ => (StatusCode: 405, Data: new { error = "Method not allowed", method = method.ToString() })
             };
 

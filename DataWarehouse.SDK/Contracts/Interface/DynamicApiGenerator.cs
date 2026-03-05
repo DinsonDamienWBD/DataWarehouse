@@ -309,7 +309,7 @@ public sealed class DynamicApiGenerator : IDisposable
             new ApiEndpoint
             {
                 Path = $"{basePath}/{{key}}",
-                Method = HttpMethod.GET,
+                Method = HttpMethod.Get,
                 PluginId = cap.PluginId,
                 CapabilityName = $"{capSlug}.get",
                 Description = $"Retrieve data by key from {cap.DisplayName}",
@@ -319,7 +319,7 @@ public sealed class DynamicApiGenerator : IDisposable
             new ApiEndpoint
             {
                 Path = basePath,
-                Method = HttpMethod.POST,
+                Method = HttpMethod.Post,
                 PluginId = cap.PluginId,
                 CapabilityName = $"{capSlug}.store",
                 Description = $"Store data via {cap.DisplayName}",
@@ -329,7 +329,7 @@ public sealed class DynamicApiGenerator : IDisposable
             new ApiEndpoint
             {
                 Path = $"{basePath}/{{key}}",
-                Method = HttpMethod.PUT,
+                Method = HttpMethod.Put,
                 PluginId = cap.PluginId,
                 CapabilityName = $"{capSlug}.update",
                 Description = $"Update data by key in {cap.DisplayName}",
@@ -340,7 +340,7 @@ public sealed class DynamicApiGenerator : IDisposable
             new ApiEndpoint
             {
                 Path = $"{basePath}/{{key}}",
-                Method = HttpMethod.DELETE,
+                Method = HttpMethod.Delete,
                 PluginId = cap.PluginId,
                 CapabilityName = $"{capSlug}.delete",
                 Description = $"Delete data by key from {cap.DisplayName}",
@@ -357,7 +357,7 @@ public sealed class DynamicApiGenerator : IDisposable
             new ApiEndpoint
             {
                 Path = $"/api/v1/query/{pluginSlug}",
-                Method = HttpMethod.POST,
+                Method = HttpMethod.Post,
                 PluginId = cap.PluginId,
                 CapabilityName = $"{capSlug}.execute",
                 Description = $"Execute query via {cap.DisplayName}",
@@ -367,7 +367,7 @@ public sealed class DynamicApiGenerator : IDisposable
             new ApiEndpoint
             {
                 Path = $"/api/v1/query/{pluginSlug}/schema",
-                Method = HttpMethod.GET,
+                Method = HttpMethod.Get,
                 PluginId = cap.PluginId,
                 CapabilityName = $"{capSlug}.schema",
                 Description = $"Get query schema for {cap.DisplayName}"
@@ -383,7 +383,7 @@ public sealed class DynamicApiGenerator : IDisposable
             new ApiEndpoint
             {
                 Path = $"/ws/v1/{pluginSlug}/{capSlug}",
-                Method = HttpMethod.GET,
+                Method = HttpMethod.Get,
                 PluginId = cap.PluginId,
                 CapabilityName = $"{capSlug}.stream",
                 Description = $"WebSocket streaming channel for {cap.DisplayName}",
@@ -392,7 +392,7 @@ public sealed class DynamicApiGenerator : IDisposable
             new ApiEndpoint
             {
                 Path = $"/api/v1/manage/{pluginSlug}/{capSlug}/status",
-                Method = HttpMethod.GET,
+                Method = HttpMethod.Get,
                 PluginId = cap.PluginId,
                 CapabilityName = $"{capSlug}.status",
                 Description = $"Get status of {cap.DisplayName}"
@@ -408,7 +408,7 @@ public sealed class DynamicApiGenerator : IDisposable
             new ApiEndpoint
             {
                 Path = $"/api/v1/manage/{pluginSlug}/{capSlug}",
-                Method = HttpMethod.GET,
+                Method = HttpMethod.Get,
                 PluginId = cap.PluginId,
                 CapabilityName = $"{capSlug}.get",
                 Description = $"Get configuration for {cap.DisplayName}",
@@ -417,7 +417,7 @@ public sealed class DynamicApiGenerator : IDisposable
             new ApiEndpoint
             {
                 Path = $"/api/v1/manage/{pluginSlug}/{capSlug}",
-                Method = HttpMethod.PUT,
+                Method = HttpMethod.Put,
                 PluginId = cap.PluginId,
                 CapabilityName = $"{capSlug}.update",
                 Description = $"Update configuration for {cap.DisplayName}",

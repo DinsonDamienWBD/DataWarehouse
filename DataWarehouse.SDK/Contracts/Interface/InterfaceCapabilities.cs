@@ -50,7 +50,7 @@ namespace DataWarehouse.SDK.Contracts.Interface;
 /// Indicates whether the interface strategy supports request cancellation.
 /// If true, clients can cancel in-progress requests, and the strategy will stop processing them.
 /// </param>
-/// <param name="RequiresTLS">
+/// <param name="RequiresTls">
 /// Indicates whether the interface strategy requires TLS/SSL encryption for all communications.
 /// If true, unencrypted connections will be rejected.
 /// </param>
@@ -64,7 +64,7 @@ public record InterfaceCapabilities(
     bool SupportsMultiplexing = false,
     TimeSpan? DefaultTimeout = null,
     bool SupportsCancellation = true,
-    bool RequiresTLS = false
+    bool RequiresTls = false
 )
 {
     /// <summary>
@@ -97,7 +97,7 @@ public record InterfaceCapabilities(
         SupportsBidirectionalStreaming: true,
         SupportsMultiplexing: true,
         DefaultTimeout: TimeSpan.FromMinutes(5),
-        RequiresTLS: true
+        RequiresTls: true
     );
 
     /// <summary>
@@ -124,7 +124,7 @@ public record InterfaceCapabilities(
     /// <returns>
     /// An <see cref="InterfaceCapabilities"/> instance with standard GraphQL capabilities.
     /// </returns>
-    public static InterfaceCapabilities CreateGraphQLDefaults() => new(
+    public static InterfaceCapabilities CreateGraphQlDefaults() => new(
         SupportsStreaming: true, // GraphQL subscriptions
         SupportsAuthentication: true,
         SupportedContentTypes: new[] { "application/json", "application/graphql" },

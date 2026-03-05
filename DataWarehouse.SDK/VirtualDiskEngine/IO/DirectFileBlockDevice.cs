@@ -14,7 +14,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.IO;
 /// <summary>
 /// Cross-platform direct file I/O block device that bypasses the OS page cache where possible.
 /// On Windows, uses FILE_FLAG_NO_BUFFERING for true direct I/O. On Linux/macOS, uses
-/// WriteThrough as a best-effort bypass (full O_DIRECT requires IoUringBlockDevice on Linux
+/// WriteThrough as a best-effort bypass (full ODirect requires IoUringBlockDevice on Linux
 /// or KqueueBlockDevice on macOS).
 /// </summary>
 /// <remarks>
@@ -108,7 +108,7 @@ public sealed class DirectFileBlockDevice : IDirectBlockDevice
         else
         {
             // Linux/macOS: WriteThrough provides best-effort cache bypass.
-            // Full O_DIRECT on Linux requires IoUringBlockDevice (plan 87-57).
+            // Full ODirect on Linux requires IoUringBlockDevice (plan 87-57).
             // Full F_NOCACHE on macOS requires KqueueBlockDevice (plan 87-60).
             options = FileOptions.Asynchronous | FileOptions.RandomAccess
                     | FileOptions.WriteThrough;

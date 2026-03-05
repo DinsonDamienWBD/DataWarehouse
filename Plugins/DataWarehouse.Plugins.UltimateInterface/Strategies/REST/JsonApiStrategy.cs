@@ -40,7 +40,7 @@ internal sealed class JsonApiStrategy : SdkInterface.InterfaceStrategyBase, IPlu
     public string[] Tags => new[] { "jsonapi", "rest", "hypermedia", "specification" };
 
     // SDK contract properties
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
         SupportsAuthentication: true,
@@ -79,7 +79,7 @@ internal sealed class JsonApiStrategy : SdkInterface.InterfaceStrategyBase, IPlu
         try
         {
             // Validate Content-Type for POST/PUT/PATCH
-            if (request.Method is SdkInterface.HttpMethod.POST or SdkInterface.HttpMethod.PUT or SdkInterface.HttpMethod.PATCH)
+            if (request.Method is SdkInterface.HttpMethod.Post or SdkInterface.HttpMethod.Put or SdkInterface.HttpMethod.Patch)
             {
                 if (request.ContentType != "application/vnd.api+json")
                 {
@@ -101,11 +101,11 @@ internal sealed class JsonApiStrategy : SdkInterface.InterfaceStrategyBase, IPlu
             // Route based on HTTP method
             var result = request.Method switch
             {
-                SdkInterface.HttpMethod.GET => await HandleGetAsync(path, pageNumber, pageSize, sparseFields, sortFields, include, cancellationToken),
-                SdkInterface.HttpMethod.POST => await HandlePostAsync(path, request.Body, cancellationToken),
-                SdkInterface.HttpMethod.PUT => await HandlePutAsync(path, request.Body, cancellationToken),
-                SdkInterface.HttpMethod.PATCH => await HandlePatchAsync(path, request.Body, cancellationToken),
-                SdkInterface.HttpMethod.DELETE => await HandleDeleteAsync(path, cancellationToken),
+                SdkInterface.HttpMethod.Get => await HandleGetAsync(path, pageNumber, pageSize, sparseFields, sortFields, include, cancellationToken),
+                SdkInterface.HttpMethod.Post => await HandlePostAsync(path, request.Body, cancellationToken),
+                SdkInterface.HttpMethod.Put => await HandlePutAsync(path, request.Body, cancellationToken),
+                SdkInterface.HttpMethod.Patch => await HandlePatchAsync(path, request.Body, cancellationToken),
+                SdkInterface.HttpMethod.Delete => await HandleDeleteAsync(path, cancellationToken),
                 _ => (StatusCode: 405, Data: CreateErrorData("Method not allowed", $"Method {request.Method} is not supported"))
             };
 

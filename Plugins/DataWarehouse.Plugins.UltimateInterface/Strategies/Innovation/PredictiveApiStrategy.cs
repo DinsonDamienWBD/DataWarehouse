@@ -45,7 +45,7 @@ internal sealed class PredictiveApiStrategy : SdkInterface.InterfaceStrategyBase
 
     // SDK contract properties
     public override bool IsProductionReady => false;
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
         SupportsAuthentication: true,

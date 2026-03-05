@@ -79,7 +79,7 @@ public sealed class GraphQlSchemaGenerator
         sb.AppendLine("type Query {");
 
         // Read operations: GET endpoints become queries
-        var getEndpoints = model.Endpoints.Where(e => e.Method == HttpMethod.GET && !e.IsStreaming);
+        var getEndpoints = model.Endpoints.Where(e => e.Method == HttpMethod.Get && !e.IsStreaming);
         foreach (var ep in getEndpoints)
         {
             var fieldName = ToFieldName(ep.CapabilityName);
@@ -98,7 +98,7 @@ public sealed class GraphQlSchemaGenerator
 
         // List/search operations return Connection types
         var queryEndpoints = model.Endpoints.Where(e =>
-            e.Method == HttpMethod.POST &&
+            e.Method == HttpMethod.Post &&
             (e.CapabilityName.Contains("query", StringComparison.OrdinalIgnoreCase) ||
              e.CapabilityName.Contains("search", StringComparison.OrdinalIgnoreCase) ||
              e.CapabilityName.Contains("execute", StringComparison.OrdinalIgnoreCase)) &&
@@ -130,7 +130,7 @@ public sealed class GraphQlSchemaGenerator
 
         // Write operations: POST (non-query), PUT, DELETE become mutations
         var writeEndpoints = model.Endpoints.Where(e =>
-            (e.Method == HttpMethod.POST || e.Method == HttpMethod.PUT || e.Method == HttpMethod.DELETE) &&
+            (e.Method == HttpMethod.Post || e.Method == HttpMethod.Put || e.Method == HttpMethod.Delete) &&
             !e.CapabilityName.Contains("query", StringComparison.OrdinalIgnoreCase) &&
             !e.CapabilityName.Contains("search", StringComparison.OrdinalIgnoreCase) &&
             !e.IsStreaming);
@@ -383,9 +383,9 @@ public sealed class GraphQlSchemaGenerator
     {
         var prefix = ep.Method switch
         {
-            HttpMethod.POST => "create",
-            HttpMethod.PUT => "update",
-            HttpMethod.DELETE => "delete",
+            HttpMethod.Post => "create",
+            HttpMethod.Put => "update",
+            HttpMethod.Delete => "delete",
             _ => "execute"
         };
 

@@ -380,7 +380,7 @@ public sealed class UltimateInterfacePlugin : DataWarehouse.SDK.Contracts.Hierar
                 ["supportsBidirectional"] = s.Capabilities.SupportsBidirectionalStreaming,
                 ["supportsAuthentication"] = s.Capabilities.SupportsAuthentication,
                 ["supportsMultiplexing"] = s.Capabilities.SupportsMultiplexing,
-                ["requiresTLS"] = s.Capabilities.RequiresTLS,
+                ["requiresTLS"] = s.Capabilities.RequiresTls,
                 ["supportedContentTypes"] = string.Join(", ", s.Capabilities.SupportedContentTypes),
                 ["maxRequestSize"] = s.Capabilities.MaxRequestSize ?? 0,
                 ["maxResponseSize"] = s.Capabilities.MaxResponseSize ?? 0
@@ -1029,7 +1029,7 @@ internal sealed class RestInterfaceStrategy : SdkInterface.InterfaceStrategyBase
     public InterfaceCategory Category => InterfaceCategory.Http;
     public string[] Tags => ["rest", "http", "openapi", "crud"];
 
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => SdkInterface.InterfaceCapabilities.CreateRestDefaults();
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -1052,7 +1052,7 @@ internal sealed class GrpcInterfaceStrategy : SdkInterface.InterfaceStrategyBase
     public InterfaceCategory Category => InterfaceCategory.Rpc;
     public string[] Tags => ["grpc", "protobuf", "rpc", "streaming"];
 
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.gRPC;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.GRpc;
     public override SdkInterface.InterfaceCapabilities Capabilities => SdkInterface.InterfaceCapabilities.CreateGrpcDefaults();
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -1098,8 +1098,8 @@ internal sealed class GraphQLInterfaceStrategy : SdkInterface.InterfaceStrategyB
     public InterfaceCategory Category => InterfaceCategory.Http;
     public string[] Tags => ["graphql", "query", "mutation", "subscription", "flexible"];
 
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.GraphQL;
-    public override SdkInterface.InterfaceCapabilities Capabilities => SdkInterface.InterfaceCapabilities.CreateGraphQLDefaults();
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.GraphQl;
+    public override SdkInterface.InterfaceCapabilities Capabilities => SdkInterface.InterfaceCapabilities.CreateGraphQlDefaults();
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
     protected override Task StopAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -1130,7 +1130,7 @@ internal sealed class McpInterfaceStrategy : SdkInterface.InterfaceStrategyBase,
         MaxResponseSize: 50 * 1024 * 1024,
         SupportsBidirectionalStreaming: true,
         DefaultTimeout: TimeSpan.FromSeconds(60),
-        RequiresTLS: true
+        RequiresTls: true
     );
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;

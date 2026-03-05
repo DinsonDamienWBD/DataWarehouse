@@ -111,7 +111,7 @@ public interface ILowLatencyStorage
 
     /// <summary>
     /// Direct memory read - bypasses OS page cache for predictable latency.
-    /// Uses O_DIRECT or similar mechanisms to avoid cache pollution.
+    /// Uses ODirect or similar mechanisms to avoid cache pollution.
     /// </summary>
     /// <param name="key">Storage key to read.</param>
     /// <param name="ct">Cancellation token.</param>
@@ -120,7 +120,7 @@ public interface ILowLatencyStorage
 
     /// <summary>
     /// Direct memory write with optional synchronous durability.
-    /// Uses O_DIRECT and optional fsync/fdatasync for durability guarantees.
+    /// Uses ODirect and optional fsync/fdatasync for durability guarantees.
     /// </summary>
     /// <param name="key">Storage key to write.</param>
     /// <param name="data">Data to write.</param>

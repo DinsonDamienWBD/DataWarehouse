@@ -40,7 +40,7 @@ internal sealed class EdgeCachedApiStrategy : SdkInterface.InterfaceStrategyBase
     public string[] Tags => new[] { "edge-caching", "cache-control", "etag", "conditional-requests", "performance" };
 
     // SDK contract properties
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
         SupportsAuthentication: true,

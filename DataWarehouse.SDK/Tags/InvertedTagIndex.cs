@@ -150,9 +150,9 @@ public sealed class InvertedTagIndex : ITagIndex, IDisposable
             throw new ArgumentOutOfRangeException(nameof(query), "Skip must be non-negative.");
         // Guard against pathological Skip values that would silently return empty results
         // while TotalCount reports a large number (misleading pagination).
-        const int MaxAllowedSkip = 10_000_000; // 10M rows is the practical ceiling
-        if (query.Skip > MaxAllowedSkip)
-            throw new ArgumentOutOfRangeException(nameof(query), $"Skip ({query.Skip}) exceeds the maximum allowed value ({MaxAllowedSkip}).");
+        const int maxAllowedSkip = 10_000_000; // 10M rows is the practical ceiling
+        if (query.Skip > maxAllowedSkip)
+            throw new ArgumentOutOfRangeException(nameof(query), $"Skip ({query.Skip}) exceeds the maximum allowed value ({maxAllowedSkip}).");
 
         var sw = Stopwatch.StartNew();
 

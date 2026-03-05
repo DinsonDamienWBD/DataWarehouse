@@ -104,7 +104,7 @@ public sealed class ComplianceAnalysis
     /// <summary>
     /// Whether PII was detected.
     /// </summary>
-    public bool ContainsPII { get; init; }
+    public bool ContainsPii { get; init; }
 
     /// <summary>
     /// Types of PII detected.
@@ -277,7 +277,7 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
 
     /// <inheritdoc/>
     public override IntelligenceCapabilities RequiredCapabilities =>
-        IntelligenceCapabilities.PIIDetection | IntelligenceCapabilities.ComplianceClassification;
+        IntelligenceCapabilities.PiiDetection | IntelligenceCapabilities.ComplianceClassification;
 
     /// <inheritdoc/>
     public override DataManagementCapabilities Capabilities { get; } = new()
@@ -465,7 +465,7 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
             .GroupBy(a => a.SensitivityLevel)
             .ToDictionary(g => g.Key.ToString(), g => g.Count());
 
-        var piiCount = analyses.Count(a => a.ContainsPII);
+        var piiCount = analyses.Count(a => a.ContainsPii);
         var violationCount = analyses.Sum(a => a.Violations.Count);
         var avgComplianceScore = analyses.Count > 0 ? analyses.Average(a => a.ComplianceScore) : 1.0;
 
@@ -491,8 +491,8 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
         Dictionary<string, object>? metadata,
         CancellationToken ct)
     {
-        var piiResult = await RequestPIIDetectionAsync(textContent, DefaultContext, ct);
-        var containsPII = piiResult?.ContainsPII ?? false;
+        var piiResult = await RequestPiiDetectionAsync(textContent, DefaultContext, ct);
+        var containsPii = piiResult?.ContainsPii ?? false;
         var piiTypes = piiResult?.Items.Select(i => i.Type).Distinct().ToList() ?? new List<string>();
 
         // Classify sensitivity
@@ -510,14 +510,14 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
         var frameworks = DetermineFrameworks(piiTypes, metadata);
         var policy = GetMostRestrictivePolicy(frameworks, sensitivity);
 
-        var violations = DetectViolations(containsPII, sensitivity, frameworks, metadata);
+        var violations = DetectViolations(containsPii, sensitivity, frameworks, metadata);
 
         return new ComplianceAnalysis
         {
             ObjectId = objectId,
             SensitivityLevel = sensitivity,
             ApplicableFrameworks = frameworks,
-            ContainsPII = containsPII,
+            ContainsPii = containsPii,
             PIITypes = piiTypes,
             RequiredRetention = policy?.MinRetention,
             DisposalMethod = policy?.DisposalMethod ?? "standard",
@@ -535,7 +535,7 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
         string? contentType,
         Dictionary<string, object>? metadata)
     {
-        var containsPII = false;
+        var containsPii = false;
         var piiTypes = new List<string>();
 
         if (!string.IsNullOrWhiteSpace(textContent))
@@ -545,7 +545,7 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
 
             if (System.Text.RegularExpressions.Regex.IsMatch(textContent, @"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b"))
             {
-                containsPII = true;
+                containsPii = true;
                 piiTypes.Add("EMAIL");
             }
             // P2-2402: Require consistent separators (both hyphens, both dots, or none) to reduce
@@ -554,22 +554,22 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
             if (System.Text.RegularExpressions.Regex.IsMatch(textContent,
                 @"(?:(?:SSN|Social Security)[\s:#]*)?(?:\b\d{3}-\d{2}-\d{4}\b|\b\d{3}\.\d{2}\.\d{4}\b|\b\d{9}\b)"))
             {
-                containsPII = true;
+                containsPii = true;
                 piiTypes.Add("SSN");
             }
             if (System.Text.RegularExpressions.Regex.IsMatch(textContent, @"\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b"))
             {
-                containsPII = true;
+                containsPii = true;
                 piiTypes.Add("CREDIT_CARD");
             }
             if (lower.Contains("patient") || lower.Contains("diagnosis") || lower.Contains("medical"))
             {
-                containsPII = true;
+                containsPii = true;
                 piiTypes.Add("HEALTH_INFO");
             }
         }
 
-        var sensitivity = containsPII ? SensitivityLevel.Confidential : SensitivityLevel.Internal;
+        var sensitivity = containsPii ? SensitivityLevel.Confidential : SensitivityLevel.Internal;
         var frameworks = DetermineFrameworks(piiTypes, metadata);
 
         return new ComplianceAnalysis
@@ -577,10 +577,10 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
             ObjectId = objectId,
             SensitivityLevel = sensitivity,
             ApplicableFrameworks = frameworks,
-            ContainsPII = containsPII,
+            ContainsPii = containsPii,
             PIITypes = piiTypes,
             RequiredRetention = GetDefaultRetention(frameworks),
-            DisposalMethod = containsPII ? "secure-delete" : "standard",
+            DisposalMethod = containsPii ? "secure-delete" : "standard",
             RequiredControls = GetRequiredControls(sensitivity, frameworks),
             Violations = Array.Empty<ComplianceViolation>(),
             ComplianceScore = 1.0,
@@ -627,14 +627,14 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
     }
 
     private static List<ComplianceViolation> DetectViolations(
-        bool containsPII,
+        bool containsPii,
         SensitivityLevel sensitivity,
         List<ComplianceFramework> frameworks,
         Dictionary<string, object>? metadata)
     {
         var violations = new List<ComplianceViolation>();
 
-        if (containsPII && metadata?.ContainsKey("encrypted") != true)
+        if (containsPii && metadata?.ContainsKey("encrypted") != true)
         {
             violations.Add(new ComplianceViolation
             {

@@ -30,13 +30,13 @@ internal static class IoRingNativeMethods
     // ── IoRing API version and flags ────────────────────────────────────
 
     /// <summary>IoRing API version 3 (Windows 11 22H2+).</summary>
-    internal const int IORING_VERSION_3 = 3;
+    internal const int IoringVersion3 = 3;
 
     /// <summary>No special flags for IoRing creation.</summary>
-    internal const uint IORING_CREATE_FLAGS_NONE = 0;
+    internal const uint IoringCreateFlagsNone = 0;
 
-    /// <summary>S_OK HRESULT indicating success.</summary>
-    internal const int S_OK = 0;
+    /// <summary>SOk HRESULT indicating success.</summary>
+    internal const int SOk = 0;
 
     // ── Structs ─────────────────────────────────────────────────────────
 
@@ -44,7 +44,7 @@ internal static class IoRingNativeMethods
     /// Flags for <see cref="CreateIoRing"/>.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct IORING_CREATE_FLAGS
+    internal struct IoringCreateFlags
     {
         internal uint Required;
         internal uint Advisory;
@@ -54,7 +54,7 @@ internal static class IoRingNativeMethods
     /// Describes a registered buffer for zero-copy I/O.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct IORING_BUFFER_INFO
+    internal struct IoringBufferInfo
     {
         internal nint Address;
         internal uint Length;
@@ -64,7 +64,7 @@ internal static class IoRingNativeMethods
     /// Completion queue entry returned after an I/O operation completes.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct IORING_CQE
+    internal struct IoringCqe
     {
         internal uint UserData;
         internal int ResultCode;
@@ -75,20 +75,20 @@ internal static class IoRingNativeMethods
     /// Handle reference for registered file handles in IoRing operations.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct IORING_HANDLE_REF
+    internal struct IoringHandleRef
     {
         internal uint Kind; // 0 = raw handle, 1 = registered index
         internal nint HandleOrIndex;
 
         /// <summary>Creates a handle reference from a raw OS handle value.</summary>
-        internal static IORING_HANDLE_REF FromHandle(nint handle) => new()
+        internal static IoringHandleRef FromHandle(nint handle) => new()
         {
             Kind = 0,
             HandleOrIndex = handle
         };
 
         /// <summary>Creates a handle reference from a registered handle index.</summary>
-        internal static IORING_HANDLE_REF FromIndex(uint index) => new()
+        internal static IoringHandleRef FromIndex(uint index) => new()
         {
             Kind = 1,
             HandleOrIndex = (nint)index
@@ -99,20 +99,20 @@ internal static class IoRingNativeMethods
     /// Buffer reference for registered buffers in IoRing operations.
     /// </summary>
     [StructLayout(LayoutKind.Sequential)]
-    internal struct IORING_BUFFER_REF
+    internal struct IoringBufferRef
     {
         internal uint Kind; // 0 = raw address, 1 = registered index
         internal nint AddressOrIndex;
 
         /// <summary>Creates a buffer reference from a raw memory address.</summary>
-        internal static IORING_BUFFER_REF FromAddress(nint address) => new()
+        internal static IoringBufferRef FromAddress(nint address) => new()
         {
             Kind = 0,
             AddressOrIndex = address
         };
 
         /// <summary>Creates a buffer reference from a registered buffer index.</summary>
-        internal static IORING_BUFFER_REF FromIndex(uint index) => new()
+        internal static IoringBufferRef FromIndex(uint index) => new()
         {
             Kind = 1,
             AddressOrIndex = (nint)index
@@ -124,7 +124,7 @@ internal static class IoRingNativeMethods
     /// <summary>
     /// Creates an I/O ring instance.
     /// </summary>
-    /// <param name="ioringVersion">The requested IoRing version (use <see cref="IORING_VERSION_3"/>).</param>
+    /// <param name="ioringVersion">The requested IoRing version (use <see cref="IoringVersion3"/>).</param>
     /// <param name="flags">Creation flags.</param>
     /// <param name="submissionQueueSize">Number of submission queue entries.</param>
     /// <param name="completionQueueSize">Number of completion queue entries.</param>
@@ -133,7 +133,7 @@ internal static class IoRingNativeMethods
     [DllImport("kernel32.dll", EntryPoint = "CreateIoRing", SetLastError = true)]
     internal static extern int CreateIoRing(
         int ioringVersion,
-        IORING_CREATE_FLAGS flags,
+        IoringCreateFlags flags,
         uint submissionQueueSize,
         uint completionQueueSize,
         out nint handle);
@@ -150,8 +150,8 @@ internal static class IoRingNativeMethods
     [DllImport("kernel32.dll", EntryPoint = "BuildIoRingReadFile", SetLastError = true)]
     internal static extern int BuildIoRingReadFile(
         nint ioringHandle,
-        IORING_HANDLE_REF fileRef,
-        IORING_BUFFER_REF dataRef,
+        IoringHandleRef fileRef,
+        IoringBufferRef dataRef,
         uint numberOfBytesToRead,
         ulong fileOffset,
         uint userData,
@@ -164,8 +164,8 @@ internal static class IoRingNativeMethods
     [DllImport("kernel32.dll", EntryPoint = "BuildIoRingWriteFile", SetLastError = true)]
     internal static extern int BuildIoRingWriteFile(
         nint ioringHandle,
-        IORING_HANDLE_REF fileRef,
-        IORING_BUFFER_REF dataRef,
+        IoringHandleRef fileRef,
+        IoringBufferRef dataRef,
         uint numberOfBytesToWrite,
         ulong fileOffset,
         uint userData,
@@ -203,7 +203,7 @@ internal static class IoRingNativeMethods
     internal static extern int BuildIoRingRegisterBuffers(
         nint ioringHandle,
         uint count,
-        IORING_BUFFER_INFO[] buffers,
+        IoringBufferInfo[] buffers,
         uint userData);
 
     /// <summary>
@@ -212,34 +212,34 @@ internal static class IoRingNativeMethods
     [DllImport("kernel32.dll", EntryPoint = "PopIoRingCompletion", SetLastError = true)]
     internal static extern int PopIoRingCompletion(
         nint ioringHandle,
-        out IORING_CQE cqe);
+        out IoringCqe cqe);
 
     // ── Availability detection ──────────────────────────────────────────
 
-    private static readonly Lazy<bool> _isSupported = new(DetectSupport, LazyThreadSafetyMode.PublicationOnly);
-    private static readonly Lazy<bool> _isWriteSupported = new(DetectWriteSupport, LazyThreadSafetyMode.PublicationOnly);
+    private static readonly Lazy<bool> SIsSupported = new(DetectSupport, LazyThreadSafetyMode.PublicationOnly);
+    private static readonly Lazy<bool> SIsWriteSupported = new(DetectWriteSupport, LazyThreadSafetyMode.PublicationOnly);
 
     /// <summary>
     /// Gets whether the IoRing API is available on the current system.
     /// Returns <c>false</c> on Windows 10 or non-Windows platforms.
     /// The result is cached after the first call.
     /// </summary>
-    internal static bool IsSupported => _isSupported.Value;
+    internal static bool IsSupported => SIsSupported.Value;
 
     /// <summary>
     /// Gets whether the IoRing write API (<c>BuildIoRingWriteFile</c>) is available.
     /// Returns <c>false</c> on early Windows 11 builds that only support reads.
     /// </summary>
-    internal static bool IsWriteSupported => _isWriteSupported.Value;
+    internal static bool IsWriteSupported => SIsWriteSupported.Value;
 
     private static bool DetectSupport()
     {
         try
         {
-            var flags = new IORING_CREATE_FLAGS { Required = IORING_CREATE_FLAGS_NONE, Advisory = IORING_CREATE_FLAGS_NONE };
-            int hr = CreateIoRing(IORING_VERSION_3, flags, 2, 2, out nint handle);
+            var flags = new IoringCreateFlags { Required = IoringCreateFlagsNone, Advisory = IoringCreateFlagsNone };
+            int hr = CreateIoRing(IoringVersion3, flags, 2, 2, out nint handle);
 
-            if (hr == S_OK && handle != nint.Zero)
+            if (hr == SOk && handle != nint.Zero)
             {
                 CloseIoRing(handle);
                 return true;
@@ -265,16 +265,16 @@ internal static class IoRingNativeMethods
         {
             // Attempt to resolve the BuildIoRingWriteFile entry point.
             // If it throws EntryPointNotFoundException, writes are not available.
-            var flags = new IORING_CREATE_FLAGS { Required = IORING_CREATE_FLAGS_NONE, Advisory = IORING_CREATE_FLAGS_NONE };
-            int hr = CreateIoRing(IORING_VERSION_3, flags, 2, 2, out nint handle);
-            if (hr != S_OK || handle == nint.Zero) return false;
+            var flags = new IoringCreateFlags { Required = IoringCreateFlagsNone, Advisory = IoringCreateFlagsNone };
+            int hr = CreateIoRing(IoringVersion3, flags, 2, 2, out nint handle);
+            if (hr != SOk || handle == nint.Zero) return false;
 
             try
             {
                 // Try calling with invalid parameters just to verify the entry point exists.
                 // The call will fail with an error, but won't throw EntryPointNotFoundException.
-                var dummyHandle = IORING_HANDLE_REF.FromHandle(nint.Zero);
-                var dummyBuffer = IORING_BUFFER_REF.FromAddress(nint.Zero);
+                var dummyHandle = IoringHandleRef.FromHandle(nint.Zero);
+                var dummyBuffer = IoringBufferRef.FromAddress(nint.Zero);
                 BuildIoRingWriteFile(handle, dummyHandle, dummyBuffer, 0, 0, 0, 0);
                 return true;
             }

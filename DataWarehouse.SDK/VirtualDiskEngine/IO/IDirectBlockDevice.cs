@@ -4,7 +4,7 @@ using System.Buffers;
 namespace DataWarehouse.SDK.VirtualDiskEngine.IO;
 
 /// <summary>
-/// Extends <see cref="IBatchBlockDevice"/> with O_DIRECT semantics and aligned buffer allocation.
+/// Extends <see cref="IBatchBlockDevice"/> with ODirect semantics and aligned buffer allocation.
 /// Direct I/O bypasses the OS page cache, providing predictable latency and avoiding
 /// double-buffering for workloads that manage their own caching (e.g., VDE block cache).
 /// </summary>
@@ -15,7 +15,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.IO;
 /// DMA-compatible buffers that satisfy this constraint.
 /// </para>
 /// <para>
-/// On Windows, direct I/O is achieved via FILE_FLAG_NO_BUFFERING. On Linux, via O_DIRECT
+/// On Windows, direct I/O is achieved via FILE_FLAG_NO_BUFFERING. On Linux, via ODirect
 /// (typically through io_uring). On macOS, via F_NOCACHE. The <see cref="IsDirectIo"/>
 /// property indicates whether the implementation has successfully enabled direct I/O
 /// on the current platform.
@@ -27,7 +27,7 @@ public interface IDirectBlockDevice : IBatchBlockDevice
     /// <summary>
     /// Gets whether this device has direct I/O enabled, bypassing the OS page cache.
     /// Returns <c>true</c> when the underlying file handle was opened with direct I/O flags
-    /// (e.g., FILE_FLAG_NO_BUFFERING on Windows, O_DIRECT on Linux).
+    /// (e.g., FILE_FLAG_NO_BUFFERING on Windows, ODirect on Linux).
     /// </summary>
     bool IsDirectIo { get; }
 

@@ -634,12 +634,12 @@ public abstract class AiEnhancedStrategyBase : DataManagementStrategyBase, IAiEn
     /// <summary>
     /// Requests PII detection from Intelligence.
     /// </summary>
-    protected async Task<(bool ContainsPII, (string Type, string Value, double Confidence)[] Items)?> RequestPIIDetectionAsync(
+    protected async Task<(bool ContainsPii, (string Type, string Value, double Confidence)[] Items)?> RequestPiiDetectionAsync(
         string text,
         IntelligenceContext? context = null,
         CancellationToken ct = default)
     {
-        if (!HasCapability(IntelligenceCapabilities.PIIDetection))
+        if (!HasCapability(IntelligenceCapabilities.PiiDetection))
             return null;
 
         var payload = new Dictionary<string, object>
@@ -648,11 +648,11 @@ public abstract class AiEnhancedStrategyBase : DataManagementStrategyBase, IAiEn
             ["contextId"] = context?.ContextId ?? Guid.NewGuid().ToString("N")
         };
 
-        var response = await SendAiRequestAsync(IntelligenceTopics.RequestPIIDetection, payload, context?.Timeout, ct);
+        var response = await SendAiRequestAsync(IntelligenceTopics.RequestPiiDetection, payload, context?.Timeout, ct);
 
         if (response?.Success == true && response.Payload is Dictionary<string, object> result)
         {
-            var containsPii = result.TryGetValue("containsPII", out var c) && c is true;
+            var containsPii = result.TryGetValue("containsPii", out var c) && c is true;
             var items = Array.Empty<(string, string, double)>();
 
             if (result.TryGetValue("piiItems", out var itemsObj) && itemsObj is object[] piiItems)

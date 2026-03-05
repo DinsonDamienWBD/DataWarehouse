@@ -162,7 +162,7 @@ public abstract class InterfacePluginBase : FeaturePluginBase
     {
         var method = request.TryGetValue("method", out var m) && m is Interface.HttpMethod hm
             ? hm
-            : Interface.HttpMethod.GET;
+            : Interface.HttpMethod.Get;
         var path = request.TryGetValue("path", out var p) && p is string ps ? ps : "/";
         return new InterfaceRequest(
             Method: method,

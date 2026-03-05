@@ -46,7 +46,7 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
     public InterfaceCategory Category => InterfaceCategory.Messaging;
     public string[] Tags => ["amqp", "rabbitmq", "mq", "messaging", "enterprise"];
 
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.AMQP;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Amqp;
 
     public override SdkInterface.InterfaceCapabilities Capabilities => new(
         SupportsStreaming: true,
@@ -58,7 +58,7 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         SupportsMultiplexing: true,
         DefaultTimeout: TimeSpan.FromSeconds(30),
         SupportsCancellation: true,
-        RequiresTLS: false // TLS optional (AMQPS)
+        RequiresTls: false // TLS optional (AMQPS)
     );
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken)
@@ -114,9 +114,9 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
 
         return request.Method switch
         {
-            SdkInterface.HttpMethod.PUT => Task.FromResult(DeclareExchange(exchangeName, request)),
-            SdkInterface.HttpMethod.DELETE => Task.FromResult(DeleteExchange(exchangeName)),
-            SdkInterface.HttpMethod.GET => Task.FromResult(GetExchange(exchangeName)),
+            SdkInterface.HttpMethod.Put => Task.FromResult(DeclareExchange(exchangeName, request)),
+            SdkInterface.HttpMethod.Delete => Task.FromResult(DeleteExchange(exchangeName)),
+            SdkInterface.HttpMethod.Get => Task.FromResult(GetExchange(exchangeName)),
             _ => Task.FromResult(SdkInterface.InterfaceResponse.BadRequest($"Unsupported method for exchange: {request.Method}"))
         };
     }
@@ -133,9 +133,9 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
 
         return request.Method switch
         {
-            SdkInterface.HttpMethod.PUT => DeclareQueue(queueName, request),
-            SdkInterface.HttpMethod.DELETE => DeleteQueue(queueName),
-            SdkInterface.HttpMethod.GET => await ConsumeFromQueue(queueName, request, cancellationToken),
+            SdkInterface.HttpMethod.Put => DeclareQueue(queueName, request),
+            SdkInterface.HttpMethod.Delete => DeleteQueue(queueName),
+            SdkInterface.HttpMethod.Get => await ConsumeFromQueue(queueName, request, cancellationToken),
             _ => SdkInterface.InterfaceResponse.BadRequest($"Unsupported method for queue: {request.Method}")
         };
     }
@@ -145,7 +145,7 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         SdkInterface.InterfaceRequest request,
         CancellationToken cancellationToken)
     {
-        if (request.Method != SdkInterface.HttpMethod.POST)
+        if (request.Method != SdkInterface.HttpMethod.Post)
             return SdkInterface.InterfaceResponse.BadRequest("Use POST to publish messages");
 
         if (pathParts.Length < 3)
@@ -337,7 +337,7 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         var exchangeName = pathParts[2];
         var routingKey = pathParts[3];
 
-        if (request.Method == SdkInterface.HttpMethod.PUT)
+        if (request.Method == SdkInterface.HttpMethod.Put)
         {
             var bindingKey = $"{queueName}:{exchangeName}:{routingKey}";
             _bindings[bindingKey] = new AmqpBinding
@@ -350,7 +350,7 @@ internal sealed class AmqpStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
             var responsePayload = JsonSerializer.SerializeToUtf8Bytes(new { status = "bound", queueName, exchangeName, routingKey });
             return SdkInterface.InterfaceResponse.Created(responsePayload, $"/binding/{queueName}/{exchangeName}/{routingKey}", "application/json");
         }
-        else if (request.Method == SdkInterface.HttpMethod.DELETE)
+        else if (request.Method == SdkInterface.HttpMethod.Delete)
         {
             var bindingKey = $"{queueName}:{exchangeName}:{routingKey}";
             _bindings.TryRemove(bindingKey, out _);

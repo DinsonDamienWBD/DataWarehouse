@@ -39,7 +39,7 @@ internal sealed class QuantumSafeApiStrategy : SdkInterface.InterfaceStrategyBas
 
     // SDK contract properties
     public override bool IsProductionReady => false;
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
         SupportsAuthentication: true,
@@ -47,7 +47,7 @@ internal sealed class QuantumSafeApiStrategy : SdkInterface.InterfaceStrategyBas
         MaxRequestSize: 10 * 1024 * 1024, // 10 MB
         MaxResponseSize: 50 * 1024 * 1024, // 50 MB
         DefaultTimeout: TimeSpan.FromSeconds(30),
-        RequiresTLS: true
+        RequiresTls: true
     );
 
     private static readonly string[] SupportedPqAlgorithms = new[]

@@ -108,19 +108,19 @@ internal static class KqueueNativeMethods
     // --- Open flags ---
 
     /// <summary>Open for reading and writing.</summary>
-    internal const int O_RDWR = 0x0002;
+    internal const int ORdwr = 0x0002;
 
     /// <summary>Create file if it does not exist.</summary>
-    internal const int O_CREAT = 0x0200;
+    internal const int OCreat = 0x0200;
 
-    /// <summary>Error if O_CREAT and file already exists.</summary>
+    /// <summary>Error if OCreat and file already exists.</summary>
     internal const int O_EXCL = 0x0800;
 
     // --- fcntl commands ---
 
     /// <summary>
     /// macOS-specific fcntl command to disable the unified buffer cache for a file descriptor.
-    /// Equivalent to O_DIRECT on Linux. When set to 1, the OS page cache is bypassed.
+    /// Equivalent to ODirect on Linux. When set to 1, the OS page cache is bypassed.
     /// </summary>
     internal const int F_NOCACHE = 48;
 

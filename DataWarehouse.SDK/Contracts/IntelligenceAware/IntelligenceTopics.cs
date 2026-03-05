@@ -255,12 +255,12 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// <summary>
         /// Request topic for PII detection.
         /// </summary>
-        public const string RequestPIIDetection = "intelligence.request.pii-detection";
+        public const string RequestPiiDetection = "intelligence.request.pii-detection";
 
         /// <summary>
         /// Response topic for PII detection requests.
         /// </summary>
-        public const string RequestPIIDetectionResponse = "intelligence.request.pii-detection.response";
+        public const string RequestPiiDetectionResponse = "intelligence.request.pii-detection.response";
 
         /// <summary>
         /// Request topic for threat assessment.

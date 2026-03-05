@@ -37,7 +37,7 @@ internal sealed class MergeStrategySelectionStrategy : SdkInterface.InterfaceStr
     public string[] Tags => new[] { "air-gap", "convergence", "merge", "strategy" };
 
     // SDK contract properties
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
         SupportsAuthentication: true,

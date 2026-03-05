@@ -41,7 +41,7 @@ internal sealed class TwirpStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
         SupportsBidirectionalStreaming: false,
         SupportsMultiplexing: false,
         DefaultTimeout: TimeSpan.FromSeconds(30),
-        RequiresTLS: false
+        RequiresTls: false
     );
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -53,7 +53,7 @@ internal sealed class TwirpStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
         CancellationToken cancellationToken)
     {
         // Twirp requires POST
-        if (request.Method != SdkInterface.HttpMethod.POST)
+        if (request.Method != SdkInterface.HttpMethod.Post)
         {
             return CreateTwirpError("bad_route", $"Method {request.Method} not allowed. Use POST.");
         }

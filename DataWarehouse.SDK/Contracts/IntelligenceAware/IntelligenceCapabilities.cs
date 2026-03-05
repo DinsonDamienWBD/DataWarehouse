@@ -12,7 +12,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     /// The flags are organized into logical groups:
     /// </para>
     /// <list type="bullet">
-    ///   <item><b>Core AI</b>: Embeddings, NLP, Conversation</item>
+    ///   <item><b>Core AI</b>: Embeddings, Nlp, Conversation</item>
     ///   <item><b>Analysis</b>: Classification, AnomalyDetection, SentimentAnalysis</item>
     ///   <item><b>Prediction</b>: Prediction, AccessPatternPrediction, FailurePrediction</item>
     ///   <item><b>Content</b>: Summarization, EntityExtraction, ContentGeneration</item>
@@ -51,7 +51,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// Natural Language Processing for text understanding.
         /// Enables intent parsing, language detection, and text analysis.
         /// </summary>
-        NLP = 1L << 1,
+        Nlp = 1L << 1,
 
         /// <summary>
         /// Multi-turn conversation and chat capabilities.
@@ -253,7 +253,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// Detect Personally Identifiable Information (PII).
         /// Identifies sensitive data for compliance and protection.
         /// </summary>
-        PIIDetection = 1L << 32,
+        PiiDetection = 1L << 32,
 
         /// <summary>
         /// Assess security threats and risks.
@@ -479,7 +479,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// <summary>
         /// Reasoning chain generation (agent mode: maps to TextCompletion + NLP).
         /// </summary>
-        ReasoningChain = TextCompletion | NLP,
+        ReasoningChain = TextCompletion | Nlp,
 
         /// <summary>
         /// Self-reflection and learning (agent mode: maps to BehaviorAnalytics).
@@ -498,7 +498,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// <summary>
         /// All core AI capabilities for general use.
         /// </summary>
-        AllCore = Embeddings | NLP | Conversation | TextCompletion | FunctionCalling | Streaming,
+        AllCore = Embeddings | Nlp | Conversation | TextCompletion | FunctionCalling | Streaming,
 
         /// <summary>
         /// All analysis capabilities.
@@ -521,7 +521,7 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// <summary>
         /// All security-related capabilities.
         /// </summary>
-        AllSecurity = PIIDetection | ThreatAssessment | CipherRecommendation | BehaviorAnalytics |
+        AllSecurity = PiiDetection | ThreatAssessment | CipherRecommendation | BehaviorAnalytics |
                       AccessControlRecommendation | ComplianceClassification | SensitivityClassification | IntrusionDetection,
 
         /// <summary>

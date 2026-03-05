@@ -44,7 +44,7 @@ internal sealed class LongPollingStrategy : SdkInterface.InterfaceStrategyBase, 
     public string[] Tags => new[] { "long-polling", "http", "real-time", "polling" };
 
     // SDK contract properties
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
         SupportsAuthentication: true,

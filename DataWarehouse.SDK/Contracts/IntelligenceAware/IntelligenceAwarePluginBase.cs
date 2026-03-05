@@ -892,12 +892,12 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
         /// <param name="context">Optional Intelligence context.</param>
         /// <param name="ct">Cancellation token.</param>
         /// <returns>PII detection result, or null if unavailable.</returns>
-        protected async Task<PIIDetectionResult?> RequestPIIDetectionAsync(
+        protected async Task<PiiDetectionResult?> RequestPiiDetectionAsync(
             string text,
             IntelligenceContext? context = null,
             CancellationToken ct = default)
         {
-            if (!HasCapability(IntelligenceCapabilities.PIIDetection))
+            if (!HasCapability(IntelligenceCapabilities.PiiDetection))
                 return null;
 
             var payload = new Dictionary<string, object>
@@ -907,19 +907,19 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
             };
 
             var response = await SendIntelligenceRequestAsync(
-                IntelligenceTopics.RequestPIIDetection,
+                IntelligenceTopics.RequestPiiDetection,
                 payload,
                 context?.Timeout,
                 ct);
 
             if (response?.Success == true && response.Payload is Dictionary<string, object> result)
             {
-                return new PIIDetectionResult
+                return new PiiDetectionResult
                 {
-                    ContainsPII = result.TryGetValue("containsPII", out var c) && c is true,
-                    PIIItems = result.TryGetValue("piiItems", out var items) && items is PIIItem[] piiItems
+                    ContainsPii = result.TryGetValue("containsPii", out var c) && c is true,
+                    PiiItems = result.TryGetValue("piiItems", out var items) && items is PiiItem[] piiItems
                         ? piiItems
-                        : Array.Empty<PIIItem>()
+                        : Array.Empty<PiiItem>()
                 };
             }
 
@@ -1322,13 +1322,13 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
                 ["timestamp"] = DateTimeOffset.UtcNow
             };
 
-            var response_msg = await SendIntelligenceRequestAsync(
+            var responseMsg = await SendIntelligenceRequestAsync(
                 IntelligenceTopics.EvolutionLearn,
                 payload,
                 timeout: null,
                 ct);
 
-            return response_msg?.Success == true;
+            return responseMsg?.Success == true;
         }
 
         /// <summary>
@@ -1745,19 +1745,19 @@ namespace DataWarehouse.SDK.Contracts.IntelligenceAware
     /// <summary>
     /// Result of PII detection.
     /// </summary>
-    public sealed class PIIDetectionResult
+    public sealed class PiiDetectionResult
     {
         /// <summary>Whether PII was found.</summary>
-        public bool ContainsPII { get; init; }
+        public bool ContainsPii { get; init; }
 
         /// <summary>Detected PII items.</summary>
-        public PIIItem[] PIIItems { get; init; } = Array.Empty<PIIItem>();
+        public PiiItem[] PiiItems { get; init; } = Array.Empty<PiiItem>();
     }
 
     /// <summary>
     /// A detected PII item.
     /// </summary>
-    public sealed class PIIItem
+    public sealed class PiiItem
     {
         /// <summary>PII type (e.g., "EMAIL", "SSN", "PHONE").</summary>
         public string Type { get; init; } = string.Empty;

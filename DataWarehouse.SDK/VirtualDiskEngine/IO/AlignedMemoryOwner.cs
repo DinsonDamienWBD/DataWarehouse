@@ -9,7 +9,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.IO;
 
 /// <summary>
 /// Provides an <see cref="IMemoryOwner{T}"/> backed by natively aligned memory,
-/// suitable for direct I/O (O_DIRECT, FILE_FLAG_NO_BUFFERING) and DMA transfers.
+/// suitable for direct I/O (ODirect, FILE_FLAG_NO_BUFFERING) and DMA transfers.
 /// </summary>
 /// <remarks>
 /// <para>

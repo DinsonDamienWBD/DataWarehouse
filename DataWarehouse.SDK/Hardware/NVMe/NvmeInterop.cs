@@ -270,7 +270,7 @@ internal static partial class NvmeInterop
     internal static partial int Ioctl(int fd, int request, ref NvmeAdminCmd arg);
 
     /// <summary>Open for read/write access.</summary>
-    internal const int O_RDWR = 2;
+    internal const int ORdwr = 2;
 
     #endregion
 }

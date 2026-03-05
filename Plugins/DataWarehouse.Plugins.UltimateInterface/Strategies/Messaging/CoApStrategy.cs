@@ -60,7 +60,7 @@ internal sealed class CoApStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         SupportsMultiplexing: true, // Multiple concurrent requests over UDP
         DefaultTimeout: TimeSpan.FromSeconds(5),
         SupportsCancellation: true,
-        RequiresTLS: false // DTLS optional
+        RequiresTls: false // DTLS optional
     );
 
     /// <summary>
@@ -100,10 +100,10 @@ internal sealed class CoApStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
             // Parse CoAP method from HTTP method or custom header
             var method = request.Method switch
             {
-                SdkInterface.HttpMethod.GET => CoApMethod.Get,
-                SdkInterface.HttpMethod.POST => CoApMethod.Post,
-                SdkInterface.HttpMethod.PUT => CoApMethod.Put,
-                SdkInterface.HttpMethod.DELETE => CoApMethod.Delete,
+                SdkInterface.HttpMethod.Get => CoApMethod.Get,
+                SdkInterface.HttpMethod.Post => CoApMethod.Post,
+                SdkInterface.HttpMethod.Put => CoApMethod.Put,
+                SdkInterface.HttpMethod.Delete => CoApMethod.Delete,
                 _ => CoApMethod.Get
             };
 

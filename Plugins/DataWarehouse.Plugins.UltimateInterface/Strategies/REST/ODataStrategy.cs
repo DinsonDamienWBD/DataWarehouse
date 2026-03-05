@@ -39,7 +39,7 @@ internal sealed class ODataStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
     public string[] Tags => new[] { "odata", "query", "rest", "metadata", "filter" };
 
     // SDK contract properties
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
         SupportsAuthentication: true,
@@ -92,11 +92,11 @@ internal sealed class ODataStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
             // Route based on HTTP method
             var result = request.Method switch
             {
-                SdkInterface.HttpMethod.GET => await HandleGetAsync(path, odataOptions, cancellationToken),
-                SdkInterface.HttpMethod.POST => await HandlePostAsync(path, request.Body, cancellationToken),
-                SdkInterface.HttpMethod.PUT => await HandlePutAsync(path, request.Body, cancellationToken),
-                SdkInterface.HttpMethod.PATCH => await HandlePatchAsync(path, request.Body, cancellationToken),
-                SdkInterface.HttpMethod.DELETE => await HandleDeleteAsync(path, cancellationToken),
+                SdkInterface.HttpMethod.Get => await HandleGetAsync(path, odataOptions, cancellationToken),
+                SdkInterface.HttpMethod.Post => await HandlePostAsync(path, request.Body, cancellationToken),
+                SdkInterface.HttpMethod.Put => await HandlePutAsync(path, request.Body, cancellationToken),
+                SdkInterface.HttpMethod.Patch => await HandlePatchAsync(path, request.Body, cancellationToken),
+                SdkInterface.HttpMethod.Delete => await HandleDeleteAsync(path, cancellationToken),
                 _ => (StatusCode: 405, Data: CreateErrorResponse("Method not allowed", $"Method {request.Method} is not supported"))
             };
 

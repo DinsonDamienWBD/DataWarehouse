@@ -39,7 +39,7 @@ internal sealed class ChangelogGenerationStrategy : SdkInterface.InterfaceStrate
     public string[] Tags => new[] { "changelog", "documentation", "developer-experience", "versioning", "migration" };
 
     // SDK contract properties
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
         SupportsAuthentication: false,

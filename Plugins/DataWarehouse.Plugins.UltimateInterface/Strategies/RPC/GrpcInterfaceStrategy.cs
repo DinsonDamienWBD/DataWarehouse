@@ -29,7 +29,7 @@ internal sealed class GrpcInterfaceStrategy : SdkInterface.InterfaceStrategyBase
     public InterfaceCategory Category => InterfaceCategory.Rpc;
     public string[] Tags => ["grpc", "protobuf", "rpc", "streaming", "http2"];
 
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.gRPC;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.GRpc;
     public override SdkInterface.InterfaceCapabilities Capabilities => SdkInterface.InterfaceCapabilities.CreateGrpcDefaults();
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;

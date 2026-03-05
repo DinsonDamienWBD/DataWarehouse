@@ -31,7 +31,7 @@ public sealed class IoUringBlockDevice : IBlockDevice
     private readonly bool _useSqPoll;
     private readonly int _maxThreadRings;
 
-    // File descriptor opened with O_DIRECT
+    // File descriptor opened with ODirect
     private int _fd = -1;
 
     // Registered buffer management
@@ -103,14 +103,14 @@ public sealed class IoUringBlockDevice : IBlockDevice
     /// </summary>
     private unsafe void InitializeNative()
     {
-        // Open file with O_DIRECT for direct I/O (bypass page cache)
-        _fd = IoUringBindings.PosixOpen(_filePath, IoUringBindings.O_RDWR | IoUringBindings.O_DIRECT, 0);
+        // Open file with ODirect for direct I/O (bypass page cache)
+        _fd = IoUringBindings.PosixOpen(_filePath, IoUringBindings.ORdwr | IoUringBindings.ODirect, 0);
         if (_fd < 0)
         {
-            throw new IOException($"Failed to open '{_filePath}' with O_DIRECT. errno={Marshal.GetLastPInvokeError()}");
+            throw new IOException($"Failed to open '{_filePath}' with ODirect. errno={Marshal.GetLastPInvokeError()}");
         }
 
-        // Pre-allocate registered buffers with 4096-byte alignment for O_DIRECT
+        // Pre-allocate registered buffers with 4096-byte alignment for ODirect
         _bufferPointers = (nint*)NativeMemory.AlignedAlloc(
             (nuint)(_queueDepth * sizeof(nint)), 64);
 
@@ -158,7 +158,7 @@ public sealed class IoUringBlockDevice : IBlockDevice
         var p = new IoUringBindings.IoUringParams();
         if (_useSqPoll)
         {
-            p.Flags = IoUringBindings.IORING_SETUP_SQPOLL;
+            p.Flags = IoUringBindings.IoringSetupSqpoll;
             p.SqThreadIdle = 2000; // 2 seconds idle before kernel thread sleeps
         }
 
@@ -513,7 +513,7 @@ public sealed class IoUringBlockDevice : IBlockDevice
     }
 
     /// <summary>
-    /// Sends a raw NVMe passthrough command via IORING_OP_URING_CMD.
+    /// Sends a raw NVMe passthrough command via IoringOpUringCmd.
     /// Only available on raw NVMe block devices (/dev/nvme*).
     /// </summary>
     /// <param name="command">NVMe command bytes.</param>
@@ -588,7 +588,7 @@ public sealed class IoUringBlockDevice : IBlockDevice
     public Task FlushAsync(CancellationToken ct = default)
     {
         ObjectDisposedException.ThrowIf(_disposed != 0, this);
-        // io_uring with O_DIRECT bypasses page cache; explicit flush is a no-op.
+        // io_uring with ODirect bypasses page cache; explicit flush is a no-op.
         // Data is persisted on write completion.
         return Task.CompletedTask;
     }

@@ -27,7 +27,7 @@ internal sealed class ConnectRpcStrategy : SdkInterface.InterfaceStrategyBase, I
     public InterfaceCategory Category => InterfaceCategory.Rpc;
     public string[] Tags => ["connect-rpc", "buf", "http", "json", "protobuf", "streaming"];
 
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.gRPC;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.GRpc;
 
     public override SdkInterface.InterfaceCapabilities Capabilities => new(
         SupportsStreaming: true,
@@ -38,7 +38,7 @@ internal sealed class ConnectRpcStrategy : SdkInterface.InterfaceStrategyBase, I
         SupportsBidirectionalStreaming: false, // Connect uses SSE for server streaming
         SupportsMultiplexing: true,
         DefaultTimeout: TimeSpan.FromMinutes(5),
-        RequiresTLS: false
+        RequiresTls: false
     );
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
@@ -50,7 +50,7 @@ internal sealed class ConnectRpcStrategy : SdkInterface.InterfaceStrategyBase, I
         CancellationToken cancellationToken)
     {
         // Connect RPC uses POST with path-based routing
-        if (request.Method != SdkInterface.HttpMethod.POST)
+        if (request.Method != SdkInterface.HttpMethod.Post)
         {
             return SdkInterface.InterfaceResponse.Error(405, "Method Not Allowed. Connect RPC requires POST.");
         }

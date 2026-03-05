@@ -117,10 +117,10 @@ internal static partial class RawPartitionNativeMethods
     /// <summary>BLKGETSIZE64: get block device size in bytes.</summary>
     private const uint LINUX_BLKGETSIZE64 = 0x80081272;
 
-    /// <summary>O_RDWR: open for read/write.</summary>
+    /// <summary>ORdwr: open for read/write.</summary>
     private const int LINUX_O_RDWR = 0x02;
 
-    /// <summary>O_DIRECT: bypass page cache.</summary>
+    /// <summary>ODirect: bypass page cache.</summary>
     private const int LINUX_O_DIRECT = 0x4000;
 
 #if NET7_0_OR_GREATER
@@ -165,7 +165,7 @@ internal static partial class RawPartitionNativeMethods
     /// <summary>F_SETFL: set file status flags (fcntl).</summary>
     private const int MACOS_F_SETFL = 4;
 
-    /// <summary>O_RDWR: open for read/write.</summary>
+    /// <summary>ORdwr: open for read/write.</summary>
     private const int MACOS_O_RDWR = 0x02;
 
 #if NET7_0_OR_GREATER

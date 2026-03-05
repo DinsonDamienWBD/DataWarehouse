@@ -361,13 +361,13 @@ namespace DataWarehouse.Plugins.UltimateCompliance
         {
             if (MessageBus == null) return;
 
-            MessageBus.Subscribe(IntelligenceTopics.RequestPIIDetection, async msg =>
+            MessageBus.Subscribe(IntelligenceTopics.RequestPiiDetection, async msg =>
             {
                 if (msg.Payload.TryGetValue("text", out var textObj) && textObj is string text)
                 {
                     var detection = DetectPII(text);
 
-                    await MessageBus.PublishAsync(IntelligenceTopics.RequestPIIDetectionResponse, new PluginMessage
+                    await MessageBus.PublishAsync(IntelligenceTopics.RequestPiiDetectionResponse, new PluginMessage
                     {
                         Type = "pii-detection.response",
                         CorrelationId = msg.CorrelationId,
@@ -375,7 +375,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance
                         Payload = new Dictionary<string, object>
                         {
                             ["success"] = true,
-                            ["containsPII"] = detection.ContainsPII,
+                            ["containsPii"] = detection.ContainsPii,
                             ["piiItems"] = detection.Items.Select(i => new Dictionary<string, object>
                             {
                                 ["type"] = i.Type,
@@ -392,7 +392,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance
         /// <summary>
         /// Detects PII in text using pattern matching.
         /// </summary>
-        private (bool ContainsPII, List<(string Type, double Confidence, int StartIndex, int EndIndex)> Items)
+        private (bool ContainsPii, List<(string Type, double Confidence, int StartIndex, int EndIndex)> Items)
             DetectPII(string text)
         {
             var items = new List<(string Type, double Confidence, int StartIndex, int EndIndex)>();

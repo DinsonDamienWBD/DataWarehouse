@@ -67,7 +67,7 @@ internal sealed class KafkaRestStrategy : SdkInterface.InterfaceStrategyBase, IP
         SupportsMultiplexing: true,
         DefaultTimeout: TimeSpan.FromSeconds(30),
         SupportsCancellation: true,
-        RequiresTLS: false // TLS optional
+        RequiresTls: false // TLS optional
     );
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken)
@@ -123,12 +123,12 @@ internal sealed class KafkaRestStrategy : SdkInterface.InterfaceStrategyBase, IP
             ReplicationFactor = 1
         });
 
-        if (request.Method == SdkInterface.HttpMethod.POST)
+        if (request.Method == SdkInterface.HttpMethod.Post)
         {
             // Produce records to topic
             return await ProduceRecords(topic, request, cancellationToken);
         }
-        else if (request.Method == SdkInterface.HttpMethod.GET)
+        else if (request.Method == SdkInterface.HttpMethod.Get)
         {
             // Get topic metadata
             return GetTopicMetadata(topic);
@@ -150,7 +150,7 @@ internal sealed class KafkaRestStrategy : SdkInterface.InterfaceStrategyBase, IP
         if (pathParts.Length == 2)
         {
             // Consumer group operations
-            if (request.Method == SdkInterface.HttpMethod.POST)
+            if (request.Method == SdkInterface.HttpMethod.Post)
                 return CreateConsumerInstance(groupName, request);
             else
                 return SdkInterface.InterfaceResponse.BadRequest("Use POST to create consumer instance");

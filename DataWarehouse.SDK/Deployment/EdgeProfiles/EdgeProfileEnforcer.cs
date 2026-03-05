@@ -165,7 +165,7 @@ public sealed class EdgeProfileEnforcer
     {
         _logger.LogWarning(
             "Flash storage optimization requested but VDE storage layer integration not configured. " +
-            "Recommended settings: block cache=32MB, WAL sync=Periodic(5s), I/O=O_DIRECT. " +
+            "Recommended settings: block cache=32MB, WAL sync=Periodic(5s), I/O=ODirect. " +
             "Configure via VDE StorageConfiguration to reduce write amplification on flash devices.");
     }
 

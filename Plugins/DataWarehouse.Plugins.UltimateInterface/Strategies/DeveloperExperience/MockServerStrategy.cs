@@ -44,7 +44,7 @@ internal sealed class MockServerStrategy : SdkInterface.InterfaceStrategyBase, I
     public string[] Tags => new[] { "mock", "testing", "developer-experience", "simulation", "recording" };
 
     // SDK contract properties
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
         SupportsAuthentication: false,

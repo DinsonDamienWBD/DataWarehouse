@@ -10,7 +10,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.IO;
 /// </summary>
 /// <remarks>
 /// <para>
-/// Direct I/O (O_DIRECT, FILE_FLAG_NO_BUFFERING) and DMA transfers require
+/// Direct I/O (ODirect, FILE_FLAG_NO_BUFFERING) and DMA transfers require
 /// buffers aligned to the physical sector size (typically 4096 bytes).
 /// This interface enables callers to obtain aligned buffers without coupling
 /// to a specific allocation strategy.

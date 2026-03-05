@@ -150,7 +150,7 @@ public sealed class NvmePassthrough : INvmePassthrough
             }
             else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
             {
-                _deviceFd = NvmeInterop.Open(_devicePath, NvmeInterop.O_RDWR);
+                _deviceFd = NvmeInterop.Open(_devicePath, NvmeInterop.ORdwr);
                 _isAvailable = _deviceFd >= 0;
             }
 

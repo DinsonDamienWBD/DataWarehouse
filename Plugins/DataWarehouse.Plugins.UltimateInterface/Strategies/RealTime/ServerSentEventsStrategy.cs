@@ -58,7 +58,7 @@ internal sealed class ServerSentEventsStrategy : SdkInterface.InterfaceStrategyB
         SupportsMultiplexing: false,
         DefaultTimeout: null, // Long-lived connections
         SupportsCancellation: true,
-        RequiresTLS: false
+        RequiresTls: false
     );
 
     /// <summary>

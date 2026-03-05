@@ -300,7 +300,7 @@ public sealed class IntelligenceDiscoveryHandler : IDisposable
             // If we have conversation, we can do NLP
             if (caps.HasFlag(SdkCapabilities.Conversation) || caps.HasFlag(SdkCapabilities.TextCompletion))
             {
-                caps |= SdkCapabilities.NLP;
+                caps |= SdkCapabilities.Nlp;
                 caps |= SdkCapabilities.IntentRecognition;
                 caps |= SdkCapabilities.EntityExtraction;
                 caps |= SdkCapabilities.KeywordExtraction;

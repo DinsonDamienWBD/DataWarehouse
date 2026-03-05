@@ -117,7 +117,7 @@ public abstract class LowLatencyStoragePluginBase : Hierarchy.DataPipelinePlugin
     protected virtual int DefaultBlockSize => 4096;
 
     /// <summary>
-    /// Whether to use direct I/O (O_DIRECT) to bypass OS page cache.
+    /// Whether to use direct I/O (ODirect) to bypass OS page cache.
     /// Set to false for workloads that benefit from page cache.
     /// </summary>
     protected virtual bool UseDirectIo => true;

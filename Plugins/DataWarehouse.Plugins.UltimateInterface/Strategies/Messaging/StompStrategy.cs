@@ -58,7 +58,7 @@ internal sealed class StompStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
         SupportsMultiplexing: false,
         DefaultTimeout: null, // Long-lived connections
         SupportsCancellation: true,
-        RequiresTLS: false
+        RequiresTls: false
     );
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken)
@@ -85,11 +85,11 @@ internal sealed class StompStrategy : SdkInterface.InterfaceStrategyBase, IPlugi
 
         return request.Method switch
         {
-            SdkInterface.HttpMethod.POST => await HandleSend(destination, request, cancellationToken),
-            SdkInterface.HttpMethod.GET => HandleSubscribe(destination, sessionId, request),
-            SdkInterface.HttpMethod.DELETE => HandleUnsubscribe(destination, sessionId),
-            SdkInterface.HttpMethod.PUT => await HandleTransactionOrAck(request),
-            SdkInterface.HttpMethod.CONNECT => HandleConnect(sessionId, request),
+            SdkInterface.HttpMethod.Post => await HandleSend(destination, request, cancellationToken),
+            SdkInterface.HttpMethod.Get => HandleSubscribe(destination, sessionId, request),
+            SdkInterface.HttpMethod.Delete => HandleUnsubscribe(destination, sessionId),
+            SdkInterface.HttpMethod.Put => await HandleTransactionOrAck(request),
+            SdkInterface.HttpMethod.Connect => HandleConnect(sessionId, request),
             _ => SdkInterface.InterfaceResponse.BadRequest($"Unsupported STOMP operation: {request.Method}")
         };
     }

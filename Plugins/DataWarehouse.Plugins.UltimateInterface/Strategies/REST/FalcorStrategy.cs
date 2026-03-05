@@ -40,7 +40,7 @@ internal sealed class FalcorStrategy : SdkInterface.InterfaceStrategyBase, IPlug
 
     // SDK contract properties
     public override bool IsProductionReady => false;
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
         SupportsAuthentication: true,
@@ -87,7 +87,7 @@ internal sealed class FalcorStrategy : SdkInterface.InterfaceStrategyBase, IPlug
                     "Falcor endpoint is available at /model.json");
             }
 
-            if (request.Method != SdkInterface.HttpMethod.POST)
+            if (request.Method != SdkInterface.HttpMethod.Post)
             {
                 return CreateErrorInterfaceResponse(405, "Method Not Allowed",
                     "Falcor requires POST requests to /model.json");

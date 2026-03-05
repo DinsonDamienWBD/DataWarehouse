@@ -43,7 +43,7 @@ internal sealed class XmlRpcStrategy : SdkInterface.InterfaceStrategyBase, IPlug
         SupportsBidirectionalStreaming: false,
         SupportsMultiplexing: false,
         DefaultTimeout: TimeSpan.FromSeconds(30),
-        RequiresTLS: false
+        RequiresTls: false
     );
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;

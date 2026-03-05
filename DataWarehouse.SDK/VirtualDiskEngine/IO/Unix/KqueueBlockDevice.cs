@@ -18,7 +18,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.IO.Unix;
 /// <remarks>
 /// <para>
 /// On macOS, the F_NOCACHE fcntl flag is applied to bypass the unified buffer cache,
-/// providing O_DIRECT-equivalent behavior. This ensures predictable latency and avoids
+/// providing ODirect-equivalent behavior. This ensures predictable latency and avoids
 /// double-buffering for workloads that manage their own caching (e.g., VDE block cache).
 /// </para>
 /// <para>
@@ -121,11 +121,11 @@ public sealed class KqueueBlockDevice : IBatchBlockDevice
         BlockCount = blockCount;
         _alignmentRequirement = alignmentRequirement;
 
-        // Open file descriptor with O_RDWR, optionally creating new
-        int openFlags = KqueueNativeMethods.O_RDWR;
+        // Open file descriptor with ORdwr, optionally creating new
+        int openFlags = KqueueNativeMethods.ORdwr;
         if (createNew)
         {
-            openFlags |= KqueueNativeMethods.O_CREAT | KqueueNativeMethods.O_EXCL;
+            openFlags |= KqueueNativeMethods.OCreat | KqueueNativeMethods.O_EXCL;
         }
 
         _fileFd = KqueueNativeMethods.Open(path, openFlags, KqueueNativeMethods.S_IRUSR_IWUSR);

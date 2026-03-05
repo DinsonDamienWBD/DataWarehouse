@@ -69,12 +69,12 @@ public class UltimateInterfaceTests
     public void InterfaceRequest_ShouldBeConstructible()
     {
         var request = new InterfaceRequest(
-            Method: SdkHttpMethod.GET,
+            Method: SdkHttpMethod.Get,
             Path: "/api/test",
             Headers: new Dictionary<string, string>(),
             Body: ReadOnlyMemory<byte>.Empty,
             QueryParameters: new Dictionary<string, string>(),
-            Protocol: InterfaceProtocol.REST);
+            Protocol: InterfaceProtocol.Rest);
         request.Should().NotBeNull();
         request.Path.Should().Be("/api/test");
     }

@@ -39,7 +39,7 @@ internal sealed class BreakingChangeDetectionStrategy : SdkInterface.InterfaceSt
     public string[] Tags => new[] { "compatibility", "breaking-changes", "developer-experience", "openapi", "versioning" };
 
     // SDK contract properties
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
         SupportsAuthentication: false,

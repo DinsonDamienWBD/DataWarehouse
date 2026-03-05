@@ -41,8 +41,8 @@ internal sealed class GraphQLInterfaceStrategy : SdkInterface.InterfaceStrategyB
     public InterfaceCategory Category => InterfaceCategory.Query;
     public string[] Tags => ["graphql", "query", "mutation", "subscription", "introspection"];
 
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.GraphQL;
-    public override SdkInterface.InterfaceCapabilities Capabilities => SdkInterface.InterfaceCapabilities.CreateGraphQLDefaults();
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.GraphQl;
+    public override SdkInterface.InterfaceCapabilities Capabilities => SdkInterface.InterfaceCapabilities.CreateGraphQlDefaults();
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
     protected override Task StopAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;

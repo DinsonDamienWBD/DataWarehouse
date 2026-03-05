@@ -78,9 +78,9 @@ namespace DataWarehouse.Tests.Infrastructure
 
         [Theory]
         [InlineData(InterfaceProtocol.Unknown, 0)]
-        [InlineData(InterfaceProtocol.REST, 1)]
-        [InlineData(InterfaceProtocol.gRPC, 2)]
-        [InlineData(InterfaceProtocol.GraphQL, 3)]
+        [InlineData(InterfaceProtocol.Rest, 1)]
+        [InlineData(InterfaceProtocol.GRpc, 2)]
+        [InlineData(InterfaceProtocol.GraphQl, 3)]
         [InlineData(InterfaceProtocol.WebSocket, 4)]
         [InlineData(InterfaceProtocol.Kafka, 11)]
         [InlineData(InterfaceProtocol.Custom, 99)]
@@ -101,17 +101,17 @@ namespace DataWarehouse.Tests.Infrastructure
             var body = System.Text.Encoding.UTF8.GetBytes("{\"test\":true}");
 
             var request = new InterfaceRequest(
-                HttpMethod.GET,
+                HttpMethod.Get,
                 "/api/users",
                 headers,
                 body,
                 query,
-                InterfaceProtocol.REST);
+                InterfaceProtocol.Rest);
 
-            Assert.Equal(HttpMethod.GET, request.Method);
+            Assert.Equal(HttpMethod.Get, request.Method);
             Assert.Equal("/api/users", request.Path);
             Assert.Equal("application/json", request.ContentType);
-            Assert.Equal(InterfaceProtocol.REST, request.Protocol);
+            Assert.Equal(InterfaceProtocol.Rest, request.Protocol);
         }
 
         [Fact]
@@ -124,12 +124,12 @@ namespace DataWarehouse.Tests.Infrastructure
             };
 
             var request = new InterfaceRequest(
-                HttpMethod.POST,
+                HttpMethod.Post,
                 "/api/data",
                 headers,
                 ReadOnlyMemory<byte>.Empty,
                 new Dictionary<string, string>(),
-                InterfaceProtocol.REST);
+                InterfaceProtocol.Rest);
 
             Assert.Equal("application/xml", request.ContentType);
             Assert.Equal("Bearer token123", request.Authorization);
@@ -140,10 +140,10 @@ namespace DataWarehouse.Tests.Infrastructure
         {
             var headers = new Dictionary<string, string> { ["X-Custom"] = "test-value" };
             var request = new InterfaceRequest(
-                HttpMethod.GET, "/test", headers,
+                HttpMethod.Get, "/test", headers,
                 ReadOnlyMemory<byte>.Empty,
                 new Dictionary<string, string>(),
-                InterfaceProtocol.REST);
+                InterfaceProtocol.Rest);
 
             Assert.True(request.TryGetHeader("X-Custom", out var value));
             Assert.Equal("test-value", value);
@@ -155,10 +155,10 @@ namespace DataWarehouse.Tests.Infrastructure
         {
             var query = new Dictionary<string, string> { ["limit"] = "50" };
             var request = new InterfaceRequest(
-                HttpMethod.GET, "/api", new Dictionary<string, string>(),
+                HttpMethod.Get, "/api", new Dictionary<string, string>(),
                 ReadOnlyMemory<byte>.Empty,
                 query,
-                InterfaceProtocol.REST);
+                InterfaceProtocol.Rest);
 
             Assert.True(request.TryGetQueryParameter("limit", out var value));
             Assert.Equal("50", value);
@@ -252,7 +252,7 @@ namespace DataWarehouse.Tests.Infrastructure
             Assert.True(caps.SupportsStreaming);
             Assert.True(caps.SupportsBidirectionalStreaming);
             Assert.True(caps.SupportsMultiplexing);
-            Assert.True(caps.RequiresTLS);
+            Assert.True(caps.RequiresTls);
         }
 
         [Fact]
@@ -268,7 +268,7 @@ namespace DataWarehouse.Tests.Infrastructure
         [Fact]
         public void InterfaceCapabilities_CreateGraphQLDefaults_HasCorrectContentTypes()
         {
-            var caps = InterfaceCapabilities.CreateGraphQLDefaults();
+            var caps = InterfaceCapabilities.CreateGraphQlDefaults();
 
             Assert.Contains("application/graphql", caps.SupportedContentTypes);
             Assert.True(caps.SupportsStreaming);
@@ -289,11 +289,11 @@ namespace DataWarehouse.Tests.Infrastructure
         public void HttpMethod_ContainsStandardMethods()
         {
             var values = Enum.GetValues<HttpMethod>();
-            Assert.Contains(HttpMethod.GET, values);
-            Assert.Contains(HttpMethod.POST, values);
-            Assert.Contains(HttpMethod.PUT, values);
-            Assert.Contains(HttpMethod.DELETE, values);
-            Assert.Contains(HttpMethod.PATCH, values);
+            Assert.Contains(HttpMethod.Get, values);
+            Assert.Contains(HttpMethod.Post, values);
+            Assert.Contains(HttpMethod.Put, values);
+            Assert.Contains(HttpMethod.Delete, values);
+            Assert.Contains(HttpMethod.Patch, values);
         }
 
         #endregion

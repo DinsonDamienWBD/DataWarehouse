@@ -46,7 +46,7 @@ internal sealed class MqttStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
     public InterfaceCategory Category => InterfaceCategory.Messaging;
     public string[] Tags => ["mqtt", "iot", "pubsub", "messaging", "qos"];
 
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.MQTT;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Mqtt;
 
     public override SdkInterface.InterfaceCapabilities Capabilities => new(
         SupportsStreaming: true,
@@ -58,7 +58,7 @@ internal sealed class MqttStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         SupportsMultiplexing: true,
         DefaultTimeout: null, // Long-lived connections
         SupportsCancellation: true,
-        RequiresTLS: false // TLS optional
+        RequiresTls: false // TLS optional
     );
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken)
@@ -88,19 +88,19 @@ internal sealed class MqttStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
 
         switch (request.Method)
         {
-            case SdkInterface.HttpMethod.POST:
+            case SdkInterface.HttpMethod.Post:
                 // PUBLISH operation
                 return await HandlePublish(topic, request.Body, qosLevel, retain, request, cancellationToken);
 
-            case SdkInterface.HttpMethod.GET:
+            case SdkInterface.HttpMethod.Get:
                 // SUBSCRIBE operation (return messages from topic)
                 return await HandleSubscribe(topic, qosLevel, clientId, cancellationToken);
 
-            case SdkInterface.HttpMethod.DELETE:
+            case SdkInterface.HttpMethod.Delete:
                 // UNSUBSCRIBE operation
                 return HandleUnsubscribe(topic, clientId);
 
-            case SdkInterface.HttpMethod.PUT:
+            case SdkInterface.HttpMethod.Put:
                 // Session management (CONNECT/DISCONNECT)
                 return HandleSessionManagement(clientId, request);
 

@@ -128,7 +128,7 @@ public sealed class RawPartitionBlockDevice : IBatchBlockDevice
             }
             else
             {
-                // Linux/macOS: WriteThrough + Asynchronous (O_DIRECT applied by native open)
+                // Linux/macOS: WriteThrough + Asynchronous (ODirect applied by native open)
                 fileOptions = FileOptions.Asynchronous | FileOptions.WriteThrough;
             }
 

@@ -38,8 +38,8 @@ internal sealed class HasuraStrategy : SdkInterface.InterfaceStrategyBase, IPlug
     public InterfaceCategory Category => InterfaceCategory.Query;
     public string[] Tags => ["hasura", "graphql", "auto-generated", "aggregation", "subscription", "instant-api"];
 
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.GraphQL;
-    public override SdkInterface.InterfaceCapabilities Capabilities => SdkInterface.InterfaceCapabilities.CreateGraphQLDefaults();
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.GraphQl;
+    public override SdkInterface.InterfaceCapabilities Capabilities => SdkInterface.InterfaceCapabilities.CreateGraphQlDefaults();
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;
     protected override Task StopAsyncCore(CancellationToken cancellationToken) => Task.CompletedTask;

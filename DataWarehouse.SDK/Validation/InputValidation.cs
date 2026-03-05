@@ -181,7 +181,7 @@ public sealed class ValidationException : Exception
 public sealed class InputValidator : IInputValidator
 {
     // Cache GetProperties() results per type to avoid repeated reflection on hot validation path
-    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, System.Reflection.PropertyInfo[]> _propertyCache
+    private static readonly System.Collections.Concurrent.ConcurrentDictionary<Type, System.Reflection.PropertyInfo[]> PropertyCache
         = new();
     private readonly BoundedDictionary<Type, object> _validators = new BoundedDictionary<Type, object>(1000);
     private readonly InputValidatorConfig _config;
@@ -261,7 +261,7 @@ public sealed class InputValidator : IInputValidator
 
     private void ValidateSecurityRules<T>(T input, ValidationResult result, ValidationContext? context) where T : class
     {
-        var properties = _propertyCache.GetOrAdd(typeof(T), t => t.GetProperties());
+        var properties = PropertyCache.GetOrAdd(typeof(T), t => t.GetProperties());
 
         foreach (var property in properties)
         {

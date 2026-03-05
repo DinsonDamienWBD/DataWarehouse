@@ -39,7 +39,7 @@ internal sealed class CostAwareApiStrategy : SdkInterface.InterfaceStrategyBase,
     public string[] Tags => new[] { "cost-tracking", "budget", "billing", "quota", "402" };
 
     // SDK contract properties
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.REST;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Rest;
     public override SdkInterface.InterfaceCapabilities Capabilities => new SdkInterface.InterfaceCapabilities(
         SupportsStreaming: false,
         SupportsAuthentication: true,
@@ -249,7 +249,7 @@ internal sealed class CostAwareApiStrategy : SdkInterface.InterfaceStrategyBase,
         }
 
         // Storage read cost (if querying data)
-        if (request.Method == SdkInterface.HttpMethod.GET)
+        if (request.Method == SdkInterface.HttpMethod.Get)
         {
             // Estimate read size based on path complexity
             var estimatedReadMB = EstimateReadSize(request);
@@ -257,9 +257,9 @@ internal sealed class CostAwareApiStrategy : SdkInterface.InterfaceStrategyBase,
         }
 
         // Storage write cost (if writing data)
-        if (request.Method == SdkInterface.HttpMethod.POST ||
-            request.Method == SdkInterface.HttpMethod.PUT ||
-            request.Method == SdkInterface.HttpMethod.PATCH)
+        if (request.Method == SdkInterface.HttpMethod.Post ||
+            request.Method == SdkInterface.HttpMethod.Put ||
+            request.Method == SdkInterface.HttpMethod.Patch)
         {
             var writeMB = Math.Max(request.Body.Length / (1024m * 1024m), 0.1m);
             breakdown["storage.write"] = writeMB * CostFactors["storage.write"];
@@ -312,7 +312,7 @@ internal sealed class CostAwareApiStrategy : SdkInterface.InterfaceStrategyBase,
     private decimal EstimateResponseSize(SdkInterface.InterfaceRequest request)
     {
         // Same logic as read size for GET requests
-        if (request.Method == SdkInterface.HttpMethod.GET)
+        if (request.Method == SdkInterface.HttpMethod.Get)
             return EstimateReadSize(request);
 
         // For writes, response is typically small

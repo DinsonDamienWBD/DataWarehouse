@@ -47,7 +47,7 @@ internal sealed class NatsStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
     public InterfaceCategory Category => InterfaceCategory.Messaging;
     public string[] Tags => ["nats", "messaging", "cloud-native", "jetstream", "pubsub"];
 
-    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.NATS;
+    public override SdkInterface.InterfaceProtocol Protocol => SdkInterface.InterfaceProtocol.Nats;
 
     public override SdkInterface.InterfaceCapabilities Capabilities => new(
         SupportsStreaming: true,
@@ -59,7 +59,7 @@ internal sealed class NatsStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
         SupportsMultiplexing: true,
         DefaultTimeout: TimeSpan.FromSeconds(5), // Request/reply default timeout
         SupportsCancellation: true,
-        RequiresTLS: false // TLS optional
+        RequiresTls: false // TLS optional
     );
 
     protected override Task StartAsyncCore(CancellationToken cancellationToken)
@@ -93,10 +93,10 @@ internal sealed class NatsStrategy : SdkInterface.InterfaceStrategyBase, IPlugin
 
         return request.Method switch
         {
-            SdkInterface.HttpMethod.POST => await HandlePublish(subject, request, cancellationToken),
-            SdkInterface.HttpMethod.GET => HandleSubscribe(subject, request),
-            SdkInterface.HttpMethod.PUT => await HandleRequestReply(subject, request, cancellationToken),
-            SdkInterface.HttpMethod.DELETE => HandleUnsubscribe(subject, request),
+            SdkInterface.HttpMethod.Post => await HandlePublish(subject, request, cancellationToken),
+            SdkInterface.HttpMethod.Get => HandleSubscribe(subject, request),
+            SdkInterface.HttpMethod.Put => await HandleRequestReply(subject, request, cancellationToken),
+            SdkInterface.HttpMethod.Delete => HandleUnsubscribe(subject, request),
             _ => SdkInterface.InterfaceResponse.BadRequest($"Unsupported NATS operation: {request.Method}")
         };
     }

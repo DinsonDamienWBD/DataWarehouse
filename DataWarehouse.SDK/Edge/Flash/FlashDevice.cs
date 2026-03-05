@@ -85,7 +85,7 @@ internal sealed class LinuxMtdFlashDevice : IFlashDevice
         _eraseBlockSize = eraseBlockSize;
         _totalBlocks = totalBlocks;
 
-        // Stub: Open /dev/mtdX with O_RDWR | O_SYNC
+        // Stub: Open /dev/mtdX with ORdwr | O_SYNC
         // Query MEMGETINFO ioctl for erase block size, total size
         // Implementation requires Linux-specific P/Invoke
         // For stub, accept parameters directly

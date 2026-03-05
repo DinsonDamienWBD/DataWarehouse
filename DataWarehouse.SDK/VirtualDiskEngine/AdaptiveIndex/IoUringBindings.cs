@@ -7,7 +7,7 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.AdaptiveIndex;
 /// <summary>
 /// Low-level P/Invoke bindings to liburing.so for io_uring kernel I/O interface.
 /// Provides queue management, SQE preparation helpers, registered buffers,
-/// and NVMe passthrough (IORING_OP_URING_CMD).
+/// and NVMe passthrough (IoringOpUringCmd).
 /// On non-Linux platforms, <see cref="IsAvailable"/> returns false and all operations
 /// should be routed through the fallback <see cref="FileBlockDevice"/>.
 /// </summary>
@@ -17,43 +17,43 @@ public static class IoUringBindings
     // ─── Constants ──────────────────────────────────────────────────────
 
     /// <summary>io_uring opcode for standard read.</summary>
-    public const byte IORING_OP_READ = 22;
+    public const byte IoringOpRead = 22;
 
     /// <summary>io_uring opcode for standard write.</summary>
-    public const byte IORING_OP_WRITE = 23;
+    public const byte IoringOpWrite = 23;
 
     /// <summary>io_uring opcode for read from a registered (fixed) buffer.</summary>
-    public const byte IORING_OP_READ_FIXED = 4;
+    public const byte IoringOpReadFixed = 4;
 
     /// <summary>io_uring opcode for write from a registered (fixed) buffer.</summary>
-    public const byte IORING_OP_WRITE_FIXED = 5;
+    public const byte IoringOpWriteFixed = 5;
 
     /// <summary>io_uring opcode for NVMe passthrough command.</summary>
-    public const byte IORING_OP_URING_CMD = 80;
+    public const byte IoringOpUringCmd = 80;
 
     /// <summary>Setup flag: kernel-side submission polling (no syscall per submit).</summary>
-    public const uint IORING_SETUP_SQPOLL = 1u << 1;
+    public const uint IoringSetupSqpoll = 1u << 1;
 
     /// <summary>Setup flag: I/O polling (busy-wait for completions).</summary>
-    public const uint IORING_SETUP_IOPOLL = 1u << 0;
+    public const uint IoringSetupIopoll = 1u << 0;
 
     /// <summary>Setup flag: single issuer (thread-safety hint to kernel).</summary>
-    public const uint IORING_SETUP_SINGLE_ISSUER = 1u << 12;
+    public const uint IoringSetupSingleIssuer = 1u << 12;
 
     /// <summary>SQE flag: use registered file descriptors.</summary>
-    public const byte IOSQE_FIXED_FILE = 1 << 0;
+    public const byte IosqeFixedFile = 1 << 0;
 
     /// <summary>SQE flag: issue after previous completes.</summary>
-    public const byte IOSQE_IO_LINK = 1 << 2;
+    public const byte IosqeIoLink = 1 << 2;
 
-    /// <summary>Linux O_DIRECT flag for bypassing the page cache.</summary>
-    public const int O_DIRECT = 0x4000;
+    /// <summary>Linux ODirect flag for bypassing the page cache.</summary>
+    public const int ODirect = 0x4000;
 
-    /// <summary>Linux O_RDWR flag.</summary>
-    public const int O_RDWR = 0x0002;
+    /// <summary>Linux ORdwr flag.</summary>
+    public const int ORdwr = 0x0002;
 
-    /// <summary>Linux O_CREAT flag.</summary>
-    public const int O_CREAT = 0x0040;
+    /// <summary>Linux OCreat flag.</summary>
+    public const int OCreat = 0x0040;
 
     // ─── Structs ────────────────────────────────────────────────────────
 
@@ -69,7 +69,7 @@ public static class IoUringBindings
         /// <summary>Requested completion queue entries.</summary>
         public uint CqEntries;
 
-        /// <summary>Setup flags (e.g., IORING_SETUP_SQPOLL).</summary>
+        /// <summary>Setup flags (e.g., IoringSetupSqpoll).</summary>
         public uint Flags;
 
         /// <summary>Idle time in milliseconds before SQ poll thread sleeps.</summary>
@@ -170,7 +170,7 @@ public static class IoUringBindings
         /// <summary>Splice fd or file index for registered files.</summary>
         [FieldOffset(44)] public int SpliceFdIn;
 
-        /// <summary>Padding / cmd field for IORING_OP_URING_CMD.</summary>
+        /// <summary>Padding / cmd field for IoringOpUringCmd.</summary>
         [FieldOffset(48)] public nint CmdAddr;
     }
 
@@ -282,13 +282,13 @@ public static class IoUringBindings
     public static extern int UnregisterBuffers(ref IoUring ring);
 
     /// <summary>
-    /// Registers file descriptors for use with IOSQE_FIXED_FILE.
+    /// Registers file descriptors for use with IosqeFixedFile.
     /// </summary>
     [DllImport("liburing", EntryPoint = "io_uring_register_files", SetLastError = true)]
     public static extern unsafe int RegisterFiles(ref IoUring ring, int* fds, uint nrFds);
 
     /// <summary>
-    /// Opens a file via POSIX open(). Used on Linux for O_DIRECT file access.
+    /// Opens a file via POSIX open(). Used on Linux for ODirect file access.
     /// </summary>
     [DllImport("libc", EntryPoint = "open", SetLastError = true)]
     public static extern int PosixOpen([MarshalAs(UnmanagedType.LPUTF8Str)] string pathname, int flags, int mode);
@@ -302,13 +302,13 @@ public static class IoUringBindings
     // ─── SQE Prep Helpers ───────────────────────────────────────────────
 
     /// <summary>
-    /// Prepares a standard read SQE (IORING_OP_READ).
+    /// Prepares a standard read SQE (IoringOpRead).
     /// </summary>
     public static unsafe void PrepRead(nint sqe, int fd, nint buf, uint nbytes, long offset)
     {
         var s = (IoUringSqe*)sqe;
         *s = default;
-        s->Opcode = IORING_OP_READ;
+        s->Opcode = IoringOpRead;
         s->Fd = fd;
         s->Addr = buf;
         s->Len = nbytes;
@@ -316,13 +316,13 @@ public static class IoUringBindings
     }
 
     /// <summary>
-    /// Prepares a standard write SQE (IORING_OP_WRITE).
+    /// Prepares a standard write SQE (IoringOpWrite).
     /// </summary>
     public static unsafe void PrepWrite(nint sqe, int fd, nint buf, uint nbytes, long offset)
     {
         var s = (IoUringSqe*)sqe;
         *s = default;
-        s->Opcode = IORING_OP_WRITE;
+        s->Opcode = IoringOpWrite;
         s->Fd = fd;
         s->Addr = buf;
         s->Len = nbytes;
@@ -330,14 +330,14 @@ public static class IoUringBindings
     }
 
     /// <summary>
-    /// Prepares a read from a registered (fixed) buffer (IORING_OP_READ_FIXED).
+    /// Prepares a read from a registered (fixed) buffer (IoringOpReadFixed).
     /// Eliminates per-I/O kernel buffer copies.
     /// </summary>
     public static unsafe void PrepReadFixed(nint sqe, int fd, nint buf, uint nbytes, long offset, int bufIndex)
     {
         var s = (IoUringSqe*)sqe;
         *s = default;
-        s->Opcode = IORING_OP_READ_FIXED;
+        s->Opcode = IoringOpReadFixed;
         s->Fd = fd;
         s->Addr = buf;
         s->Len = nbytes;
@@ -346,14 +346,14 @@ public static class IoUringBindings
     }
 
     /// <summary>
-    /// Prepares a write from a registered (fixed) buffer (IORING_OP_WRITE_FIXED).
+    /// Prepares a write from a registered (fixed) buffer (IoringOpWriteFixed).
     /// Eliminates per-I/O kernel buffer copies.
     /// </summary>
     public static unsafe void PrepWriteFixed(nint sqe, int fd, nint buf, uint nbytes, long offset, int bufIndex)
     {
         var s = (IoUringSqe*)sqe;
         *s = default;
-        s->Opcode = IORING_OP_WRITE_FIXED;
+        s->Opcode = IoringOpWriteFixed;
         s->Fd = fd;
         s->Addr = buf;
         s->Len = nbytes;
@@ -362,14 +362,14 @@ public static class IoUringBindings
     }
 
     /// <summary>
-    /// Prepares an NVMe passthrough command SQE (IORING_OP_URING_CMD).
+    /// Prepares an NVMe passthrough command SQE (IoringOpUringCmd).
     /// Only available on raw NVMe block devices (/dev/nvme*).
     /// </summary>
     public static unsafe void PrepUringCmd(nint sqe, int fd, nint cmdBuf, uint cmdLen)
     {
         var s = (IoUringSqe*)sqe;
         *s = default;
-        s->Opcode = IORING_OP_URING_CMD;
+        s->Opcode = IoringOpUringCmd;
         s->Fd = fd;
         s->CmdAddr = cmdBuf;
         s->Len = cmdLen;

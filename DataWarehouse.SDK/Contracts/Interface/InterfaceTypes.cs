@@ -231,19 +231,19 @@ public enum InterfaceProtocol
     /// REST (Representational State Transfer) over HTTP/HTTPS.
     /// Standard web API protocol using HTTP methods and JSON/XML payloads.
     /// </summary>
-    REST = 1,
+    Rest = 1,
 
     /// <summary>
     /// gRPC (Google Remote Procedure Call) protocol.
     /// High-performance RPC framework using HTTP/2 and Protocol Buffers.
     /// </summary>
-    gRPC = 2,
+    GRpc = 2,
 
     /// <summary>
     /// GraphQL query language protocol.
     /// Flexible API query language allowing clients to request specific data structures.
     /// </summary>
-    GraphQL = 3,
+    GraphQl = 3,
 
     /// <summary>
     /// WebSocket protocol for bidirectional communication.
@@ -261,13 +261,13 @@ public enum InterfaceProtocol
     /// MQTT (Message Queuing Telemetry Transport) protocol.
     /// Lightweight publish-subscribe messaging protocol, often used for IoT.
     /// </summary>
-    MQTT = 6,
+    Mqtt = 6,
 
     /// <summary>
     /// AMQP (Advanced Message Queuing Protocol).
     /// Enterprise message-oriented middleware protocol for message queuing.
     /// </summary>
-    AMQP = 7,
+    Amqp = 7,
 
     /// <summary>
     /// Apache Thrift RPC protocol.
@@ -297,7 +297,7 @@ public enum InterfaceProtocol
     /// NATS (Neural Autonomic Transport System) messaging protocol.
     /// High-performance cloud-native messaging system.
     /// </summary>
-    NATS = 12,
+    Nats = 12,
 
     /// <summary>
     /// Redis Serialization Protocol (RESP).
@@ -324,45 +324,45 @@ public enum HttpMethod
     /// <summary>
     /// GET method - retrieve a resource.
     /// </summary>
-    GET,
+    Get,
 
     /// <summary>
     /// POST method - create a new resource or execute an operation.
     /// </summary>
-    POST,
+    Post,
 
     /// <summary>
     /// PUT method - update or replace a resource.
     /// </summary>
-    PUT,
+    Put,
 
     /// <summary>
     /// DELETE method - remove a resource.
     /// </summary>
-    DELETE,
+    Delete,
 
     /// <summary>
     /// PATCH method - partially update a resource.
     /// </summary>
-    PATCH,
+    Patch,
 
     /// <summary>
     /// HEAD method - retrieve headers only, no body.
     /// </summary>
-    HEAD,
+    Head,
 
     /// <summary>
     /// OPTIONS method - query supported methods and capabilities.
     /// </summary>
-    OPTIONS,
+    Options,
 
     /// <summary>
     /// TRACE method - echo the received request for debugging.
     /// </summary>
-    TRACE,
+    Trace,
 
     /// <summary>
     /// CONNECT method - establish a tunnel through a proxy.
     /// </summary>
-    CONNECT
+    Connect
 }
