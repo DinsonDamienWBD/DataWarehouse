@@ -482,7 +482,7 @@ public sealed class OntologyBasedOrganizationStrategy : FeatureStrategyBase
         var classLabels = _classes.Values.Select(c => c.Label).Take(20).ToList();
         var prompt = $"Classify the following content into one of these categories: {string.Join(", ", classLabels)}\n\nContent: {content.Substring(0, Math.Min(500, content.Length))}\n\nRespond with only the category name.";
 
-        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 50 }, ct);
+        var response = await AiProvider.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 50 }, ct);
 
         var matchedClass = _classes.Values.FirstOrDefault(c =>
             c.Label.Equals(response.Content?.Trim(), StringComparison.OrdinalIgnoreCase));
@@ -1418,7 +1418,7 @@ public sealed class ContextAwareStorageStrategy : FeatureStrategyBase
                 var content = Encoding.UTF8.GetString(data);
                 if (content.Length > 0 && content.Length < 10000)
                 {
-                    var summaryRequest = new AIRequest
+                    var summaryRequest = new AiRequest
                     {
                         Prompt = $"Summarize in one sentence: {content.Substring(0, Math.Min(2000, content.Length))}",
                         MaxTokens = 100
@@ -2025,7 +2025,7 @@ public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
 
         var prompt = $"Validate this content against schema '{schema.SchemaId}' with fields: {string.Join(", ", schema.Fields.Select(f => f.Name))}. List any semantic issues found.\n\nContent:\n{content.Substring(0, Math.Min(1000, content.Length))}";
 
-        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 200 }, ct);
+        var response = await AiProvider.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 200 }, ct);
 
         var issues = new List<SemanticValidationIssue>();
         if (response.Content?.Contains("issue", StringComparison.OrdinalIgnoreCase) == true ||
@@ -2050,7 +2050,7 @@ public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
 
         var prompt = $"What type of data is this? Reply with one word (JSON, XML, CSV, Markdown, PlainText, Code, or Other):\n\n{content.Substring(0, Math.Min(500, content.Length))}";
 
-        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 20 }, ct);
+        var response = await AiProvider.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 20 }, ct);
 
         if (!string.IsNullOrWhiteSpace(response.Content))
         {
@@ -2495,7 +2495,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
 
         var prompt = $"Rate the semantic similarity between these two texts from 0 to 1:\n\nText 1: {source.Substring(0, Math.Min(500, source.Length))}\n\nText 2: {target.Substring(0, Math.Min(500, target.Length))}\n\nRespond with just a number.";
 
-        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 10 }, ct);
+        var response = await AiProvider.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 10 }, ct);
 
         if (float.TryParse(response.Content?.Trim(), out var score))
             return Math.Clamp(score, 0, 1);
@@ -2513,7 +2513,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
 
         var prompt = $"Find matching terms between these vocabularies. Format: term1=term2, one per line.\n\nVocabulary 1: {terms1}\nVocabulary 2: {terms2}";
 
-        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 200 }, ct);
+        var response = await AiProvider.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 200 }, ct);
 
         var mappings = new List<TermMapping>();
         if (response.Content != null)
@@ -2546,7 +2546,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
         var termList = string.Join(", ", vocabulary.Terms.Values.Take(20).Select(t => t.Label));
         var prompt = $"Which of these terms apply to this content? List applicable terms.\n\nTerms: {termList}\n\nContent: {content.Substring(0, Math.Min(500, content.Length))}";
 
-        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 100 }, ct);
+        var response = await AiProvider.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 100 }, ct);
 
         var annotations = new List<SemanticAnnotationItem>();
         if (response.Content != null)

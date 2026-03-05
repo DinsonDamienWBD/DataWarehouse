@@ -22,7 +22,7 @@ public sealed class StoragePricing
     /// <summary>
     /// Storage cost per GB per month.
     /// </summary>
-    public required decimal StorageCostPerGBMonth { get; init; }
+    public required decimal StorageCostPerGbMonth { get; init; }
 
     /// <summary>
     /// Read operation cost per 10,000 operations.
@@ -221,7 +221,7 @@ public sealed class CostAwareDataPlacementStrategy : AiEnhancedStrategyBase
     /// <summary>
     /// Gets all registered tiers.
     /// </summary>
-    public IReadOnlyList<StoragePricing> GetTiers() => _tiers.Values.OrderBy(t => t.StorageCostPerGBMonth).ToList();
+    public IReadOnlyList<StoragePricing> GetTiers() => _tiers.Values.OrderBy(t => t.StorageCostPerGbMonth).ToList();
 
     /// <summary>
     /// Sets the budget constraint.
@@ -503,7 +503,7 @@ public sealed class CostAwareDataPlacementStrategy : AiEnhancedStrategyBase
     private static decimal CalculateMonthlyCost(long sizeBytes, long monthlyReadOps, long monthlyWriteOps, StoragePricing tier, TimeSpan duration)
     {
         var sizeGB = sizeBytes / (1024m * 1024 * 1024);
-        var storageCost = sizeGB * tier.StorageCostPerGBMonth;
+        var storageCost = sizeGB * tier.StorageCostPerGbMonth;
         var readCost = (monthlyReadOps / 10000m) * tier.ReadCostPer10K;
         var writeCost = (monthlyWriteOps / 10000m) * tier.WriteCostPer10K;
 
@@ -529,7 +529,7 @@ public sealed class CostAwareDataPlacementStrategy : AiEnhancedStrategyBase
         {
             TierId = "hot",
             Name = "Hot Storage",
-            StorageCostPerGBMonth = 0.023m,
+            StorageCostPerGbMonth = 0.023m,
             ReadCostPer10K = 0.004m,
             WriteCostPer10K = 0.005m,
             RetrievalCostPerGB = 0m,
@@ -542,7 +542,7 @@ public sealed class CostAwareDataPlacementStrategy : AiEnhancedStrategyBase
         {
             TierId = "cool",
             Name = "Cool Storage",
-            StorageCostPerGBMonth = 0.01m,
+            StorageCostPerGbMonth = 0.01m,
             ReadCostPer10K = 0.01m,
             WriteCostPer10K = 0.01m,
             RetrievalCostPerGB = 0.01m,
@@ -555,7 +555,7 @@ public sealed class CostAwareDataPlacementStrategy : AiEnhancedStrategyBase
         {
             TierId = "archive",
             Name = "Archive Storage",
-            StorageCostPerGBMonth = 0.002m,
+            StorageCostPerGbMonth = 0.002m,
             ReadCostPer10K = 0.10m,
             WriteCostPer10K = 0.10m,
             RetrievalCostPerGB = 0.02m,

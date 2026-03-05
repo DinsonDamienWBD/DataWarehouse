@@ -29,7 +29,7 @@ public sealed class CouchDbStorageStrategy : DatabaseStorageStrategyBase
     public override string StrategyId => "couchdb";
     public override string Name => "CouchDB Storage";
     public override StorageTier Tier => StorageTier.Warm;
-    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSQL;
+    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSql;
     public override string Engine => "CouchDB";
 
     public override StorageCapabilities Capabilities => new()

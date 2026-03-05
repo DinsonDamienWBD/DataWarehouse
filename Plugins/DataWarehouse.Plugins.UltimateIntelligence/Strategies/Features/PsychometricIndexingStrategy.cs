@@ -58,7 +58,7 @@ public sealed class PsychometricIndexingStrategy : FeatureStrategyBase
 
             var prompt = BuildAnalysisPrompt(content, depth, emotionModel, enablePersonality, enableDeception);
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 800,
@@ -207,7 +207,7 @@ Return JSON:
   ""neuroticism"": 0.0-1.0
 }}";
 
-                var response = await AiProvider.CompleteAsync(new AIRequest
+                var response = await AiProvider.CompleteAsync(new AiRequest
                 {
                     Prompt = prompt,
                     MaxTokens = 200,

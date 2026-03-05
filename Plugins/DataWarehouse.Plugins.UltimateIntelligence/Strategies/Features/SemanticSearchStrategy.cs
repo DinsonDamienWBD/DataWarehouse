@@ -166,7 +166,7 @@ public sealed class SemanticSearchStrategy : FeatureStrategyBase
         }
         prompt += "\nReturn the numbers in order of relevance, comma-separated.";
 
-        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 100 }, ct);
+        var response = await AiProvider.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 100 }, ct);
 
         // Parse reranking - simplified
         return results;

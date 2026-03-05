@@ -25,7 +25,7 @@ public sealed class VitessStorageStrategy : DatabaseStorageStrategyBase
     public override string StrategyId => "vitess";
     public override string Name => "Vitess NewSQL Storage";
     public override StorageTier Tier => StorageTier.Hot;
-    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NewSQL;
+    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NewSql;
     public override string Engine => "Vitess";
 
     public override StorageCapabilities Capabilities => new()

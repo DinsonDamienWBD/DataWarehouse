@@ -197,7 +197,7 @@ public class CacheOptions
     public long MaxSizeBytes { get; set; }
 
     /// <summary>Eviction policy when cache is full.</summary>
-    public CacheEvictionPolicy EvictionPolicy { get; set; } = CacheEvictionPolicy.LRU;
+    public CacheEvictionPolicy EvictionPolicy { get; set; } = CacheEvictionPolicy.Lru;
 
     /// <summary>Interval for background cleanup of expired items.</summary>
     public TimeSpan CleanupInterval { get; set; } = TimeSpan.FromMinutes(5);
@@ -219,7 +219,7 @@ public class CacheOptions
         DefaultTtl = TimeSpan.FromHours(1),
         MaxItems = 10000,
         MaxSizeBytes = 100 * 1024 * 1024, // 100 MB
-        EvictionPolicy = CacheEvictionPolicy.LRU,
+        EvictionPolicy = CacheEvictionPolicy.Lru,
         CleanupInterval = TimeSpan.FromMinutes(5)
     };
 
@@ -231,7 +231,7 @@ public class CacheOptions
         DefaultTtl = TimeSpan.FromMinutes(5),
         MaxItems = 50000,
         MaxSizeBytes = 500 * 1024 * 1024, // 500 MB
-        EvictionPolicy = CacheEvictionPolicy.LRU,
+        EvictionPolicy = CacheEvictionPolicy.Lru,
         CleanupInterval = TimeSpan.FromMinutes(1),
         ExtendTtlOnAccess = true,
         TtlExtensionAmount = TimeSpan.FromMinutes(5)
@@ -245,7 +245,7 @@ public class CacheOptions
         DefaultTtl = TimeSpan.FromDays(7),
         MaxItems = 100000,
         MaxSizeBytes = 1024 * 1024 * 1024, // 1 GB
-        EvictionPolicy = CacheEvictionPolicy.LFU,
+        EvictionPolicy = CacheEvictionPolicy.Lfu,
         CleanupInterval = TimeSpan.FromHours(1)
     };
 }
@@ -256,13 +256,13 @@ public class CacheOptions
 public enum CacheEvictionPolicy
 {
     /// <summary>Least Recently Used - evict items not accessed recently.</summary>
-    LRU,
+    Lru,
 
     /// <summary>Least Frequently Used - evict items accessed least often.</summary>
-    LFU,
+    Lfu,
 
     /// <summary>First In First Out - evict oldest items first.</summary>
-    FIFO,
+    Fifo,
 
     /// <summary>Random - evict random items.</summary>
     Random,

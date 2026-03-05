@@ -32,9 +32,9 @@ public sealed class GeminiProviderStrategy : AIProviderStrategyBase
     public override string DisplayName => "Google Gemini";
 
     /// <inheritdoc/>
-    public override AICapabilities Capabilities =>
-        AICapabilities.TextCompletion | AICapabilities.ChatCompletion | AICapabilities.Streaming |
-        AICapabilities.Embeddings | AICapabilities.ImageAnalysis | AICapabilities.CodeGeneration;
+    public override AiCapabilities Capabilities =>
+        AiCapabilities.TextCompletion | AiCapabilities.ChatCompletion | AiCapabilities.Streaming |
+        AiCapabilities.Embeddings | AiCapabilities.ImageAnalysis | AiCapabilities.CodeGeneration;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -66,7 +66,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     /// <inheritdoc/>
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default)
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
@@ -103,21 +103,21 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             if (result?.UsageMetadata != null)
                 RecordTokens(result.UsageMetadata.TotalTokenCount);
 
-            return new AIResponse
+            return new AiResponse
             {
                 Success = true,
                 Content = textPart?.Text ?? string.Empty,
                 FinishReason = candidate?.FinishReason?.ToLowerInvariant(),
                 Usage = result?.UsageMetadata != null
-                    ? new AIUsage { PromptTokens = result.UsageMetadata.PromptTokenCount, CompletionTokens = result.UsageMetadata.CandidatesTokenCount }
+                    ? new AiUsage { PromptTokens = result.UsageMetadata.PromptTokenCount, CompletionTokens = result.UsageMetadata.CandidatesTokenCount }
                     : null
             };
         });
     }
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(
-        AIRequest request,
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(
+        AiRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var apiKey = GetRequiredConfig("ApiKey");
@@ -159,12 +159,12 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
 
             if (textPart?.Text != null)
             {
-                yield return new AIStreamChunk { Content = textPart.Text };
+                yield return new AiStreamChunk { Content = textPart.Text };
             }
 
             if (candidate?.FinishReason != null)
             {
-                yield return new AIStreamChunk { IsFinal = true, FinishReason = candidate.FinishReason.ToLowerInvariant() };
+                yield return new AiStreamChunk { IsFinal = true, FinishReason = candidate.FinishReason.ToLowerInvariant() };
                 break;
             }
         }
@@ -195,7 +195,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         });
     }
 
-    private static List<object> BuildContents(AIRequest request)
+    private static List<object> BuildContents(AiRequest request)
     {
         var contents = new List<object>();
 
@@ -299,9 +299,9 @@ public sealed class MistralProviderStrategy : AIProviderStrategyBase
     public override string DisplayName => "Mistral AI";
 
     /// <inheritdoc/>
-    public override AICapabilities Capabilities =>
-        AICapabilities.TextCompletion | AICapabilities.ChatCompletion | AICapabilities.Streaming |
-        AICapabilities.Embeddings | AICapabilities.FunctionCalling | AICapabilities.CodeGeneration;
+    public override AiCapabilities Capabilities =>
+        AiCapabilities.TextCompletion | AiCapabilities.ChatCompletion | AiCapabilities.Streaming |
+        AiCapabilities.Embeddings | AiCapabilities.FunctionCalling | AiCapabilities.CodeGeneration;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -334,7 +334,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     /// <inheritdoc/>
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default)
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
@@ -374,28 +374,28 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             if (result?.Usage != null)
                 RecordTokens(result.Usage.TotalTokens);
 
-            return new AIResponse
+            return new AiResponse
             {
                 Success = true,
                 Content = choice?.Message?.Content ?? string.Empty,
                 FinishReason = choice?.FinishReason,
                 FunctionCall = choice?.Message?.ToolCalls?.FirstOrDefault()?.Function != null
-                    ? new AIFunctionCall
+                    ? new AiFunctionCall
                     {
                         Name = choice.Message.ToolCalls[0].Function.Name,
                         Arguments = choice.Message.ToolCalls[0].Function.Arguments
                     }
                     : null,
                 Usage = result?.Usage != null
-                    ? new AIUsage { PromptTokens = result.Usage.PromptTokens, CompletionTokens = result.Usage.CompletionTokens }
+                    ? new AiUsage { PromptTokens = result.Usage.PromptTokens, CompletionTokens = result.Usage.CompletionTokens }
                     : null
             };
         });
     }
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(
-        AIRequest request,
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(
+        AiRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var apiKey = GetRequiredConfig("ApiKey");
@@ -431,7 +431,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             var data = line.Substring(6);
             if (data == "[DONE]")
             {
-                yield return new AIStreamChunk { IsFinal = true, FinishReason = "stop" };
+                yield return new AiStreamChunk { IsFinal = true, FinishReason = "stop" };
                 break;
             }
 
@@ -439,7 +439,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             var delta = chunk?.Choices?.FirstOrDefault()?.Delta;
             if (delta?.Content != null)
             {
-                yield return new AIStreamChunk { Content = delta.Content };
+                yield return new AiStreamChunk { Content = delta.Content };
             }
         }
     }
@@ -469,7 +469,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         });
     }
 
-    private static List<object> BuildMessages(AIRequest request)
+    private static List<object> BuildMessages(AiRequest request)
     {
         var messages = new List<object>();
 
@@ -577,9 +577,9 @@ public sealed class CohereProviderStrategy : AIProviderStrategyBase
     public override string DisplayName => "Cohere";
 
     /// <inheritdoc/>
-    public override AICapabilities Capabilities =>
-        AICapabilities.TextCompletion | AICapabilities.ChatCompletion | AICapabilities.Streaming |
-        AICapabilities.Embeddings | AICapabilities.CodeGeneration;
+    public override AiCapabilities Capabilities =>
+        AiCapabilities.TextCompletion | AiCapabilities.ChatCompletion | AiCapabilities.Streaming |
+        AiCapabilities.Embeddings | AiCapabilities.CodeGeneration;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -612,7 +612,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     /// <inheritdoc/>
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default)
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
@@ -643,21 +643,21 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             if (result?.Meta?.Tokens != null)
                 RecordTokens(result.Meta.Tokens.InputTokens + result.Meta.Tokens.OutputTokens);
 
-            return new AIResponse
+            return new AiResponse
             {
                 Success = true,
                 Content = result?.Text ?? string.Empty,
                 FinishReason = result?.FinishReason,
                 Usage = result?.Meta?.Tokens != null
-                    ? new AIUsage { PromptTokens = result.Meta.Tokens.InputTokens, CompletionTokens = result.Meta.Tokens.OutputTokens }
+                    ? new AiUsage { PromptTokens = result.Meta.Tokens.InputTokens, CompletionTokens = result.Meta.Tokens.OutputTokens }
                     : null
             };
         });
     }
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(
-        AIRequest request,
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(
+        AiRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var apiKey = GetRequiredConfig("ApiKey");
@@ -696,11 +696,11 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
 
             if (chunk?.EventType == "text-generation")
             {
-                yield return new AIStreamChunk { Content = chunk.Text ?? "" };
+                yield return new AiStreamChunk { Content = chunk.Text ?? "" };
             }
             else if (chunk?.EventType == "stream-end")
             {
-                yield return new AIStreamChunk { IsFinal = true, FinishReason = chunk.FinishReason };
+                yield return new AiStreamChunk { IsFinal = true, FinishReason = chunk.FinishReason };
                 break;
             }
         }
@@ -736,7 +736,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         });
     }
 
-    private static List<object> BuildChatHistory(AIRequest request)
+    private static List<object> BuildChatHistory(AiRequest request)
     {
         var history = new List<object>();
 
@@ -808,9 +808,9 @@ public sealed class PerplexityProviderStrategy : AIProviderStrategyBase
     public override string DisplayName => "Perplexity AI";
 
     /// <inheritdoc/>
-    public override AICapabilities Capabilities =>
-        AICapabilities.TextCompletion | AICapabilities.ChatCompletion | AICapabilities.Streaming |
-        AICapabilities.CodeGeneration;
+    public override AiCapabilities Capabilities =>
+        AiCapabilities.TextCompletion | AiCapabilities.ChatCompletion | AiCapabilities.Streaming |
+        AiCapabilities.CodeGeneration;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -842,7 +842,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     /// <inheritdoc/>
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default)
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
@@ -872,13 +872,13 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             if (result?.Usage != null)
                 RecordTokens(result.Usage.TotalTokens);
 
-            return new AIResponse
+            return new AiResponse
             {
                 Success = true,
                 Content = choice?.Message?.Content ?? string.Empty,
                 FinishReason = choice?.FinishReason,
                 Usage = result?.Usage != null
-                    ? new AIUsage { PromptTokens = result.Usage.PromptTokens, CompletionTokens = result.Usage.CompletionTokens }
+                    ? new AiUsage { PromptTokens = result.Usage.PromptTokens, CompletionTokens = result.Usage.CompletionTokens }
                     : null,
                 Metadata = result?.Citations != null
                     ? new Dictionary<string, object> { ["citations"] = result.Citations }
@@ -888,8 +888,8 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(
-        AIRequest request,
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(
+        AiRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var apiKey = GetRequiredConfig("ApiKey");
@@ -925,7 +925,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             var data = line.Substring(6);
             if (data == "[DONE]")
             {
-                yield return new AIStreamChunk { IsFinal = true, FinishReason = "stop" };
+                yield return new AiStreamChunk { IsFinal = true, FinishReason = "stop" };
                 break;
             }
 
@@ -933,7 +933,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             var delta = chunk?.Choices?.FirstOrDefault()?.Delta;
             if (delta?.Content != null)
             {
-                yield return new AIStreamChunk { Content = delta.Content };
+                yield return new AiStreamChunk { Content = delta.Content };
             }
         }
     }
@@ -944,7 +944,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         throw new NotSupportedException("Perplexity AI does not provide an embeddings API.");
     }
 
-    private static List<object> BuildMessages(AIRequest request)
+    private static List<object> BuildMessages(AiRequest request)
     {
         var messages = new List<object>();
 
@@ -1030,9 +1030,9 @@ public sealed class GroqProviderStrategy : AIProviderStrategyBase
     public override string DisplayName => "Groq";
 
     /// <inheritdoc/>
-    public override AICapabilities Capabilities =>
-        AICapabilities.TextCompletion | AICapabilities.ChatCompletion | AICapabilities.Streaming |
-        AICapabilities.FunctionCalling | AICapabilities.CodeGeneration;
+    public override AiCapabilities Capabilities =>
+        AiCapabilities.TextCompletion | AiCapabilities.ChatCompletion | AiCapabilities.Streaming |
+        AiCapabilities.FunctionCalling | AiCapabilities.CodeGeneration;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -1064,7 +1064,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     /// <inheritdoc/>
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default)
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
@@ -1104,28 +1104,28 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             if (result?.Usage != null)
                 RecordTokens(result.Usage.TotalTokens);
 
-            return new AIResponse
+            return new AiResponse
             {
                 Success = true,
                 Content = choice?.Message?.Content ?? string.Empty,
                 FinishReason = choice?.FinishReason,
                 FunctionCall = choice?.Message?.ToolCalls?.FirstOrDefault()?.Function != null
-                    ? new AIFunctionCall
+                    ? new AiFunctionCall
                     {
                         Name = choice.Message.ToolCalls[0].Function.Name,
                         Arguments = choice.Message.ToolCalls[0].Function.Arguments
                     }
                     : null,
                 Usage = result?.Usage != null
-                    ? new AIUsage { PromptTokens = result.Usage.PromptTokens, CompletionTokens = result.Usage.CompletionTokens }
+                    ? new AiUsage { PromptTokens = result.Usage.PromptTokens, CompletionTokens = result.Usage.CompletionTokens }
                     : null
             };
         });
     }
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(
-        AIRequest request,
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(
+        AiRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var apiKey = GetRequiredConfig("ApiKey");
@@ -1161,7 +1161,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             var data = line.Substring(6);
             if (data == "[DONE]")
             {
-                yield return new AIStreamChunk { IsFinal = true, FinishReason = "stop" };
+                yield return new AiStreamChunk { IsFinal = true, FinishReason = "stop" };
                 break;
             }
 
@@ -1169,7 +1169,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             var delta = chunk?.Choices?.FirstOrDefault()?.Delta;
             if (delta?.Content != null)
             {
-                yield return new AIStreamChunk { Content = delta.Content };
+                yield return new AiStreamChunk { Content = delta.Content };
             }
         }
     }
@@ -1180,7 +1180,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         throw new NotSupportedException("Groq does not provide an embeddings API.");
     }
 
-    private static List<object> BuildMessages(AIRequest request)
+    private static List<object> BuildMessages(AiRequest request)
     {
         var messages = new List<object>();
 
@@ -1278,9 +1278,9 @@ public sealed class TogetherProviderStrategy : AIProviderStrategyBase
     public override string DisplayName => "Together AI";
 
     /// <inheritdoc/>
-    public override AICapabilities Capabilities =>
-        AICapabilities.TextCompletion | AICapabilities.ChatCompletion | AICapabilities.Streaming |
-        AICapabilities.Embeddings | AICapabilities.CodeGeneration | AICapabilities.ImageGeneration;
+    public override AiCapabilities Capabilities =>
+        AiCapabilities.TextCompletion | AiCapabilities.ChatCompletion | AiCapabilities.Streaming |
+        AiCapabilities.Embeddings | AiCapabilities.CodeGeneration | AiCapabilities.ImageGeneration;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -1313,7 +1313,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     /// <inheritdoc/>
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default)
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
@@ -1343,21 +1343,21 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             if (result?.Usage != null)
                 RecordTokens(result.Usage.TotalTokens);
 
-            return new AIResponse
+            return new AiResponse
             {
                 Success = true,
                 Content = choice?.Message?.Content ?? string.Empty,
                 FinishReason = choice?.FinishReason,
                 Usage = result?.Usage != null
-                    ? new AIUsage { PromptTokens = result.Usage.PromptTokens, CompletionTokens = result.Usage.CompletionTokens }
+                    ? new AiUsage { PromptTokens = result.Usage.PromptTokens, CompletionTokens = result.Usage.CompletionTokens }
                     : null
             };
         });
     }
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(
-        AIRequest request,
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(
+        AiRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var apiKey = GetRequiredConfig("ApiKey");
@@ -1393,7 +1393,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             var data = line.Substring(6);
             if (data == "[DONE]")
             {
-                yield return new AIStreamChunk { IsFinal = true, FinishReason = "stop" };
+                yield return new AiStreamChunk { IsFinal = true, FinishReason = "stop" };
                 break;
             }
 
@@ -1401,7 +1401,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             var delta = chunk?.Choices?.FirstOrDefault()?.Delta;
             if (delta?.Content != null)
             {
-                yield return new AIStreamChunk { Content = delta.Content };
+                yield return new AiStreamChunk { Content = delta.Content };
             }
         }
     }
@@ -1431,7 +1431,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         });
     }
 
-    private static List<object> BuildMessages(AIRequest request)
+    private static List<object> BuildMessages(AiRequest request)
     {
         var messages = new List<object>();
 

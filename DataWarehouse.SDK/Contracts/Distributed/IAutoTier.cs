@@ -217,7 +217,7 @@ namespace DataWarehouse.SDK.Contracts.Distributed
         /// <summary>
         /// Cost per GB per month for this tier.
         /// </summary>
-        public required double CostPerGBMonth { get; init; }
+        public required double CostPerGbMonth { get; init; }
 
         /// <summary>
         /// Performance class of this tier.

@@ -84,7 +84,7 @@ Return your classification as JSON with format:
 }}";
             }
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 500,

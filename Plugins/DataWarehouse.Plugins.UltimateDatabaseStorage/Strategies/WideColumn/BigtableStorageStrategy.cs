@@ -32,7 +32,7 @@ public sealed class BigtableStorageStrategy : DatabaseStorageStrategyBase
     public override string StrategyId => "bigtable";
     public override string Name => "Google Cloud Bigtable Storage";
     public override StorageTier Tier => StorageTier.Hot;
-    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSQL; // WideColumn not available in SDK
+    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSql; // WideColumn not available in SDK
     public override string Engine => "Bigtable";
 
     public override StorageCapabilities Capabilities => new()

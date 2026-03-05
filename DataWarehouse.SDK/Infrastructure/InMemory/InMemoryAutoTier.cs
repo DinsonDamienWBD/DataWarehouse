@@ -30,7 +30,7 @@ namespace DataWarehouse.SDK.Infrastructure.InMemory
                 Description = "Default single-node storage tier",
                 CapacityBytes = long.MaxValue,
                 UsedBytes = 0,
-                CostPerGBMonth = 0,
+                CostPerGbMonth = 0,
                 PerformanceClass = TierPerformanceClass.Hot
             };
         }

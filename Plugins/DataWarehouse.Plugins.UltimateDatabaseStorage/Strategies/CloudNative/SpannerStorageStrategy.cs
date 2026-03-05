@@ -30,7 +30,7 @@ public sealed class SpannerStorageStrategy : DatabaseStorageStrategyBase
     public override string StrategyId => "spanner";
     public override string Name => "Google Cloud Spanner Storage";
     public override StorageTier Tier => StorageTier.Warm;
-    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NewSQL;
+    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NewSql;
     public override string Engine => "Cloud Spanner";
 
     public override StorageCapabilities Capabilities => new()

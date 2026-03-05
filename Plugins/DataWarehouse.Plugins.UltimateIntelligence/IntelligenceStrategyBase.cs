@@ -355,9 +355,9 @@ public abstract class IntelligenceStrategyBase : StrategyBase, IIntelligenceStra
 }
 
 /// <summary>
-/// Base class for AI provider strategies that implement IAIProvider.
+/// Base class for AI provider strategies that implement IAiProvider.
 /// </summary>
-public abstract class AIProviderStrategyBase : IntelligenceStrategyBase, IAIProvider
+public abstract class AIProviderStrategyBase : IntelligenceStrategyBase, IAiProvider
 {
     /// <inheritdoc/>
     public override IntelligenceStrategyCategory Category => IntelligenceStrategyCategory.AiProvider;
@@ -369,13 +369,13 @@ public abstract class AIProviderStrategyBase : IntelligenceStrategyBase, IAIProv
     public abstract string DisplayName { get; }
 
     /// <inheritdoc/>
-    public abstract AICapabilities Capabilities { get; }
+    public abstract AiCapabilities Capabilities { get; }
 
     /// <inheritdoc/>
-    public abstract Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);
+    public abstract Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);
 
     /// <inheritdoc/>
-    public abstract IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, CancellationToken ct = default);
+    public abstract IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, CancellationToken ct = default);
 
     /// <inheritdoc/>
     public abstract Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
@@ -472,7 +472,7 @@ public abstract class FeatureStrategyBase : IntelligenceStrategyBase
     /// <summary>
     /// Gets the AI provider to use for this feature.
     /// </summary>
-    protected IAIProvider? AiProvider { get; private set; }
+    protected IAiProvider? AiProvider { get; private set; }
 
     /// <summary>
     /// Gets the vector store to use for this feature.
@@ -487,7 +487,7 @@ public abstract class FeatureStrategyBase : IntelligenceStrategyBase
     /// <summary>
     /// Sets the AI provider for this feature.
     /// </summary>
-    public void SetAIProvider(IAIProvider provider)
+    public void SetAIProvider(IAiProvider provider)
     {
         AiProvider = provider;
     }

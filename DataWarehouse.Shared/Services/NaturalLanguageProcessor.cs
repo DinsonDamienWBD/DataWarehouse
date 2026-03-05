@@ -177,7 +177,7 @@ public sealed class NaturalLanguageProcessor : IDisposable
         ["help"] = "Show help for a command"
     };
 
-    private readonly IAIProviderRegistry? _aiRegistry;
+    private readonly IAiProviderRegistry? _aiRegistry;
     private readonly NlpMessageBusRouter? _messageBusRouter;
     private readonly ConversationContextManager _contextManager;
     private readonly CLILearningStore _learningStore;
@@ -191,7 +191,7 @@ public sealed class NaturalLanguageProcessor : IDisposable
     /// <param name="learningStorePath">Optional path for persisting learned patterns.</param>
     /// <param name="aiConfidenceThreshold">Minimum pattern confidence before AI fallback (default 0.6).</param>
     public NaturalLanguageProcessor(
-        IAIProviderRegistry? aiRegistry = null,
+        IAiProviderRegistry? aiRegistry = null,
         string? learningStorePath = null,
         double aiConfidenceThreshold = 0.6)
     {
@@ -209,7 +209,7 @@ public sealed class NaturalLanguageProcessor : IDisposable
     /// <param name="aiConfidenceThreshold">Minimum pattern confidence before AI fallback (default 0.6).</param>
     /// <param name="messageBusRouter">Optional message bus router for server-side NLP.</param>
     public NaturalLanguageProcessor(
-        IAIProviderRegistry? aiRegistry,
+        IAiProviderRegistry? aiRegistry,
         string? learningStorePath,
         double aiConfidenceThreshold,
         NlpMessageBusRouter? messageBusRouter)
@@ -418,13 +418,13 @@ public sealed class NaturalLanguageProcessor : IDisposable
     /// </summary>
     private async Task<CommandIntent> ProcessWithAIAsync(
         string input,
-        IAIProvider provider,
+        IAiProvider provider,
         CancellationToken ct)
     {
         var systemPrompt = BuildSystemPrompt();
         var userPrompt = $"Parse this command: \"{input}\"\n\nRespond with JSON only, no explanation.";
 
-        var request = new AIRequest
+        var request = new AiRequest
         {
             Prompt = userPrompt,
             SystemMessage = systemPrompt,
@@ -738,7 +738,7 @@ Rules:
 
         try
         {
-            var request = new AIRequest
+            var request = new AiRequest
             {
                 Prompt = $"User question about DataWarehouse CLI: \"{query}\"",
                 SystemMessage = BuildHelpSystemPrompt(),

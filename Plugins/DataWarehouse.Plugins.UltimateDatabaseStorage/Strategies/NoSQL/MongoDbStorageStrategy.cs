@@ -34,7 +34,7 @@ public sealed class MongoDbStorageStrategy : DatabaseStorageStrategyBase
     public override string StrategyId => "mongodb";
     public override string Name => "MongoDB Storage";
     public override StorageTier Tier => StorageTier.Warm;
-    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSQL;
+    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSql;
     public override string Engine => "MongoDB";
 
     public override StorageCapabilities Capabilities => new()

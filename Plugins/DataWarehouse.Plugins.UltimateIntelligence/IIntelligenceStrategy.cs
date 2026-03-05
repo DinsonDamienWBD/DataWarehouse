@@ -7,7 +7,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence;
 /// </summary>
 public enum IntelligenceStrategyCategory
 {
-    /// <summary>AI provider strategy (wraps IAIProvider).</summary>
+    /// <summary>AI provider strategy (wraps IAiProvider).</summary>
     AiProvider,
 
     /// <summary>Vector store strategy (wraps IVectorStore).</summary>

@@ -92,7 +92,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence
         /// <summary>
         /// Get the currently active AI provider (stub - implement based on your plugin design).
         /// </summary>
-        private IAIProvider? GetActiveAIProvider()
+        private IAiProvider? GetActiveAIProvider()
         {
             // Return the configured AI provider when wired in.
             // Example: return _aiProviders.FirstOrDefault(p => p.IsAvailable);

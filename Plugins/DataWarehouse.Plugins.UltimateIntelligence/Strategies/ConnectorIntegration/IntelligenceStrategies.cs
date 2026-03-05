@@ -567,7 +567,7 @@ Return a JSON array of endpoints with this structure:
 
 Return ONLY the JSON array, no other text.";
 
-        var response = await AiProvider.CompleteAsync(new AIRequest
+        var response = await AiProvider.CompleteAsync(new AiRequest
         {
             Prompt = prompt,
             MaxTokens = 4000,
@@ -741,7 +741,7 @@ Requirements:
 
 Generate ONLY the C# class code, no markdown formatting.";
 
-        var response = await AiProvider.CompleteAsync(new AIRequest
+        var response = await AiProvider.CompleteAsync(new AiRequest
         {
             Prompt = prompt,
             MaxTokens = 4000,
@@ -1184,7 +1184,7 @@ Return JSON array:
   }}
 ]";
 
-        var response = await AiProvider.CompleteAsync(new AIRequest
+        var response = await AiProvider.CompleteAsync(new AiRequest
         {
             Prompt = prompt,
             MaxTokens = 3000,
@@ -1273,7 +1273,7 @@ Return JSON:
   }}
 ]";
 
-        var response = await AiProvider.CompleteAsync(new AIRequest
+        var response = await AiProvider.CompleteAsync(new AiRequest
         {
             Prompt = prompt,
             MaxTokens = 2000,
@@ -1640,7 +1640,7 @@ SQL Query:
 
 Return ONLY the transpiled query, no explanation or markdown formatting.";
 
-        var response = await AiProvider!.CompleteAsync(new AIRequest
+        var response = await AiProvider!.CompleteAsync(new AiRequest
         {
             Prompt = prompt,
             MaxTokens = 2000,
@@ -1660,7 +1660,7 @@ Return ONLY the transpiled query, no explanation or markdown formatting.";
 Query: {query}
 Return JSON: {{""isValid"": true/false, ""syntaxErrors"": [], ""semanticWarnings"": [], ""securityConcerns"": []}}";
 
-        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.1f }, ct);
+        var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.1f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
         return ParseValidationResult(response.Content ?? "{}");
     }
@@ -1670,7 +1670,7 @@ Return JSON: {{""isValid"": true/false, ""syntaxErrors"": [], ""semanticWarnings
         var prompt = $@"Generate explain plan for this {dialect} query: {query}
 Return JSON: {{""estimatedCost"": 0, ""estimatedRows"": 0, ""operations"": [], ""usedIndexes"": [], ""suggestions"": []}}";
 
-        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1500, Temperature = 0.2f }, ct);
+        var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 1500, Temperature = 0.2f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
         return ParseExplainPlan(response.Content ?? "{}");
     }
@@ -2040,7 +2040,7 @@ public sealed class LegacyBehavioralModelingStrategy : FeatureStrategyBase
             return new Dictionary<string, object> { ["error"] = "Vision parsing not available" };
 
         var prompt = "Analyze this terminal screen and extract: menu options, data fields, status messages, cursor position, errors. Return structured JSON.";
-        var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 2000, Temperature = 0.1f }, ct);
+        var response = await AiProvider.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 2000, Temperature = 0.1f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
 
         try
@@ -2084,7 +2084,7 @@ public sealed class LegacyBehavioralModelingStrategy : FeatureStrategyBase
 {sampleJson}
 Return JSON: {{""operationName"": ""X"", ""httpMethod"": ""GET"", ""suggestedPath"": ""/api/x"", ""inputParameters"": [{{""name"": ""id"", ""dataType"": ""string"", ""required"": true}}]}}";
 
-        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.2f }, ct);
+        var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.2f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
 
         try
@@ -2127,7 +2127,7 @@ Return JSON: {{""operationName"": ""X"", ""httpMethod"": ""GET"", ""suggestedPat
         var opsSummary = string.Join(", ", ops.Select(o => o.OperationName));
         var prompt = $"For a {systemType} system with operations [{opsSummary}], identify states and transitions. Return JSON: {{\"states\": [{{\"name\": \"X\"}}], \"transitions\": [{{\"fromState\": \"A\", \"toState\": \"B\", \"trigger\": \"op\"}}], \"initialState\": \"X\"}}";
 
-        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1500, Temperature = 0.2f }, ct);
+        var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 1500, Temperature = 0.2f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
 
         try
@@ -2174,7 +2174,7 @@ Return JSON: {{""operationName"": ""X"", ""httpMethod"": ""GET"", ""suggestedPat
 
         var prompt = $"Traffic stats: {samples.Samples.Count} samples, avg duration {avgDuration:F0}ms, failure rate {failureRate:P1}. Identify anomaly patterns. Return JSON array: [{{\"patternName\": \"X\", \"description\": \"Y\", \"severity\": \"medium\", \"detectionCondition\": \"Z\"}}]";
 
-        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.2f }, ct);
+        var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.2f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
 
         var patterns = new List<BehavioralAnomalyPattern>();
@@ -2500,7 +2500,7 @@ public sealed class SmartQuotaTradingStrategy : FeatureStrategyBase
 
         var prompt = $"Analyze usage patterns for {quota.ConnectorId}: {JsonSerializer.Serialize(patterns)}. Suggest optimal scheduling windows. Return JSON array of insights: [\"insight1\", \"insight2\"]";
 
-        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500, Temperature = 0.3f }, ct);
+        var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 500, Temperature = 0.3f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
 
         try
@@ -2869,7 +2869,7 @@ public sealed class ApiArchaeologistStrategy : FeatureStrategyBase
 
                 // Use AI to identify potentially undocumented fields
                 var prompt = $"Analyze these API response fields and identify which might be undocumented/internal: {string.Join(", ", fieldNames.Take(50))}. Return JSON: [{{\"field\": \"name\", \"reason\": \"why\"}}]";
-                var aiResp = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500, Temperature = 0.2f }, ct);
+                var aiResp = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 500, Temperature = 0.2f }, ct);
                 RecordTokens(aiResp.Usage?.TotalTokens ?? 0);
 
                 try
@@ -3238,7 +3238,7 @@ Prediction horizon: {context.PredictionHorizon.TotalMinutes} minutes
 Return JSON array with predictions and confidence:
 [{{""timestamp"": ""ISO8601"", ""value"": X, ""confidence"": 0.8, ""lowerBound"": X-Y, ""upperBound"": X+Y}}]";
 
-        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.2f }, ct);
+        var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 1000, Temperature = 0.2f }, ct);
         RecordTokens(response.Usage?.TotalTokens ?? 0);
 
         var predictions = new List<PredictedValue>();

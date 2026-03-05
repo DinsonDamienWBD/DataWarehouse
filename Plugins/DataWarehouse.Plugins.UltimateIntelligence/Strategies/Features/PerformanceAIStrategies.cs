@@ -137,7 +137,7 @@ Return JSON:
   ""reasoning"": ""explanation""
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 400,
@@ -528,7 +528,7 @@ Return JSON:
   ""recommendations"": [""rec1"", ""rec2""]
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 300,
@@ -579,7 +579,7 @@ Return JSON:
   ""confidence"": 0.6
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 400,
@@ -867,7 +867,7 @@ Return JSON:
   ""implementation_priority"": ""immediate|high|medium|low""
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 400,

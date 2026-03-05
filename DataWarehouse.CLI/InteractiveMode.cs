@@ -18,7 +18,7 @@ public sealed class InteractiveMode
     private readonly CommandExecutor _executor;
     private readonly ConsoleRenderer _renderer = new();
     private readonly NaturalLanguageProcessor _nlp;
-    private readonly IAIProviderRegistry? _aiRegistry;
+    private readonly IAiProviderRegistry? _aiRegistry;
     private readonly CommandHistory _history;
     private readonly CancellationTokenSource _cts = new();
 
@@ -34,7 +34,7 @@ public sealed class InteractiveMode
         CommandExecutor executor,
         CommandHistory history,
         NaturalLanguageProcessor? nlp = null,
-        IAIProviderRegistry? aiRegistry = null)
+        IAiProviderRegistry? aiRegistry = null)
     {
         _executor = executor;
         _history = history;

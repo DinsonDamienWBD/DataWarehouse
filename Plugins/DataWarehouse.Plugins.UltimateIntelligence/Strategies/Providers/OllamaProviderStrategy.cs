@@ -30,9 +30,9 @@ public sealed class OllamaProviderStrategy : AIProviderStrategyBase
     public override string DisplayName => "Ollama (Local)";
 
     /// <inheritdoc/>
-    public override AICapabilities Capabilities =>
-        AICapabilities.TextCompletion | AICapabilities.ChatCompletion | AICapabilities.Streaming |
-        AICapabilities.Embeddings | AICapabilities.CodeGeneration;
+    public override AiCapabilities Capabilities =>
+        AiCapabilities.TextCompletion | AiCapabilities.ChatCompletion | AiCapabilities.Streaming |
+        AiCapabilities.Embeddings | AiCapabilities.CodeGeneration;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -64,7 +64,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     /// <inheritdoc/>
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default)
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
@@ -97,21 +97,21 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
                 RecordTokens(result.PromptEvalCount + result.EvalCount);
             }
 
-            return new AIResponse
+            return new AiResponse
             {
                 Success = true,
                 Content = result?.Message?.Content ?? string.Empty,
                 FinishReason = result?.Done == true ? "stop" : "length",
                 Usage = result != null
-                    ? new AIUsage { PromptTokens = result.PromptEvalCount, CompletionTokens = result.EvalCount }
+                    ? new AiUsage { PromptTokens = result.PromptEvalCount, CompletionTokens = result.EvalCount }
                     : null
             };
         });
     }
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(
-        AIRequest request,
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(
+        AiRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var apiBase = GetConfig("ApiBase") ?? DefaultApiBase;
@@ -148,12 +148,12 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             var chunk = JsonSerializer.Deserialize<OllamaStreamChunk>(line);
             if (chunk?.Message?.Content != null)
             {
-                yield return new AIStreamChunk { Content = chunk.Message.Content };
+                yield return new AiStreamChunk { Content = chunk.Message.Content };
             }
 
             if (chunk?.Done == true)
             {
-                yield return new AIStreamChunk { IsFinal = true, FinishReason = "stop" };
+                yield return new AiStreamChunk { IsFinal = true, FinishReason = "stop" };
                 break;
             }
         }
@@ -182,7 +182,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         });
     }
 
-    private static List<object> BuildMessages(AIRequest request)
+    private static List<object> BuildMessages(AiRequest request)
     {
         var messages = new List<object>();
 

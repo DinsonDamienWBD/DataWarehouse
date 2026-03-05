@@ -108,7 +108,7 @@ Return JSON:
   ""optimization_hints"": [""hint1"", ""hint2""]
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 500,
@@ -226,7 +226,7 @@ Return JSON:
   ""confidence"": 0.8
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 400,
@@ -529,7 +529,7 @@ Return JSON:
   ""cost_savings_estimate"": 0.15
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 300,
@@ -587,7 +587,7 @@ Return JSON:
   ""change_timing"": ""immediate|within_24h|within_week""
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 300,

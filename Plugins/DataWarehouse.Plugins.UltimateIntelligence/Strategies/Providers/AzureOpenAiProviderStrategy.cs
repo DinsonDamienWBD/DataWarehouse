@@ -28,10 +28,10 @@ public sealed class AzureOpenAiProviderStrategy : AIProviderStrategyBase
     public override string DisplayName => "Azure OpenAI";
 
     /// <inheritdoc/>
-    public override AICapabilities Capabilities =>
-        AICapabilities.TextCompletion | AICapabilities.ChatCompletion | AICapabilities.Streaming |
-        AICapabilities.Embeddings | AICapabilities.ImageGeneration | AICapabilities.FunctionCalling |
-        AICapabilities.CodeGeneration;
+    public override AiCapabilities Capabilities =>
+        AiCapabilities.TextCompletion | AiCapabilities.ChatCompletion | AiCapabilities.Streaming |
+        AiCapabilities.Embeddings | AiCapabilities.ImageGeneration | AiCapabilities.FunctionCalling |
+        AiCapabilities.CodeGeneration;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -64,7 +64,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     /// <inheritdoc/>
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default)
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
@@ -101,24 +101,24 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             if (result?.Usage != null)
                 RecordTokens(result.Usage.TotalTokens);
 
-            return new AIResponse
+            return new AiResponse
             {
                 Success = true,
                 Content = choice?.Message?.Content ?? string.Empty,
                 FinishReason = choice?.FinishReason,
                 FunctionCall = choice?.Message?.FunctionCall != null
-                    ? new AIFunctionCall { Name = choice.Message.FunctionCall.Name, Arguments = choice.Message.FunctionCall.Arguments }
+                    ? new AiFunctionCall { Name = choice.Message.FunctionCall.Name, Arguments = choice.Message.FunctionCall.Arguments }
                     : null,
                 Usage = result?.Usage != null
-                    ? new AIUsage { PromptTokens = result.Usage.PromptTokens, CompletionTokens = result.Usage.CompletionTokens }
+                    ? new AiUsage { PromptTokens = result.Usage.PromptTokens, CompletionTokens = result.Usage.CompletionTokens }
                     : null
             };
         });
     }
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(
-        AIRequest request,
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(
+        AiRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var apiKey = GetRequiredConfig("ApiKey");
@@ -155,7 +155,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             var data = line.Substring(6);
             if (data == "[DONE]")
             {
-                yield return new AIStreamChunk { IsFinal = true, FinishReason = "stop" };
+                yield return new AiStreamChunk { IsFinal = true, FinishReason = "stop" };
                 break;
             }
 
@@ -163,7 +163,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             var delta = chunk?.Choices?.FirstOrDefault()?.Delta;
             if (delta?.Content != null)
             {
-                yield return new AIStreamChunk { Content = delta.Content };
+                yield return new AiStreamChunk { Content = delta.Content };
             }
         }
     }
@@ -195,7 +195,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         });
     }
 
-    private static List<object> BuildMessages(AIRequest request)
+    private static List<object> BuildMessages(AiRequest request)
     {
         var messages = new List<object>();
 

@@ -110,17 +110,17 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
     /// <summary>
     /// Primary configuration for this plugin.
     /// </summary>
-    protected readonly TConfig _config;
+    protected readonly TConfig Config;
 
     /// <summary>
     /// Connection registry for multi-instance management.
     /// </summary>
-    protected readonly StorageConnectionRegistry<TConfig> _connectionRegistry;
+    protected readonly StorageConnectionRegistry<TConfig> ConnectionRegistry;
 
     /// <summary>
     /// Instance health cache for quick lookups.
     /// </summary>
-    protected readonly BoundedDictionary<string, InstanceHealthStatus> _healthCache = new BoundedDictionary<string, InstanceHealthStatus>(1000);
+    protected readonly BoundedDictionary<string, InstanceHealthStatus> HealthCache = new BoundedDictionary<string, InstanceHealthStatus>(1000);
 
     /// <summary>
     /// Health monitoring timer.
@@ -142,17 +142,17 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
     /// </summary>
     protected HybridStoragePluginBase(TConfig config)
     {
-        _config = config ?? throw new ArgumentNullException(nameof(config));
-        _connectionRegistry = new StorageConnectionRegistry<TConfig>(CreateConnectionAsync);
+        Config = config ?? throw new ArgumentNullException(nameof(config));
+        ConnectionRegistry = new StorageConnectionRegistry<TConfig>(CreateConnectionAsync);
 
         // Start health monitoring if enabled
-        if (_config.EnableHealthMonitoring && _config.HealthCheckIntervalSeconds > 0)
+        if (Config.EnableHealthMonitoring && Config.HealthCheckIntervalSeconds > 0)
         {
             _healthMonitorTimer = new Timer(
                 async _ => { try { await CheckAllHealthAsync(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
                 null,
-                TimeSpan.FromSeconds(_config.HealthCheckIntervalSeconds),
-                TimeSpan.FromSeconds(_config.HealthCheckIntervalSeconds));
+                TimeSpan.FromSeconds(Config.HealthCheckIntervalSeconds),
+                TimeSpan.FromSeconds(Config.HealthCheckIntervalSeconds));
         }
     }
 
@@ -177,7 +177,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
         StorageRole roles = StorageRole.Primary,
         int priority = 0)
     {
-        return await _connectionRegistry.RegisterAsync(instanceId, config, roles, priority);
+        return await ConnectionRegistry.RegisterAsync(instanceId, config, roles, priority);
     }
 
     /// <summary>
@@ -189,7 +189,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
         StorageRole roles = StorageRole.Primary,
         int priority = 0)
     {
-        return _connectionRegistry.Register(instanceId, config, roles, priority);
+        return ConnectionRegistry.Register(instanceId, config, roles, priority);
     }
 
     /// <summary>
@@ -197,45 +197,45 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
     /// </summary>
     public async Task UnregisterInstanceAsync(string instanceId)
     {
-        await _connectionRegistry.UnregisterAsync(instanceId);
-        _healthCache.TryRemove(instanceId, out _);
+        await ConnectionRegistry.UnregisterAsync(instanceId);
+        HealthCache.TryRemove(instanceId, out _);
     }
 
     /// <summary>
     /// Gets all registered instance IDs.
     /// </summary>
-    public IEnumerable<string> GetInstanceIds() => _connectionRegistry.InstanceIds;
+    public IEnumerable<string> GetInstanceIds() => ConnectionRegistry.InstanceIds;
 
     /// <summary>
     /// Gets an instance by ID.
     /// </summary>
     public StorageConnectionInstance<TConfig>? GetInstance(string instanceId)
-        => _connectionRegistry.Get(instanceId);
+        => ConnectionRegistry.Get(instanceId);
 
     /// <summary>
     /// Gets all instances for a specific role.
     /// </summary>
     public IEnumerable<StorageConnectionInstance<TConfig>> GetInstancesByRole(StorageRole role)
-        => _connectionRegistry.GetByRole(role);
+        => ConnectionRegistry.GetByRole(role);
 
     /// <summary>
     /// Gets the primary instance for a role.
     /// </summary>
     public StorageConnectionInstance<TConfig>? GetPrimaryForRole(StorageRole role)
-        => _connectionRegistry.GetPrimaryForRole(role);
+        => ConnectionRegistry.GetPrimaryForRole(role);
 
     /// <summary>
     /// Gets a healthy instance for a role.
     /// </summary>
     public StorageConnectionInstance<TConfig>? GetHealthyForRole(StorageRole role)
-        => _connectionRegistry.GetHealthyForRole(role);
+        => ConnectionRegistry.GetHealthyForRole(role);
 
     /// <summary>
     /// Updates the roles for an instance at runtime.
     /// </summary>
     public bool UpdateInstanceRoles(string instanceId, StorageRole roles)
     {
-        var instance = _connectionRegistry.Get(instanceId);
+        var instance = ConnectionRegistry.Get(instanceId);
         if (instance == null) return false;
         instance.Roles = roles;
         return true;
@@ -246,7 +246,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
     /// </summary>
     public bool UpdateInstancePriority(string instanceId, int priority)
     {
-        var instance = _connectionRegistry.Get(instanceId);
+        var instance = ConnectionRegistry.Get(instanceId);
         if (instance == null) return false;
         instance.Priority = priority;
         return true;
@@ -261,10 +261,10 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
     /// </summary>
     public async Task<Dictionary<string, InstanceHealthStatus>> CheckAllHealthAsync(CancellationToken ct = default)
     {
-        var results = await _connectionRegistry.CheckHealthAsync(ct);
+        var results = await ConnectionRegistry.CheckHealthAsync(ct);
         foreach (var kv in results)
         {
-            _healthCache[kv.Key] = kv.Value;
+            HealthCache[kv.Key] = kv.Value;
         }
         return results;
     }
@@ -273,7 +273,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
     /// Gets cached health status for an instance.
     /// </summary>
     public InstanceHealthStatus GetInstanceHealth(string instanceId)
-        => _healthCache.TryGetValue(instanceId, out var status) ? status : InstanceHealthStatus.Unknown;
+        => HealthCache.TryGetValue(instanceId, out var status) ? status : InstanceHealthStatus.Unknown;
 
     /// <summary>
     /// Gets aggregate health status.
@@ -282,7 +282,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
     {
         // Cat 13 (finding 636): single pass over Values to avoid O(3n) multiple enumerations.
         int total = 0, healthy = 0;
-        foreach (var h in _healthCache.Values)
+        foreach (var h in HealthCache.Values)
         {
             total++;
             if (h == InstanceHealthStatus.Healthy) healthy++;
@@ -409,7 +409,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
 
     private void HandleListInstances(PluginMessage message)
     {
-        var instances = _connectionRegistry.GetAll().Select(i => new Dictionary<string, object>
+        var instances = ConnectionRegistry.GetAll().Select(i => new Dictionary<string, object>
         {
             ["instanceId"] = i.InstanceId,
             ["roles"] = (int)i.Roles,
@@ -436,7 +436,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
         var instanceId = id?.ToString();
         if (!string.IsNullOrEmpty(instanceId))
         {
-            var instance = _connectionRegistry.Get(instanceId);
+            var instance = ConnectionRegistry.Get(instanceId);
             if (instance != null)
                 await instance.CheckHealthAsync();
         }
@@ -492,11 +492,11 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
         var metadata = base.GetMetadata();
         metadata["StorageCategory"] = StorageCategory;
         metadata["SupportsMultiInstance"] = true;
-        metadata["RegisteredInstances"] = _connectionRegistry.Count;
+        metadata["RegisteredInstances"] = ConnectionRegistry.Count;
         metadata["AggregateHealth"] = GetAggregateHealth().ToString();
-        metadata["EnableCaching"] = _config.EnableCaching;
-        metadata["EnableIndexing"] = _config.EnableIndexing;
-        metadata["EnableHealthMonitoring"] = _config.EnableHealthMonitoring;
+        metadata["EnableCaching"] = Config.EnableCaching;
+        metadata["EnableIndexing"] = Config.EnableIndexing;
+        metadata["EnableHealthMonitoring"] = Config.EnableHealthMonitoring;
         metadata["RuntimeConfigurable"] = true;
         return metadata;
     }
@@ -568,7 +568,7 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
         _disposed = true;
 
         _healthMonitorTimer?.Dispose();
-        await _connectionRegistry.DisposeAsync();
+        await ConnectionRegistry.DisposeAsync();
 
         await base.DisposeAsyncCore();
     }
@@ -585,76 +585,76 @@ public abstract class HybridStoragePluginBase<TConfig> : IndexableStoragePluginB
 /// </summary>
 public class StorageConfigBuilder<TConfig> where TConfig : StorageConfigBase, new()
 {
-    private readonly TConfig _config = new();
+    private readonly TConfig Config = new();
 
     public StorageConfigBuilder<TConfig> WithInstanceId(string id)
     {
-        _config.InstanceId = id;
+        Config.InstanceId = id;
         return this;
     }
 
     public StorageConfigBuilder<TConfig> WithDisplayName(string name)
     {
-        _config.DisplayName = name;
+        Config.DisplayName = name;
         return this;
     }
 
     public StorageConfigBuilder<TConfig> WithMaxConnections(int max)
     {
-        _config.MaxConnections = max;
+        Config.MaxConnections = max;
         return this;
     }
 
     public StorageConfigBuilder<TConfig> WithConnectionTimeout(int seconds)
     {
-        _config.ConnectionTimeoutSeconds = seconds;
+        Config.ConnectionTimeoutSeconds = seconds;
         return this;
     }
 
     public StorageConfigBuilder<TConfig> WithOperationTimeout(int seconds)
     {
-        _config.OperationTimeoutSeconds = seconds;
+        Config.OperationTimeoutSeconds = seconds;
         return this;
     }
 
     public StorageConfigBuilder<TConfig> EnableCaching(bool enable = true, TimeSpan? defaultTtl = null)
     {
-        _config.EnableCaching = enable;
+        Config.EnableCaching = enable;
         if (defaultTtl.HasValue)
-            _config.DefaultCacheTtl = defaultTtl.Value;
+            Config.DefaultCacheTtl = defaultTtl.Value;
         return this;
     }
 
     public StorageConfigBuilder<TConfig> EnableIndexing(bool enable = true)
     {
-        _config.EnableIndexing = enable;
+        Config.EnableIndexing = enable;
         return this;
     }
 
     public StorageConfigBuilder<TConfig> EnableHealthMonitoring(bool enable = true, int intervalSeconds = 60)
     {
-        _config.EnableHealthMonitoring = enable;
-        _config.HealthCheckIntervalSeconds = intervalSeconds;
+        Config.EnableHealthMonitoring = enable;
+        Config.HealthCheckIntervalSeconds = intervalSeconds;
         return this;
     }
 
     public StorageConfigBuilder<TConfig> WithRetryPolicy(int maxRetries, int delayMs)
     {
-        _config.MaxRetries = maxRetries;
-        _config.RetryDelayMs = delayMs;
+        Config.MaxRetries = maxRetries;
+        Config.RetryDelayMs = delayMs;
         return this;
     }
 
     public StorageConfigBuilder<TConfig> WithTags(params string[] tags)
     {
         foreach (var tag in tags)
-            _config.Tags.Add(tag);
+            Config.Tags.Add(tag);
         return this;
     }
 
     public StorageConfigBuilder<TConfig> WithMetadata(string key, object value)
     {
-        _config.Metadata[key] = value;
+        Config.Metadata[key] = value;
         return this;
     }
 
@@ -663,11 +663,11 @@ public class StorageConfigBuilder<TConfig> where TConfig : StorageConfigBase, ne
     /// </summary>
     public StorageConfigBuilder<TConfig> Configure(Action<TConfig> configure)
     {
-        configure(_config);
+        configure(Config);
         return this;
     }
 
-    public TConfig Build() => _config;
+    public TConfig Build() => Config;
 }
 
 /// <summary>

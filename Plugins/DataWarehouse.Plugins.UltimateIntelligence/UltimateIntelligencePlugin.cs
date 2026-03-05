@@ -221,7 +221,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
     /// <summary>
     /// Gets the active AI provider.
     /// </summary>
-    public IAIProvider? GetActiveAIProvider() => _activeAIProvider as IAIProvider;
+    public IAiProvider? GetActiveAIProvider() => _activeAIProvider as IAiProvider;
 
     /// <summary>
     /// Gets the active vector store.
@@ -291,7 +291,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
     {
         ArgumentNullException.ThrowIfNull(feature);
 
-        if (_activeAIProvider is IAIProvider aiProvider)
+        if (_activeAIProvider is IAiProvider aiProvider)
             feature.SetAIProvider(aiProvider);
 
         if (_activeVectorStore is IVectorStore vectorStore)

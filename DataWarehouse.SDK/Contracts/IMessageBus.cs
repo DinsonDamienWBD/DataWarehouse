@@ -141,7 +141,7 @@ namespace DataWarehouse.SDK.Contracts
         // AI operations
         public const string AIQuery = "ai.query";
         public const string AIEmbed = "ai.embed";
-        public const string AIResponse = "ai.response";
+        public const string AiResponse = "ai.response";
 
         // Metadata operations
         public const string MetadataIndex = "metadata.index";

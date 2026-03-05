@@ -537,7 +537,7 @@ public sealed class AdaptiveModelStrategy : FeatureStrategyBase
                         $"Base response: {baseResponse}\n\n" +
                         $"Personalized response:";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
+            var response = await AiProvider.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 500 }, ct);
             return response.Content;
         });
     }

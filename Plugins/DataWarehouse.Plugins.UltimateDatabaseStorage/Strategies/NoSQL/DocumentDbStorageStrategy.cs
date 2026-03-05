@@ -31,7 +31,7 @@ public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
     public override string StrategyId => "documentdb";
     public override string Name => "Azure Cosmos DB (DocumentDB) Storage";
     public override StorageTier Tier => StorageTier.Hot;
-    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSQL;
+    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSql;
     public override string Engine => "CosmosDB";
 
     public override StorageCapabilities Capabilities => new()

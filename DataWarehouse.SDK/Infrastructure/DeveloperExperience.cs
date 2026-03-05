@@ -415,7 +415,7 @@ public sealed class PluginNewCommand : ICliCommand
         {
             "storage" => "PluginBase, IStorageProvider",
             "pipeline" => "PipelinePluginBase",
-            "ai" => "PluginBase, IAIProvider",
+            "ai" => "PluginBase, IAiProvider",
             _ => "PluginBase, IFeaturePlugin"
         };
 

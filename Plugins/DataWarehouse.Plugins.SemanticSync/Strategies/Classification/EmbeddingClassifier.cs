@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.SemanticSync.Strategies.Classification;
 
 /// <summary>
 /// AI embedding-based semantic classifier that uses vector similarity against reference
-/// centroids to determine data importance. Requires an <see cref="IAIProvider"/> with
+/// centroids to determine data importance. Requires an <see cref="IAiProvider"/> with
 /// embedding capabilities for operation.
 /// </summary>
 /// <remarks>
@@ -35,7 +35,7 @@ namespace DataWarehouse.Plugins.SemanticSync.Strategies.Classification;
 [SdkCompatibility("5.0.0", Notes = "Phase 60: Semantic classification")]
 public sealed class EmbeddingClassifier : SemanticSyncStrategyBase, ISemanticClassifier
 {
-    private readonly IAIProvider _aiProvider;
+    private readonly IAiProvider _aiProvider;
 
     /// <summary>
     /// Pre-computed reference centroids for each importance level.
@@ -79,7 +79,7 @@ public sealed class EmbeddingClassifier : SemanticSyncStrategyBase, ISemanticCla
     /// </summary>
     /// <param name="aiProvider">The AI provider used for generating embeddings. Must not be null.</param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="aiProvider"/> is null.</exception>
-    public EmbeddingClassifier(IAIProvider aiProvider)
+    public EmbeddingClassifier(IAiProvider aiProvider)
     {
         _aiProvider = aiProvider ?? throw new ArgumentNullException(nameof(aiProvider));
     }

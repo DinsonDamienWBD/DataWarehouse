@@ -24,7 +24,7 @@ public sealed class CockroachDbStorageStrategy : DatabaseStorageStrategyBase
     public override string StrategyId => "cockroachdb";
     public override string Name => "CockroachDB NewSQL Storage";
     public override StorageTier Tier => StorageTier.Hot;
-    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NewSQL;
+    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NewSql;
     public override string Engine => "CockroachDB";
 
     public override StorageCapabilities Capabilities => new()

@@ -80,7 +80,7 @@ Return JSON with predicted files:
   ]
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 500,
@@ -239,7 +239,7 @@ Return JSON:
   ""overall_health_score"": 0.7
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 500,
@@ -294,7 +294,7 @@ Return JSON:
   ]
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 500,

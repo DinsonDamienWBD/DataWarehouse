@@ -1064,13 +1064,13 @@ public sealed record ChangeValidationResult
 /// </summary>
 public sealed class ImpactAnalyzer
 {
-    private readonly IAIProvider? _aiProvider;
+    private readonly IAiProvider? _aiProvider;
 
     /// <summary>
     /// Initializes the impact analyzer.
     /// </summary>
     /// <param name="aiProvider">Optional AI provider for advanced analysis.</param>
-    public ImpactAnalyzer(IAIProvider? aiProvider = null)
+    public ImpactAnalyzer(IAiProvider? aiProvider = null)
     {
         _aiProvider = aiProvider;
     }
@@ -1264,7 +1264,7 @@ Provide:
 
 Format: JSON with keys: recommendations (array), warnings (array), riskFactors (array of {{name, description, contribution}})";
 
-        var response = await _aiProvider!.CompleteAsync(new AIRequest
+        var response = await _aiProvider!.CompleteAsync(new AiRequest
         {
             Prompt = prompt,
             MaxTokens = 500,
@@ -1750,7 +1750,7 @@ public sealed class SimulationEngine : FeatureStrategyBase
     /// Sets the AI provider for enhanced analysis.
     /// </summary>
     /// <param name="provider">AI provider to use.</param>
-    public void SetAIProviderForAnalysis(IAIProvider provider)
+    public void SetAIProviderForAnalysis(IAiProvider provider)
     {
         SetAIProvider(provider);
     }

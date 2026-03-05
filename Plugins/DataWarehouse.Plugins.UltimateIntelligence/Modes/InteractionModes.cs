@@ -375,14 +375,14 @@ public sealed class ConversationMemory
 /// </summary>
 public sealed class StreamingSupport
 {
-    private readonly IAIProvider _aiProvider;
+    private readonly IAiProvider _aiProvider;
     private readonly BoundedDictionary<string, CancellationTokenSource> _activeStreams = new BoundedDictionary<string, CancellationTokenSource>(1000);
 
     /// <summary>
     /// Initializes streaming support.
     /// </summary>
     /// <param name="aiProvider">AI provider for streaming.</param>
-    public StreamingSupport(IAIProvider aiProvider)
+    public StreamingSupport(IAiProvider aiProvider)
     {
         _aiProvider = aiProvider;
     }
@@ -409,7 +409,7 @@ public sealed class StreamingSupport
                 ? prompt
                 : $"{systemPrompt}\n\nUser: {prompt}\n\nAssistant:";
 
-            var request = new AIRequest
+            var request = new AiRequest
             {
                 Prompt = fullPrompt,
                 MaxTokens = 2000,
@@ -515,7 +515,7 @@ public sealed class ChatHandler : FeatureStrategyBase
     /// Initializes the chat handler with an AI provider.
     /// </summary>
     /// <param name="provider">AI provider to use.</param>
-    public void Initialize(IAIProvider provider)
+    public void Initialize(IAiProvider provider)
     {
         SetAIProvider(provider);
         _streamingSupport = new StreamingSupport(provider);
@@ -581,7 +581,7 @@ public sealed class ChatHandler : FeatureStrategyBase
         var prompt = $"{context}\n\nAssistant:";
 
         // Get AI response
-        var response = await AiProvider.CompleteAsync(new AIRequest
+        var response = await AiProvider.CompleteAsync(new AiRequest
         {
             Prompt = prompt,
             MaxTokens = 2000,
@@ -1800,7 +1800,7 @@ public sealed class ReportGenerator : FeatureStrategyBase
         var content = string.Join("\n\n", report.Sections.Select(s => $"## {s.Title}\n{s.Content}"));
         var prompt = $"Summarize this report in 2-3 sentences:\n\n{content}";
 
-        var response = await AiProvider!.CompleteAsync(new AIRequest
+        var response = await AiProvider!.CompleteAsync(new AiRequest
         {
             Prompt = prompt,
             MaxTokens = 200
@@ -2563,7 +2563,7 @@ public sealed class InteractionModeCoordinator : FeatureStrategyBase
     /// Initializes all modes with the AI provider.
     /// </summary>
     /// <param name="aiProvider">AI provider to use.</param>
-    public void Initialize(IAIProvider aiProvider)
+    public void Initialize(IAiProvider aiProvider)
     {
         SetAIProvider(aiProvider);
         ChatHandler.Initialize(aiProvider);

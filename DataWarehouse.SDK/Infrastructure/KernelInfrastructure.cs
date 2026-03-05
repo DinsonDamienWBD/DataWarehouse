@@ -1775,7 +1775,7 @@ public sealed class AIProviderSelectionOptions
 /// Registry for AI providers with capability-based selection.
 /// Supports fallback chains and cost-aware selection.
 /// </summary>
-public interface IAIProviderRegistry
+public interface IAiProviderRegistry
 {
     /// <summary>
     /// Registers an AI provider.
@@ -1836,7 +1836,7 @@ public interface IAIProviderRegistry
 /// <summary>
 /// Default implementation of the AI Provider Registry.
 /// </summary>
-public sealed class AIProviderRegistry : IAIProviderRegistry, IAsyncDisposable
+public sealed class AIProviderRegistry : IAiProviderRegistry, IAsyncDisposable
 {
     private readonly BoundedDictionary<string, IAIProviderRegistration> _providers = new BoundedDictionary<string, IAIProviderRegistration>(1000);
     private readonly Timer _availabilityCheckTimer;

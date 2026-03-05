@@ -31,7 +31,7 @@ public sealed class DynamoDbStorageStrategy : DatabaseStorageStrategyBase
     public override string StrategyId => "dynamodb";
     public override string Name => "Amazon DynamoDB Storage";
     public override StorageTier Tier => StorageTier.Hot;
-    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSQL;
+    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSql;
     public override string Engine => "DynamoDB";
 
     public override StorageCapabilities Capabilities => new()

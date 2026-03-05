@@ -348,7 +348,7 @@ public sealed class HybridSearchStrategy : FeatureStrategyBase
     /// <summary>
     /// Configures the underlying search strategies with AI provider and vector store.
     /// </summary>
-    public void ConfigureStrategies(IAIProvider? aiProvider, IVectorStore? vectorStore)
+    public void ConfigureStrategies(IAiProvider? aiProvider, IVectorStore? vectorStore)
     {
         if (aiProvider != null)
         {

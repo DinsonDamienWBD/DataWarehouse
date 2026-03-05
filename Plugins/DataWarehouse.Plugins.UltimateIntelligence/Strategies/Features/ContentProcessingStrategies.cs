@@ -155,10 +155,10 @@ public sealed class ContentExtractionStrategy : FeatureStrategyBase
     {
         // For production, integrate with actual PDF library (PdfPig, iTextSharp, etc.)
         // Using AI for extraction when vision is available
-        if (AiProvider != null && AiProvider.Capabilities.HasFlag(AICapabilities.ImageAnalysis))
+        if (AiProvider != null && AiProvider.Capabilities.HasFlag(AiCapabilities.ImageAnalysis))
         {
             var base64Content = Convert.ToBase64String(content);
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = "Extract all text content from this PDF document. Maintain paragraph structure. Return only the extracted text.",
                 MaxTokens = 4000,
@@ -280,11 +280,11 @@ public sealed class ContentExtractionStrategy : FeatureStrategyBase
         if (!enableOcr)
             return "[Image - OCR disabled]";
 
-        if (AiProvider == null || !AiProvider.Capabilities.HasFlag(AICapabilities.ImageAnalysis))
+        if (AiProvider == null || !AiProvider.Capabilities.HasFlag(AiCapabilities.ImageAnalysis))
             return "[Image - No vision capability available]";
 
         var base64Content = Convert.ToBase64String(content);
-        var response = await AiProvider.CompleteAsync(new AIRequest
+        var response = await AiProvider.CompleteAsync(new AiRequest
         {
             Prompt = "Extract all visible text from this image using OCR. Return only the extracted text, maintaining the original layout where possible.",
             MaxTokens = 2000,
@@ -336,7 +336,7 @@ public sealed class ContentExtractionStrategy : FeatureStrategyBase
             return $"[{format} - No AI provider available for extraction]";
 
         var base64Content = Convert.ToBase64String(content[..Math.Min(content.Length, 50000)]);
-        var response = await AiProvider.CompleteAsync(new AIRequest
+        var response = await AiProvider.CompleteAsync(new AiRequest
         {
             Prompt = $"This is a {format}. Extract and return all readable text content.",
             MaxTokens = 2000,
@@ -541,7 +541,7 @@ public sealed class ContentSummarizationStrategy : FeatureStrategyBase
 
             var prompt = BuildSummarizationPrompt(content, summaryStyle, targetLength, preserveKeyFacts);
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = maxTokens,
@@ -593,7 +593,7 @@ Provide your response in this exact JSON format:
   ""key_entities"": [""entity1"", ""entity2""]
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 1500,
@@ -647,7 +647,7 @@ Format as JSON:
   ""document_count"": {docs.Count}
 }}}}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = combinedPrompt,
                 MaxTokens = 1000,

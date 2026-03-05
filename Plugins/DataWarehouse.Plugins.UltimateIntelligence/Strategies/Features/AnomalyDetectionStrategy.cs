@@ -130,7 +130,7 @@ Return JSON:
   ""reasons"": [""reason1"", ""reason2""]
 }}";
 
-                var response = await AiProvider.CompleteAsync(new AIRequest
+                var response = await AiProvider.CompleteAsync(new AiRequest
                 {
                     Prompt = prompt,
                     MaxTokens = 300,
@@ -223,7 +223,7 @@ Data points flagged as anomalous:
 
 Provide insights on possible causes and patterns.";
 
-                var response = await AiProvider.CompleteAsync(new AIRequest
+                var response = await AiProvider.CompleteAsync(new AiRequest
                 {
                     Prompt = prompt,
                     MaxTokens = 200

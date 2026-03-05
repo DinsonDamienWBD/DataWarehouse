@@ -24,7 +24,7 @@ public sealed class TiDbStorageStrategy : DatabaseStorageStrategyBase
     public override string StrategyId => "tidb";
     public override string Name => "TiDB NewSQL Storage";
     public override StorageTier Tier => StorageTier.Hot;
-    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NewSQL;
+    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NewSql;
     public override string Engine => "TiDB";
 
     public override StorageCapabilities Capabilities => new()

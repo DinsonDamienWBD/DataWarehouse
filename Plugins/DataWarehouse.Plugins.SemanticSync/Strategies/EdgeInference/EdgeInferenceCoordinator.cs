@@ -33,7 +33,7 @@ public sealed class EdgeInferenceCoordinator : SemanticSyncStrategyBase
 {
     private readonly LocalModelManager _modelManager;
     private readonly ISemanticClassifier? _cloudClassifier;
-    private readonly IAIProvider? _aiProvider;
+    private readonly IAiProvider? _aiProvider;
 
     /// <summary>
     /// Maps <see cref="SemanticImportance"/> to <see cref="SyncFidelity"/> for sync decision generation.
@@ -64,7 +64,7 @@ public sealed class EdgeInferenceCoordinator : SemanticSyncStrategyBase
     internal EdgeInferenceCoordinator(
         LocalModelManager modelManager,
         ISemanticClassifier? cloudClassifier = null,
-        IAIProvider? aiProvider = null)
+        IAiProvider? aiProvider = null)
     {
         _modelManager = modelManager ?? throw new ArgumentNullException(nameof(modelManager));
         _cloudClassifier = cloudClassifier;

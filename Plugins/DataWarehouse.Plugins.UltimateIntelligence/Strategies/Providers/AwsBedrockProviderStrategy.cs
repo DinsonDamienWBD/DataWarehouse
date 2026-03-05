@@ -33,9 +33,9 @@ public sealed class AwsBedrockProviderStrategy : AIProviderStrategyBase
     public override string DisplayName => "AWS Bedrock";
 
     /// <inheritdoc/>
-    public override AICapabilities Capabilities =>
-        AICapabilities.TextCompletion | AICapabilities.ChatCompletion | AICapabilities.Streaming |
-        AICapabilities.Embeddings | AICapabilities.ImageGeneration | AICapabilities.CodeGeneration;
+    public override AiCapabilities Capabilities =>
+        AiCapabilities.TextCompletion | AiCapabilities.ChatCompletion | AiCapabilities.Streaming |
+        AiCapabilities.Embeddings | AiCapabilities.ImageGeneration | AiCapabilities.CodeGeneration;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -84,7 +84,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     /// <inheritdoc/>
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default)
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
@@ -112,8 +112,8 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(
-        AIRequest request,
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(
+        AiRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var region = GetConfig("Region") ?? DefaultRegion;
@@ -180,7 +180,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         });
     }
 
-    private object BuildModelPayload(string model, AIRequest request)
+    private object BuildModelPayload(string model, AiRequest request)
     {
         if (model.StartsWith("anthropic.claude"))
         {
@@ -218,7 +218,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         return new { prompt = request.Prompt };
     }
 
-    private List<object> BuildClaudeMessages(AIRequest request)
+    private List<object> BuildClaudeMessages(AiRequest request)
     {
         var messages = new List<object>();
         foreach (var msg in request.ChatHistory)
@@ -228,7 +228,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         return messages;
     }
 
-    private string BuildTitanPrompt(AIRequest request)
+    private string BuildTitanPrompt(AiRequest request)
     {
         var sb = new StringBuilder();
         if (!string.IsNullOrEmpty(request.SystemMessage))
@@ -240,7 +240,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         return sb.ToString();
     }
 
-    private string BuildLlamaPrompt(AIRequest request)
+    private string BuildLlamaPrompt(AiRequest request)
     {
         var sb = new StringBuilder();
         if (!string.IsNullOrEmpty(request.SystemMessage))
@@ -252,19 +252,19 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         return sb.ToString();
     }
 
-    private AIResponse ParseModelResponse(string model, string responseBody)
+    private AiResponse ParseModelResponse(string model, string responseBody)
     {
         if (model.StartsWith("anthropic.claude"))
         {
             var result = JsonSerializer.Deserialize<BedrockClaudeResponse>(responseBody);
             var textContent = result?.Content?.FirstOrDefault(c => c.Type == "text");
             RecordTokens((result?.Usage?.InputTokens ?? 0) + (result?.Usage?.OutputTokens ?? 0));
-            return new AIResponse
+            return new AiResponse
             {
                 Success = true,
                 Content = textContent?.Text ?? string.Empty,
                 FinishReason = result?.StopReason,
-                Usage = new AIUsage
+                Usage = new AiUsage
                 {
                     PromptTokens = result?.Usage?.InputTokens ?? 0,
                     CompletionTokens = result?.Usage?.OutputTokens ?? 0
@@ -274,7 +274,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         else if (model.StartsWith("amazon.titan"))
         {
             var result = JsonSerializer.Deserialize<BedrockTitanResponse>(responseBody);
-            return new AIResponse
+            return new AiResponse
             {
                 Success = true,
                 Content = result?.Results?.FirstOrDefault()?.OutputText ?? string.Empty,
@@ -284,7 +284,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         else if (model.StartsWith("meta.llama"))
         {
             var result = JsonSerializer.Deserialize<BedrockLlamaResponse>(responseBody);
-            return new AIResponse
+            return new AiResponse
             {
                 Success = true,
                 Content = result?.Generation ?? string.Empty,
@@ -292,10 +292,10 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             };
         }
 
-        return new AIResponse { Success = false, ErrorMessage = "Unknown model type" };
+        return new AiResponse { Success = false, ErrorMessage = "Unknown model type" };
     }
 
-    private AIStreamChunk? ParseStreamChunk(string model, string line)
+    private AiStreamChunk? ParseStreamChunk(string model, string line)
     {
         // Simplified stream parsing - real implementation would handle AWS event stream format
         try
@@ -303,11 +303,11 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             var data = JsonSerializer.Deserialize<JsonElement>(line);
             if (data.TryGetProperty("delta", out var delta) && delta.TryGetProperty("text", out var text))
             {
-                return new AIStreamChunk { Content = text.GetString() ?? "" };
+                return new AiStreamChunk { Content = text.GetString() ?? "" };
             }
             if (data.TryGetProperty("stop_reason", out _))
             {
-                return new AIStreamChunk { IsFinal = true, FinishReason = "stop" };
+                return new AiStreamChunk { IsFinal = true, FinishReason = "stop" };
             }
         }
         catch { /* JSON parsing failure — return null */ }

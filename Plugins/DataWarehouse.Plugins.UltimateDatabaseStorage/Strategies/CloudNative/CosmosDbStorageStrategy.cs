@@ -33,7 +33,7 @@ public sealed class CosmosDbStorageStrategy : DatabaseStorageStrategyBase
     public override string StrategyId => "cosmosdb";
     public override string Name => "Azure Cosmos DB Storage";
     public override StorageTier Tier => StorageTier.Hot;
-    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSQL;
+    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSql;
     public override string Engine => "Cosmos DB";
 
     public override StorageCapabilities Capabilities => new()

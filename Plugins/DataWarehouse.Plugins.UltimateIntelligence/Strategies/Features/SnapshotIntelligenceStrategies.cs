@@ -92,7 +92,7 @@ Return JSON:
   ""recommended_interval_minutes"": 30
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 400,
@@ -430,7 +430,7 @@ Return JSON:
   ""comparison_time"": null
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 200,
@@ -559,7 +559,7 @@ Return JSON:
   ""time_constraints"": ""last_modified_within_7_days""
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 300,
@@ -814,7 +814,7 @@ Return JSON:
   ""alternative_snapshot"": ""snapshot_id_or_null""
 }}";
 
-            var response = await AiProvider.CompleteAsync(new AIRequest
+            var response = await AiProvider.CompleteAsync(new AiRequest
             {
                 Prompt = prompt,
                 MaxTokens = 300,

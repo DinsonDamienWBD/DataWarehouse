@@ -165,7 +165,7 @@ namespace DataWarehouse.SDK.Contracts
         {
             DefaultTtl = TimeSpan.FromHours(1),
             MaxEntries = 10000,
-            EvictionPolicy = CacheEvictionPolicy.LRU,
+            EvictionPolicy = CacheEvictionPolicy.Lru,
             EnableStatistics = true
         };
 

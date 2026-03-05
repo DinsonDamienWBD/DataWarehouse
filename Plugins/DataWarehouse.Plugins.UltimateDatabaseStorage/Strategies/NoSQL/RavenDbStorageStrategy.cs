@@ -28,7 +28,7 @@ public sealed class RavenDbStorageStrategy : DatabaseStorageStrategyBase
     public override string StrategyId => "ravendb";
     public override string Name => "RavenDB Storage";
     public override StorageTier Tier => StorageTier.Warm;
-    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSQL;
+    public override DatabaseCategory DatabaseCategory => DatabaseCategory.NoSql;
     public override string Engine => "RavenDB";
 
     public override StorageCapabilities Capabilities => new()

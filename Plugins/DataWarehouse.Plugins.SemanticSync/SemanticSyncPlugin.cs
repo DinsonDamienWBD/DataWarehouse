@@ -171,8 +171,8 @@ public sealed class SemanticSyncPlugin : OrchestrationPluginBase
 
         await base.OnStartCoreAsync(ct);
 
-        // Step 1: Resolve optional IAIProvider from kernel services (null if unavailable)
-        IAIProvider? aiProvider = ResolveAIProvider();
+        // Step 1: Resolve optional IAiProvider from kernel services (null if unavailable)
+        IAiProvider? aiProvider = ResolveAIProvider();
 
         // Step 2: Create helper instances
         var localModelManager = new LocalModelManager();
@@ -482,10 +482,10 @@ public sealed class SemanticSyncPlugin : OrchestrationPluginBase
     }
 
     /// <summary>
-    /// Attempts to resolve an IAIProvider. Returns null if unavailable (edge/air-gapped environments).
+    /// Attempts to resolve an IAiProvider. Returns null if unavailable (edge/air-gapped environments).
     /// All strategies handle null AI provider gracefully with fallback behavior.
     /// </summary>
-    private static IAIProvider? ResolveAIProvider()
+    private static IAiProvider? ResolveAIProvider()
     {
         // AI provider is not injected by kernel services.
         // In production, it would be resolved via service registry or message bus request.
@@ -655,7 +655,7 @@ public sealed class SemanticSyncPlugin : OrchestrationPluginBase
 /// non-AI behavior (rule-based classification, extraction-based summarization, etc.).
 /// </summary>
 [SdkCompatibility("5.0.0", Notes = "Phase 60: Null AI provider for graceful degradation")]
-internal sealed class NullAIProvider : IAIProvider
+internal sealed class NullAIProvider : IAiProvider
 {
     /// <summary>
     /// Singleton instance of the null AI provider.
@@ -674,15 +674,15 @@ internal sealed class NullAIProvider : IAIProvider
     public bool IsAvailable => false;
 
     /// <inheritdoc/>
-    public AICapabilities Capabilities => AICapabilities.None;
+    public AiCapabilities Capabilities => AiCapabilities.None;
 
     /// <inheritdoc/>
-    public Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default) =>
+    public Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default) =>
         throw new NotSupportedException("AI provider is not available in this deployment.");
 
     /// <inheritdoc/>
-    public async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(
-        AIRequest request,
+    public async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(
+        AiRequest request,
         [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
         throw new NotSupportedException("AI provider is not available in this deployment.");

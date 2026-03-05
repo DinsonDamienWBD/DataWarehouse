@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.SemanticSync.Strategies.ConflictResolution;
 /// </summary>
 /// <remarks>
 /// <para>
-/// When an <see cref="IAIProvider"/> is available, generates embeddings for both data versions
+/// When an <see cref="IAiProvider"/> is available, generates embeddings for both data versions
 /// and computes cosine similarity to classify conflicts. Thresholds:
 /// >= 0.95 = no conflict (semantically equivalent), 0.7-0.95 = partial overlap, &lt; 0.7 = divergent.
 /// </para>
@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.SemanticSync.Strategies.ConflictResolution;
 [SdkCompatibility("5.0.0", Notes = "Phase 60: Sync fidelity control")]
 internal sealed class EmbeddingSimilarityDetector
 {
-    private readonly IAIProvider? _aiProvider;
+    private readonly IAiProvider? _aiProvider;
 
     /// <summary>Cosine similarity threshold above which two versions are semantically equivalent.</summary>
     private const double EquivalenceThreshold = 0.95;
@@ -50,7 +50,7 @@ internal sealed class EmbeddingSimilarityDetector
     /// <param name="aiProvider">
     /// Optional AI provider for embedding-based comparison. When null, falls back to structural comparison.
     /// </param>
-    public EmbeddingSimilarityDetector(IAIProvider? aiProvider = null)
+    public EmbeddingSimilarityDetector(IAiProvider? aiProvider = null)
     {
         _aiProvider = aiProvider;
     }
@@ -96,7 +96,7 @@ internal sealed class EmbeddingSimilarityDetector
 
         // Step 2: Try embedding-based comparison if AI available
         if (_aiProvider is { IsAvailable: true } &&
-            _aiProvider.Capabilities.HasFlag(AICapabilities.Embeddings))
+            _aiProvider.Capabilities.HasFlag(AiCapabilities.Embeddings))
         {
             return await DetectWithEmbeddingsAsync(dataId, localData, remoteData, ct)
                 .ConfigureAwait(false);

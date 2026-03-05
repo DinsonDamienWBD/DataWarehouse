@@ -28,7 +28,7 @@ public sealed class CohereEmbeddingProvider : AIProviderStrategyBase
     public override string DisplayName => "Cohere Embed";
 
     /// <inheritdoc/>
-    public override AICapabilities Capabilities => AICapabilities.Embeddings;
+    public override AiCapabilities Capabilities => AiCapabilities.Embeddings;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -54,11 +54,11 @@ public sealed class CohereEmbeddingProvider : AIProviderStrategyBase
     public CohereEmbeddingProvider(HttpClient httpClient) { _httpClient = httpClient; }
 
     /// <inheritdoc/>
-    public override Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default) =>
+    public override Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default) =>
         throw new NotSupportedException("Cohere embedding provider does not support chat completion. Use GetEmbeddingsAsync.");
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
         throw new NotSupportedException("Cohere embedding provider does not support streaming.");
 #pragma warning disable CS0162 // Unreachable code to satisfy IAsyncEnumerable
@@ -150,7 +150,7 @@ public sealed class HuggingFaceEmbeddingProvider : AIProviderStrategyBase
     public override string DisplayName => "HuggingFace Sentence Transformers";
 
     /// <inheritdoc/>
-    public override AICapabilities Capabilities => AICapabilities.Embeddings;
+    public override AiCapabilities Capabilities => AiCapabilities.Embeddings;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -175,11 +175,11 @@ public sealed class HuggingFaceEmbeddingProvider : AIProviderStrategyBase
     public HuggingFaceEmbeddingProvider(HttpClient httpClient) { _httpClient = httpClient; }
 
     /// <inheritdoc/>
-    public override Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default) =>
+    public override Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default) =>
         throw new NotSupportedException("HuggingFace embedding provider does not support chat completion.");
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     {
         throw new NotSupportedException("HuggingFace embedding provider does not support streaming.");
 #pragma warning disable CS0162

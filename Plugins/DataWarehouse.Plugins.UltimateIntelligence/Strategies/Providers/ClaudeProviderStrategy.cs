@@ -30,9 +30,9 @@ public sealed class ClaudeProviderStrategy : AIProviderStrategyBase
     public override string DisplayName => "Anthropic Claude";
 
     /// <inheritdoc/>
-    public override AICapabilities Capabilities =>
-        AICapabilities.TextCompletion | AICapabilities.ChatCompletion | AICapabilities.Streaming |
-        AICapabilities.ImageAnalysis | AICapabilities.FunctionCalling | AICapabilities.CodeGeneration;
+    public override AiCapabilities Capabilities =>
+        AiCapabilities.TextCompletion | AiCapabilities.ChatCompletion | AiCapabilities.Streaming |
+        AiCapabilities.ImageAnalysis | AiCapabilities.FunctionCalling | AiCapabilities.CodeGeneration;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -64,7 +64,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     /// <inheritdoc/>
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default)
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
@@ -103,24 +103,24 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             var textContent = result?.Content?.FirstOrDefault(c => c.Type == "text");
             var toolUse = result?.Content?.FirstOrDefault(c => c.Type == "tool_use");
 
-            return new AIResponse
+            return new AiResponse
             {
                 Success = true,
                 Content = textContent?.Text ?? string.Empty,
                 FinishReason = result?.StopReason,
                 FunctionCall = toolUse != null
-                    ? new AIFunctionCall { Name = toolUse.Name ?? "", Arguments = JsonSerializer.Serialize(toolUse.Input) }
+                    ? new AiFunctionCall { Name = toolUse.Name ?? "", Arguments = JsonSerializer.Serialize(toolUse.Input) }
                     : null,
                 Usage = result?.Usage != null
-                    ? new AIUsage { PromptTokens = result.Usage.InputTokens, CompletionTokens = result.Usage.OutputTokens }
+                    ? new AiUsage { PromptTokens = result.Usage.InputTokens, CompletionTokens = result.Usage.OutputTokens }
                     : null
             };
         });
     }
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(
-        AIRequest request,
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(
+        AiRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var apiKey = GetRequiredConfig("ApiKey");
@@ -159,11 +159,11 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
 
             if (eventData?.Type == "content_block_delta" && eventData.Delta?.Type == "text_delta")
             {
-                yield return new AIStreamChunk { Content = eventData.Delta.Text ?? "" };
+                yield return new AiStreamChunk { Content = eventData.Delta.Text ?? "" };
             }
             else if (eventData?.Type == "message_stop")
             {
-                yield return new AIStreamChunk { IsFinal = true, FinishReason = "stop" };
+                yield return new AiStreamChunk { IsFinal = true, FinishReason = "stop" };
                 break;
             }
         }
@@ -177,7 +177,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         throw new NotSupportedException("Claude does not provide a native embeddings API. Use OpenAI or a dedicated embedding provider.");
     }
 
-    private static List<object> BuildMessages(AIRequest request)
+    private static List<object> BuildMessages(AiRequest request)
     {
         var messages = new List<object>();
 

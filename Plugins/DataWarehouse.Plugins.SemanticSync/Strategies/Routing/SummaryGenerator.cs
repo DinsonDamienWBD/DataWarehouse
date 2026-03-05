@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.SemanticSync.Strategies.Routing;
 /// </summary>
 /// <remarks>
 /// <para>
-/// When an <see cref="IAIProvider"/> is available and the data is text-based (UTF-8 decodable),
+/// When an <see cref="IAiProvider"/> is available and the data is text-based (UTF-8 decodable),
 /// AI-driven summarization produces semantically meaningful summaries. Without AI or for binary
 /// data, an extraction fallback takes leading bytes proportional to the target fidelity level.
 /// </para>
@@ -31,13 +31,13 @@ internal sealed class SummaryGenerator
 {
     private static readonly SearchValues<char> KeyValueSeparators = SearchValues.Create([':', '=']);
 
-    private readonly IAIProvider? _aiProvider;
+    private readonly IAiProvider? _aiProvider;
 
     /// <summary>
     /// Initializes a new instance of <see cref="SummaryGenerator"/>.
     /// </summary>
     /// <param name="aiProvider">Optional AI provider for intelligent summarization. Pass null to use extraction fallback exclusively.</param>
-    public SummaryGenerator(IAIProvider? aiProvider = null)
+    public SummaryGenerator(IAiProvider? aiProvider = null)
     {
         _aiProvider = aiProvider;
     }
@@ -124,7 +124,7 @@ internal sealed class SummaryGenerator
         {
             try
             {
-                var request = new AIRequest
+                var request = new AiRequest
                 {
                     Prompt = $"Expand the following summary back into a detailed representation. Provide the expanded content only, no commentary.\n\nSummary:\n{summary.SummaryText}",
                     SystemMessage = "You are a data reconstruction engine. Expand summaries into detailed data representations faithfully.",
@@ -170,7 +170,7 @@ internal sealed class SummaryGenerator
                 $"Summarize the following data concisely.\n\n{TruncateForPrompt(textContent)}"
         };
 
-        var request = new AIRequest
+        var request = new AiRequest
         {
             Prompt = prompt,
             SystemMessage = "You are a data summarization engine. Produce concise, accurate summaries.",
@@ -352,7 +352,7 @@ internal sealed class SummaryGenerator
     private async Task<byte[]> GenerateEmbeddingBytesAsync(string text, CancellationToken ct)
     {
         if (_aiProvider is null || !_aiProvider.IsAvailable ||
-            !_aiProvider.Capabilities.HasFlag(AICapabilities.Embeddings))
+            !_aiProvider.Capabilities.HasFlag(AiCapabilities.Embeddings))
         {
             return Array.Empty<byte>();
         }

@@ -26,7 +26,7 @@ public static class Program
     private static ConsoleRenderer _renderer = new();
     private static NaturalLanguageProcessor? _nlp;
     private static CommandHistory? _history;
-    private static IAIProviderRegistry? _aiRegistry;
+    private static IAiProviderRegistry? _aiRegistry;
     private static string? _sessionId;
 
     /// <summary>
@@ -100,7 +100,7 @@ public static class Program
     /// <summary>
     /// Tries to initialize the AI provider registry if configured.
     /// </summary>
-    private static IAIProviderRegistry? TryGetAIRegistry()
+    private static IAiProviderRegistry? TryGetAIRegistry()
     {
         // Check for environment variables that indicate AI is configured
         var openaiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");

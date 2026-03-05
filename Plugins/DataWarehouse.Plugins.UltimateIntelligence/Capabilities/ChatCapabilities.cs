@@ -345,7 +345,7 @@ public sealed record FunctionCall
 /// </summary>
 public sealed class ChatCapabilityHandler : IDisposable
 {
-    private readonly Func<string, IAIProvider?> _providerResolver;
+    private readonly Func<string, IAiProvider?> _providerResolver;
     private readonly ConversationManager _conversationManager;
     private readonly FunctionCallingHandler _functionHandler;
     private readonly VisionHandler _visionHandler;
@@ -359,7 +359,7 @@ public sealed class ChatCapabilityHandler : IDisposable
     /// <param name="providerResolver">Function to resolve AI providers by name.</param>
     /// <param name="config">Optional chat configuration.</param>
     public ChatCapabilityHandler(
-        Func<string, IAIProvider?> providerResolver,
+        Func<string, IAiProvider?> providerResolver,
         ChatConfig? config = null)
     {
         _providerResolver = providerResolver ?? throw new ArgumentNullException(nameof(providerResolver));
@@ -407,7 +407,7 @@ public sealed class ChatCapabilityHandler : IDisposable
         }
 
         // Build AI request
-        var aiRequest = new AIRequest
+        var aiRequest = new AiRequest
         {
             Prompt = BuildPromptFromMessages(messages),
             SystemMessage = ExtractSystemMessage(messages),
@@ -477,7 +477,7 @@ public sealed class ChatCapabilityHandler : IDisposable
             throw new InvalidOperationException($"Provider '{providerName}' not found.");
         }
 
-        var aiRequest = new AIRequest
+        var aiRequest = new AiRequest
         {
             Prompt = request.Prompt,
             Model = request.Model,
@@ -1064,13 +1064,13 @@ public sealed class StreamingHandler
     /// <param name="ct">Cancellation token.</param>
     /// <returns>Async enumerable of response chunks.</returns>
     public async IAsyncEnumerable<string> StreamAsync(
-        IAIProvider provider,
+        IAiProvider provider,
         string prompt,
         string? systemMessage,
         string model,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
-        var request = new AIRequest
+        var request = new AiRequest
         {
             Prompt = prompt,
             SystemMessage = systemMessage,

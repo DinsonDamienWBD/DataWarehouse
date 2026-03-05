@@ -290,7 +290,7 @@ public sealed class ReActAgentStrategy : AgentStrategyBase
 
                 // Thought: Reasoning step
                 var thoughtPrompt = BuildReActPrompt(task, actions, context);
-                var thoughtResponse = await AiProvider.CompleteAsync(new AIRequest
+                var thoughtResponse = await AiProvider.CompleteAsync(new AiRequest
                 {
                     Prompt = thoughtPrompt,
                     MaxTokens = 500,
@@ -585,7 +585,7 @@ Constraints:
 
 Generate a numbered list of subtasks (max {GetConfig("MaxSubTasks") ?? "20"}):";
 
-        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 1000 }, ct);
+        var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 1000 }, ct);
 
         // Simple parsing - split by numbers
         var subtasks = response.Content
@@ -601,7 +601,7 @@ Generate a numbered list of subtasks (max {GetConfig("MaxSubTasks") ?? "20"}):";
     {
         // Simplified execution - in production would use tools and more complex logic
         var prompt = $"Execute the following subtask and provide the result:\n\nSubtask: {subtask}\n\nResult:";
-        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
+        var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 500 }, ct);
         return response.Content.Trim();
     }
 
@@ -617,7 +617,7 @@ Completed Subtasks:
 
 Final Answer:";
 
-        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
+        var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 500 }, ct);
         return response.Content.Trim();
     }
 }
@@ -767,7 +767,7 @@ Task: {task}
 
 Execute your role and provide your contribution:";
 
-        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 500 }, ct);
+        var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 500 }, ct);
         return response.Content.Trim();
     }
 
@@ -928,7 +928,7 @@ public sealed class LangGraphAgentStrategy : AgentStrategyBase
 
             case "llm":
                 var prompt = $"Analyze the following task:\n\n{state["task"]}\n\nAnalysis:";
-                var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 300 }, ct);
+                var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 300 }, ct);
                 return response.Content.Trim();
 
             case "conditional":
@@ -1110,7 +1110,7 @@ public sealed class BabyAgiAgentStrategy : AgentStrategyBase
     private async Task<string> ExecuteTaskItemAsync(string taskDescription, AgentContext context, CancellationToken ct)
     {
         var prompt = $"Execute the following task and provide the result:\n\nTask: {taskDescription}\n\nResult:";
-        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 400 }, ct);
+        var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 400 }, ct);
         return response.Content.Trim();
     }
 
@@ -1124,7 +1124,7 @@ Result: {result}
 
 Create a list of new tasks (max 3), or return 'NONE' if no new tasks are needed:";
 
-        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 300 }, ct);
+        var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 300 }, ct);
 
         if (response.Content.Contains("NONE", StringComparison.OrdinalIgnoreCase))
             return new List<string>();
@@ -1151,7 +1151,7 @@ Current Tasks:
 
 Return the task IDs in priority order (comma-separated):";
 
-        var response = await AiProvider!.CompleteAsync(new AIRequest { Prompt = prompt, MaxTokens = 100 }, ct);
+        var response = await AiProvider!.CompleteAsync(new AiRequest { Prompt = prompt, MaxTokens = 100 }, ct);
 
         // Simple parsing - in production use better logic
         var priorityOrder = response.Content
@@ -1240,7 +1240,7 @@ public sealed class ToolCallingAgentStrategy : AgentStrategyBase
                 var prompt = BuildToolCallingPrompt(task, conversationHistory, context.Tools);
 
                 // Call AI with tool definitions
-                var response = await AiProvider.CompleteAsync(new AIRequest
+                var response = await AiProvider.CompleteAsync(new AiRequest
                 {
                     Prompt = prompt,
                     MaxTokens = 1000,

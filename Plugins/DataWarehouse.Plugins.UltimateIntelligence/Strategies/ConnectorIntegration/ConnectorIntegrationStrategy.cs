@@ -680,7 +680,7 @@ Tasks:
 
 Provide only the optimized JSON payload in your response, no explanations.";
 
-                var aiRequest = new AIRequest
+                var aiRequest = new AiRequest
                 {
                     Prompt = prompt,
                     MaxTokens = 800,
@@ -763,7 +763,7 @@ Optimization Guidelines:
 
 Return ONLY the optimized query text. Do not include explanations or markdown formatting.";
 
-                var aiRequest = new AIRequest
+                var aiRequest = new AiRequest
                 {
                     Prompt = prompt,
                     MaxTokens = 1000,
@@ -847,7 +847,7 @@ Provide a JSON response with:
 
 Return only valid JSON, no explanations.";
 
-                var aiRequest = new AIRequest
+                var aiRequest = new AiRequest
                 {
                     Prompt = prompt,
                     MaxTokens = 800,
@@ -959,7 +959,7 @@ Return a JSON array of anomalies, each with:
 
 Return only the JSON array, or [] if no anomalies detected.";
 
-                var aiRequest = new AIRequest
+                var aiRequest = new AiRequest
                 {
                     Prompt = prompt,
                     MaxTokens = 1000,
@@ -1087,7 +1087,7 @@ Return a JSON object with:
 
 Return only valid JSON.";
 
-                var aiRequest = new AIRequest
+                var aiRequest = new AiRequest
                 {
                     Prompt = prompt,
                     MaxTokens = 500,

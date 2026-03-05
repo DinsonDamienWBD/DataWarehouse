@@ -9,7 +9,7 @@ namespace DataWarehouse.SDK.AI
     /// AI-agnostic provider interface. Supports OpenAI, Claude, Copilot, Ollama,
     /// and any future AI/LLM providers without SDK changes.
     /// </summary>
-    public interface IAIProvider
+    public interface IAiProvider
     {
         /// <summary>
         /// Provider identifier (e.g., "openai", "anthropic", "ollama", "azure", "copilot").
@@ -29,17 +29,17 @@ namespace DataWarehouse.SDK.AI
         /// <summary>
         /// Supported capabilities of this provider.
         /// </summary>
-        AICapabilities Capabilities { get; }
+        AiCapabilities Capabilities { get; }
 
         /// <summary>
         /// Generate a completion from a prompt.
         /// </summary>
-        Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);
+        Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);
 
         /// <summary>
         /// Generate a streaming completion from a prompt.
         /// </summary>
-        IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, CancellationToken ct = default);
+        IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, CancellationToken ct = default);
 
         /// <summary>
         /// Generate embeddings for text.
@@ -56,7 +56,7 @@ namespace DataWarehouse.SDK.AI
     /// AI provider capabilities flags.
     /// </summary>
     [Flags]
-    public enum AICapabilities
+    public enum AiCapabilities
     {
         None = 0,
         TextCompletion = 1,
@@ -73,7 +73,7 @@ namespace DataWarehouse.SDK.AI
     /// <summary>
     /// AI request model - provider agnostic.
     /// </summary>
-    public class AIRequest
+    public class AiRequest
     {
         /// <summary>
         /// The prompt or user message.
@@ -88,7 +88,7 @@ namespace DataWarehouse.SDK.AI
         /// <summary>
         /// Chat history for multi-turn conversations.
         /// </summary>
-        public List<AIChatMessage> ChatHistory { get; init; } = new();
+        public List<AiChatMessage> ChatHistory { get; init; } = new();
 
         /// <summary>
         /// Model to use (provider-specific, e.g., "gpt-4", "claude-3-opus").
@@ -109,7 +109,7 @@ namespace DataWarehouse.SDK.AI
         /// <summary>
         /// Optional function/tool definitions for function calling.
         /// </summary>
-        public List<AIFunction>? Functions { get; init; }
+        public List<AiFunction>? Functions { get; init; }
 
         /// <summary>
         /// Additional provider-specific parameters.
@@ -120,7 +120,7 @@ namespace DataWarehouse.SDK.AI
     /// <summary>
     /// AI response model - provider agnostic.
     /// </summary>
-    public class AIResponse
+    public class AiResponse
     {
         /// <summary>
         /// The generated content.
@@ -145,12 +145,12 @@ namespace DataWarehouse.SDK.AI
         /// <summary>
         /// Function call request if the model wants to call a function.
         /// </summary>
-        public AIFunctionCall? FunctionCall { get; init; }
+        public AiFunctionCall? FunctionCall { get; init; }
 
         /// <summary>
         /// Token usage statistics.
         /// </summary>
-        public AIUsage? Usage { get; init; }
+        public AiUsage? Usage { get; init; }
 
         /// <summary>
         /// Provider-specific response metadata.
@@ -161,7 +161,7 @@ namespace DataWarehouse.SDK.AI
     /// <summary>
     /// Streaming chunk from AI provider.
     /// </summary>
-    public class AIStreamChunk
+    public class AiStreamChunk
     {
         /// <summary>
         /// The content delta in this chunk.
@@ -182,7 +182,7 @@ namespace DataWarehouse.SDK.AI
     /// <summary>
     /// Chat message for multi-turn conversations.
     /// </summary>
-    public class AIChatMessage
+    public class AiChatMessage
     {
         /// <summary>
         /// Role of the message sender (e.g., "user", "assistant", "system", "function").
@@ -203,7 +203,7 @@ namespace DataWarehouse.SDK.AI
     /// <summary>
     /// Function definition for function calling.
     /// </summary>
-    public class AIFunction
+    public class AiFunction
     {
         /// <summary>
         /// Function name.
@@ -224,7 +224,7 @@ namespace DataWarehouse.SDK.AI
     /// <summary>
     /// Function call request from AI.
     /// </summary>
-    public class AIFunctionCall
+    public class AiFunctionCall
     {
         /// <summary>
         /// Function name to call.
@@ -240,7 +240,7 @@ namespace DataWarehouse.SDK.AI
     /// <summary>
     /// Token usage statistics.
     /// </summary>
-    public class AIUsage
+    public class AiUsage
     {
         /// <summary>
         /// Tokens used in the prompt.
@@ -261,12 +261,12 @@ namespace DataWarehouse.SDK.AI
     /// <summary>
     /// Registry for AI providers. Allows runtime registration and selection.
     /// </summary>
-    public interface IAIProviderRegistry
+    public interface IAiProviderRegistry
     {
         /// <summary>
         /// Register an AI provider.
         /// </summary>
-        void Register(IAIProvider provider);
+        void Register(IAiProvider provider);
 
         /// <summary>
         /// Unregister an AI provider.
@@ -276,17 +276,17 @@ namespace DataWarehouse.SDK.AI
         /// <summary>
         /// Get a specific provider by ID.
         /// </summary>
-        IAIProvider? GetProvider(string providerId);
+        IAiProvider? GetProvider(string providerId);
 
         /// <summary>
         /// Get all registered providers.
         /// </summary>
-        IEnumerable<IAIProvider> GetAllProviders();
+        IEnumerable<IAiProvider> GetAllProviders();
 
         /// <summary>
         /// Get the default/preferred provider.
         /// </summary>
-        IAIProvider? GetDefaultProvider();
+        IAiProvider? GetDefaultProvider();
 
         /// <summary>
         /// Set the default provider.
@@ -296,6 +296,6 @@ namespace DataWarehouse.SDK.AI
         /// <summary>
         /// Get providers that support specific capabilities.
         /// </summary>
-        IEnumerable<IAIProvider> GetProvidersWithCapabilities(AICapabilities required);
+        IEnumerable<IAiProvider> GetProvidersWithCapabilities(AiCapabilities required);
     }
 }

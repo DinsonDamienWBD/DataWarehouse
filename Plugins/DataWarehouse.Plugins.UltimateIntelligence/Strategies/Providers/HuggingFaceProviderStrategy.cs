@@ -31,9 +31,9 @@ public sealed class HuggingFaceProviderStrategy : AIProviderStrategyBase
     public override string DisplayName => "Hugging Face";
 
     /// <inheritdoc/>
-    public override AICapabilities Capabilities =>
-        AICapabilities.TextCompletion | AICapabilities.ChatCompletion |
-        AICapabilities.Embeddings | AICapabilities.CodeGeneration;
+    public override AiCapabilities Capabilities =>
+        AiCapabilities.TextCompletion | AiCapabilities.ChatCompletion |
+        AiCapabilities.Embeddings | AiCapabilities.CodeGeneration;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyInfo Info => new()
@@ -82,7 +82,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     /// <inheritdoc/>
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default)
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default)
     {
         return await ExecuteWithTrackingAsync(async () =>
         {
@@ -112,7 +112,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
             var result = await response.Content.ReadFromJsonAsync<List<HuggingFaceTextGeneration>>(cancellationToken: ct);
             var generation = result?.FirstOrDefault();
 
-            return new AIResponse
+            return new AiResponse
             {
                 Success = true,
                 Content = generation?.GeneratedText ?? string.Empty,
@@ -122,8 +122,8 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
     }
 
     /// <inheritdoc/>
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(
-        AIRequest request,
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(
+        AiRequest request,
         [EnumeratorCancellation] CancellationToken ct = default)
     {
         var apiKey = GetRequiredConfig("ApiKey");
@@ -172,11 +172,11 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
 
             if (chunk?.Token?.Text != null)
             {
-                yield return new AIStreamChunk { Content = chunk.Token.Text };
+                yield return new AiStreamChunk { Content = chunk.Token.Text };
             }
             if (chunk?.Token?.Special == true)
             {
-                yield return new AIStreamChunk { IsFinal = true, FinishReason = "stop" };
+                yield return new AiStreamChunk { IsFinal = true, FinishReason = "stop" };
                 break;
             }
         }
@@ -208,7 +208,7 @@ new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
         });
     }
 
-    private static string BuildPrompt(AIRequest request)
+    private static string BuildPrompt(AiRequest request)
     {
         var parts = new List<string>();
 

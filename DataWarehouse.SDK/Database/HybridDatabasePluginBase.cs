@@ -31,11 +31,11 @@ namespace DataWarehouse.SDK.Database;
 public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePluginBase
     where TConfig : DatabaseConfigBase, new()
 {
-    protected readonly TConfig _config;
-    protected readonly JsonSerializerOptions _jsonOptions;
-    protected readonly SemaphoreSlim _connectionLock = new(1, 1);
-    protected readonly StorageConnectionRegistry<TConfig> _connectionRegistry;
-    protected bool _isConnected;
+    protected readonly TConfig DbConfig;
+    protected readonly JsonSerializerOptions DbJsonOptions;
+    protected readonly SemaphoreSlim DbConnectionLock = new(1, 1);
+    protected readonly StorageConnectionRegistry<TConfig> DbConnectionRegistry;
+    protected bool DbIsConnected;
 
     /// <summary>
     /// The type of database (NoSQL, Embedded, Relational).
@@ -50,12 +50,12 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
     /// <summary>
     /// Whether the connection is currently active.
     /// </summary>
-    public bool IsConnected => _isConnected;
+    public bool IsConnected => DbIsConnected;
 
     /// <summary>
     /// Access to the connection registry for multi-instance management.
     /// </summary>
-    public StorageConnectionRegistry<TConfig> ConnectionRegistry => _connectionRegistry;
+    public StorageConnectionRegistry<TConfig> ConnectionRegistry => DbConnectionRegistry;
 
     /// <summary>
     /// Whether this database supports transactions.
@@ -64,14 +64,14 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
 
     protected HybridDatabasePluginBase(TConfig? config = null)
     {
-        _config = config ?? new TConfig();
-        _jsonOptions = new JsonSerializerOptions
+        DbConfig = config ?? new TConfig();
+        DbJsonOptions = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             WriteIndented = false,
             DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull
         };
-        _connectionRegistry = new StorageConnectionRegistry<TConfig>(CreateConnectionAsync);
+        DbConnectionRegistry = new StorageConnectionRegistry<TConfig>(CreateConnectionAsync);
     }
 
     /// <summary>
@@ -87,14 +87,14 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
         var metadata = base.GetMetadata();
         metadata["DatabaseCategory"] = DatabaseCategory.ToString();
         metadata["Engine"] = Engine;
-        metadata["ConnectionString"] = _config.ConnectionString != null ? "***" : "not configured";
-        metadata["IsConnected"] = _isConnected;
+        metadata["ConnectionString"] = DbConfig.ConnectionString != null ? "***" : "not configured";
+        metadata["IsConnected"] = IsConnected;
         metadata["SupportsTransactions"] = SupportsTransactions;
         metadata["SupportsQueries"] = true;
         metadata["SupportsConcurrency"] = true;
         metadata["SupportsListing"] = true;
         metadata["SupportsMultiInstance"] = true;
-        metadata["RegisteredInstances"] = _connectionRegistry.Count;
+        metadata["RegisteredInstances"] = ConnectionRegistry.Count;
         return metadata;
     }
 
@@ -192,7 +192,7 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
             return MessageResponse.Error("Missing required parameters: collection, data");
 
         var uri = BuildUri(database, collection, id);
-        var jsonData = JsonSerializer.Serialize(data, _jsonOptions);
+        var jsonData = JsonSerializer.Serialize(data, DbJsonOptions);
         using var stream = new MemoryStream(Encoding.UTF8.GetBytes(jsonData));
 
         if (ttl.HasValue)
@@ -221,7 +221,7 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
         var stream = await LoadAsync(uri);
         using var reader = new StreamReader(stream);
         var json = await reader.ReadToEndAsync();
-        var data = JsonSerializer.Deserialize<object>(json, _jsonOptions);
+        var data = JsonSerializer.Deserialize<object>(json, DbJsonOptions);
 
         return MessageResponse.Ok(new { Database = database, Collection = collection, Id = id, Data = data });
     }
@@ -289,7 +289,7 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
     {
         var instanceId = GetPayloadString(message.Payload, "instanceId");
         await ConnectAsync(instanceId);
-        return MessageResponse.Ok(new { Connected = _isConnected, InstanceId = instanceId ?? "default" });
+        return MessageResponse.Ok(new { Connected = IsConnected, InstanceId = instanceId ?? "default" });
     }
 
     protected virtual async Task<MessageResponse> HandleDisconnectAsync(PluginMessage message)
@@ -389,7 +389,7 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
             config.ConnectionString = connectionString;
 
         var roles = ParseStorageRoles(rolesStr);
-        await _connectionRegistry.RegisterAsync(instanceId, config, roles);
+        await ConnectionRegistry.RegisterAsync(instanceId, config, roles);
 
         return MessageResponse.Ok(new { InstanceId = instanceId, Registered = true, Roles = roles.ToString() });
     }
@@ -400,13 +400,13 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
         if (string.IsNullOrEmpty(instanceId))
             return MessageResponse.Error("Missing required parameter: instanceId");
 
-        await _connectionRegistry.UnregisterAsync(instanceId);
+        await ConnectionRegistry.UnregisterAsync(instanceId);
         return MessageResponse.Ok(new { InstanceId = instanceId, Unregistered = true });
     }
 
     protected virtual MessageResponse HandleListInstancesAsync(PluginMessage message)
     {
-        var instances = _connectionRegistry.GetAll().Select(i => new
+        var instances = ConnectionRegistry.GetAll().Select(i => new
         {
             i.InstanceId,
             i.Roles,
@@ -415,7 +415,7 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
             i.LastActivity,
             i.Health
         });
-        return MessageResponse.Ok(new { Instances = instances, Count = _connectionRegistry.Count });
+        return MessageResponse.Ok(new { Instances = instances, Count = ConnectionRegistry.Count });
     }
 
     // Cache handlers
@@ -473,24 +473,24 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
         if (string.IsNullOrEmpty(instanceId))
         {
             // Default instance
-            if (_isConnected) return;
+            if (IsConnected) return;
 
-            await _connectionLock.WaitAsync();
+            await DbConnectionLock.WaitAsync();
             try
             {
-                if (_isConnected) return;
-                await _connectionRegistry.GetOrCreateDefaultAsync(_config);
-                _isConnected = true;
+                if (IsConnected) return;
+                await ConnectionRegistry.GetOrCreateDefaultAsync(DbConfig);
+                DbIsConnected = true;
             }
             finally
             {
-                _connectionLock.Release();
+                DbConnectionLock.Release();
             }
         }
         else
         {
             // Named instance
-            var instance = _connectionRegistry.GetRequired(instanceId);
+            var instance = ConnectionRegistry.GetRequired(instanceId);
             await instance.GetPrimaryConnectionAsync();
         }
     }
@@ -502,12 +502,12 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
     {
         if (string.IsNullOrEmpty(instanceId))
         {
-            await _connectionRegistry.ClearAsync();
-            _isConnected = false;
+            await ConnectionRegistry.ClearAsync();
+            DbIsConnected = false;
         }
         else
         {
-            await _connectionRegistry.UnregisterAsync(instanceId);
+            await ConnectionRegistry.UnregisterAsync(instanceId);
         }
     }
 
@@ -615,22 +615,22 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
     {
         if (string.IsNullOrEmpty(instanceId))
         {
-            if (_isConnected) return;
+            if (IsConnected) return;
 
-            await _connectionLock.WaitAsync();
+            await DbConnectionLock.WaitAsync();
             try
             {
-                if (_isConnected) return;
+                if (IsConnected) return;
                 await ConnectAsync();
             }
             finally
             {
-                _connectionLock.Release();
+                DbConnectionLock.Release();
             }
         }
         else
         {
-            var instance = _connectionRegistry.Get(instanceId);
+            var instance = ConnectionRegistry.Get(instanceId);
             if (instance == null || !instance.IsConnected)
             {
                 await ConnectAsync(instanceId);
@@ -642,9 +642,9 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
     {
         if (string.IsNullOrEmpty(instanceId))
         {
-            return _connectionRegistry.Get("__default__");
+            return ConnectionRegistry.Get("__default__");
         }
-        return _connectionRegistry.Get(instanceId);
+        return ConnectionRegistry.Get(instanceId);
     }
 
     private static StorageRole ParseStorageRoles(string? rolesStr)
@@ -669,8 +669,8 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
     /// </summary>
     protected override async ValueTask DisposeAsyncCore()
     {
-        await _connectionRegistry.DisposeAsync();
-        _connectionLock.Dispose();
+        await ConnectionRegistry.DisposeAsync();
+        DbConnectionLock.Dispose();
 
         await base.DisposeAsyncCore();
     }
@@ -684,7 +684,7 @@ public abstract class HybridDatabasePluginBase<TConfig> : IndexableStoragePlugin
 public enum DatabaseCategory
 {
     /// <summary>Document databases like MongoDB, CouchDB.</summary>
-    NoSQL,
+    NoSql,
     /// <summary>Embedded databases like SQLite, LiteDB.</summary>
     Embedded,
     /// <summary>Relational databases like MySQL, PostgreSQL, SQL Server.</summary>
@@ -704,7 +704,7 @@ public enum DatabaseCategory
     /// <summary>Analytics databases like ClickHouse, Presto, Druid.</summary>
     Analytics,
     /// <summary>NewSQL databases like CockroachDB, TiDB, YugabyteDB, Vitess.</summary>
-    NewSQL,
+    NewSql,
     /// <summary>Spatial databases like PostGIS.</summary>
     Spatial,
     /// <summary>Streaming platforms like Kafka, Pulsar.</summary>
