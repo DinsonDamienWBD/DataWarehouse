@@ -26,7 +26,7 @@ namespace DataWarehouse.SDK.Edge.Bus;
 /// </para>
 /// </remarks>
 [SdkCompatibility("3.0.0", Notes = "Phase 36: I2C wrapper using System.Device.I2c (EDGE-01)")]
-public sealed class I2cBusController : II2cBusController
+public sealed class I2CBusController : II2CBusController
 {
     private bool _disposed;
 
@@ -51,7 +51,7 @@ public sealed class I2cBusController : II2cBusController
         {
             var settings = new I2cConnectionSettings(busId, deviceAddress);
             var device = I2cDevice.Create(settings);
-            return new I2cDeviceWrapper(device);
+            return new I2CDeviceWrapper(device);
         }
         catch (Exception ex)
         {
@@ -71,19 +71,19 @@ public sealed class I2cBusController : II2cBusController
     {
         if (_disposed)
         {
-            throw new ObjectDisposedException(nameof(I2cBusController));
+            throw new ObjectDisposedException(nameof(I2CBusController));
         }
     }
 
     /// <summary>
     /// Wrapper around System.Device.I2c.I2cDevice implementing II2cDevice.
     /// </summary>
-    private sealed class I2cDeviceWrapper : II2cDevice
+    private sealed class I2CDeviceWrapper : II2cDevice
     {
         private readonly I2cDevice _device;
         private bool _disposed;
 
-        public I2cDeviceWrapper(I2cDevice device)
+        public I2CDeviceWrapper(I2cDevice device)
         {
             _device = device;
         }
@@ -143,7 +143,7 @@ public sealed class I2cBusController : II2cBusController
         {
             if (_disposed)
             {
-                throw new ObjectDisposedException(nameof(I2cDeviceWrapper));
+                throw new ObjectDisposedException(nameof(I2CDeviceWrapper));
             }
         }
     }

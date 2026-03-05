@@ -241,36 +241,36 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
             ArgumentNullException.ThrowIfNull(b);
 
             // Validate dimensions: a is MxK, b is KxN, result is MxN
-            int M = a.GetLength(0), K = a.GetLength(1);
-            int K2 = b.GetLength(0), N = b.GetLength(1);
+            int m = a.GetLength(0), k = a.GetLength(1);
+            int k2 = b.GetLength(0), n = b.GetLength(1);
 
-            if (K != K2)
+            if (k != k2)
                 throw new ArgumentException("Matrix dimensions incompatible for multiplication (a.cols must equal b.rows)");
 
             // CuBLAS cublasSgemm or rocBLAS rocblas_sgemm implementation requires:
-            // 1. Allocate GPU memory for matrices (M*K + K*N + M*N floats)
+            // 1. Allocate GPU memory for matrices (m*k + k*n + m*n floats)
             // 2. Copy a, b to GPU
-            // 3. Call cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, M, N, K, &alpha, d_a, M, d_b, K, &beta, d_c, M)
+            // 3. Call cublasSgemm(handle, CUBLAS_OP_N, CUBLAS_OP_N, m, n, k, &alpha, d_a, m, d_b, k, &beta, d_c, m)
             // 4. Copy result from GPU
             // 5. Free GPU memory
             //
             // For Phase 35: CPU fallback
-            if (M > 4096 || N > 4096 || K > 4096)
-                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {M}x{K} * {K}x{N}. Max 4096 per dimension (finding P2-372).");
-            float[] result = new float[M * N];
+            if (m > 4096 || n > 4096 || k > 4096)
+                throw new ArgumentException($"Matrix dimensions too large for CPU fallback: {m}x{k} * {k}x{n}. Max 4096 per dimension (finding P2-372).");
+            float[] result = new float[m * n];
             long t0 = System.Diagnostics.Stopwatch.GetTimestamp();
             await Task.Run(() =>
             {
-                for (int i = 0; i < M; i++)
+                for (int i = 0; i < m; i++)
                 {
-                    for (int j = 0; j < N; j++)
+                    for (int j = 0; j < n; j++)
                     {
                         float sum = 0;
-                        for (int k = 0; k < K; k++)
+                        for (int ki = 0; ki < k; ki++)
                         {
-                            sum += a[i, k] * b[k, j];
+                            sum += a[i, ki] * b[ki, j];
                         }
-                        result[i * N + j] = sum;
+                        result[i * n + j] = sum;
                     }
                 }
             });
@@ -291,27 +291,27 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
 
             // Embedding: input (1 x D), weights (D x E) -> output (1 x E)
             // This is matrix-vector multiply: y = W^T * x
-            int D = input.Length;
-            int D2 = weights.GetLength(0), E = weights.GetLength(1);
+            int d = input.Length;
+            int d2 = weights.GetLength(0), e = weights.GetLength(1);
 
-            if (D != D2)
+            if (d != d2)
                 throw new ArgumentException("Input dimension must match weight rows");
 
             // CuBLAS cublasSgemv or rocBLAS rocblas_sgemv implementation requires:
-            // 1. Allocate GPU memory for input vector (D floats) and weight matrix (D*E floats)
+            // 1. Allocate GPU memory for input vector (d floats) and weight matrix (d*e floats)
             // 2. Copy input, weights to GPU
-            // 3. Call cublasSgemv(handle, CUBLAS_OP_T, D, E, &alpha, d_W, D, d_x, 1, &beta, d_y, 1)
+            // 3. Call cublasSgemv(handle, CUBLAS_OP_T, d, e, &alpha, d_W, d, d_x, 1, &beta, d_y, 1)
             // 4. Copy result from GPU
             // 5. Free GPU memory
             //
             // For Phase 35: CPU fallback
-            float[] result = new float[E];
+            float[] result = new float[e];
             await Task.Run(() =>
             {
-                for (int j = 0; j < E; j++)
+                for (int j = 0; j < e; j++)
                 {
                     float sum = 0;
-                    for (int i = 0; i < D; i++)
+                    for (int i = 0; i < d; i++)
                     {
                         sum += input[i] * weights[i, j];
                     }

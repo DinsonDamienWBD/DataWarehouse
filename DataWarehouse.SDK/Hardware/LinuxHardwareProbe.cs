@@ -75,7 +75,7 @@ namespace DataWarehouse.SDK.Hardware
                 }
 
                 // I2C buses
-                if (ShouldDiscover(typeFilter, HardwareDeviceType.I2cBus))
+                if (ShouldDiscover(typeFilter, HardwareDeviceType.I2CBus))
                 {
                     devices.AddRange(await DiscoverI2cBusesAsync(ct));
                 }
@@ -418,7 +418,7 @@ namespace DataWarehouse.SDK.Hardware
                     {
                         DeviceId = adapterName,
                         Name = name ?? $"I2C Bus {adapterName}",
-                        Type = HardwareDeviceType.I2cBus,
+                        Type = HardwareDeviceType.I2CBus,
                         DevicePath = $"/dev/{adapterName}",
                         Properties = ImmutableDictionary<string, string>.Empty
                     });

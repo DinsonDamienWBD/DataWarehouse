@@ -44,27 +44,27 @@ public readonly struct ExtentChecksumRecord : IEquatable<ExtentChecksumRecord>
     public int ExtentBlockCount { get; }
 
     /// <summary>CRC32C checksum computed across all blocks in the extent.</summary>
-    public uint Crc32c { get; }
+    public uint Crc32C { get; }
 
     /// <summary>Creates a new extent checksum record.</summary>
-    public ExtentChecksumRecord(long extentStartBlock, int extentBlockCount, uint crc32c)
+    public ExtentChecksumRecord(long extentStartBlock, int extentBlockCount, uint crc32C)
     {
         ExtentStartBlock = extentStartBlock;
         ExtentBlockCount = extentBlockCount;
-        Crc32c = crc32c;
+        Crc32C = crc32C;
     }
 
     /// <inheritdoc />
     public bool Equals(ExtentChecksumRecord other)
         => ExtentStartBlock == other.ExtentStartBlock
         && ExtentBlockCount == other.ExtentBlockCount
-        && Crc32c == other.Crc32c;
+        && Crc32C == other.Crc32C;
 
     /// <inheritdoc />
     public override bool Equals(object? obj) => obj is ExtentChecksumRecord other && Equals(other);
 
     /// <inheritdoc />
-    public override int GetHashCode() => HashCode.Combine(ExtentStartBlock, ExtentBlockCount, Crc32c);
+    public override int GetHashCode() => HashCode.Combine(ExtentStartBlock, ExtentBlockCount, Crc32C);
 
     /// <summary>Equality operator.</summary>
     public static bool operator ==(ExtentChecksumRecord left, ExtentChecksumRecord right) => left.Equals(right);

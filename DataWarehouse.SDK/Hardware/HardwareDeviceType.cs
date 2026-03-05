@@ -39,7 +39,7 @@ namespace DataWarehouse.SDK.Hardware
         GpioController = 128,
 
         /// <summary>I2C bus controller.</summary>
-        I2cBus = 256,
+        I2CBus = 256,
 
         /// <summary>SPI bus controller.</summary>
         SpiBus = 512,

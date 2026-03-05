@@ -307,10 +307,10 @@ public sealed class Fuse3LowLevelMountProvider : IVdeMountProvider
     {
         return type switch
         {
-            InodeType.File => Fuse3Native.S_IFREG,
-            InodeType.Directory => Fuse3Native.S_IFDIR,
-            InodeType.SymLink => Fuse3Native.S_IFLNK,
-            _ => Fuse3Native.S_IFREG
+            InodeType.File => Fuse3Native.SIfreg,
+            InodeType.Directory => Fuse3Native.SIfdir,
+            InodeType.SymLink => Fuse3Native.SIflnk,
+            _ => Fuse3Native.SIfreg
         };
     }
 
@@ -336,17 +336,17 @@ public sealed class Fuse3LowLevelMountProvider : IVdeMountProvider
     {
         return ex switch
         {
-            FileNotFoundException => Fuse3Native.ENOENT,
-            DirectoryNotFoundException => Fuse3Native.ENOENT,
-            UnauthorizedAccessException => Fuse3Native.EACCES,
-            InvalidOperationException e when e.Message.Contains("read-only", StringComparison.OrdinalIgnoreCase) => Fuse3Native.EROFS,
-            InvalidOperationException e when e.Message.Contains("not empty", StringComparison.OrdinalIgnoreCase) => Fuse3Native.ENOTEMPTY,
+            FileNotFoundException => Fuse3Native.Enoent,
+            DirectoryNotFoundException => Fuse3Native.Enoent,
+            UnauthorizedAccessException => Fuse3Native.Eacces,
+            InvalidOperationException e when e.Message.Contains("read-only", StringComparison.OrdinalIgnoreCase) => Fuse3Native.Erofs,
+            InvalidOperationException e when e.Message.Contains("not empty", StringComparison.OrdinalIgnoreCase) => Fuse3Native.Enotempty,
             IOException e when e.Message.Contains("disk full", StringComparison.OrdinalIgnoreCase)
-                            || e.Message.Contains("no space", StringComparison.OrdinalIgnoreCase) => Fuse3Native.ENOSPC,
-            IOException e when e.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase) => Fuse3Native.EEXIST,
-            ArgumentException => Fuse3Native.EINVAL,
-            NotSupportedException => Fuse3Native.ENOTSUP,
-            _ => Fuse3Native.EIO
+                            || e.Message.Contains("no space", StringComparison.OrdinalIgnoreCase) => Fuse3Native.Enospc,
+            IOException e when e.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase) => Fuse3Native.Eexist,
+            ArgumentException => Fuse3Native.Einval,
+            NotSupportedException => Fuse3Native.Enotsup,
+            _ => Fuse3Native.Eio
         };
     }
 
@@ -366,7 +366,7 @@ public sealed class Fuse3LowLevelMountProvider : IVdeMountProvider
 
             if (!result.Found)
             {
-                Fuse3Native.fuse_reply_err(req, Fuse3Native.ENOENT);
+                Fuse3Native.fuse_reply_err(req, Fuse3Native.Enoent);
                 return;
             }
 
@@ -666,7 +666,7 @@ public sealed class Fuse3LowLevelMountProvider : IVdeMountProvider
             var attrs = adapter.GetattrAsync((long)ino, CancellationToken.None).GetAwaiter().GetResult();
             if (attrs.Type != InodeType.Directory)
             {
-                Fuse3Native.fuse_reply_err(req, Fuse3Native.ENOTDIR);
+                Fuse3Native.fuse_reply_err(req, Fuse3Native.Enotdir);
                 return;
             }
 
@@ -835,7 +835,7 @@ public sealed class Fuse3LowLevelMountProvider : IVdeMountProvider
 
             if (data == null)
             {
-                Fuse3Native.fuse_reply_err(req, Fuse3Native.ENODATA);
+                Fuse3Native.fuse_reply_err(req, Fuse3Native.Enodata);
                 return;
             }
 

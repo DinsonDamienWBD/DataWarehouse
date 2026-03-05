@@ -70,7 +70,7 @@ public sealed class GravityOptimizerTests
             costProvider: (_, _) => Task.FromResult(new CostMetrics
             {
                 CurrentNodeId = "node-1",
-                EgressCostPerGB = 0.09m
+                EgressCostPerGb = 0.09m
             }),
             latencyProvider: (_, _) => Task.FromResult(new LatencyMetrics
             {
@@ -104,7 +104,7 @@ public sealed class GravityOptimizerTests
             }),
             costProvider: (_, _) => Task.FromResult(new CostMetrics
             {
-                EgressCostPerGB = 0m
+                EgressCostPerGb = 0m
             }),
             latencyProvider: (_, _) => Task.FromResult(new LatencyMetrics
             {
@@ -202,7 +202,7 @@ public sealed class GravityOptimizerTests
             AccessFrequency: 1000,
             LastAccessUtc: DateTimeOffset.UtcNow,
             ColocatedDependencies: 5,
-            EgressCostPerGB: 0.09m,
+            EgressCostPerGb: 0.09m,
             LatencyMs: 5.0,
             ComplianceWeight: 1.0,
             CompositeScore: 0.85); // > 0.7 threshold

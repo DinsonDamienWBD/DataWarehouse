@@ -55,7 +55,7 @@ public readonly struct GpsCoordinate : IEquatable<GpsCoordinate>
     /// </remarks>
     public double HaversineDistanceTo(GpsCoordinate other)
     {
-        const double EarthRadiusMeters = 6_371_000.0;
+        const double earthRadiusMeters = 6_371_000.0;
 
         var lat1Rad = Latitude * Math.PI / 180.0;
         var lat2Rad = other.Latitude * Math.PI / 180.0;
@@ -67,7 +67,7 @@ public readonly struct GpsCoordinate : IEquatable<GpsCoordinate>
                 Math.Sin(dLonRad / 2) * Math.Sin(dLonRad / 2);
         var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
 
-        return EarthRadiusMeters * c;
+        return earthRadiusMeters * c;
     }
 
     /// <inheritdoc/>

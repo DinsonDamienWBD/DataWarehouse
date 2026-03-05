@@ -88,8 +88,8 @@ public static class BusControllerFactory
     /// Optional platform capability registry. If null, performs filesystem-based detection.
     /// </param>
     /// <returns>
-    /// An <see cref="II2cBusController"/> instance. Either <see cref="I2cBusController"/>
-    /// if I2C hardware is detected, or <see cref="NullI2cBusController"/> otherwise.
+    /// An <see cref="II2CBusController"/> instance. Either <see cref="I2CBusController"/>
+    /// if I2C hardware is detected, or <see cref="NullI2CBusController"/> otherwise.
     /// </returns>
     /// <remarks>
     /// <para>
@@ -101,7 +101,7 @@ public static class BusControllerFactory
     /// </list>
     /// </para>
     /// </remarks>
-    public static II2cBusController CreateI2CController(IPlatformCapabilityRegistry? registry = null)
+    public static II2CBusController CreateI2CController(IPlatformCapabilityRegistry? registry = null)
     {
         bool hasI2C = false;
 
@@ -120,8 +120,8 @@ public static class BusControllerFactory
         }
 
         return hasI2C
-            ? new I2cBusController()
-            : new NullI2cBusController();
+            ? new I2CBusController()
+            : new NullI2CBusController();
     }
 
     /// <summary>

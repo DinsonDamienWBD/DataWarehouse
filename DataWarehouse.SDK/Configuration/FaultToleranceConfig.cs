@@ -44,13 +44,13 @@ public enum FaultToleranceMode
     /// RAID-6 style dual parity protection.
     /// Suitable for: Enterprise storage arrays, high-capacity deployments.
     /// </summary>
-    RAID6 = 4,
+    Raid6 = 4,
 
     /// <summary>
     /// ZFS RAID-Z3 triple parity - maximum protection.
     /// Suitable for: Mission-critical data, compliance requirements.
     /// </summary>
-    RAIDZ3 = 5,
+    Raidz3 = 5,
 
     /// <summary>
     /// Automatic selection based on deployment context and data criticality.
@@ -89,7 +89,7 @@ public enum DeploymentTier
     Individual = 0,
 
     /// <summary>Small/medium business (2-10 nodes).</summary>
-    SMB = 1,
+    Smb = 1,
 
     /// <summary>Enterprise deployment (10-100 nodes).</summary>
     Enterprise = 2,
@@ -150,7 +150,7 @@ public sealed class FaultToleranceConfig
     /// <summary>
     /// Deployment tier - influences automatic mode selection.
     /// </summary>
-    public DeploymentTier Tier { get; init; } = DeploymentTier.SMB;
+    public DeploymentTier Tier { get; init; } = DeploymentTier.Smb;
 
     /// <summary>
     /// Reed-Solomon configuration (used when Mode is ReedSolomon).
@@ -208,10 +208,10 @@ public sealed class FaultToleranceConfig
     /// <summary>
     /// Creates configuration for SMB deployment.
     /// </summary>
-    public static FaultToleranceConfig ForSMB() => new()
+    public static FaultToleranceConfig ForSmb() => new()
     {
         Mode = FaultToleranceMode.Mirror2,
-        Tier = DeploymentTier.SMB,
+        Tier = DeploymentTier.Smb,
         Criticality = DataCriticality.Normal,
         MinimumProviders = 2,
         AllowFallback = true,
@@ -238,7 +238,7 @@ public sealed class FaultToleranceConfig
     /// </summary>
     public static FaultToleranceConfig ForHighStakes() => new()
     {
-        Mode = FaultToleranceMode.RAIDZ3,
+        Mode = FaultToleranceMode.Raidz3,
         Tier = DeploymentTier.HighStakes,
         Criticality = DataCriticality.Critical,
         MinimumProviders = 4,
@@ -320,8 +320,8 @@ public sealed class FaultToleranceConfig
             FaultToleranceMode.Mirror2 => 2,
             FaultToleranceMode.Replica3 => 3,
             FaultToleranceMode.ReedSolomon => 4, // Minimum 2+2
-            FaultToleranceMode.RAID6 => 4,       // Minimum 2 data + 2 parity
-            FaultToleranceMode.RAIDZ3 => 4,      // Minimum 1 data + 3 parity
+            FaultToleranceMode.Raid6 => 4,       // Minimum 2 data + 2 parity
+            FaultToleranceMode.Raidz3 => 4,      // Minimum 1 data + 3 parity
             FaultToleranceMode.Automatic => 1,
             _ => 1
         };
@@ -524,27 +524,27 @@ public sealed class FaultToleranceManager
             (DeploymentTier.Individual, _) => availableProviders >= 2 ? FaultToleranceMode.Mirror2 : FaultToleranceMode.None,
 
             // SMB tier - balance cost and protection
-            (DeploymentTier.SMB, DataCriticality.Low) => FaultToleranceMode.None,
-            (DeploymentTier.SMB, DataCriticality.Normal) => availableProviders >= 2 ? FaultToleranceMode.Mirror2 : FaultToleranceMode.None,
-            (DeploymentTier.SMB, DataCriticality.High) => availableProviders >= 3 ? FaultToleranceMode.Replica3 : FaultToleranceMode.Mirror2,
-            (DeploymentTier.SMB, _) => availableProviders >= 3 ? FaultToleranceMode.Replica3 : FaultToleranceMode.Mirror2,
+            (DeploymentTier.Smb, DataCriticality.Low) => FaultToleranceMode.None,
+            (DeploymentTier.Smb, DataCriticality.Normal) => availableProviders >= 2 ? FaultToleranceMode.Mirror2 : FaultToleranceMode.None,
+            (DeploymentTier.Smb, DataCriticality.High) => availableProviders >= 3 ? FaultToleranceMode.Replica3 : FaultToleranceMode.Mirror2,
+            (DeploymentTier.Smb, _) => availableProviders >= 3 ? FaultToleranceMode.Replica3 : FaultToleranceMode.Mirror2,
 
             // Enterprise tier - reliability focus
             (DeploymentTier.Enterprise, DataCriticality.Low) => FaultToleranceMode.Mirror2,
             (DeploymentTier.Enterprise, DataCriticality.Normal) => availableProviders >= 3 ? FaultToleranceMode.Replica3 : FaultToleranceMode.Mirror2,
-            (DeploymentTier.Enterprise, DataCriticality.High) => availableProviders >= 4 ? FaultToleranceMode.RAID6 : FaultToleranceMode.Replica3,
-            (DeploymentTier.Enterprise, _) => availableProviders >= 4 ? FaultToleranceMode.RAID6 : FaultToleranceMode.Replica3,
+            (DeploymentTier.Enterprise, DataCriticality.High) => availableProviders >= 4 ? FaultToleranceMode.Raid6 : FaultToleranceMode.Replica3,
+            (DeploymentTier.Enterprise, _) => availableProviders >= 4 ? FaultToleranceMode.Raid6 : FaultToleranceMode.Replica3,
 
             // High-stakes tier - maximum protection
             (DeploymentTier.HighStakes, DataCriticality.Low) => availableProviders >= 3 ? FaultToleranceMode.Replica3 : FaultToleranceMode.Mirror2,
-            (DeploymentTier.HighStakes, DataCriticality.Normal) => availableProviders >= 4 ? FaultToleranceMode.RAID6 : FaultToleranceMode.Replica3,
-            (DeploymentTier.HighStakes, _) => availableProviders >= 4 ? FaultToleranceMode.RAIDZ3 : FaultToleranceMode.RAID6,
+            (DeploymentTier.HighStakes, DataCriticality.Normal) => availableProviders >= 4 ? FaultToleranceMode.Raid6 : FaultToleranceMode.Replica3,
+            (DeploymentTier.HighStakes, _) => availableProviders >= 4 ? FaultToleranceMode.Raidz3 : FaultToleranceMode.Raid6,
 
             // Hyperscale tier - efficiency at scale with durability
             (DeploymentTier.Hyperscale, DataCriticality.Low) => availableProviders >= 4 ? FaultToleranceMode.ReedSolomon : FaultToleranceMode.Mirror2,
             (DeploymentTier.Hyperscale, DataCriticality.Normal) => availableProviders >= 9 ? FaultToleranceMode.ReedSolomon : FaultToleranceMode.Replica3,
-            (DeploymentTier.Hyperscale, DataCriticality.High) => availableProviders >= 12 ? FaultToleranceMode.ReedSolomon : FaultToleranceMode.RAID6,
-            (DeploymentTier.Hyperscale, _) => availableProviders >= 4 ? FaultToleranceMode.RAIDZ3 : FaultToleranceMode.Replica3,
+            (DeploymentTier.Hyperscale, DataCriticality.High) => availableProviders >= 12 ? FaultToleranceMode.ReedSolomon : FaultToleranceMode.Raid6,
+            (DeploymentTier.Hyperscale, _) => availableProviders >= 4 ? FaultToleranceMode.Raidz3 : FaultToleranceMode.Replica3,
 
             // Default fallback
             _ => availableProviders >= 2 ? FaultToleranceMode.Mirror2 : FaultToleranceMode.None
@@ -648,8 +648,8 @@ public sealed class FaultToleranceManager
             FaultToleranceMode.Mirror2 => "2-way mirroring (RAID-1)",
             FaultToleranceMode.Replica3 => "3-way replication",
             FaultToleranceMode.ReedSolomon => "Reed-Solomon erasure coding",
-            FaultToleranceMode.RAID6 => "RAID-6 dual parity",
-            FaultToleranceMode.RAIDZ3 => "RAID-Z3 triple parity",
+            FaultToleranceMode.Raid6 => "RAID-6 dual parity",
+            FaultToleranceMode.Raidz3 => "RAID-Z3 triple parity",
             FaultToleranceMode.Automatic => "Automatic selection",
             _ => "Unknown mode"
         };
@@ -666,8 +666,8 @@ public sealed class FaultToleranceManager
             FaultToleranceMode.Mirror2 => 100,         // 2x storage
             FaultToleranceMode.Replica3 => 200,        // 3x storage
             FaultToleranceMode.ReedSolomon => rsConfig?.StorageOverhead ?? 50,
-            FaultToleranceMode.RAID6 => 33.3,          // ~1.33x for 4 disks
-            FaultToleranceMode.RAIDZ3 => 75,           // ~1.75x for 4 disks
+            FaultToleranceMode.Raid6 => 33.3,          // ~1.33x for 4 disks
+            FaultToleranceMode.Raidz3 => 75,           // ~1.75x for 4 disks
             _ => 0
         };
     }
@@ -683,8 +683,8 @@ public sealed class FaultToleranceManager
             FaultToleranceMode.Mirror2 => 1,
             FaultToleranceMode.Replica3 => 2,
             FaultToleranceMode.ReedSolomon => rsConfig?.ParityShards ?? 3,
-            FaultToleranceMode.RAID6 => 2,
-            FaultToleranceMode.RAIDZ3 => 3,
+            FaultToleranceMode.Raid6 => 2,
+            FaultToleranceMode.Raidz3 => 3,
             _ => 0
         };
     }

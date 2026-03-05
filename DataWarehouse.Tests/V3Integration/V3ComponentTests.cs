@@ -304,7 +304,7 @@ public class V3ComponentTests
         HardwareDeviceType.BlockDevice.Should().Be((HardwareDeviceType)32);
         HardwareDeviceType.NetworkAdapter.Should().Be((HardwareDeviceType)64);
         HardwareDeviceType.GpioController.Should().Be((HardwareDeviceType)128);
-        HardwareDeviceType.I2cBus.Should().Be((HardwareDeviceType)256);
+        HardwareDeviceType.I2CBus.Should().Be((HardwareDeviceType)256);
         HardwareDeviceType.SpiBus.Should().Be((HardwareDeviceType)512);
         HardwareDeviceType.TpmDevice.Should().Be((HardwareDeviceType)1024);
         HardwareDeviceType.HsmDevice.Should().Be((HardwareDeviceType)2048);

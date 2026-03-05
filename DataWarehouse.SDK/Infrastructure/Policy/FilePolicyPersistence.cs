@@ -31,7 +31,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
         private readonly string _policiesDirectory;
         private readonly string _profilePath;
 
-        private static readonly JsonSerializerOptions s_fileOptions = CreateFileOptions();
+        private static readonly JsonSerializerOptions SFileOptions = CreateFileOptions();
 
         /// <summary>
         /// Initializes a new instance of <see cref="FilePolicyPersistence"/> with the specified base directory.
@@ -68,7 +68,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                     try
                     {
                         var bytes = await ReadAllBytesAsync(filePath, ct).ConfigureAwait(false);
-                        var entry = JsonSerializer.Deserialize<PolicyFileEntry>(bytes, s_fileOptions);
+                        var entry = JsonSerializer.Deserialize<PolicyFileEntry>(bytes, SFileOptions);
                         if (entry == null) continue;
 
                         var policy = PolicySerializationHelper.DeserializePolicy(entry.PolicyData);
@@ -112,7 +112,7 @@ namespace DataWarehouse.SDK.Infrastructure.Policy
                     PolicyData = serializedPolicy
                 };
 
-                var json = JsonSerializer.SerializeToUtf8Bytes(entry, s_fileOptions);
+                var json = JsonSerializer.SerializeToUtf8Bytes(entry, SFileOptions);
                 await AtomicWriteAsync(filePath, json, ct).ConfigureAwait(false);
             }
             catch (Exception ex) when (ex is not OperationCanceledException)

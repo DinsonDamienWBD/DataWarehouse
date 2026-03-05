@@ -60,16 +60,16 @@ public enum HypervisorType
     HyperV,
 
     /// <summary>KVM (Kernel-based Virtual Machine) hypervisor.</summary>
-    KVM,
+    Kvm,
 
     /// <summary>Xen hypervisor.</summary>
     Xen,
 
     /// <summary>QEMU without KVM acceleration.</summary>
-    QEMU,
+    Qemu,
 
     /// <summary>Microsoft Virtual PC (legacy).</summary>
-    VirtualPC,
+    VirtualPc,
 
     /// <summary>Oracle VirtualBox.</summary>
     VirtualBox,

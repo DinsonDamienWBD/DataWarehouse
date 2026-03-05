@@ -66,7 +66,7 @@ public sealed class NullGpioBusController : IGpioBusController
 /// on platforms without I2C hardware.
 /// </remarks>
 [SdkCompatibility("3.0.0", Notes = "Phase 36: Null I2C controller for non-IoT platforms (EDGE-01)")]
-public sealed class NullI2cBusController : II2cBusController
+public sealed class NullI2CBusController : II2CBusController
 {
     /// <inheritdoc/>
     public II2cDevice OpenDevice(int busId, int deviceAddress) => new NullI2cDevice();

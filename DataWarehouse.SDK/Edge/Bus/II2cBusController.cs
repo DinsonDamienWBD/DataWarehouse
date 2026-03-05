@@ -28,7 +28,7 @@ namespace DataWarehouse.SDK.Edge.Bus;
 /// </para>
 /// </remarks>
 [SdkCompatibility("3.0.0", Notes = "Phase 36: I2C bus controller interface (EDGE-01)")]
-public interface II2cBusController : IDisposable
+public interface II2CBusController : IDisposable
 {
     /// <summary>
     /// Opens a connection to an I2C device.

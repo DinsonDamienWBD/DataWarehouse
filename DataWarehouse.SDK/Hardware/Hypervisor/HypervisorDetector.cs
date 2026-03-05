@@ -128,9 +128,9 @@ public sealed class HypervisorDetector : IHypervisorDetector
                 {
                     "VMwareVMware" => HypervisorType.VMware,
                     "Microsoft Hv" => HypervisorType.HyperV,
-                    "KVMKVMKVM" => HypervisorType.KVM,
+                    "KVMKVMKVM" => HypervisorType.Kvm,
                     "XenVMMXenVMM" => HypervisorType.Xen,
-                    "TCGTCGTCGTCG" => HypervisorType.QEMU,
+                    "TCGTCGTCGTCG" => HypervisorType.Qemu,
                     "VBoxVBoxVBox" => HypervisorType.VirtualBox,
                     _ => HypervisorType.Unknown
                 };
@@ -411,7 +411,7 @@ public sealed class HypervisorDetector : IHypervisorDetector
                 "Use synthetic network adapter",
                 "Enable Dynamic Memory cooperation"
             },
-            HypervisorType.KVM => new List<string>
+            HypervisorType.Kvm => new List<string>
             {
                 "Use virtio-blk for storage",
                 "Use virtio-net for network",
@@ -449,7 +449,7 @@ public sealed class HypervisorDetector : IHypervisorDetector
     /// </remarks>
     private static bool HasParavirtualizedIo(HypervisorType type)
     {
-        return type is HypervisorType.VMware or HypervisorType.HyperV or HypervisorType.KVM or HypervisorType.Xen;
+        return type is HypervisorType.VMware or HypervisorType.HyperV or HypervisorType.Kvm or HypervisorType.Xen;
     }
 
     /// <summary>
@@ -465,7 +465,7 @@ public sealed class HypervisorDetector : IHypervisorDetector
     /// </remarks>
     private static bool HasBalloonDriver(HypervisorType type)
     {
-        return type is HypervisorType.VMware or HypervisorType.HyperV or HypervisorType.KVM or HypervisorType.Xen;
+        return type is HypervisorType.VMware or HypervisorType.HyperV or HypervisorType.Kvm or HypervisorType.Xen;
     }
 
     /// <summary>
@@ -509,12 +509,12 @@ public sealed class HypervisorDetector : IHypervisorDetector
         {
             HypervisorType.VMware => "hypervisor.vmware",
             HypervisorType.HyperV => "hypervisor.hyperv",
-            HypervisorType.KVM => "hypervisor.kvm",
+            HypervisorType.Kvm => "hypervisor.kvm",
             HypervisorType.Xen => "hypervisor.xen",
-            HypervisorType.QEMU => "hypervisor.qemu",
+            HypervisorType.Qemu => "hypervisor.qemu",
             HypervisorType.VirtualBox => "hypervisor.virtualbox",
             HypervisorType.Parallels => "hypervisor.parallels",
-            HypervisorType.VirtualPC => "hypervisor.virtualpc",
+            HypervisorType.VirtualPc => "hypervisor.virtualpc",
             _ => "hypervisor.unknown"
         };
 

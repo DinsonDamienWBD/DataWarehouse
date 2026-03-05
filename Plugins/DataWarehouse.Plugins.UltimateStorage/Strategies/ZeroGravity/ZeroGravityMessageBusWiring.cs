@@ -223,7 +223,7 @@ public sealed class ZeroGravityMessageBusWiring : IDisposable
             ["CompositeScore"] = score.CompositeScore,
             ["AccessFrequency"] = score.AccessFrequency,
             ["ColocatedDependencies"] = score.ColocatedDependencies,
-            ["EgressCostPerGB"] = score.EgressCostPerGB,
+            ["EgressCostPerGb"] = score.EgressCostPerGb,
             ["Timestamp"] = DateTimeOffset.UtcNow
         }, ct);
     }

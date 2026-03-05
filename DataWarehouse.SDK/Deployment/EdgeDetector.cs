@@ -62,13 +62,13 @@ public sealed class EdgeDetector : IDeploymentDetector
             if (_hardwareProbe != null)
             {
                 var devices = await _hardwareProbe.DiscoverAsync(
-                    HardwareDeviceType.GpioController | HardwareDeviceType.I2cBus | HardwareDeviceType.SpiBus,
+                    HardwareDeviceType.GpioController | HardwareDeviceType.I2CBus | HardwareDeviceType.SpiBus,
                     ct);
 
                 foreach (var device in devices)
                 {
                     if (device.Type == HardwareDeviceType.GpioController) gpioCount++;
-                    else if (device.Type == HardwareDeviceType.I2cBus) i2cCount++;
+                    else if (device.Type == HardwareDeviceType.I2CBus) i2cCount++;
                     else if (device.Type == HardwareDeviceType.SpiBus) spiCount++;
                 }
             }

@@ -9,37 +9,37 @@ public enum AcceleratorType
     None = 0,
 
     /// <summary>CPU SIMD instructions (SSE, SSE2, SSE3, SSE4).</summary>
-    SIMD = 1,
+    Simd = 1,
 
     /// <summary>Intel AVX2 (Advanced Vector Extensions 2) instructions.</summary>
-    AVX2 = 2,
+    Avx2 = 2,
 
     /// <summary>Intel AVX-512 instructions for high-performance vectorization.</summary>
-    AVX512 = 3,
+    Avx512 = 3,
 
     /// <summary>ARM NEON SIMD instructions.</summary>
-    NEON = 4,
+    Neon = 4,
 
     /// <summary>NVIDIA CUDA-capable GPU acceleration.</summary>
-    GPU_CUDA = 100,
+    GpuCuda = 100,
 
     /// <summary>OpenCL-compatible GPU or accelerator.</summary>
-    GPU_OpenCL = 101,
+    GpuOpenCl = 101,
 
     /// <summary>Vulkan Compute API for GPU acceleration.</summary>
-    GPU_Vulkan = 102,
+    GpuVulkan = 102,
 
     /// <summary>DirectCompute (DirectX compute shaders) for GPU acceleration.</summary>
-    GPU_DirectCompute = 103,
+    GpuDirectCompute = 103,
 
     /// <summary>Apple Metal GPU acceleration.</summary>
-    GPU_Metal = 104,
+    GpuMetal = 104,
 
     /// <summary>FPGA (Field-Programmable Gate Array) accelerator.</summary>
-    FPGA = 200,
+    Fpga = 200,
 
     /// <summary>TPU (Tensor Processing Unit) for machine learning workloads.</summary>
-    TPU = 201,
+    Tpu = 201,
 
     /// <summary>Custom or vendor-specific accelerator.</summary>
     Custom = 1000

@@ -89,7 +89,7 @@ public sealed class GravityAwarePlacementOptimizer : IPlacementOptimizer
         double colocationScore = colocation.ColocatedDependencies > 0
             ? Math.Min(1.0, colocation.ColocatedDependencies / 10.0)
             : 0.0;
-        double egressScore = Math.Min(1.0, (double)cost.EgressCostPerGB / 0.12); // $0.12/GB as max reference
+        double egressScore = Math.Min(1.0, (double)cost.EgressCostPerGb / 0.12); // $0.12/GB as max reference
         double latencyScore = latency.CurrentLatencyMs > 0
             ? Math.Max(0.0, 1.0 - (latency.CurrentLatencyMs / 200.0)) // 200ms as worst-case reference
             : 0.5; // unknown latency = neutral
@@ -108,7 +108,7 @@ public sealed class GravityAwarePlacementOptimizer : IPlacementOptimizer
             AccessFrequency: access.ReadsPerHour + access.WritesPerHour,
             LastAccessUtc: access.LastAccessUtc,
             ColocatedDependencies: colocation.ColocatedDependencies,
-            EgressCostPerGB: cost.EgressCostPerGB,
+            EgressCostPerGb: cost.EgressCostPerGb,
             LatencyMs: latency.CurrentLatencyMs,
             ComplianceWeight: complianceScore,
             CompositeScore: Math.Clamp(composite, 0.0, 1.0));
@@ -257,10 +257,10 @@ public record CostMetrics
     public string? CurrentNodeId { get; init; }
 
     /// <summary>Cost per GB to move data out of the current location.</summary>
-    public decimal EgressCostPerGB { get; init; }
+    public decimal EgressCostPerGb { get; init; }
 
     /// <summary>Monthly storage cost per GB at the current location.</summary>
-    public decimal StorageCostPerGBMonth { get; init; }
+    public decimal StorageCostPerGbMonth { get; init; }
 }
 
 /// <summary>

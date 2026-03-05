@@ -508,25 +508,25 @@ public static class HilbertCurveEngine
         // Enumerate all Hilbert indices within the bounding box and collect contiguous ranges.
         // For small bounding boxes this is efficient; for large boxes we use a scan approach.
         int maxCoordValue = (1 << bitsPerDimension) - 1;
-        var clamped_min = new int[dimensions];
-        var clamped_max = new int[dimensions];
+        var clampedMin = new int[dimensions];
+        var clampedMax = new int[dimensions];
         long totalPoints = 1;
 
         for (int d = 0; d < dimensions; d++)
         {
-            clamped_min[d] = Math.Clamp(minCoords[d], 0, maxCoordValue);
-            clamped_max[d] = Math.Clamp(maxCoords[d], 0, maxCoordValue);
-            if (clamped_max[d] < clamped_min[d])
-                (clamped_min[d], clamped_max[d]) = (clamped_max[d], clamped_min[d]);
-            totalPoints *= (clamped_max[d] - clamped_min[d] + 1);
+            clampedMin[d] = Math.Clamp(minCoords[d], 0, maxCoordValue);
+            clampedMax[d] = Math.Clamp(maxCoords[d], 0, maxCoordValue);
+            if (clampedMax[d] < clampedMin[d])
+                (clampedMin[d], clampedMax[d]) = (clampedMax[d], clampedMin[d]);
+            totalPoints *= (clampedMax[d] - clampedMin[d] + 1);
         }
 
         // Collect Hilbert indices for all points in the bounding box
         var indices = new List<long>((int)Math.Min(totalPoints, 1_000_000));
         var current = new int[dimensions];
-        Array.Copy(clamped_min, current, dimensions);
+        Array.Copy(clampedMin, current, dimensions);
 
-        CollectIndices(indices, current, clamped_min, clamped_max, dimensions, bitsPerDimension, 0);
+        CollectIndices(indices, current, clampedMin, clampedMax, dimensions, bitsPerDimension, 0);
 
         if (indices.Count == 0)
             yield break;

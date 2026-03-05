@@ -112,7 +112,7 @@ public sealed record DataGravityScore(
     double AccessFrequency,
     DateTimeOffset LastAccessUtc,
     int ColocatedDependencies,
-    decimal EgressCostPerGB,
+    decimal EgressCostPerGb,
     double LatencyMs,
     double ComplianceWeight,
     double CompositeScore);

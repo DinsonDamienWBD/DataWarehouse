@@ -179,7 +179,7 @@ public sealed class LoadBalancingConfig
     /// <summary>
     /// Deployment tier - influences intelligent mode selection.
     /// </summary>
-    public DeploymentTier Tier { get; init; } = DeploymentTier.SMB;
+    public DeploymentTier Tier { get; init; } = DeploymentTier.Smb;
 
     /// <summary>
     /// Enable automatic sharding and rebalancing.
@@ -260,10 +260,10 @@ public sealed class LoadBalancingConfig
     /// <summary>
     /// Creates configuration for SMB deployment.
     /// </summary>
-    public static LoadBalancingConfig ForSMB() => new()
+    public static LoadBalancingConfig ForSmb() => new()
     {
         Mode = LoadBalancingMode.Automatic,
-        Tier = DeploymentTier.SMB,
+        Tier = DeploymentTier.Smb,
         Algorithm = LoadBalancingAlgorithm.LeastConnections,
         Sharding = ShardingStrategy.HashBased,
         EnableAutoSharding = true,
@@ -447,8 +447,8 @@ public sealed class LoadBalancingManager
             (DeploymentTier.Individual, _, _) => LoadBalancingMode.Manual,
 
             // SMB with low load - manual is fine
-            (DeploymentTier.SMB, _, < 10) => LoadBalancingMode.Manual,
-            (DeploymentTier.SMB, _, _) => LoadBalancingMode.Automatic,
+            (DeploymentTier.Smb, _, < 10) => LoadBalancingMode.Manual,
+            (DeploymentTier.Smb, _, _) => LoadBalancingMode.Automatic,
 
             // Enterprise - automatic for reliability
             (DeploymentTier.Enterprise, _, _) => LoadBalancingMode.Automatic,

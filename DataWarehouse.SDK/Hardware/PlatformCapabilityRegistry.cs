@@ -620,7 +620,7 @@ namespace DataWarehouse.SDK.Hardware
                 }
 
                 // I2C buses
-                if (device.Type.HasFlag(HardwareDeviceType.I2cBus))
+                if (device.Type.HasFlag(HardwareDeviceType.I2CBus))
                 {
                     capabilities.Add("i2c");
                 }

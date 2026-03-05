@@ -28,12 +28,12 @@ namespace DataWarehouse.SDK.VirtualDiskEngine.Mount;
 internal static class Fuse3Native
 {
     private const string LibFuse3 = "libfuse3.so.3";
-    private static readonly Lazy<bool> _isAvailable = new(DetectLibrary);
+    private static readonly Lazy<bool> IsAvailableLazy = new(DetectLibrary);
 
     /// <summary>
     /// Returns true if libfuse3.so.3 can be loaded on this system.
     /// </summary>
-    public static bool IsAvailable() => RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && _isAvailable.Value;
+    public static bool IsAvailable() => RuntimeInformation.IsOSPlatform(OSPlatform.Linux) && IsAvailableLazy.Value;
 
     private static bool DetectLibrary()
     {
@@ -54,43 +54,43 @@ internal static class Fuse3Native
     // ---------------------------------------------------------------
 
     /// <summary>No such file or directory.</summary>
-    public const int ENOENT = 2;
+    public const int Enoent = 2;
 
     /// <summary>Input/output error.</summary>
-    public const int EIO = 5;
+    public const int Eio = 5;
 
     /// <summary>Permission denied.</summary>
-    public const int EACCES = 13;
+    public const int Eacces = 13;
 
     /// <summary>File exists.</summary>
-    public const int EEXIST = 17;
+    public const int Eexist = 17;
 
     /// <summary>Not a directory.</summary>
-    public const int ENOTDIR = 20;
+    public const int Enotdir = 20;
 
     /// <summary>Is a directory.</summary>
-    public const int EISDIR = 21;
+    public const int Eisdir = 21;
 
     /// <summary>Invalid argument.</summary>
-    public const int EINVAL = 22;
+    public const int Einval = 22;
 
     /// <summary>No space left on device.</summary>
-    public const int ENOSPC = 28;
+    public const int Enospc = 28;
 
     /// <summary>Read-only file system.</summary>
-    public const int EROFS = 30;
+    public const int Erofs = 30;
 
     /// <summary>Function not implemented.</summary>
-    public const int ENOSYS = 38;
+    public const int Enosys = 38;
 
     /// <summary>Directory not empty.</summary>
-    public const int ENOTEMPTY = 39;
+    public const int Enotempty = 39;
 
     /// <summary>No data available.</summary>
-    public const int ENODATA = 61;
+    public const int Enodata = 61;
 
     /// <summary>Operation not supported.</summary>
-    public const int ENOTSUP = 95;
+    public const int Enotsup = 95;
 
     // ---------------------------------------------------------------
     // Structs matching libfuse3 C headers (x86_64 Linux ABI)
@@ -637,11 +637,11 @@ internal static class Fuse3Native
     // ---------------------------------------------------------------
 
     /// <summary>Regular file mode bit.</summary>
-    public const uint S_IFREG = 0x8000;
+    public const uint SIfreg = 0x8000;
 
     /// <summary>Directory mode bit.</summary>
-    public const uint S_IFDIR = 0x4000;
+    public const uint SIfdir = 0x4000;
 
     /// <summary>Symbolic link mode bit.</summary>
-    public const uint S_IFLNK = 0xA000;
+    public const uint SIflnk = 0xA000;
 }
