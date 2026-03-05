@@ -313,7 +313,8 @@ public sealed class ShardTransaction
 [SdkCompatibility("6.0.0", Notes = "Phase 93: Shard Lifecycle - Transaction Coordination")]
 public sealed class ShardTransactionCoordinator : IAsyncDisposable
 {
-    private readonly IShardVdeAccessor _shardAccessor;
+    /// <summary>Gets the shardaccessor for diagnostic access.</summary>
+    internal IShardVdeAccessor ShardAccessor { get; }
     private readonly IDistributedLockService _lockService;
     private readonly FederationOptions _options;
     private readonly BoundedDictionary<Guid, ShardTransaction> _activeTransactions;
@@ -336,7 +337,7 @@ public sealed class ShardTransactionCoordinator : IAsyncDisposable
         ArgumentNullException.ThrowIfNull(lockService);
         ArgumentNullException.ThrowIfNull(options);
 
-        _shardAccessor = shardAccessor;
+        ShardAccessor = shardAccessor;
         _lockService = lockService;
         _options = options;
         _activeTransactions = new BoundedDictionary<Guid, ShardTransaction>(4096);

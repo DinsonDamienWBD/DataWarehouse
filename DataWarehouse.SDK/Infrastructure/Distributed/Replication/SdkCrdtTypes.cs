@@ -14,9 +14,9 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     /// for improved performance (no runtime reflection, reduced allocations).
     /// </summary>
     [JsonSerializable(typeof(Dictionary<string, long>))]
-    [JsonSerializable(typeof(SdkPNCounter.PNCounterData))]
-    [JsonSerializable(typeof(SdkLWWRegister.LWWRegisterData))]
-    [JsonSerializable(typeof(SdkORSet.ORSetData))]
+    [JsonSerializable(typeof(SdkPnCounter.PnCounterData))]
+    [JsonSerializable(typeof(SdkLwwRegister.LwwRegisterData))]
+    [JsonSerializable(typeof(SdkOrSet.OrSetData))]
     [JsonSerializable(typeof(List<CrdtSyncItem>))]
     [JsonSerializable(typeof(CrdtSyncItem))]
     internal partial class CrdtJsonContext : JsonSerializerContext
@@ -124,7 +124,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     /// Value = positive.Value - negative.Value.
     /// </summary>
     [SdkCompatibility("2.0.0", Notes = "Phase 29: CRDT types")]
-    internal sealed class SdkPNCounter : ICrdtType
+    internal sealed class SdkPnCounter : ICrdtType
     {
         private SdkGCounter _positive = new();
         private SdkGCounter _negative = new();
@@ -155,10 +155,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// </summary>
         public ICrdtType Merge(ICrdtType other)
         {
-            if (other is not SdkPNCounter otherCounter)
+            if (other is not SdkPnCounter otherCounter)
                 throw new ArgumentException("Cannot merge with non-PNCounter type.", nameof(other));
 
-            var result = new SdkPNCounter
+            var result = new SdkPnCounter
             {
                 _positive = (SdkGCounter)_positive.Merge(otherCounter._positive),
                 _negative = (SdkGCounter)_negative.Merge(otherCounter._negative)
@@ -170,22 +170,22 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// <inheritdoc />
         public byte[] Serialize()
         {
-            var wrapper = new PNCounterData
+            var wrapper = new PnCounterData
             {
                 P = _positive.Serialize(),
                 N = _negative.Serialize()
             };
-            return JsonSerializer.SerializeToUtf8Bytes(wrapper, CrdtJsonContext.Default.PNCounterData);
+            return JsonSerializer.SerializeToUtf8Bytes(wrapper, CrdtJsonContext.Default.PnCounterData);
         }
 
         /// <summary>
         /// Deserializes a PNCounter from a byte array.
         /// </summary>
-        public static SdkPNCounter Deserialize(byte[] data)
+        public static SdkPnCounter Deserialize(byte[] data)
         {
-            var wrapper = JsonSerializer.Deserialize(data, CrdtJsonContext.Default.PNCounterData) ?? new PNCounterData();
+            var wrapper = JsonSerializer.Deserialize(data, CrdtJsonContext.Default.PnCounterData) ?? new PnCounterData();
 
-            var result = new SdkPNCounter
+            var result = new SdkPnCounter
             {
                 _positive = wrapper.P != null ? SdkGCounter.Deserialize(wrapper.P) : new SdkGCounter(),
                 _negative = wrapper.N != null ? SdkGCounter.Deserialize(wrapper.N) : new SdkGCounter()
@@ -194,7 +194,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             return result;
         }
 
-        internal sealed class PNCounterData
+        internal sealed class PnCounterData
         {
             [JsonPropertyName("p")]
             public byte[]? P { get; set; }
@@ -210,7 +210,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     /// timestamp wins. Equal timestamps use NodeId string comparison as deterministic tiebreaker.
     /// </summary>
     [SdkCompatibility("2.0.0", Notes = "Phase 29: CRDT types")]
-    internal sealed class SdkLWWRegister : ICrdtType
+    internal sealed class SdkLwwRegister : ICrdtType
     {
         /// <summary>
         /// Maximum allowed clock skew for incoming timestamps. Timestamps more than this amount
@@ -249,7 +249,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// </summary>
         public ICrdtType Merge(ICrdtType other)
         {
-            if (other is not SdkLWWRegister otherRegister)
+            if (other is not SdkLwwRegister otherRegister)
                 throw new ArgumentException("Cannot merge with non-LWWRegister type.", nameof(other));
 
             // DIST-08: Reject timestamps too far in the future (prevents DateTimeOffset.MaxValue poisoning)
@@ -278,23 +278,23 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// <inheritdoc />
         public byte[] Serialize()
         {
-            var wrapper = new LWWRegisterData
+            var wrapper = new LwwRegisterData
             {
                 Value = Convert.ToBase64String(Value),
                 Timestamp = Timestamp,
                 NodeId = NodeId
             };
-            return JsonSerializer.SerializeToUtf8Bytes(wrapper, CrdtJsonContext.Default.LWWRegisterData);
+            return JsonSerializer.SerializeToUtf8Bytes(wrapper, CrdtJsonContext.Default.LwwRegisterData);
         }
 
         /// <summary>
         /// Deserializes a LWWRegister from a byte array.
         /// </summary>
-        public static SdkLWWRegister Deserialize(byte[] data)
+        public static SdkLwwRegister Deserialize(byte[] data)
         {
-            var wrapper = JsonSerializer.Deserialize(data, CrdtJsonContext.Default.LWWRegisterData) ?? new LWWRegisterData();
+            var wrapper = JsonSerializer.Deserialize(data, CrdtJsonContext.Default.LwwRegisterData) ?? new LwwRegisterData();
 
-            return new SdkLWWRegister
+            return new SdkLwwRegister
             {
                 Value = wrapper.Value != null ? Convert.FromBase64String(wrapper.Value) : Array.Empty<byte>(),
                 Timestamp = wrapper.Timestamp,
@@ -302,7 +302,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             };
         }
 
-        internal sealed class LWWRegisterData
+        internal sealed class LwwRegisterData
         {
             [JsonPropertyName("value")]
             public string? Value { get; set; }
@@ -322,11 +322,11 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     /// An element is present if it has tags in the add-set that are not in the remove-set.
     /// </summary>
     [SdkCompatibility("2.0.0", Notes = "Phase 29: CRDT types")]
-    internal sealed class SdkORSet : ICrdtType
+    internal sealed class SdkOrSet : ICrdtType
     {
         private readonly BoundedDictionary<string, HashSet<string>> _addSet = new BoundedDictionary<string, HashSet<string>>(1000);
         private readonly BoundedDictionary<string, HashSet<string>> _removeSet = new BoundedDictionary<string, HashSet<string>>(1000);
-        internal readonly BoundedDictionary<string, DateTimeOffset> _removeTimestamps = new BoundedDictionary<string, DateTimeOffset>(1000);
+        internal readonly BoundedDictionary<string, DateTimeOffset> RemoveTimestamps = new BoundedDictionary<string, DateTimeOffset>(1000);
 
         /// <summary>
         /// Tombstone count threshold for automatic GC after Merge(). Default: 10000.
@@ -391,7 +391,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                         {
                             removedTags.Add(tag);
                             var key = $"{element}:{tag}";
-                            _removeTimestamps.TryAdd(key, now);
+                            RemoveTimestamps.TryAdd(key, now);
                         }
                     }
                 }
@@ -403,10 +403,10 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// </summary>
         public ICrdtType Merge(ICrdtType other)
         {
-            if (other is not SdkORSet otherSet)
+            if (other is not SdkOrSet otherSet)
                 throw new ArgumentException("Cannot merge with non-ORSet type.", nameof(other));
 
-            var result = new SdkORSet();
+            var result = new SdkOrSet();
 
             // Union add-sets
             MergeSets(_addSet, result._addSet);
@@ -417,8 +417,8 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             MergeSets(otherSet._removeSet, result._removeSet);
 
             // Merge remove timestamps (earliest known removal wins -- conservative)
-            MergeTimestamps(_removeTimestamps, result._removeTimestamps);
-            MergeTimestamps(otherSet._removeTimestamps, result._removeTimestamps);
+            MergeTimestamps(RemoveTimestamps, result.RemoveTimestamps);
+            MergeTimestamps(otherSet.RemoveTimestamps, result.RemoveTimestamps);
 
             // Auto-GC: trigger time-based tombstone collection when threshold exceeded
             if (result.TombstoneCount > result.AutoGcThreshold)
@@ -505,7 +505,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 {
                     foreach (var tag in addTags)
                     {
-                        _removeTimestamps.TryRemove($"{element}:{tag}", out _);
+                        RemoveTimestamps.TryRemove($"{element}:{tag}", out _);
                     }
                 }
             }
@@ -516,7 +516,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 {
                     foreach (var tag in removeTags)
                     {
-                        _removeTimestamps.TryRemove($"{element}:{tag}", out _);
+                        RemoveTimestamps.TryRemove($"{element}:{tag}", out _);
                     }
                 }
             }
@@ -545,7 +545,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
                 {
                     foreach (var tag in removeTags)
                     {
-                        _removeTimestamps.TryRemove($"{element}:{tag}", out _);
+                        RemoveTimestamps.TryRemove($"{element}:{tag}", out _);
                     }
                 }
             }
@@ -601,7 +601,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// </summary>
         internal DateTimeOffset GetRemoveTimestamp(string element, string tag)
         {
-            return _removeTimestamps.TryGetValue($"{element}:{tag}", out var timestamp)
+            return RemoveTimestamps.TryGetValue($"{element}:{tag}", out var timestamp)
                 ? timestamp
                 : DateTimeOffset.MinValue;
         }
@@ -609,13 +609,13 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// <inheritdoc />
         public byte[] Serialize()
         {
-            var wrapper = new ORSetData
+            var wrapper = new OrSetData
             {
                 AddSet = SerializeTagSets(_addSet),
                 RemoveSet = SerializeTagSets(_removeSet),
-                RemoveTimestamps = SerializeTimestamps(_removeTimestamps)
+                RemoveTimestamps = SerializeTimestamps(RemoveTimestamps)
             };
-            return JsonSerializer.SerializeToUtf8Bytes(wrapper, CrdtJsonContext.Default.ORSetData);
+            return JsonSerializer.SerializeToUtf8Bytes(wrapper, CrdtJsonContext.Default.OrSetData);
         }
 
         /// <summary>
@@ -623,14 +623,14 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// Backward compatible: if removeTimestamps field is missing, all tombstones are
         /// treated as having <see cref="DateTimeOffset.MinValue"/> (always eligible for pruning).
         /// </summary>
-        public static SdkORSet Deserialize(byte[] data)
+        public static SdkOrSet Deserialize(byte[] data)
         {
-            var wrapper = JsonSerializer.Deserialize(data, CrdtJsonContext.Default.ORSetData) ?? new ORSetData();
+            var wrapper = JsonSerializer.Deserialize(data, CrdtJsonContext.Default.OrSetData) ?? new OrSetData();
 
-            var result = new SdkORSet();
+            var result = new SdkOrSet();
             DeserializeTagSets(wrapper.AddSet, result._addSet);
             DeserializeTagSets(wrapper.RemoveSet, result._removeSet);
-            DeserializeTimestamps(wrapper.RemoveTimestamps, result._removeTimestamps);
+            DeserializeTimestamps(wrapper.RemoveTimestamps, result.RemoveTimestamps);
             return result;
         }
 
@@ -685,7 +685,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             }
         }
 
-        internal sealed class ORSetData
+        internal sealed class OrSetData
         {
             [JsonPropertyName("addSet")]
             public Dictionary<string, List<string>>? AddSet { get; set; }

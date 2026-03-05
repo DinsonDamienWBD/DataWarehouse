@@ -40,7 +40,8 @@ public sealed class ShardMigrationEngine : IAsyncDisposable
     private readonly RoutingTable _routingTable;
     private readonly MigrationRedirectTable _redirectTable;
     private readonly IDistributedLockService _lockService;
-    private readonly FederationOptions _options;
+    /// <summary>Gets the options for diagnostic access.</summary>
+    internal FederationOptions Options { get; }
     private readonly string _lockOwner;
     private readonly CancellationTokenSource _disposeCts;
     private bool _disposed;
@@ -71,7 +72,7 @@ public sealed class ShardMigrationEngine : IAsyncDisposable
         _routingTable = routingTable;
         _redirectTable = redirectTable;
         _lockService = lockService;
-        _options = options;
+        Options = options;
         _lockOwner = $"migration-engine-{Environment.MachineName}";
         _disposeCts = new CancellationTokenSource();
     }

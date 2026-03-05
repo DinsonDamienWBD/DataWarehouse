@@ -411,7 +411,7 @@ public sealed class SemanticWearLevelingAllocator : IBlockAllocator
         int warmCount   = Math.Max(1, (int)Math.Round(total * _config.WarmGroupRatio));
         int frozenCount = Math.Max(1, (int)Math.Round(total * _config.FrozenGroupRatio));
         // Cold gets the remainder (ensures sum == total)
-        int coldCount = Math.Max(1, total - hotCount - warmCount - frozenCount);
+        int coldCount;
 
         // Clamp to available groups
         hotCount    = Math.Min(hotCount,    total);

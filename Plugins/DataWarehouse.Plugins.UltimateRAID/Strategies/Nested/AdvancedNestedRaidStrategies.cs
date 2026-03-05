@@ -53,7 +53,7 @@ public sealed class Raid10Strategy : SdkRaidStrategyBase
         MinDisks: _disksPerMirror * 2,
         MaxDisks: null,
         StripeSize: _chunkSize,
-        EstimatedRebuildTimePerTB: TimeSpan.FromHours(1.5), // Mirror rebuild is fast
+        EstimatedRebuildTimePerTb: TimeSpan.FromHours(1.5), // Mirror rebuild is fast
         ReadPerformanceMultiplier: 2.0, // Can read from either mirror
         WritePerformanceMultiplier: 0.9, // Must write to all mirrors
         CapacityEfficiency: 1.0 / _disksPerMirror,
@@ -346,7 +346,7 @@ public sealed class Raid50Strategy : SdkRaidStrategyBase
         MinDisks: _disksPerRaid5Group * 2,
         MaxDisks: null,
         StripeSize: _chunkSize,
-        EstimatedRebuildTimePerTB: TimeSpan.FromHours(3),
+        EstimatedRebuildTimePerTb: TimeSpan.FromHours(3),
         ReadPerformanceMultiplier: (_disksPerRaid5Group - 1) * 1.4,
         WritePerformanceMultiplier: (_disksPerRaid5Group - 2) * 0.8,
         CapacityEfficiency: (double)(_disksPerRaid5Group - 1) / _disksPerRaid5Group,
@@ -670,7 +670,7 @@ public sealed class Raid60Strategy : SdkRaidStrategyBase
         MinDisks: _disksPerRaid6Group * 2,
         MaxDisks: null,
         StripeSize: _chunkSize,
-        EstimatedRebuildTimePerTB: TimeSpan.FromHours(5),
+        EstimatedRebuildTimePerTb: TimeSpan.FromHours(5),
         ReadPerformanceMultiplier: (_disksPerRaid6Group - 2) * 1.3,
         WritePerformanceMultiplier: (_disksPerRaid6Group - 3) * 0.6,
         CapacityEfficiency: (double)(_disksPerRaid6Group - 2) / _disksPerRaid6Group,

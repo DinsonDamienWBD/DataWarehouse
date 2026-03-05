@@ -65,7 +65,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             MinDisks: _dataChunks + _parityChunks,
             MaxDisks: _dataChunks + _parityChunks,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(2.5),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(2.5),
             ReadPerformanceMultiplier: _dataChunks * 0.95,
             WritePerformanceMultiplier: _dataChunks * 0.8, // Sparse matrix encoding
             CapacityEfficiency: _dataChunks / (double)(_dataChunks + _parityChunks),
@@ -465,7 +465,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             MinDisks: (int)(_sourceSymbols * _overheadFactor), // Need k+epsilon symbols
             MaxDisks: null, // Rateless - can add more
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(2),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(2),
             ReadPerformanceMultiplier: _sourceSymbols * 0.9,
             WritePerformanceMultiplier: _sourceSymbols * 0.85,
             CapacityEfficiency: _sourceSymbols / (double)_encodedSymbols,

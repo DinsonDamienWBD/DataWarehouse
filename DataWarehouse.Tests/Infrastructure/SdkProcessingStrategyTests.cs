@@ -260,16 +260,16 @@ namespace DataWarehouse.Tests.Infrastructure
             var estimate = new QueryCostEstimate
             {
                 EstimatedTimeMs = 50.0,
-                EstimatedIOOperations = 500,
+                EstimatedIoOperations = 500,
                 EstimatedDataScanned = 10 * 1024 * 1024,
-                EstimatedCPUCost = 5.0,
+                EstimatedCpuCost = 5.0,
                 EstimatedMemoryUsage = 2 * 1024 * 1024,
                 CostScore = 25.0,
                 Recommendations = new[] { "Add index on 'amount' column" }
             };
 
             Assert.Equal(50.0, estimate.EstimatedTimeMs);
-            Assert.Equal(500, estimate.EstimatedIOOperations);
+            Assert.Equal(500, estimate.EstimatedIoOperations);
             Assert.Equal(25.0, estimate.CostScore);
             Assert.Single(estimate.Recommendations!);
         }

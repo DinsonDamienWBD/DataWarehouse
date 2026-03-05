@@ -38,27 +38,27 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <summary>
         /// Success return code for HIP operations.
         /// </summary>
-        internal const int hipSuccess = 0;
+        internal const int HipSuccess = 0;
 
         /// <summary>
         /// HIP error codes (minimal subset).
         /// </summary>
-        internal enum hipError
+        internal enum HipError
         {
-            hipSuccess = 0,
-            hipErrorInvalidValue = 1,
-            hipErrorMemoryAllocation = 2,
-            hipErrorInitializationError = 3,
-            hipErrorInvalidDevice = 10,
-            hipErrorNoDevice = 100,
+            HipSuccess = 0,
+            HipErrorInvalidValue = 1,
+            HipErrorMemoryAllocation = 2,
+            HipErrorInitializationError = 3,
+            HipErrorInvalidDevice = 10,
+            HipErrorNoDevice = 100,
         }
 
         /// <summary>
         /// Memory copy direction constants.
         /// </summary>
-        internal const int hipMemcpyHostToDevice = 1;
-        internal const int hipMemcpyDeviceToHost = 2;
-        internal const int hipMemcpyDeviceToDevice = 3;
+        internal const int HipMemcpyHostToDevice = 1;
+        internal const int HipMemcpyDeviceToHost = 2;
+        internal const int HipMemcpyDeviceToDevice = 3;
 
         /// <summary>
         /// Gets the number of HIP-capable devices.
@@ -94,7 +94,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
         /// <param name="dst">Destination pointer.</param>
         /// <param name="src">Source pointer.</param>
         /// <param name="count">Number of bytes to copy.</param>
-        /// <param name="kind">Copy direction (hipMemcpyHostToDevice, hipMemcpyDeviceToHost, etc.).</param>
+        /// <param name="kind">Copy direction (HipMemcpyHostToDevice, HipMemcpyDeviceToHost, etc.).</param>
         /// <returns>HIP error code (0 = success).</returns>
         [LibraryImport(HipLibraryWindows, EntryPoint = "hipMemcpy")]
         [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]

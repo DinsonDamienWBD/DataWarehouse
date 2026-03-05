@@ -36,7 +36,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
             MinDisks: 3,
             MaxDisks: null,
             StripeSize: 128 * 1024, // 128 KB default
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(4),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(4),
             ReadPerformanceMultiplier: _defaultStripeWidth * 0.9, // Slightly lower due to checksum verification
             WritePerformanceMultiplier: (_defaultStripeWidth - 1) * 0.7, // Copy-on-write overhead
             CapacityEfficiency: (_defaultStripeWidth - 1) / (double)_defaultStripeWidth,
@@ -462,7 +462,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
             MinDisks: 4,
             MaxDisks: null,
             StripeSize: 128 * 1024,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(5),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(5),
             ReadPerformanceMultiplier: _defaultStripeWidth * 0.85,
             WritePerformanceMultiplier: (_defaultStripeWidth - 2) * 0.65,
             CapacityEfficiency: (_defaultStripeWidth - 2) / (double)_defaultStripeWidth,
@@ -845,7 +845,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
             MinDisks: 5,
             MaxDisks: null,
             StripeSize: 128 * 1024,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(6),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(6),
             ReadPerformanceMultiplier: _defaultStripeWidth * 0.80,
             WritePerformanceMultiplier: (_defaultStripeWidth - 3) * 0.60,
             CapacityEfficiency: (_defaultStripeWidth - 3) / (double)_defaultStripeWidth,

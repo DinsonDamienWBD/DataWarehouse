@@ -161,13 +161,13 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             }
 
             // Convert scores to integer weights (multiply by 10000 for precision)
-            const int ScaleMultiplier = 10_000;
+            const int scaleMultiplier = 10_000;
             var weights = new int[candidates.Count];
             int totalWeight = 0;
 
             for (int i = 0; i < candidates.Count; i++)
             {
-                weights[i] = Math.Max(1, (int)(candidates[i].Score * ScaleMultiplier));
+                weights[i] = Math.Max(1, (int)(candidates[i].Score * scaleMultiplier));
                 totalWeight += weights[i];
             }
 

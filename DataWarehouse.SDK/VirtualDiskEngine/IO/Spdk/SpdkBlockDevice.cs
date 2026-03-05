@@ -42,7 +42,7 @@ public sealed class SpdkBlockDevice : IDirectBlockDevice
     /// <summary>
     /// Guards one-time SPDK environment initialization across all device instances.
     /// </summary>
-    private static readonly Lazy<bool> _envInitialized = new(InitializeEnvironment, isThreadSafe: true);
+    private static readonly Lazy<bool> EnvInitialized = new(InitializeEnvironment, isThreadSafe: true);
 
     private readonly SpdkDmaAllocator _dmaAllocator = new();
     private readonly int _queueDepth;
@@ -125,7 +125,7 @@ public sealed class SpdkBlockDevice : IDirectBlockDevice
         _queueDepth = queueDepth;
 
         // Initialize the SPDK environment (once per process)
-        if (!_envInitialized.Value)
+        if (!EnvInitialized.Value)
         {
             throw new InvalidOperationException(
                 "SPDK environment initialization failed. Check hugepage configuration and DPDK EAL parameters.");

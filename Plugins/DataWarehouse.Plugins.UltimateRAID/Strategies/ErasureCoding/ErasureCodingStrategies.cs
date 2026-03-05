@@ -46,7 +46,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             MinDisks: _dataChunks + _parityChunks,
             MaxDisks: _dataChunks + _parityChunks,
             StripeSize: 256 * 1024, // 256 KB
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(3 + _parityChunks * 0.5),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(3 + _parityChunks * 0.5),
             ReadPerformanceMultiplier: _dataChunks * 0.95,
             WritePerformanceMultiplier: _dataChunks * 0.7, // Encoding overhead
             CapacityEfficiency: _dataChunks / (double)(_dataChunks + _parityChunks),
@@ -554,7 +554,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             MinDisks: _dataChunks + _localGroups + _globalParity,
             MaxDisks: _dataChunks + _localGroups + _globalParity,
             StripeSize: 256 * 1024,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(2), // Faster due to local recovery
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(2), // Faster due to local recovery
             ReadPerformanceMultiplier: _dataChunks * 0.95,
             WritePerformanceMultiplier: _dataChunks * 0.75,
             CapacityEfficiency: _dataChunks / (double)(_dataChunks + _localGroups + _globalParity),
@@ -1020,7 +1020,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             MinDisks: _dataChunks + _parityChunks,
             MaxDisks: _dataChunks + _parityChunks,
             StripeSize: 1024 * 1024, // 1 MB for optimal SIMD performance
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(2), // Fast with hardware acceleration
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(2), // Fast with hardware acceleration
             ReadPerformanceMultiplier: _dataChunks * 0.98, // Hardware acceleration
             WritePerformanceMultiplier: _dataChunks * 0.85, // SIMD encoding
             CapacityEfficiency: _dataChunks / (double)(_dataChunks + _parityChunks),

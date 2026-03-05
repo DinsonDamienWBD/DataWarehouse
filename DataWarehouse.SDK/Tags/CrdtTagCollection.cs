@@ -8,7 +8,7 @@ namespace DataWarehouse.SDK.Tags;
 
 /// <summary>
 /// CRDT-backed tag collection that supports conflict-free multi-node concurrent writes.
-/// Uses an <see cref="SdkORSet"/> for tracking tag key presence (add/remove with OR-Set semantics)
+/// Uses an <see cref="SdkOrSet"/> for tracking tag key presence (add/remove with OR-Set semantics)
 /// and per-key version vectors with configurable merge strategies for value conflict resolution.
 /// </summary>
 /// <remarks>
@@ -23,7 +23,7 @@ namespace DataWarehouse.SDK.Tags;
 [SdkCompatibility("5.0.0", Notes = "Phase 55: CRDT tag collection")]
 public sealed class CrdtTagCollection
 {
-    private readonly SdkORSet _tagKeys;
+    private readonly SdkOrSet _tagKeys;
     private readonly BoundedDictionary<TagKey, (Tag Tag, TagVersionVector Version)> _tagValues;
     private readonly string _nodeId;
     private readonly TagMergeMode _defaultMode;
@@ -41,7 +41,7 @@ public sealed class CrdtTagCollection
         ArgumentException.ThrowIfNullOrWhiteSpace(nodeId);
         _nodeId = nodeId;
         _defaultMode = defaultMode;
-        _tagKeys = new SdkORSet();
+        _tagKeys = new SdkOrSet();
         _tagValues = new BoundedDictionary<TagKey, (Tag, TagVersionVector)>(1000);
         _mergeOverrides = new BoundedDictionary<TagKey, TagMergeMode>(1000);
         _currentVersion = new TagVersionVector();
@@ -51,7 +51,7 @@ public sealed class CrdtTagCollection
     private CrdtTagCollection(
         string nodeId,
         TagMergeMode defaultMode,
-        SdkORSet tagKeys,
+        SdkOrSet tagKeys,
         BoundedDictionary<TagKey, (Tag Tag, TagVersionVector Version)> tagValues,
         BoundedDictionary<TagKey, TagMergeMode> mergeOverrides,
         TagVersionVector currentVersion)
@@ -200,7 +200,7 @@ public sealed class CrdtTagCollection
         ArgumentNullException.ThrowIfNull(other);
 
         // Step 1: Merge OR-Sets for key presence
-        var mergedOrSet = (SdkORSet)_tagKeys.Merge(other._tagKeys);
+        var mergedOrSet = (SdkOrSet)_tagKeys.Merge(other._tagKeys);
 
         // Step 2: Merge tag values for each key present in merged OR-Set
         var mergedValues = new BoundedDictionary<TagKey, (Tag Tag, TagVersionVector Version)>(1000);
@@ -315,7 +315,7 @@ public sealed class CrdtTagCollection
         var envelope = JsonSerializer.Deserialize<CrdtTagCollectionData>(data)
                        ?? throw new InvalidOperationException("Failed to deserialize CrdtTagCollection envelope.");
 
-        var orSet = SdkORSet.Deserialize(envelope.OrSetData ?? Array.Empty<byte>());
+        var orSet = SdkOrSet.Deserialize(envelope.OrSetData ?? Array.Empty<byte>());
         var defaultMode = (TagMergeMode)(envelope.DefaultMode);
         var currentVersion = TagVersionVector.Deserialize(envelope.CurrentVersion ?? Array.Empty<byte>());
 

@@ -41,7 +41,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
     }
 
     /// <summary>
-    /// Static pruner for <see cref="SdkORSet"/> that garbage-collects tombstones and compacts
+    /// Static pruner for <see cref="SdkOrSet"/> that garbage-collects tombstones and compacts
     /// add-set tags. Prevents unbounded tombstone growth (P0-12) by removing entries for
     /// fully-removed elements whose tombstones have exceeded the causal stability threshold,
     /// and by compacting stable elements to a single surviving tag.
@@ -58,7 +58,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// <param name="knownActiveNodes">Set of known active node IDs (reserved for future use).</param>
         /// <returns>Metrics describing what was pruned.</returns>
         public static OrSetPruneResult Prune(
-            SdkORSet orSet,
+            SdkOrSet orSet,
             OrSetPruneOptions options,
             IReadOnlySet<string>? knownActiveNodes = null)
         {
@@ -161,7 +161,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// Estimates the approximate memory usage of an ORSet in bytes.
         /// Uses string length * 2 (UTF-16) + object overhead as a rough estimate.
         /// </summary>
-        private static long EstimateMemoryUsage(SdkORSet orSet)
+        private static long EstimateMemoryUsage(SdkOrSet orSet)
         {
             long estimate = 0;
             const int objectOverhead = 24; // Approximate per-object overhead in .NET

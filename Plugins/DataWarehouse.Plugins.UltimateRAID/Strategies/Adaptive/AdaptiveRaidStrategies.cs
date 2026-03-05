@@ -41,7 +41,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             MinDisks: 4,
             MaxDisks: null,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(3),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(3),
             ReadPerformanceMultiplier: 1.5, // Average across modes
             WritePerformanceMultiplier: 0.8,
             CapacityEfficiency: 0.65, // Variable
@@ -500,7 +500,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             MinDisks: 5,
             MaxDisks: null,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(2), // Proactive rebuild is faster
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(2), // Proactive rebuild is faster
             ReadPerformanceMultiplier: 1.3,
             WritePerformanceMultiplier: 0.75,
             CapacityEfficiency: 0.62,
@@ -1038,7 +1038,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             MinDisks: 6, // Minimum: 3 SSDs + 3 HDDs
             MaxDisks: null,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(4),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(4),
             ReadPerformanceMultiplier: 2.0, // High for hot data on SSD
             WritePerformanceMultiplier: 1.5,
             CapacityEfficiency: 0.70,
@@ -1481,7 +1481,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             MinDisks: 4,
             MaxDisks: 16,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(3),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(3),
             ReadPerformanceMultiplier: 1.7, // Weighted average
             WritePerformanceMultiplier: 1.0,
             CapacityEfficiency: 0.60, // Weighted average

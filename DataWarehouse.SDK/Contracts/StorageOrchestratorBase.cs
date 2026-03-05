@@ -11,8 +11,8 @@ namespace DataWarehouse.SDK.Contracts
     /// </summary>
     public abstract class StoragePoolBase : Hierarchy.InfrastructurePluginBase, IStoragePool
     {
-        protected readonly BoundedDictionary<string, (IStorageProvider Provider, StorageRole Role)> _providers = new BoundedDictionary<string, (IStorageProvider Provider, StorageRole Role)>(1000);
-        protected volatile IStorageStrategy _strategy;
+        protected readonly BoundedDictionary<string, (IStorageProvider Provider, StorageRole Role)> ProviderMap = new BoundedDictionary<string, (IStorageProvider Provider, StorageRole Role)>(1000);
+        protected volatile IStorageStrategy CurrentStrategy;
 
         /// <summary>
         /// Per-URI locks to prevent concurrent writes to the same resource.
@@ -33,29 +33,29 @@ namespace DataWarehouse.SDK.Contracts
 
         public abstract string PoolId { get; }
         public override string Name => $"StoragePool-{PoolId}";
-        public IStorageStrategy Strategy => _strategy;
-        public IReadOnlyList<IStorageProvider> Providers => _providers.Values.Select(p => p.Provider).ToList();
+        public IStorageStrategy Strategy => CurrentStrategy;
+        public IReadOnlyList<IStorageProvider> Providers => ProviderMap.Values.Select(p => p.Provider).ToList();
 
         protected StoragePoolBase()
         {
-            _strategy = new SimpleStrategy();
+            CurrentStrategy = new SimpleStrategy();
         }
 
         public virtual void AddProvider(IStorageProvider provider, StorageRole role = StorageRole.Primary)
         {
             ArgumentNullException.ThrowIfNull(provider);
             var id = (provider as IPlugin)?.Id ?? provider.Scheme;
-            _providers[id] = (provider, role);
+            ProviderMap[id] = (provider, role);
         }
 
         public virtual bool RemoveProvider(string providerId)
         {
-            return _providers.TryRemove(providerId, out _);
+            return ProviderMap.TryRemove(providerId, out _);
         }
 
         public virtual void SetStrategy(IStorageStrategy strategy)
         {
-            _strategy = strategy ?? throw new ArgumentNullException(nameof(strategy));
+            CurrentStrategy = strategy ?? throw new ArgumentNullException(nameof(strategy));
         }
 
         public virtual async Task<StorageResult> SaveAsync(Uri uri, Stream data, StorageIntent? intent = null, CancellationToken ct = default)
@@ -67,9 +67,9 @@ namespace DataWarehouse.SDK.Contracts
             await uriLock.WaitAsync(ct);
             try
             {
-                var providers = Providers;
+                var providers = this.Providers;
                 long dataLength = data.CanSeek ? data.Length : 0;
-                var plans = _strategy.PlanWrite(providers, intent, dataLength).ToList();
+                var plans = CurrentStrategy.PlanWrite(providers, intent, dataLength).ToList();
                 var usedProviders = new List<string>();
                 long bytesWritten = 0;
 
@@ -116,7 +116,7 @@ namespace DataWarehouse.SDK.Contracts
 
         public virtual async Task<Stream> LoadAsync(Uri uri, CancellationToken ct = default)
         {
-            var providers = _strategy.PlanRead(Providers, null).ToList();
+            var providers = CurrentStrategy.PlanRead(this.Providers, null).ToList();
             var errors = new List<(string ProviderId, string Error)>();
 
             foreach (var provider in providers)
@@ -153,14 +153,14 @@ namespace DataWarehouse.SDK.Contracts
         public virtual async Task DeleteAsync(Uri uri, CancellationToken ct = default)
         {
             ct.ThrowIfCancellationRequested();
-            var tasks = Providers.Select(p => p.DeleteAsync(uri));
+            var tasks = ProviderMap.Select(p => p.Value.Provider.DeleteAsync(uri));
             await Task.WhenAll(tasks);
             // Any exceptions from individual providers will propagate via AggregateException
         }
 
         public virtual async Task<StoragePoolHealth> GetHealthAsync(CancellationToken ct = default)
         {
-            var healthTasks = _providers.Select(async kvp =>
+            var healthTasks = ProviderMap.Select(async kvp =>
             {
                 bool healthy;
                 try
@@ -348,7 +348,7 @@ namespace DataWarehouse.SDK.Contracts
                 {
                     // Check all providers per strategy, not just the first
                     bool exists = false;
-                    foreach (var provider in Providers)
+                    foreach (var provider in this.Providers)
                     {
                         if (await provider.ExistsAsync(uri))
                         {
@@ -373,15 +373,15 @@ namespace DataWarehouse.SDK.Contracts
 
         public StorageRole GetProviderRole(string providerId)
         {
-            return _providers.TryGetValue(providerId, out var p) ? p.Role : StorageRole.Primary;
+            return ProviderMap.TryGetValue(providerId, out var p) ? p.Role : StorageRole.Primary;
         }
 
         protected override Dictionary<string, object> GetMetadata()
         {
             var metadata = base.GetMetadata();
             metadata["PoolId"] = PoolId;
-            metadata["ProviderCount"] = _providers.Count;
-            metadata["StrategyType"] = _strategy.Type.ToString();
+            metadata["ProviderCount"] = ProviderMap.Count;
+            metadata["StrategyType"] = CurrentStrategy.Type.ToString();
             return metadata;
         }
     }

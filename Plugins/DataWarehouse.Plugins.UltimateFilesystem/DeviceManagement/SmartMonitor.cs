@@ -97,7 +97,7 @@ public sealed class SmartMonitor
         int powerOnHours = 0;
         bool isHealthy = true;
 
-        if (busType == BusType.NVMe)
+        if (busType == BusType.NvMe)
         {
             // NVMe: read temperature from hwmon
             temperature = await ReadNvmeTemperatureAsync(sysBlockPath, ct).ConfigureAwait(false);

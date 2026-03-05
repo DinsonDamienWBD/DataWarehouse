@@ -163,8 +163,8 @@ public sealed class StorageCostOptimizer
                 if (alreadyReserved) continue;
 
                 // Estimate stable GB from billing quantity
-                decimal estimatedGB = cost.Quantity > 0 ? (decimal)cost.Quantity : 0;
-                if (estimatedGB < _options.MinReservedCapacityGB) continue;
+                decimal estimatedGb = cost.Quantity > 0 ? (decimal)cost.Quantity : 0;
+                if (estimatedGb < _options.MinReservedCapacityGb) continue;
 
                 // Calculate 1-year reserved savings (typical: 35% discount)
                 decimal onDemandMonthly = cost.Amount;
@@ -178,10 +178,10 @@ public sealed class StorageCostOptimizer
                     Provider = report.Provider,
                     Region = cost.Region ?? "unknown",
                     StorageClass = cost.ServiceName,
-                    CommitGb = (long)estimatedGB,
+                    CommitGb = (long)estimatedGb,
                     TermMonths = 12,
-                    OnDemandCostPerGbMonth = estimatedGB > 0 ? onDemandMonthly / estimatedGB : 0,
-                    ReservedCostPerGbMonth = estimatedGB > 0 ? reservedMonthly / estimatedGB : 0,
+                    OnDemandCostPerGbMonth = estimatedGb > 0 ? onDemandMonthly / estimatedGb : 0,
+                    ReservedCostPerGbMonth = estimatedGb > 0 ? reservedMonthly / estimatedGb : 0,
                     MonthlySavings = monthlySavings,
                     BreakEvenMonths = 0, // reserved pricing saves immediately vs on-demand
                     UtilizationConfidence = 0.85 // 30 days of stable usage indicates high confidence
@@ -221,17 +221,17 @@ public sealed class StorageCostOptimizer
                 decimal coldTierCost = storage.Amount * 0.25m; // cold tier typically 75% cheaper
                 decimal transitionCost = storage.Amount * 0.05m; // one-time transition fee estimate
                 decimal monthlySavings = storage.Amount - coldTierCost;
-                long sizeGB = (long)Math.Max(1, storage.Quantity);
+                long sizeGb = (long)Math.Max(1, storage.Quantity);
 
                 recs.Add(new TierTransitionRecommendation
                 {
                     ObjectKeyPattern = $"{storage.Region}/{storage.ServiceName}/*",
-                    AffectedSizeGb = sizeGB,
+                    AffectedSizeGb = sizeGb,
                     CurrentTier = "Standard",
                     RecommendedTier = "Cold/Archive",
                     AccessFrequencyPerDay = opsPerDay,
-                    CurrentCostPerGbMonth = sizeGB > 0 ? storage.Amount / (decimal)sizeGB : 0,
-                    RecommendedCostPerGbMonth = sizeGB > 0 ? coldTierCost / (decimal)sizeGB : 0,
+                    CurrentCostPerGbMonth = sizeGb > 0 ? storage.Amount / (decimal)sizeGb : 0,
+                    RecommendedCostPerGbMonth = sizeGb > 0 ? coldTierCost / (decimal)sizeGb : 0,
                     TransitionCost = transitionCost,
                     MonthlySavings = monthlySavings,
                     BreakEvenDays = monthlySavings > 0
@@ -266,10 +266,10 @@ public sealed class StorageCostOptimizer
                 if (priceDiff < _options.MinMonthlySavings) continue;
 
                 // Estimate egress cost (typical $0.09/GB across major cloud providers)
-                decimal totalGB = expensive.Breakdown
+                decimal totalGb = expensive.Breakdown
                     .Where(b => b.Category == CostCategory.Storage)
                     .Sum(b => (decimal)b.Quantity);
-                decimal egressCost = totalGB * 0.09m;
+                decimal egressCost = totalGb * 0.09m;
 
                 // Require savings to cover egress within 3 months minimum
                 if (priceDiff <= egressCost / 3) continue;
@@ -279,9 +279,9 @@ public sealed class StorageCostOptimizer
                     SourceProvider = expensive.Provider,
                     TargetProvider = cheaper.Provider,
                     DataCategory = "Storage",
-                    DataSizeGb = (long)totalGB,
-                    SourceCostPerGbMonth = totalGB > 0 ? expensive.TotalCost / totalGB : 0,
-                    TargetCostPerGbMonth = totalGB > 0 ? cheaper.TotalCost / totalGB : 0,
+                    DataSizeGb = (long)totalGb,
+                    SourceCostPerGbMonth = totalGb > 0 ? expensive.TotalCost / totalGb : 0,
+                    TargetCostPerGbMonth = totalGb > 0 ? cheaper.TotalCost / totalGb : 0,
                     EgressCost = egressCost,
                     MonthlySavings = priceDiff,
                     BreakEvenDays = priceDiff > 0
@@ -309,7 +309,7 @@ public sealed record StorageCostOptimizerOptions
     public double MaxSpotInterruptionRisk { get; init; } = 0.10;
 
     /// <summary>Minimum GB for reserved capacity recommendation (default 100 GB).</summary>
-    public long MinReservedCapacityGB { get; init; } = 100;
+    public long MinReservedCapacityGb { get; init; } = 100;
 
     /// <summary>Minimum monthly savings to generate a recommendation (default $10).</summary>
     public decimal MinMonthlySavings { get; init; } = 10.00m;

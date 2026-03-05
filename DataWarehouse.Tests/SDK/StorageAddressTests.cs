@@ -175,33 +175,33 @@ public class StorageAddressTests
 
     #endregion
 
-    #region I2cBusAddress
+    #region I2CBusAddress
 
     [Fact]
-    public void I2cBusAddress_Kind_ShouldBeI2cBus()
+    public void I2CBusAddress_Kind_ShouldBeI2cBus()
     {
-        var addr = StorageAddress.FromI2cBus(1, 0x48);
-        addr.Kind.Should().Be(StorageAddressKind.I2cBus);
+        var addr = StorageAddress.FromI2CBus(1, 0x48);
+        addr.Kind.Should().Be(StorageAddressKind.I2CBus);
     }
 
     [Fact]
-    public void I2cBusAddress_ToKey_ShouldContainHexAddress()
+    public void I2CBusAddress_ToKey_ShouldContainHexAddress()
     {
-        var addr = StorageAddress.FromI2cBus(1, 0x48);
+        var addr = StorageAddress.FromI2CBus(1, 0x48);
         addr.ToKey().Should().Contain("48");
     }
 
     [Fact]
-    public void I2cBusAddress_DeviceAddressOutOfRange_ShouldThrow()
+    public void I2CBusAddress_DeviceAddressOutOfRange_ShouldThrow()
     {
-        var act = () => StorageAddress.FromI2cBus(1, 128);
+        var act = () => StorageAddress.FromI2CBus(1, 128);
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
 
     [Fact]
-    public void I2cBusAddress_NegativeBus_ShouldThrow()
+    public void I2CBusAddress_NegativeBus_ShouldThrow()
     {
-        var act = () => StorageAddress.FromI2cBus(-1, 0x48);
+        var act = () => StorageAddress.FromI2CBus(-1, 0x48);
         act.Should().Throw<ArgumentOutOfRangeException>();
     }
 

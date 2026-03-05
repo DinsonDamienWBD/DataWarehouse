@@ -19,7 +19,7 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
         /// <summary>
         /// The default CRDT type used when no pattern matches (LWWRegister -- most general).
         /// </summary>
-        public Type DefaultType => typeof(SdkLWWRegister);
+        public Type DefaultType => typeof(SdkLwwRegister);
 
         /// <summary>
         /// Registers an exact key to a specific CRDT type.
@@ -97,14 +97,14 @@ namespace DataWarehouse.SDK.Infrastructure.Distributed
             if (type == typeof(SdkGCounter))
                 return SdkGCounter.Deserialize(data);
 
-            if (type == typeof(SdkPNCounter))
-                return SdkPNCounter.Deserialize(data);
+            if (type == typeof(SdkPnCounter))
+                return SdkPnCounter.Deserialize(data);
 
-            if (type == typeof(SdkLWWRegister))
-                return SdkLWWRegister.Deserialize(data);
+            if (type == typeof(SdkLwwRegister))
+                return SdkLwwRegister.Deserialize(data);
 
-            if (type == typeof(SdkORSet))
-                return SdkORSet.Deserialize(data);
+            if (type == typeof(SdkOrSet))
+                return SdkOrSet.Deserialize(data);
 
             throw new NotSupportedException($"Deserialization not supported for CRDT type {type.Name}");
         }

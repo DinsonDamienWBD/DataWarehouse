@@ -58,7 +58,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             MinDisks: 3 + _parityDriveCount, // At least 3 data + parity drives
             MaxDisks: 48, // Typical StorageTek array limit
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(3),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(3),
             ReadPerformanceMultiplier: 1.2, // Cached reads
             WritePerformanceMultiplier: 1.5, // Async writes boost performance
             CapacityEfficiency: 0.85, // High efficiency with dedicated parity
@@ -528,7 +528,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             MinDisks: 2, // 1 data + 1 parity minimum
             MaxDisks: null,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(2), // Fast rebuild from snapshot
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(2), // Fast rebuild from snapshot
             ReadPerformanceMultiplier: 1.0, // Direct disk reads
             WritePerformanceMultiplier: 0.95, // No synchronous parity
             CapacityEfficiency: 0.85, // High efficiency

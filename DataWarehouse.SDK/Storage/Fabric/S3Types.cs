@@ -373,13 +373,13 @@ public record S3CompleteMultipartResponse
 public enum S3PresignedMethod
 {
     /// <summary>Presigned URL for downloading an object.</summary>
-    GET,
+    Get,
 
     /// <summary>Presigned URL for uploading an object.</summary>
-    PUT,
+    Put,
 
     /// <summary>Presigned URL for deleting an object.</summary>
-    DELETE
+    Delete
 }
 
 /// <summary>

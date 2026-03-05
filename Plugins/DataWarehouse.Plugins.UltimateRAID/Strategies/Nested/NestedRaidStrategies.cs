@@ -50,7 +50,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Nested
             MinDisks: _disksPerRaid3Group * 2, // At least 2 RAID 3 groups
             MaxDisks: null,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(4),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(4),
             ReadPerformanceMultiplier: 1.4, // Striped reads across groups
             WritePerformanceMultiplier: 0.7, // Parity overhead per group
             CapacityEfficiency: (double)(_disksPerRaid3Group - 1) / _disksPerRaid3Group, // ~67% with 3 disks/group

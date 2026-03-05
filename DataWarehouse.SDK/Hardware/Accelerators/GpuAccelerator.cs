@@ -175,7 +175,7 @@ namespace DataWarehouse.SDK.Hardware.Accelerators
                 // Query device count
                 int result = RocmInterop.GetDeviceCount(out int count);
 
-                if (result == RocmInterop.hipSuccess && count > 0)
+                if (result == RocmInterop.HipSuccess && count > 0)
                 {
                     _runtime = GpuRuntime.RoCm;
                     _deviceCount = count;

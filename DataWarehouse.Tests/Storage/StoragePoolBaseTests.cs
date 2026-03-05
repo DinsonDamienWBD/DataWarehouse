@@ -334,7 +334,7 @@ public class StoragePoolBaseTests
         {
             ArgumentNullException.ThrowIfNull(provider);
             var id = $"{(provider as IPlugin)?.Id ?? provider.Scheme}-{Interlocked.Increment(ref _providerCounter)}";
-            _providers[id] = (provider, role);
+            ProviderMap[id] = (provider, role);
         }
 
         public override Task StartAsync(CancellationToken ct)

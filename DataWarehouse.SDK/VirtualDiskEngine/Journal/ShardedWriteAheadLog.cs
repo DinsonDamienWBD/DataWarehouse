@@ -39,7 +39,8 @@ public readonly struct WalShardStats
 [SdkCompatibility("6.0.0", Notes = "Phase 91.5 VOPT-29: Thread-affinity sharded WAL")]
 public sealed class ShardedWriteAheadLog : IWriteAheadLog, IAsyncDisposable
 {
-    private readonly IBlockDevice _device;
+    /// <summary>Gets the device for diagnostic access.</summary>
+    internal IBlockDevice Device { get; }
     private readonly int _shardCount;
     private readonly long _walTotalBlocks;
     private readonly WalShard[] _shards;
@@ -118,7 +119,7 @@ public sealed class ShardedWriteAheadLog : IWriteAheadLog, IAsyncDisposable
         ArgumentOutOfRangeException.ThrowIfLessThan(blockSize, 1);
         ArgumentOutOfRangeException.ThrowIfNegative(shardCount);
 
-        _device = device;
+        Device = device;
         _walTotalBlocks = walTotalBlocks;
 
         // Auto-detect shard count

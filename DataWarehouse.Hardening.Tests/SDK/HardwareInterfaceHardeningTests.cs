@@ -119,7 +119,7 @@ public class HardwareInterfaceHardeningTests
         Assert.Contains(SdkAssembly.GetTypes(), t => t.Name == "WindowsHardwareProbe");
     }
 
-    // Finding 871: HardwareDeviceType.I2cBus renamed to I2CBus
+    // Finding 871: HardwareDeviceType.I2CBus renamed to I2CBus
     [Fact]
     public void Finding871_HardwareDeviceTypeI2CBusRenamed()
     {
@@ -127,7 +127,7 @@ public class HardwareInterfaceHardeningTests
         Assert.NotNull(type);
         var names = Enum.GetNames(type);
         Assert.Contains("I2CBus", names);
-        Assert.DoesNotContain("I2cBus", names);
+        Assert.DoesNotContain("I2CBus", names);
     }
 
     // Finding 872: HardwareProbe always-false expression

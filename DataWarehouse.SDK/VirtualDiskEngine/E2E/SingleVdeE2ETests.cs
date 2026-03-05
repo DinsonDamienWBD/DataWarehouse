@@ -106,23 +106,23 @@ public static class SingleVdeE2ETests
                 ct: ct).ConfigureAwait(false);
 
             // Store 3 objects with different sizes
-            var data1KB = E2ETestInfrastructure.GenerateTestData(1024, seed: 0x01);
-            var data64KB = E2ETestInfrastructure.GenerateTestData(64 * 1024, seed: 0x02);
-            var data1MB = E2ETestInfrastructure.GenerateTestData(1024 * 1024, seed: 0x03);
+            var data1Kb = E2ETestInfrastructure.GenerateTestData(1024, seed: 0x01);
+            var data64Kb = E2ETestInfrastructure.GenerateTestData(64 * 1024, seed: 0x02);
+            var data1Mb = E2ETestInfrastructure.GenerateTestData(1024 * 1024, seed: 0x03);
 
-            await vde.StoreAsync("obj-1kb", new MemoryStream(data1KB), null, ct).ConfigureAwait(false);
-            await vde.StoreAsync("obj-64kb", new MemoryStream(data64KB), null, ct).ConfigureAwait(false);
-            await vde.StoreAsync("obj-1mb", new MemoryStream(data1MB), null, ct).ConfigureAwait(false);
+            await vde.StoreAsync("obj-1kb", new MemoryStream(data1Kb), null, ct).ConfigureAwait(false);
+            await vde.StoreAsync("obj-64kb", new MemoryStream(data64Kb), null, ct).ConfigureAwait(false);
+            await vde.StoreAsync("obj-1mb", new MemoryStream(data1Mb), null, ct).ConfigureAwait(false);
 
             // Retrieve each and verify data matches
             using (var retrieved1 = await vde.RetrieveAsync("obj-1kb", ct).ConfigureAwait(false))
-                await E2ETestInfrastructure.VerifyDataRoundTrip(data1KB, retrieved1).ConfigureAwait(false);
+                await E2ETestInfrastructure.VerifyDataRoundTrip(data1Kb, retrieved1).ConfigureAwait(false);
 
             using (var retrieved2 = await vde.RetrieveAsync("obj-64kb", ct).ConfigureAwait(false))
-                await E2ETestInfrastructure.VerifyDataRoundTrip(data64KB, retrieved2).ConfigureAwait(false);
+                await E2ETestInfrastructure.VerifyDataRoundTrip(data64Kb, retrieved2).ConfigureAwait(false);
 
             using (var retrieved3 = await vde.RetrieveAsync("obj-1mb", ct).ConfigureAwait(false))
-                await E2ETestInfrastructure.VerifyDataRoundTrip(data1MB, retrieved3).ConfigureAwait(false);
+                await E2ETestInfrastructure.VerifyDataRoundTrip(data1Mb, retrieved3).ConfigureAwait(false);
 
             // List all objects and verify count == 3
             int listCount = 0;

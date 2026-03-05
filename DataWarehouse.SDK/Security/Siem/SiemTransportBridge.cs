@@ -638,8 +638,10 @@ namespace DataWarehouse.SDK.Security.Siem
     public sealed class FileSiemTransport : ISiemTransport
     {
         private readonly SiemTransportOptions _options;
-        private readonly ILogger _logger;
         private readonly SemaphoreSlim _writeLock = new(1, 1);
+
+        /// <summary>Gets the logger for diagnostic access.</summary>
+        internal ILogger Logger { get; }
 
         /// <inheritdoc />
         public string TransportId { get; }
@@ -650,7 +652,7 @@ namespace DataWarehouse.SDK.Security.Siem
         public FileSiemTransport(SiemTransportOptions options, ILogger logger, string? transportId = null)
         {
             _options = options ?? throw new ArgumentNullException(nameof(options));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            Logger = logger ?? throw new ArgumentNullException(nameof(logger));
             TransportId = transportId ?? $"file-{Guid.NewGuid():N}";
         }
 

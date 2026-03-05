@@ -153,7 +153,7 @@ public static class RaidConstants
     /// Rebuild checkpoint interval in MB (100 MB).
     /// Save progress every N megabytes during rebuild.
     /// </summary>
-    public const int RebuildCheckpointIntervalMB = 100;
+    public const int RebuildCheckpointIntervalMb = 100;
 
     /// <summary>
     /// Maximum rebuild retry attempts (3).

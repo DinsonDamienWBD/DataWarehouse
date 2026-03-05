@@ -124,7 +124,7 @@ namespace DataWarehouse.SDK.Security.SupplyChain
         private readonly ISecurityContext? _securityContext;
         private readonly IMessageBus? _messageBus;
 
-        private static readonly JsonSerializerOptions s_jsonOptions = new()
+        private static readonly JsonSerializerOptions SJsonOptions = new()
         {
             PropertyNameCaseInsensitive = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
@@ -221,7 +221,7 @@ namespace DataWarehouse.SDK.Security.SupplyChain
                     // DSSE envelope
                     var payloadBase64 = payloadProp.GetString()!;
                     var statementJson = Encoding.UTF8.GetString(Convert.FromBase64String(payloadBase64));
-                    var statement = JsonSerializer.Deserialize<InTotoStatement>(statementJson, s_jsonOptions)!;
+                    var statement = JsonSerializer.Deserialize<InTotoStatement>(statementJson, SJsonOptions)!;
 
                     byte[]? signature = null;
                     string? sigKeyId = null;
@@ -248,7 +248,7 @@ namespace DataWarehouse.SDK.Security.SupplyChain
                 else
                 {
                     // Raw in-toto statement
-                    var statement = JsonSerializer.Deserialize<InTotoStatement>(provenanceJson, s_jsonOptions)!;
+                    var statement = JsonSerializer.Deserialize<InTotoStatement>(provenanceJson, SJsonOptions)!;
                     var provenance = new SlsaProvenance
                     {
                         Statement = statement,

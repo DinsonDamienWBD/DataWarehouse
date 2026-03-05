@@ -29,11 +29,11 @@ public static class SimdOperations
 
     // ── XXH64 constants ──────────────────────────────────────────────────
 
-    private const ulong XXH_PRIME64_1 = 0x9E3779B185EBCA87UL;
-    private const ulong XXH_PRIME64_2 = 0x14DEF9DEA2F79CD5UL;
-    private const ulong XXH_PRIME64_3 = 0x0165667B19E3779FUL;
-    private const ulong XXH_PRIME64_4 = 0xC2B2AE3D27D4EB4FUL;
-    private const ulong XXH_PRIME64_5 = 0x27D4EB2F165667C5UL;
+    private const ulong XxhPrime641 = 0x9E3779B185EBCA87UL;
+    private const ulong XxhPrime642 = 0x14DEF9DEA2F79CD5UL;
+    private const ulong XxhPrime643 = 0x0165667B19E3779FUL;
+    private const ulong XxhPrime644 = 0xC2B2AE3D27D4EB4FUL;
+    private const ulong XxhPrime645 = 0x27D4EB2F165667C5UL;
 
     /// <summary>
     /// Returns a human-readable string describing the SIMD capabilities detected at runtime.
@@ -394,10 +394,10 @@ public static class SimdOperations
         int length = data.Length;
 
         // Initialize 4 accumulators
-        ulong v1 = seed + XXH_PRIME64_1 + XXH_PRIME64_2;
-        ulong v2 = seed + XXH_PRIME64_2;
+        ulong v1 = seed + XxhPrime641 + XxhPrime642;
+        ulong v2 = seed + XxhPrime642;
         ulong v3 = seed;
-        ulong v4 = seed - XXH_PRIME64_1;
+        ulong v4 = seed - XxhPrime641;
 
         // Process 32-byte stripes
         int offset = 0;
@@ -432,16 +432,16 @@ public static class SimdOperations
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong XxHash64Short(ReadOnlySpan<byte> data, ulong seed, int length)
     {
-        ulong h64 = seed + XXH_PRIME64_5 + (ulong)length;
+        ulong h64 = seed + XxhPrime645 + (ulong)length;
         return Xxh64Finalize(h64, data);
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static ulong Xxh64Round(ulong acc, ulong input)
     {
-        acc += input * XXH_PRIME64_2;
+        acc += input * XxhPrime642;
         acc = BitOperations.RotateLeft(acc, 31);
-        acc *= XXH_PRIME64_1;
+        acc *= XxhPrime641;
         return acc;
     }
 
@@ -450,7 +450,7 @@ public static class SimdOperations
     {
         val = Xxh64Round(0, val);
         acc ^= val;
-        acc = acc * XXH_PRIME64_1 + XXH_PRIME64_4;
+        acc = acc * XxhPrime641 + XxhPrime644;
         return acc;
     }
 
@@ -465,7 +465,7 @@ public static class SimdOperations
         {
             ulong k1 = Xxh64Round(0, MemoryMarshal.Read<ulong>(remaining.Slice(offset)));
             h64 ^= k1;
-            h64 = BitOperations.RotateLeft(h64, 27) * XXH_PRIME64_1 + XXH_PRIME64_4;
+            h64 = BitOperations.RotateLeft(h64, 27) * XxhPrime641 + XxhPrime644;
             offset += 8;
         }
 
@@ -473,24 +473,24 @@ public static class SimdOperations
         while (offset + 4 <= length)
         {
             ulong k1 = (ulong)MemoryMarshal.Read<uint>(remaining.Slice(offset));
-            h64 ^= k1 * XXH_PRIME64_1;
-            h64 = BitOperations.RotateLeft(h64, 23) * XXH_PRIME64_2 + XXH_PRIME64_3;
+            h64 ^= k1 * XxhPrime641;
+            h64 = BitOperations.RotateLeft(h64, 23) * XxhPrime642 + XxhPrime643;
             offset += 4;
         }
 
         // Process remaining bytes
         while (offset < length)
         {
-            h64 ^= remaining[offset] * XXH_PRIME64_5;
-            h64 = BitOperations.RotateLeft(h64, 11) * XXH_PRIME64_1;
+            h64 ^= remaining[offset] * XxhPrime645;
+            h64 = BitOperations.RotateLeft(h64, 11) * XxhPrime641;
             offset++;
         }
 
         // Final avalanche
         h64 ^= h64 >> 33;
-        h64 *= XXH_PRIME64_2;
+        h64 *= XxhPrime642;
         h64 ^= h64 >> 29;
-        h64 *= XXH_PRIME64_3;
+        h64 *= XxhPrime643;
         h64 ^= h64 >> 32;
 
         return h64;

@@ -263,7 +263,7 @@ namespace DataWarehouse.SDK.Security.SupplyChain
         private readonly ISecurityContext? _securityContext;
         private readonly IMessageBus? _messageBus;
 
-        private static readonly JsonSerializerOptions s_jsonOptions = new()
+        private static readonly JsonSerializerOptions SJsonOptions = new()
         {
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
             WriteIndented = true,
@@ -300,7 +300,7 @@ namespace DataWarehouse.SDK.Security.SupplyChain
             var statement = BuildStatement(request, subjects);
 
             // 3. Serialize the statement
-            var statementJson = JsonSerializer.Serialize(statement, s_jsonOptions);
+            var statementJson = JsonSerializer.Serialize(statement, SJsonOptions);
 
             // 4. Sign if key store and signing key are available
             byte[]? signature = null;
@@ -332,7 +332,7 @@ namespace DataWarehouse.SDK.Security.SupplyChain
                         }
                     };
 
-                    serializedOutput = JsonSerializer.Serialize(envelope, s_jsonOptions);
+                    serializedOutput = JsonSerializer.Serialize(envelope, SJsonOptions);
                     slsaLevel = 2; // Level 2: signed provenance
 
                     // Check for Level 3: builder in allowed list + source constraints

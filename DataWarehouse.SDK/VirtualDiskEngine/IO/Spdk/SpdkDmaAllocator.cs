@@ -98,14 +98,16 @@ internal sealed class SpdkDmaAllocator
     private sealed unsafe class SpdkDmaMemoryOwner : IMemoryOwner<byte>
     {
         private IntPtr _pointer;
-        private readonly int _byteCount;
         private DmaUnmanagedMemoryManager? _manager;
         private int _disposed;
+
+        /// <summary>Gets the size in bytes of the DMA buffer.</summary>
+        internal int ByteCount { get; }
 
         internal SpdkDmaMemoryOwner(IntPtr pointer, int byteCount)
         {
             _pointer = pointer;
-            _byteCount = byteCount;
+            ByteCount = byteCount;
             _manager = new DmaUnmanagedMemoryManager((byte*)pointer, byteCount);
         }
 

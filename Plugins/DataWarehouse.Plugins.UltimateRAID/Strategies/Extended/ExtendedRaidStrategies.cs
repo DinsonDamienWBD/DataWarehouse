@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             MinDisks: 4,
             MaxDisks: null,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(2),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(2),
             ReadPerformanceMultiplier: 1.8,
             WritePerformanceMultiplier: 0.9,
             CapacityEfficiency: 0.5, // 50% due to mirroring
@@ -236,7 +236,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             MinDisks: 8,
             MaxDisks: null,
             StripeSize: 131072, // 128KB
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(1.5),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(1.5),
             ReadPerformanceMultiplier: 2.5,
             WritePerformanceMultiplier: 1.2,
             CapacityEfficiency: 0.5,
@@ -454,7 +454,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             MinDisks: 6,
             MaxDisks: null,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(3),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(3),
             ReadPerformanceMultiplier: 1.6,
             WritePerformanceMultiplier: 0.8,
             CapacityEfficiency: 0.67, // (n-2)/n for typical 6-disk configuration
@@ -735,7 +735,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             MinDisks: 8,
             MaxDisks: null,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(4),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(4),
             ReadPerformanceMultiplier: 1.5,
             WritePerformanceMultiplier: 0.7,
             CapacityEfficiency: 0.60, // (n-4)/n for typical 8-disk configuration
@@ -1020,7 +1020,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             MinDisks: 3,
             MaxDisks: null,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(2),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(2),
             ReadPerformanceMultiplier: 1.4,
             WritePerformanceMultiplier: 0.7,
             CapacityEfficiency: 0.5,
@@ -1220,7 +1220,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             MinDisks: 4,
             MaxDisks: null,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(2.5),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(2.5),
             ReadPerformanceMultiplier: 1.1,
             WritePerformanceMultiplier: 0.7,
             CapacityEfficiency: 0.60, // (n-2)/n accounting for integrated spare
@@ -1470,16 +1470,16 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
     /// RAID 5EE strategy implementing enhanced RAID 5E with distributed hot spare
     /// for improved rebuild performance and fault tolerance.
     /// </summary>
-    public class Raid5EEStrategy : SdkRaidStrategyBase
+    public class Raid5EeStrategy : SdkRaidStrategyBase
     {
-        public override RaidLevel Level => RaidLevel.Raid5EE;
+        public override RaidLevel Level => RaidLevel.Raid5Ee;
 
         public override RaidCapabilities Capabilities => new RaidCapabilities(
             RedundancyLevel: 1,
             MinDisks: 4,
             MaxDisks: null,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(2),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(2),
             ReadPerformanceMultiplier: 1.2,
             WritePerformanceMultiplier: 0.75,
             CapacityEfficiency: 0.58,
@@ -1730,7 +1730,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             MinDisks: 5,
             MaxDisks: null,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(3.5),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(3.5),
             ReadPerformanceMultiplier: 1.0,
             WritePerformanceMultiplier: 0.6,
             CapacityEfficiency: 0.55, // (n-3)/n accounting for dual parity + spare

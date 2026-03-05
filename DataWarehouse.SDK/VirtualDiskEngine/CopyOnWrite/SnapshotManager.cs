@@ -63,7 +63,8 @@ public sealed class SnapshotManager
 {
     private readonly IInodeTable _inodeTable;
     private readonly ICowEngine _cowEngine;
-    private readonly IBlockAllocator _allocator;
+    /// <summary>Gets the block allocator used for snapshot operations.</summary>
+    internal IBlockAllocator Allocator { get; }
     private readonly IWriteAheadLog _wal;
     private readonly long _snapshotMetadataInodeNumber;
     private readonly IBlockDevice? _blockDevice; // Optional: enables full indirect block traversal (finding 775)
@@ -102,7 +103,7 @@ public sealed class SnapshotManager
     {
         _inodeTable = inodeTable ?? throw new ArgumentNullException(nameof(inodeTable));
         _cowEngine = cowEngine ?? throw new ArgumentNullException(nameof(cowEngine));
-        _allocator = allocator ?? throw new ArgumentNullException(nameof(allocator));
+        Allocator = allocator ?? throw new ArgumentNullException(nameof(allocator));
         _wal = wal ?? throw new ArgumentNullException(nameof(wal));
         _snapshotMetadataInodeNumber = snapshotMetadataInodeNumber;
         _blockDevice = blockDevice;

@@ -42,7 +42,7 @@ public enum StorageAddressKind
     /// <summary>
     /// I2C bus device (bus ID + device address).
     /// </summary>
-    I2cBus,
+    I2CBus,
 
     /// <summary>
     /// SPI bus device (bus ID + chip select).

@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             MinDisks: 3,
             MaxDisks: 28,
             StripeSize: 4096,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(4),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(4),
             ReadPerformanceMultiplier: 0.9,
             WritePerformanceMultiplier: 0.5,
             CapacityEfficiency: 0.71, // (n-2)/n for typical configurations
@@ -208,7 +208,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             MinDisks: 4,
             MaxDisks: 28,
             StripeSize: 4096,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(6),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(6),
             ReadPerformanceMultiplier: 0.85,
             WritePerformanceMultiplier: 0.4,
             CapacityEfficiency: 0.68, // (n-3)/n for typical configurations
@@ -413,7 +413,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             MinDisks: 3,
             MaxDisks: null,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(5),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(5),
             ReadPerformanceMultiplier: 0.8,
             WritePerformanceMultiplier: 0.6,
             CapacityEfficiency: 0.67, // Variable based on disk mix
@@ -580,7 +580,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             MinDisks: 4,
             MaxDisks: null,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(6),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(6),
             ReadPerformanceMultiplier: 0.75,
             WritePerformanceMultiplier: 0.5,
             CapacityEfficiency: 0.60, // Variable based on disk mix
@@ -751,7 +751,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             MinDisks: 3,
             MaxDisks: 64,
             StripeSize: 262144, // 256KB
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(8),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(8),
             ReadPerformanceMultiplier: 0.7,
             WritePerformanceMultiplier: 0.5,
             CapacityEfficiency: 0.65, // Highly variable
@@ -927,7 +927,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             MinDisks: 4,
             MaxDisks: 16,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(5),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(5),
             ReadPerformanceMultiplier: 0.85,
             WritePerformanceMultiplier: 0.55,
             CapacityEfficiency: 0.75, // (n-2)/n
@@ -1142,7 +1142,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             MinDisks: 2,
             MaxDisks: 30,
             StripeSize: 4096,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(4),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(4),
             ReadPerformanceMultiplier: 1.0, // Direct disk reads
             WritePerformanceMultiplier: 0.7,
             CapacityEfficiency: 0.80, // Sum of all data disks / total
@@ -1306,7 +1306,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Vendor
             MinDisks: 3,
             MaxDisks: 30,
             StripeSize: 4096,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(5),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(5),
             ReadPerformanceMultiplier: 1.0,
             WritePerformanceMultiplier: 0.6,
             CapacityEfficiency: 0.75,

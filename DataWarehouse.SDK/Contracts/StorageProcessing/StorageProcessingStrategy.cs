@@ -494,7 +494,7 @@ namespace DataWarehouse.SDK.Contracts.StorageProcessing
         /// <summary>
         /// Estimated I/O operations required.
         /// </summary>
-        public long EstimatedIOOperations { get; init; }
+        public long EstimatedIoOperations { get; init; }
 
         /// <summary>
         /// Estimated amount of data to scan in bytes.
@@ -504,7 +504,7 @@ namespace DataWarehouse.SDK.Contracts.StorageProcessing
         /// <summary>
         /// Estimated CPU cost (arbitrary units, backend-specific).
         /// </summary>
-        public double EstimatedCPUCost { get; init; }
+        public double EstimatedCpuCost { get; init; }
 
         /// <summary>
         /// Estimated memory usage in bytes.
@@ -619,9 +619,9 @@ namespace DataWarehouse.SDK.Contracts.StorageProcessing
             return Task.FromResult(new QueryCostEstimate
             {
                 EstimatedTimeMs = totalCost,
-                EstimatedIOOperations = 1000 + (filterCount * 100),
+                EstimatedIoOperations = 1000 + (filterCount * 100),
                 EstimatedDataScanned = 1024 * 1024, // 1 MB default
-                EstimatedCPUCost = totalCost / 10.0,
+                EstimatedCpuCost = totalCost / 10.0,
                 EstimatedMemoryUsage = 1024 * 1024, // 1 MB default
                 CostScore = Math.Min(100, totalCost / 10.0)
             });

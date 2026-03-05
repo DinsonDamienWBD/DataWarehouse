@@ -145,14 +145,14 @@ public abstract record StorageAddress
     }
 
     /// <summary>
-    /// Creates an I2cBusAddress from a bus ID and device address.
+    /// Creates an I2CBusAddress from a bus ID and device address.
     /// </summary>
-    public static StorageAddress FromI2cBus(int busId, int deviceAddress)
+    public static StorageAddress FromI2CBus(int busId, int deviceAddress)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(busId);
         ArgumentOutOfRangeException.ThrowIfLessThan(deviceAddress, 0);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(deviceAddress, 127);
-        return new I2cBusAddress(busId, deviceAddress);
+        return new I2CBusAddress(busId, deviceAddress);
     }
 
     /// <summary>
@@ -240,7 +240,7 @@ public abstract record StorageAddress
             "file" => new FilePathAddress(uri.LocalPath),
             "nvme" => ParseNvmeUri(uri),
             "gpio" => ParseGpioUri(uri),
-            "i2c" => ParseI2cUri(uri),
+            "i2c" => ParseI2CUri(uri),
             "spi" => ParseSpiUri(uri),
             "block" => new BlockDeviceAddress(uri.AbsolutePath.TrimStart('/')),
             "dw" => DwAddressParser.Parse(uri),
@@ -293,7 +293,7 @@ public abstract record StorageAddress
         throw new FormatException($"Invalid gpio URI format: {uri}. Expected gpio://[boardId]/pin/{{pin}}");
     }
 
-    private static StorageAddress ParseI2cUri(Uri uri)
+    private static StorageAddress ParseI2CUri(Uri uri)
     {
         // Expected format: i2c://{busId}/0x{deviceAddress}
         var path = uri.AbsolutePath.TrimStart('/');
@@ -303,7 +303,7 @@ public abstract record StorageAddress
             parts[1].StartsWith("0x", StringComparison.OrdinalIgnoreCase) &&
             int.TryParse(parts[1].AsSpan(2), System.Globalization.NumberStyles.HexNumber, null, out var deviceAddress))
         {
-            return new I2cBusAddress(busId, deviceAddress);
+            return new I2CBusAddress(busId, deviceAddress);
         }
         throw new FormatException($"Invalid i2c URI format: {uri}. Expected i2c://{{busId}}/0x{{deviceAddress}}");
     }
@@ -406,9 +406,9 @@ public sealed record GpioPinAddress(int Pin, string? BoardId = null) : StorageAd
 /// Storage address for I2C bus device (bus ID + device address).
 /// </summary>
 [SdkCompatibility("3.0.0", Notes = "Phase 32: StorageAddress universal addressing")]
-public sealed record I2cBusAddress(int BusId, int DeviceAddress) : StorageAddress
+public sealed record I2CBusAddress(int BusId, int DeviceAddress) : StorageAddress
 {
-    public override StorageAddressKind Kind => StorageAddressKind.I2cBus;
+    public override StorageAddressKind Kind => StorageAddressKind.I2CBus;
 
     public override string ToKey() => $"i2c://{BusId}/0x{DeviceAddress:X2}";
 }

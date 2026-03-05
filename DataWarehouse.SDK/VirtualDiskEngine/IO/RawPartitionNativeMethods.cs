@@ -29,14 +29,14 @@ internal static partial class RawPartitionNativeMethods
     // Windows: DeviceIoControl for disk geometry
     // =====================================================================
 
-    private const uint IOCTL_DISK_GET_DRIVE_GEOMETRY_EX = 0x000700A0;
-    private const uint GENERIC_READ = 0x80000000;
-    private const uint GENERIC_WRITE = 0x40000000;
-    private const uint OPEN_EXISTING = 3;
-    private const uint FILE_SHARE_READ = 0x00000001;
-    private const uint FILE_SHARE_WRITE = 0x00000002;
-    private const uint FILE_FLAG_NO_BUFFERING = 0x20000000;
-    private const uint FILE_FLAG_WRITE_THROUGH = 0x80000000;
+    private const uint IoctlDiskGetDriveGeometryEx = 0x000700A0;
+    private const uint GenericRead = 0x80000000;
+    private const uint GenericWrite = 0x40000000;
+    private const uint OpenExisting = 3;
+    private const uint FileShareRead = 0x00000001;
+    private const uint FileShareWrite = 0x00000002;
+    private const uint FileFlagNoBuffering = 0x20000000;
+    private const uint FileFlagWriteThrough = 0x80000000;
 
     /// <summary>
     /// DISK_GEOMETRY_EX structure returned by DeviceIoControl on Windows.
@@ -112,16 +112,16 @@ internal static partial class RawPartitionNativeMethods
     // =====================================================================
 
     /// <summary>BLKSSZGET: get block device sector size.</summary>
-    private const uint LINUX_BLKSSZGET = 0x1268;
+    private const uint LinuxBlksszget = 0x1268;
 
     /// <summary>BLKGETSIZE64: get block device size in bytes.</summary>
-    private const uint LINUX_BLKGETSIZE64 = 0x80081272;
+    private const uint LinuxBlkgetsize64 = 0x80081272;
 
     /// <summary>ORdwr: open for read/write.</summary>
-    private const int LINUX_O_RDWR = 0x02;
+    private const int LinuxORdwr = 0x02;
 
     /// <summary>ODirect: bypass page cache.</summary>
-    private const int LINUX_O_DIRECT = 0x4000;
+    private const int LinuxODirect = 0x4000;
 
 #if NET7_0_OR_GREATER
     [LibraryImport("libc", EntryPoint = "open", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
@@ -154,19 +154,19 @@ internal static partial class RawPartitionNativeMethods
     // =====================================================================
 
     /// <summary>DKIOCGETBLOCKSIZE: get disk block (sector) size.</summary>
-    private const uint MACOS_DKIOCGETBLOCKSIZE = 0x40046418;
+    private const uint MacosDkiocgetblocksize = 0x40046418;
 
     /// <summary>DKIOCGETBLOCKCOUNT: get disk block count.</summary>
-    private const uint MACOS_DKIOCGETBLOCKCOUNT = 0x40086419;
+    private const uint MacosDkiocgetblockcount = 0x40086419;
 
     /// <summary>F_NOCACHE: disable file system caching.</summary>
-    private const int MACOS_F_NOCACHE = 48;
+    private const int MacosFNocache = 48;
 
     /// <summary>F_SETFL: set file status flags (fcntl).</summary>
-    private const int MACOS_F_SETFL = 4;
+    private const int MacosFSetfl = 4;
 
     /// <summary>ORdwr: open for read/write.</summary>
-    private const int MACOS_O_RDWR = 0x02;
+    private const int MacosORdwr = 0x02;
 
 #if NET7_0_OR_GREATER
     [LibraryImport("libc", EntryPoint = "open", SetLastError = true, StringMarshalling = StringMarshalling.Utf8)]
@@ -312,10 +312,10 @@ internal static partial class RawPartitionNativeMethods
     {
         nint handle = Win32CreateFile(
             devicePath,
-            GENERIC_READ,
-            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            GenericRead,
+            FileShareRead | FileShareWrite,
             nint.Zero,
-            OPEN_EXISTING,
+            OpenExisting,
             0,
             nint.Zero);
 
@@ -336,7 +336,7 @@ internal static partial class RawPartitionNativeMethods
         {
             bool success = Win32DeviceIoControl(
                 handle,
-                IOCTL_DISK_GET_DRIVE_GEOMETRY_EX,
+                IoctlDiskGetDriveGeometryEx,
                 nint.Zero,
                 0,
                 out DiskGeometryEx geometry,
@@ -364,11 +364,11 @@ internal static partial class RawPartitionNativeMethods
     {
         nint handle = Win32CreateFile(
             devicePath,
-            GENERIC_READ | GENERIC_WRITE,
+            GenericRead | GenericWrite,
             0, // Exclusive access
             nint.Zero,
-            OPEN_EXISTING,
-            FILE_FLAG_NO_BUFFERING | FILE_FLAG_WRITE_THROUGH,
+            OpenExisting,
+            FileFlagNoBuffering | FileFlagWriteThrough,
             nint.Zero);
 
         if (handle == -1 || handle == nint.Zero)
@@ -393,7 +393,7 @@ internal static partial class RawPartitionNativeMethods
 
     private static (int sectorSize, long totalBytes) GetPartitionGeometryLinux(string devicePath)
     {
-        int fd = LinuxOpen(devicePath, LINUX_O_RDWR);
+        int fd = LinuxOpen(devicePath, LinuxORdwr);
         if (fd < 0)
         {
             int errno = Marshal.GetLastPInvokeError();
@@ -410,7 +410,7 @@ internal static partial class RawPartitionNativeMethods
         try
         {
             int sectorSize = 0;
-            if (LinuxIoctlInt(fd, LINUX_BLKSSZGET, ref sectorSize) < 0)
+            if (LinuxIoctlInt(fd, LinuxBlksszget, ref sectorSize) < 0)
             {
                 int errno = Marshal.GetLastPInvokeError();
                 throw new InvalidOperationException(
@@ -418,7 +418,7 @@ internal static partial class RawPartitionNativeMethods
             }
 
             long totalBytes = 0;
-            if (LinuxIoctlLong(fd, LINUX_BLKGETSIZE64, ref totalBytes) < 0)
+            if (LinuxIoctlLong(fd, LinuxBlkgetsize64, ref totalBytes) < 0)
             {
                 int errno = Marshal.GetLastPInvokeError();
                 throw new InvalidOperationException(
@@ -435,7 +435,7 @@ internal static partial class RawPartitionNativeMethods
 
     private static nint OpenDeviceLinux(string devicePath)
     {
-        int fd = LinuxOpen(devicePath, LINUX_O_RDWR | LINUX_O_DIRECT);
+        int fd = LinuxOpen(devicePath, LinuxORdwr | LinuxODirect);
         if (fd < 0)
         {
             int errno = Marshal.GetLastPInvokeError();
@@ -458,7 +458,7 @@ internal static partial class RawPartitionNativeMethods
 
     private static (int sectorSize, long totalBytes) GetPartitionGeometryMacOs(string devicePath)
     {
-        int fd = MacOsOpen(devicePath, MACOS_O_RDWR);
+        int fd = MacOsOpen(devicePath, MacosORdwr);
         if (fd < 0)
         {
             int errno = Marshal.GetLastPInvokeError();
@@ -475,7 +475,7 @@ internal static partial class RawPartitionNativeMethods
         try
         {
             uint blockSize = 0;
-            if (MacOsIoctlUint(fd, MACOS_DKIOCGETBLOCKSIZE, ref blockSize) < 0)
+            if (MacOsIoctlUint(fd, MacosDkiocgetblocksize, ref blockSize) < 0)
             {
                 int errno = Marshal.GetLastPInvokeError();
                 throw new InvalidOperationException(
@@ -483,7 +483,7 @@ internal static partial class RawPartitionNativeMethods
             }
 
             ulong blockCount = 0;
-            if (MacOsIoctlUlong(fd, MACOS_DKIOCGETBLOCKCOUNT, ref blockCount) < 0)
+            if (MacOsIoctlUlong(fd, MacosDkiocgetblockcount, ref blockCount) < 0)
             {
                 int errno = Marshal.GetLastPInvokeError();
                 throw new InvalidOperationException(
@@ -501,7 +501,7 @@ internal static partial class RawPartitionNativeMethods
 
     private static nint OpenDeviceMacOs(string devicePath)
     {
-        int fd = MacOsOpen(devicePath, MACOS_O_RDWR);
+        int fd = MacOsOpen(devicePath, MacosORdwr);
         if (fd < 0)
         {
             int errno = Marshal.GetLastPInvokeError();
@@ -516,7 +516,7 @@ internal static partial class RawPartitionNativeMethods
         }
 
         // Disable file system caching on macOS via F_NOCACHE
-        MacOsFcntl(fd, MACOS_F_NOCACHE, 1);
+        MacOsFcntl(fd, MacosFNocache, 1);
 
         return (nint)fd;
     }

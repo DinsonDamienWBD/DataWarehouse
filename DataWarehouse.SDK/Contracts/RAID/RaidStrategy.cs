@@ -111,7 +111,7 @@ namespace DataWarehouse.SDK.Contracts.RAID
     /// <param name="MinDisks">The minimum number of disks required for this RAID level.</param>
     /// <param name="MaxDisks">The maximum number of disks supported (null for unlimited).</param>
     /// <param name="StripeSize">The default stripe size in bytes.</param>
-    /// <param name="EstimatedRebuildTimePerTB">Estimated rebuild time per terabyte of data.</param>
+    /// <param name="EstimatedRebuildTimePerTb">Estimated rebuild time per terabyte of data.</param>
     /// <param name="ReadPerformanceMultiplier">Read performance multiplier relative to single disk.</param>
     /// <param name="WritePerformanceMultiplier">Write performance multiplier relative to single disk.</param>
     /// <param name="CapacityEfficiency">Percentage of total capacity that is usable (0.0 to 1.0).</param>
@@ -123,7 +123,7 @@ namespace DataWarehouse.SDK.Contracts.RAID
         int MinDisks,
         int? MaxDisks,
         int StripeSize,
-        TimeSpan EstimatedRebuildTimePerTB,
+        TimeSpan EstimatedRebuildTimePerTb,
         double ReadPerformanceMultiplier,
         double WritePerformanceMultiplier,
         double CapacityEfficiency,
@@ -306,7 +306,7 @@ namespace DataWarehouse.SDK.Contracts.RAID
         /// <summary>
         /// RAID 5EE - Enhanced RAID 5E with distributed hot spare.
         /// </summary>
-        Raid5EE = 54,
+        Raid5Ee = 54,
 
         /// <summary>
         /// RAID 6E - RAID 6 with integrated hot spare.

@@ -26,7 +26,8 @@ public sealed class RoaringBitmapTagIndex
 
     private readonly IBlockDevice _device;
     private readonly long _regionStart;
-    private readonly long _regionBlockCount;
+    /// <summary>Number of blocks in this tag index region.</summary>
+    internal long RegionBlockCount { get; }
     private readonly int _blockSize;
 
     /// <summary>In-memory index: XxHash64(key+value) -> RoaringBitmap of inode numbers.</summary>
@@ -50,7 +51,7 @@ public sealed class RoaringBitmapTagIndex
     {
         _device = device ?? throw new ArgumentNullException(nameof(device));
         _regionStart = tagIndexRegionStart;
-        _regionBlockCount = tagIndexRegionBlockCount;
+        RegionBlockCount = tagIndexRegionBlockCount;
         _blockSize = blockSize;
     }
 

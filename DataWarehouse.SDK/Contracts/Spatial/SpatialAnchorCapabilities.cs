@@ -8,7 +8,7 @@ public sealed record SpatialAnchorCapabilities
     /// <summary>
     /// Gets whether the strategy supports SLAM-based visual feature matching.
     /// </summary>
-    public required bool SupportsSLAM { get; init; }
+    public required bool SupportsSlam { get; init; }
 
     /// <summary>
     /// Gets whether the strategy supports cloud-backed persistent anchors.

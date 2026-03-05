@@ -57,7 +57,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             MinDisks: _dataBits + _parityBits, // e.g., 7 for Hamming(7,4)
             MaxDisks: _dataBits + _parityBits,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(8), // Slow due to bit-level operations
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(8), // Slow due to bit-level operations
             ReadPerformanceMultiplier: 0.6, // Overhead from bit-level striping
             WritePerformanceMultiplier: 0.5, // Hamming calculation overhead
             CapacityEfficiency: _dataBits / (double)(_dataBits + _parityBits), // ~57% for Hamming(7,4)
@@ -494,7 +494,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             MinDisks: 3, // 2 data + 1 parity minimum
             MaxDisks: null,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(5),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(5),
             ReadPerformanceMultiplier: 0.85, // Good for sequential
             WritePerformanceMultiplier: 0.6, // Parity disk bottleneck
             CapacityEfficiency: 0.67, // (n-1)/n
@@ -843,7 +843,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             MinDisks: 3, // 2 data + 1 parity
             MaxDisks: null,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(4),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(4),
             ReadPerformanceMultiplier: 0.9, // Good read performance
             WritePerformanceMultiplier: 0.5, // Parity disk bottleneck
             CapacityEfficiency: 0.67, // (n-1)/n

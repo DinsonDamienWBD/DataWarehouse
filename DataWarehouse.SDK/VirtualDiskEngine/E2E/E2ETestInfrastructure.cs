@@ -48,7 +48,7 @@ public static class E2ETestInfrastructure
     /// <param name="stripeSizeBlocks">Stripe size in blocks. Default 256.</param>
     /// <returns>A compound block device.</returns>
     public static CompoundBlockDevice CreateCompoundDevice(
-        IPhysicalBlockDevice[] devices,
+        IReadOnlyList<IPhysicalBlockDevice> devices,
         DeviceLayoutType layout,
         int stripeSizeBlocks = 256)
     {

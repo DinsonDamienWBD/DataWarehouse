@@ -45,7 +45,7 @@ public sealed class SpatialAnchorStrategy : IndexingStrategyBase, ISpatialAnchor
     /// <inheritdoc/>
     public SpatialAnchorCapabilities AnchorCapabilities { get; } = new()
     {
-        SupportsSLAM = true,
+        SupportsSlam = true,
         SupportsCloudPersistence = false,  // Phase 11: local only
         SupportsLocalCache = true,
         MinPrecisionMeters = 0.5,  // Sub-meter with visual features
@@ -82,7 +82,7 @@ public sealed class SpatialAnchorStrategy : IndexingStrategyBase, ISpatialAnchor
                 $"Expiration must be between 1 and {AnchorCapabilities.MaxExpirationDays} days.");
         }
 
-        if (visualFeatures != null && !AnchorCapabilities.SupportsSLAM)
+        if (visualFeatures != null && !AnchorCapabilities.SupportsSlam)
         {
             throw new InvalidOperationException("Visual features not supported by this strategy.");
         }

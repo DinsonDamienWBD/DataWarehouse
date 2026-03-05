@@ -32,7 +32,7 @@ internal static partial class SpdkNativeBindings
     /// </summary>
     private const string SpdkLib = "libspdk_nvme";
 
-    private static readonly Lazy<bool> _isAvailable = new(ProbeLibrary, isThreadSafe: true);
+    private static readonly Lazy<bool> IsAvailableLazy = new(ProbeLibrary, isThreadSafe: true);
 
     #region Environment Initialisation
 
@@ -242,7 +242,7 @@ internal static partial class SpdkNativeBindings
     /// Gets whether the preamble SPDK library (<c>libspdk_nvme</c>) is available
     /// on the current system. The result is cached after the first probe.
     /// </summary>
-    internal static bool IsAvailable => _isAvailable.Value;
+    internal static bool IsAvailable => IsAvailableLazy.Value;
 
     private static bool ProbeLibrary()
     {

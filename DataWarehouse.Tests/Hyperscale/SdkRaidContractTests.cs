@@ -69,7 +69,7 @@ public class SdkRaidContractTests
             MinDisks: 3,
             MaxDisks: 32,
             StripeSize: 65536,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(4),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(4),
             ReadPerformanceMultiplier: 2.5,
             WritePerformanceMultiplier: 0.75,
             CapacityEfficiency: 0.67,

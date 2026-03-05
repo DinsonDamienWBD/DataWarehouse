@@ -37,7 +37,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             MinDisks: _parityCount + 2, // At least 2 data + parity drives
             MaxDisks: null,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(5),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(5),
             ReadPerformanceMultiplier: 0.8,
             WritePerformanceMultiplier: 0.5, // Multi-parity overhead
             CapacityEfficiency: 0.6, // Lower due to multiple parity
@@ -395,7 +395,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             MinDisks: _mirrorCount,
             MaxDisks: _mirrorCount,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(2),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(2),
             ReadPerformanceMultiplier: _mirrorCount, // Can read from any mirror
             WritePerformanceMultiplier: 1.0 / _mirrorCount, // Must write to all
             CapacityEfficiency: 1.0 / _mirrorCount,
@@ -501,7 +501,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             MinDisks: 1,
             MaxDisks: null,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.Zero,
+            EstimatedRebuildTimePerTb: TimeSpan.Zero,
             ReadPerformanceMultiplier: 1.0,
             WritePerformanceMultiplier: 1.0,
             CapacityEfficiency: 1.0,
@@ -606,7 +606,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             MinDisks: 3,
             MaxDisks: null,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(5),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(5),
             ReadPerformanceMultiplier: 0.8, // Decryption overhead
             WritePerformanceMultiplier: 0.7, // Encryption overhead
             CapacityEfficiency: 0.67,
@@ -885,7 +885,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             MinDisks: 2,
             MaxDisks: null,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(3),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(3),
             ReadPerformanceMultiplier: 1.2,
             WritePerformanceMultiplier: 0.7,
             CapacityEfficiency: 0.5,
@@ -1099,7 +1099,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             MinDisks: 3,
             MaxDisks: null,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(4),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(4),
             ReadPerformanceMultiplier: 0.7, // Spin-up latency
             WritePerformanceMultiplier: 0.6,
             CapacityEfficiency: 0.67,

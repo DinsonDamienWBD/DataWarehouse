@@ -63,7 +63,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             MinDisks: 2,
             MaxDisks: null,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.Zero, // No rebuild possible
+            EstimatedRebuildTimePerTb: TimeSpan.Zero, // No rebuild possible
             ReadPerformanceMultiplier: 1.0, // Linear scaling per disk
             WritePerformanceMultiplier: 1.0, // Linear scaling per disk
             CapacityEfficiency: 1.0,
@@ -318,7 +318,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             MinDisks: 2,
             MaxDisks: null,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(2),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(2),
             ReadPerformanceMultiplier: 1.0, // Can read from any mirror
             WritePerformanceMultiplier: 1.0 / 2.0, // Must write to all mirrors
             CapacityEfficiency: 0.5, // 50% efficiency with 2 disks
@@ -583,7 +583,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             MinDisks: 3,
             MaxDisks: null,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(4),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(4),
             ReadPerformanceMultiplier: 0.9,
             WritePerformanceMultiplier: 0.7, // Write penalty due to parity calculation
             CapacityEfficiency: 0.67, // (n-1)/n efficiency
@@ -976,7 +976,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             MinDisks: 4,
             MaxDisks: null,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(6),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(6),
             ReadPerformanceMultiplier: 0.85,
             WritePerformanceMultiplier: 0.6, // Higher write penalty due to dual parity
             CapacityEfficiency: 0.5, // (n-2)/n efficiency
@@ -1366,7 +1366,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
             MinDisks: 4,
             MaxDisks: null,
             StripeSize: _chunkSize,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(2),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(2),
             ReadPerformanceMultiplier: 1.5, // Read from multiple mirrors
             WritePerformanceMultiplier: 0.9, // Good write performance
             CapacityEfficiency: 0.5,

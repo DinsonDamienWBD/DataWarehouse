@@ -87,7 +87,7 @@ public class V3ComponentTests
         values.Should().Contain(StorageAddressKind.BlockDevice);
         values.Should().Contain(StorageAddressKind.NvmeNamespace);
         values.Should().Contain(StorageAddressKind.GpioPin);
-        values.Should().Contain(StorageAddressKind.I2cBus);
+        values.Should().Contain(StorageAddressKind.I2CBus);
         values.Should().Contain(StorageAddressKind.SpiBus);
         values.Should().Contain(StorageAddressKind.CustomAddress);
     }

@@ -98,7 +98,7 @@ public class UltimateRAIDTests
             MinDisks: 4,
             MaxDisks: 64,
             StripeSize: 131072,
-            EstimatedRebuildTimePerTB: TimeSpan.FromHours(6),
+            EstimatedRebuildTimePerTb: TimeSpan.FromHours(6),
             ReadPerformanceMultiplier: 3.0,
             WritePerformanceMultiplier: 0.5,
             CapacityEfficiency: 0.5,

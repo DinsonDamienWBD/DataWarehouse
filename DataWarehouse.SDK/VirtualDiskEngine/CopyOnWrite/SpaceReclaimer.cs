@@ -74,8 +74,8 @@ public sealed class SpaceReclaimer
 
         var blockList = blockNumbers.ToList();
         long blocksProcessed = blockList.Count;
-        long blocksFreed = 0;
-        long blocksStillShared = 0;
+        long blocksFreed;
+        long blocksStillShared;
 
         // Batch decrement all reference counts
         // The CowEngine will handle freeing blocks that reach refCount == 0

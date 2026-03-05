@@ -25,7 +25,7 @@ internal static partial class SpdkNativeMethods
 {
     private const string LibName = "spdk";
 
-    private static readonly Lazy<bool> _isSupported = new(ProbeLibrary, isThreadSafe: true);
+    private static readonly Lazy<bool> IsSupportedLazy = new(ProbeLibrary, isThreadSafe: true);
 
     #region Environment Init
 
@@ -338,7 +338,7 @@ internal static partial class SpdkNativeMethods
     /// The result is cached after the first call.
     /// </summary>
     /// <returns><c>true</c> if SPDK is available; otherwise, <c>false</c>.</returns>
-    internal static bool IsSupported() => _isSupported.Value;
+    internal static bool IsSupported() => IsSupportedLazy.Value;
 
     private static bool ProbeLibrary()
     {
