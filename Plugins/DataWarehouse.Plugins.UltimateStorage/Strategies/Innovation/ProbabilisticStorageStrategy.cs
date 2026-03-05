@@ -795,10 +795,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                     TruePositives = truePositives,
                     FalsePositives = falsePositives,
                     TrueNegatives = trueNegatives,
-                    ActualFPR = trueNegatives + falsePositives > 0
+                    ActualFpr = trueNegatives + falsePositives > 0
                         ? (double)falsePositives / (trueNegatives + falsePositives)
                         : 0,
-                    ConfiguredFPR = bloom.ConfiguredErrorRate
+                    ConfiguredFpr = bloom.ConfiguredErrorRate
                 };
             }
 
@@ -837,12 +837,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             IncrementOperationCounter(StorageOperationType.Store);
 
             // Parse storage mode from metadata
-            string mode = "auto";
             string structureType = "BloomFilter";
             if (metadata != null)
             {
-                if (metadata.TryGetValue("ProbabilisticMode", out var modeValue))
-                    mode = modeValue;
                 if (metadata.TryGetValue("StructureType", out var typeValue))
                     structureType = typeValue;
             }
@@ -1177,8 +1174,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         public int TruePositives { get; init; }
         public int FalsePositives { get; init; }
         public int TrueNegatives { get; init; }
-        public double ActualFPR { get; init; }
-        public double ConfiguredFPR { get; init; }
+        public double ActualFpr { get; init; }
+        public double ConfiguredFpr { get; init; }
     }
 
     /// <summary>

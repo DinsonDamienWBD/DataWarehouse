@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -42,6 +43,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         private string _basePath = "/";
         private bool _enableSnapshots = false;
         private string? _snapshotPolicy = null;
+        internal string? SnapshotPolicy => _snapshotPolicy;
         private bool _enableReplication = false;
         private string? _replicationTarget = null;
         private bool _enableSafeMode = false;
@@ -51,8 +53,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         private int? _objectLockRetentionDays = null;
         private bool _enableLifecycleRules = false;
         private int? _lifecycleTransitionDays = null;
+        internal int? LifecycleTransitionDays => _lifecycleTransitionDays;
         private bool _enableQuotas = false;
+        internal bool EnableQuotas => _enableQuotas;
         private long? _hardQuotaBytes = null;
+        internal long? HardQuotaBytes => _hardQuotaBytes;
         private int _timeoutSeconds = 300;
         private bool _validateCertificate = true;
         private string _apiVersion = "2.4";
@@ -60,8 +65,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         private int _retryDelayMs = 1000;
         private bool _enableCompression = true;
         private bool _enableDeduplication = true;
+        internal bool EnableDeduplication => _enableDeduplication;
         private string? _nfsExportRules = null;
+        internal string? NfsExportRules => _nfsExportRules;
         private string? _smbShareRules = null;
+        internal string? SmbShareRules => _smbShareRules;
 
         public override string StrategyId => "pure-storage-flashblade";
         public override string Name => "Pure Storage FlashBlade";
@@ -553,7 +561,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                     var name = item.GetProperty("name").GetString() ?? string.Empty;
                     var size = item.TryGetProperty("size", out var sizeElement) ? sizeElement.GetInt64() : 0L;
                     var created = item.TryGetProperty("created", out var createdElement)
-                        ? DateTime.Parse(createdElement.GetString() ?? DateTime.UtcNow.ToString())
+                        ? DateTime.Parse(createdElement.GetString() ?? DateTime.UtcNow.ToString(CultureInfo.InvariantCulture))
                         : DateTime.UtcNow;
 
                     var relativePath = name.StartsWith(_basePath) ? name.Substring(_basePath.Length).TrimStart('/') : name;
@@ -592,7 +600,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
                     var key = item.GetProperty("Key").GetString() ?? string.Empty;
                     var size = item.GetProperty("Size").GetInt64();
-                    var lastModified = DateTime.Parse(item.GetProperty("LastModified").GetString() ?? DateTime.UtcNow.ToString());
+                    var lastModified = DateTime.Parse(item.GetProperty("LastModified").GetString() ?? DateTime.UtcNow.ToString(CultureInfo.InvariantCulture));
                     var etag = item.TryGetProperty("ETag", out var etagElement) ? etagElement.GetString()?.Trim('"') ?? string.Empty : string.Empty;
 
                     yield return new StorageObjectMetadata
@@ -646,7 +654,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                 var item = items[0];
                 var size = item.TryGetProperty("size", out var sizeElement) ? sizeElement.GetInt64() : 0L;
                 var created = item.TryGetProperty("created", out var createdElement)
-                    ? DateTime.Parse(createdElement.GetString() ?? DateTime.UtcNow.ToString())
+                    ? DateTime.Parse(createdElement.GetString() ?? DateTime.UtcNow.ToString(CultureInfo.InvariantCulture))
                     : DateTime.UtcNow;
 
                 // Extract custom metadata if present
@@ -891,7 +899,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                     var name = item.GetProperty("name").GetString() ?? string.Empty;
                     var id = item.TryGetProperty("id", out var idElement) ? idElement.GetString() ?? string.Empty : string.Empty;
                     var created = item.TryGetProperty("created", out var createdElement)
-                        ? DateTime.Parse(createdElement.GetString() ?? DateTime.UtcNow.ToString())
+                        ? DateTime.Parse(createdElement.GetString() ?? DateTime.UtcNow.ToString(CultureInfo.InvariantCulture))
                         : DateTime.UtcNow;
 
                     snapshots.Add(new PureSnapshotInfo

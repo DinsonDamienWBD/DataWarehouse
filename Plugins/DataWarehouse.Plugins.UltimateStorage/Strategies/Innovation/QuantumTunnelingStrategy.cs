@@ -34,6 +34,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private int _parallelStreams = 8;
         private int _chunkSizeBytes = 1_048_576;
         private bool _enableCompression = true;
+        internal bool EnableCompression => _enableCompression;
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly BoundedDictionary<string, TransferMetrics> _transferMetrics = new BoundedDictionary<string, TransferMetrics>(1000);
 

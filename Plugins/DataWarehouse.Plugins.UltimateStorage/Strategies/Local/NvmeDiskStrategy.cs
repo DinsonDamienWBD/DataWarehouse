@@ -47,20 +47,21 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
     /// </remarks>
     public class NvmeDiskStrategy : UltimateStorageStrategyBase
     {
-        private const int NVME_BLOCK_SIZE = 4096; // Standard NVMe block size (4KB)
-        private const int DEFAULT_QUEUE_DEPTH = 64;
-        private const int MAX_TRANSFER_SIZE = 1024 * 1024; // 1MB per transfer
+        private const int NvmeBlockSize = 4096; // Standard NVMe block size (4KB)
+        private const int DefaultQueueDepth = 64;
+        private const int MaxTransferSize = 1024 * 1024; // 1MB per transfer
 
         private SemaphoreSlim _ioLock;
         private string _devicePath = string.Empty;
         private string _basePath = string.Empty;
         private uint _namespaceId = 1;
-        private int _blockSize = NVME_BLOCK_SIZE;
-        private int _queueDepth = DEFAULT_QUEUE_DEPTH;
-        private bool _useDirectIO = true;
-        private bool _enableSMART = true;
+        private int _blockSize = NvmeBlockSize;
+        private int _queueDepth = DefaultQueueDepth;
+        private bool _useDirectIo = true;
+        private bool _enableSmart = true;
         private byte _powerState = 0;
-        private int _alignmentSize = NVME_BLOCK_SIZE;
+        private int _alignmentSize = NvmeBlockSize;
+        internal int AlignmentSize => _alignmentSize;
         private bool _isNvmeDevice = false;
 
         // NVMe device information (cached)
@@ -74,7 +75,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         /// </summary>
         public NvmeDiskStrategy()
         {
-            _ioLock = new SemaphoreSlim(DEFAULT_QUEUE_DEPTH, DEFAULT_QUEUE_DEPTH);
+            _ioLock = new SemaphoreSlim(DefaultQueueDepth, DefaultQueueDepth);
         }
 
         /// <inheritdoc/>
@@ -114,18 +115,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             _devicePath = GetConfiguration<string>("DevicePath", string.Empty);
             _basePath = GetConfiguration<string>("BasePath", Directory.GetCurrentDirectory());
             _namespaceId = GetConfiguration<uint>("NamespaceId", 1);
-            _blockSize = GetConfiguration<int>("BlockSize", NVME_BLOCK_SIZE);
-            _queueDepth = GetConfiguration<int>("QueueDepth", DEFAULT_QUEUE_DEPTH);
-            _useDirectIO = GetConfiguration<bool>("UseDirectIO", true);
-            _enableSMART = GetConfiguration<bool>("EnableSMART", true);
+            _blockSize = GetConfiguration<int>("BlockSize", NvmeBlockSize);
+            _queueDepth = GetConfiguration<int>("QueueDepth", DefaultQueueDepth);
+            _useDirectIo = GetConfiguration<bool>("UseDirectIO", true);
+            _enableSmart = GetConfiguration<bool>("EnableSMART", true);
             _powerState = GetConfiguration<byte>("PowerState", 0);
-            _alignmentSize = GetConfiguration<int>("AlignmentSize", NVME_BLOCK_SIZE);
+            _alignmentSize = GetConfiguration<int>("AlignmentSize", NvmeBlockSize);
 
             // Validate block size alignment
-            if (_blockSize % NVME_BLOCK_SIZE != 0)
+            if (_blockSize % NvmeBlockSize != 0)
             {
                 throw new InvalidOperationException(
-                    $"BlockSize must be a multiple of {NVME_BLOCK_SIZE} bytes for NVMe devices");
+                    $"BlockSize must be a multiple of {NvmeBlockSize} bytes for NVMe devices");
             }
 
             // Validate power state
@@ -135,7 +136,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             }
 
             // Update semaphore for queue depth using atomic swap to avoid race window
-            if (_queueDepth != DEFAULT_QUEUE_DEPTH)
+            if (_queueDepth != DefaultQueueDepth)
             {
                 var newLock = new SemaphoreSlim(_queueDepth, _queueDepth);
                 var oldLock = Interlocked.Exchange(ref _ioLock, newLock);
@@ -169,7 +170,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 }
 
                 // Retrieve initial SMART data (requires native IOCTL; unavailable without platform integration)
-                if (_enableSMART)
+                if (_enableSmart)
                 {
                     try
                     {
@@ -207,10 +208,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             try
             {
                 var startTime = DateTime.UtcNow;
-                var bytesWritten = 0L;
+                long bytesWritten;
 
                 // Use aligned I/O for NVMe optimization
-                if (_isNvmeDevice && _useDirectIO)
+                if (_isNvmeDevice && _useDirectIo)
                 {
                     bytesWritten = await WriteAlignedAsync(filePath, data, ct);
                 }
@@ -270,7 +271,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                 IncrementOperationCounter(StorageOperationType.Retrieve);
 
                 // Use aligned I/O for NVMe optimization
-                if (_isNvmeDevice && _useDirectIO)
+                if (_isNvmeDevice && _useDirectIo)
                 {
                     var ms = new MemoryStream(65536);
                     await ReadAlignedAsync(filePath, ms, ct);
@@ -446,7 +447,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             try
             {
                 // Refresh SMART data if enabled and cache is stale (>60 seconds)
-                if (_enableSMART && _isNvmeDevice &&
+                if (_enableSmart && _isNvmeDevice &&
                     (DateTime.UtcNow - _lastHealthCheck).TotalSeconds > 60)
                 {
                     try

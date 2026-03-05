@@ -37,6 +37,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         private bool _autoPinContent = true;
         private bool _useEncryption = false;
         private bool _useManifests = true;
+        internal bool UseManifests => _useManifests;
         private bool _useTags = true;
         private int _timeoutSeconds = 300;
         private int _maxRetries = 3;
@@ -48,6 +49,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         private string? _feedTopic;
         private string? _feedOwner;
         private bool _useSingleOwnerChunks = false;
+        internal bool UseSingleOwnerChunks => _useSingleOwnerChunks;
 
         public override string StrategyId => "swarm";
         public override string Name => "Swarm Decentralized Storage";
@@ -312,7 +314,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             ValidateKey(key);
 
             // Try to get reference from cache first
-            string? reference = null;
+            string? reference;
             lock (_mapLock)
             {
                 _keyToReferenceMap.TryGetValue(key, out reference);
@@ -355,7 +357,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             ValidateKey(key);
 
             // Get reference for statistics before deletion
-            string? reference = null;
+            string? reference;
             long size = 0;
 
             lock (_mapLock)
@@ -474,7 +476,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             ValidateKey(key);
 
             // Get reference
-            string? reference = null;
+            string? reference;
             lock (_mapLock)
             {
                 _keyToReferenceMap.TryGetValue(key, out reference);
@@ -869,7 +871,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         {
             try
             {
-                string? metadataReference = null;
+                string? metadataReference;
 
                 lock (_mapLock)
                 {
@@ -982,7 +984,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             EnsureInitialized();
             ValidateKey(key);
 
-            string? reference = null;
+            string? reference;
             lock (_mapLock)
             {
                 _keyToReferenceMap.TryGetValue(key, out reference);
@@ -1017,7 +1019,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             EnsureInitialized();
             ValidateKey(key);
 
-            string? reference = null;
+            string? reference;
             lock (_mapLock)
             {
                 _keyToReferenceMap.TryGetValue(key, out reference);
@@ -1052,7 +1054,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             EnsureInitialized();
             ValidateKey(key);
 
-            string? reference = null;
+            string? reference;
             lock (_mapLock)
             {
                 _keyToReferenceMap.TryGetValue(key, out reference);

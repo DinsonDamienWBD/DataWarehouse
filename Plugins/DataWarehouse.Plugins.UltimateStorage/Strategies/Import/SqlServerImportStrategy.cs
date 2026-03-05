@@ -108,12 +108,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Import
             using var connection = new SqlConnection(_connectionString);
             await connection.OpenAsync(ct);
 
-            using var bulkCopy = new SqlBulkCopy(connection)
-            {
-                DestinationTableName = $"[{tableName.Replace("]", "]]")}]",
-                BatchSize = _batchSize,
-                BulkCopyTimeout = _commandTimeout
-            };
+            using var bulkCopy = new SqlBulkCopy(connection);
+            bulkCopy.DestinationTableName = $"[{tableName.Replace("]", "]]")}]";
+            bulkCopy.BatchSize = _batchSize;
+            bulkCopy.BulkCopyTimeout = _commandTimeout;
 
             await bulkCopy.WriteToServerAsync(dt, ct);
 

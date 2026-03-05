@@ -33,14 +33,18 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
     {
         private string _mountPath = string.Empty;
         private string _masterHost = "mfsmaster";
+        internal string MasterHost => _masterHost;
         private int _masterPort = 9421;
+        internal int MasterPort => _masterPort;
 
         // Goal/Replication configuration
         private int _defaultGoal = 2; // Default replication level (2 copies)
         private bool _useCustomGoals = false;
         private Dictionary<string, int> _pathGoals = new(); // Path-specific goals
         private bool _useErasureCoding = false;
+        internal bool UseErasureCoding => _useErasureCoding;
         private string _ecGoal = "ec32"; // EC goal name (e.g., "ec32" for 3+2 EC)
+        internal string EcGoal => _ecGoal;
 
         // Trash bin configuration
         private bool _enableTrashBin = true;
@@ -50,7 +54,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         // Snapshot configuration
         private bool _enableSnapshots = true;
         private int _maxSnapshots = 100;
+        internal int MaxSnapshots => _maxSnapshots;
         private int _snapshotRetentionDays = 30;
+        internal int SnapshotRetentionDays => _snapshotRetentionDays;
 
         // Quota configuration
         private bool _enableQuotas = true;
@@ -63,18 +69,25 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         private bool _useStorageClasses = false;
         private string _defaultStorageClass = "default";
         private Dictionary<string, string> _storageClassLabels = new(); // Class -> Label expressions
+        internal IReadOnlyDictionary<string, string> StorageClassLabels => _storageClassLabels;
 
         // Chunk servers
         private bool _enableChunkServerAffinity = false;
+        internal bool EnableChunkServerAffinity => _enableChunkServerAffinity;
         private List<string> _preferredChunkServers = new();
+        internal IReadOnlyList<string> PreferredChunkServers => _preferredChunkServers;
 
         // Performance settings
         private int _readBufferSizeBytes = 256 * 1024; // 256KB
         private int _writeBufferSizeBytes = 256 * 1024; // 256KB
         private bool _useReadAhead = true;
+        internal bool UseReadAhead => _useReadAhead;
         private int _readAheadSizeKb = 2048; // 2MB
+        internal int ReadAheadSizeKb => _readAheadSizeKb;
         private bool _useWriteCache = true;
+        internal bool UseWriteCache => _useWriteCache;
         private int _writeCacheSizeKb = 2048; // 2MB
+        internal int WriteCacheSizeKb => _writeCacheSizeKb;
 
         // Data integrity
         private bool _verifyChecksums = true;
@@ -82,10 +95,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
 
         // Session and statistics
         private string _sessionId = string.Empty;
+        internal string SessionId => _sessionId;
         private DateTime _sessionStartTime = DateTime.UtcNow;
+        internal DateTime SessionStartTime => _sessionStartTime;
 
         // Lock management — reference-counted to prevent unbounded growth
         private readonly Dictionary<string, (SemaphoreSlim Semaphore, int RefCount)> _fileLocks = new();
+        internal IReadOnlyDictionary<string, (SemaphoreSlim Semaphore, int RefCount)> FileLocks => _fileLocks;
         private readonly object _lockDictionaryLock = new();
 
         public override string StrategyId => "moosefs";
@@ -260,7 +276,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
             }
 
             // Write file
-            long bytesWritten = 0;
+            long bytesWritten;
             var fileOptions = FileOptions.Asynchronous;
 
             if (_useStableWrites)
@@ -1001,7 +1017,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         /// </summary>
         private async Task StoreMetadataAsync(string filePath, IDictionary<string, string> metadata, CancellationToken ct)
         {
-            if (metadata == null || metadata.Count == 0)
+            if (metadata.Count == 0)
             {
                 return;
             }

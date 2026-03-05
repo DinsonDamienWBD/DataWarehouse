@@ -39,6 +39,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private int _orbitUpdateIntervalSeconds = 60;
         private bool _enableWeatherFiltering = true;
         private bool _enableDopplerCompensation = false;
+        internal bool EnableDopplerCompensation => _enableDopplerCompensation;
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly BoundedDictionary<string, SatelliteNode> _availableSatellites = new BoundedDictionary<string, SatelliteNode>(1000);
         private readonly BoundedDictionary<string, GroundStation> _groundStations = new BoundedDictionary<string, GroundStation>(1000);
@@ -119,7 +120,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
                 // Start orbit tracking timer — store to prevent GC collection and enable disposal
                 _orbitUpdateTimer = new Timer(
-                    async _ => await UpdateSatelliteOrbitsAsync(CancellationToken.None),
+                    _ => Task.Run(async () => { try { await UpdateSatelliteOrbitsAsync(CancellationToken.None); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[SatelliteStorage] {ex.GetType().Name}: {ex.Message}"); } }),
                     null,
                     TimeSpan.Zero,
                     TimeSpan.FromSeconds(_orbitUpdateIntervalSeconds));

@@ -38,6 +38,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private NfsVersion _nfsVersion = NfsVersion.V4;
         private NfsAuthType _authType = NfsAuthType.AuthSys;
         private string _username = string.Empty;
+        internal string Username => _username;
         private string _uid = "1000";
         private string _gid = "1000";
         private MountType _mountType = MountType.Hard;
@@ -50,6 +51,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private volatile bool _isMounted = false;
         private bool _isWindowsNfsClient = false;
         private string? _kerberosRealm = null;
+        internal string? KerberosRealm => _kerberosRealm;
         private string? _kerberosPrincipal = null;
 
         private int _bufferSize = 65536; // 64KB default
@@ -104,8 +106,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             {
                 "v3" or "3" or "nfsv3" => NfsVersion.V3,
                 "v4" or "4" or "nfsv4" => NfsVersion.V4,
-                "v4.1" or "4.1" or "nfsv4.1" => NfsVersion.V4_1,
-                "v4.2" or "4.2" or "nfsv4.2" => NfsVersion.V4_2,
+                "v4.1" or "4.1" or "nfsv4.1" => NfsVersion.V41,
+                "v4.2" or "4.2" or "nfsv4.2" => NfsVersion.V42,
                 _ => NfsVersion.V4
             };
 
@@ -304,8 +306,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             {
                 NfsVersion.V3 => "nfsvers=3",
                 NfsVersion.V4 => "nfsvers=4",
-                NfsVersion.V4_1 => "nfsvers=4.1",
-                NfsVersion.V4_2 => "nfsvers=4.2",
+                NfsVersion.V41 => "nfsvers=4.1",
+                NfsVersion.V42 => "nfsvers=4.2",
                 _ => "nfsvers=4"
             };
             options.Add(nfsVersionStr);
@@ -464,7 +466,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             try
             {
                 var startPosition = data.CanSeek ? data.Position : 0;
-                long bytesWritten = 0;
+                long bytesWritten;
 
                 // Acquire advisory lock if enabled
                 object? lockHandle = null;
@@ -994,7 +996,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 CreateNoWindow = true
             };
 
-            using var process = new Process { StartInfo = startInfo };
+            using var process = new Process();
+            process.StartInfo = startInfo;
 
             var outputBuilder = new StringBuilder();
             var errorBuilder = new StringBuilder();
@@ -1139,10 +1142,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         V4,
 
         /// <summary>NFSv4.1 - Adds pNFS (parallel NFS) support.</summary>
-        V4_1,
+        V41,
 
         /// <summary>NFSv4.2 - Adds server-side copy and sparse file support.</summary>
-        V4_2
+        V42
     }
 
     /// <summary>
@@ -1267,10 +1270,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         {
             if (!_disposed)
             {
-                if (_innerStream != null)
-                {
-                    await _innerStream.DisposeAsync();
-                }
+                await _innerStream.DisposeAsync();
                 if (_lockHandle != null)
                 {
                     await _strategy.ReleaseFileLockAsync(_lockHandle, CancellationToken.None);

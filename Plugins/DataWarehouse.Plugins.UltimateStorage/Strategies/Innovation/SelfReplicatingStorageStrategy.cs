@@ -38,8 +38,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly BoundedDictionary<string, ReplicaStatus> _replicaStatus = new BoundedDictionary<string, ReplicaStatus>(1000);
         private int _replicationFactor = 3;
         private bool _enableErasureCoding = false;
+        internal bool EnableErasureCoding => _enableErasureCoding;
         private int _erasureDataShards = 4;
+        internal int ErasureDataShards => _erasureDataShards;
         private int _erasureParityShards = 2;
+        internal int ErasureParityShards => _erasureParityShards;
         private bool _enableAutomaticRepair = true;
         private bool _enableHealthMonitoring = true;
         private int _healthCheckIntervalSeconds = 60;
@@ -199,7 +202,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             // Replicate to other locations asynchronously
             _ = Task.Run(async () =>
             {
-                await Task.Delay(_replicationDelayMs);
+                await Task.Delay(_replicationDelayMs, CancellationToken.None);
                 await ReplicateToLocationsAsync(key, dataBytes, checksum, targetLocations.Skip(1).ToList(), metadata, CancellationToken.None);
             }, CancellationToken.None);
 

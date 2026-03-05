@@ -53,10 +53,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
     /// </remarks>
     public class ScmStrategy : UltimateStorageStrategyBase
     {
-        private const int DEFAULT_BLOCK_SIZE = 4096; // 4KB blocks
-        private const long DEFAULT_MAX_MMAP_SIZE = 1L * 1024 * 1024 * 1024; // 1GB
-        private const int DEFAULT_FLUSH_BATCH_SIZE = 64;
-        private const int CACHE_LINE_SIZE = 64; // x86-64 cache line size
+        private const int DefaultBlockSize = 4096; // 4KB blocks
+        private const long DefaultMaxMmapSize = 1L * 1024 * 1024 * 1024; // 1GB
+        private const int DefaultFlushBatchSize = 64;
+        private const int CacheLineSize = 64; // x86-64 cache line size
 
         private readonly SemaphoreSlim _ioLock = new(10, 10);
         private readonly SemaphoreSlim _mmapLock = new(1, 1);
@@ -69,15 +69,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         private string? _scmDevicePath = null;
         private ScmAccessMode _accessMode = ScmAccessMode.Hybrid;
         private bool _enableMemoryMapping = true;
+        internal bool EnableMemoryMapping => _enableMemoryMapping;
         private bool _enableWearLeveling = true;
         private bool _enableEnduranceTracking = true;
         private bool _enableNumaAware = true;
         private bool _enableCxlPooling = false;
         private TieringPolicy _tieringPolicy = TieringPolicy.Hot;
+        internal TieringPolicy TieringPolicyValue => _tieringPolicy;
         private PersistenceMode _persistenceMode = PersistenceMode.Sync;
-        private int _flushBatchSize = DEFAULT_FLUSH_BATCH_SIZE;
-        private long _maxMemoryMapSize = DEFAULT_MAX_MMAP_SIZE;
-        private int _blockSize = DEFAULT_BLOCK_SIZE;
+        private int _flushBatchSize = DefaultFlushBatchSize;
+        private long _maxMemoryMapSize = DefaultMaxMmapSize;
+        private int _blockSize = DefaultBlockSize;
         private bool _enableDax = true;
 
         // Wear leveling and endurance tracking
@@ -85,7 +87,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         private long _totalEraseOperations = 0;
         private long _totalFlushOperations = 0;
         private DateTime _lastWearLevelingCheck = DateTime.MinValue;
+        internal DateTime LastWearLevelingCheck => _lastWearLevelingCheck;
         private WearLevelingInfo? _cachedWearInfo;
+        internal WearLevelingInfo? CachedWearInfo => _cachedWearInfo;
 
         // CXL memory pooling
         private readonly BoundedDictionary<int, CxlMemoryPool> _cxlPools = new BoundedDictionary<int, CxlMemoryPool>(1000);
@@ -131,9 +135,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             _enableCxlPooling = GetConfiguration<bool>("EnableCxlPooling", false);
             _tieringPolicy = GetConfiguration<TieringPolicy>("TieringPolicy", TieringPolicy.Hot);
             _persistenceMode = GetConfiguration<PersistenceMode>("PersistenceMode", PersistenceMode.Sync);
-            _flushBatchSize = GetConfiguration<int>("FlushBatchSize", DEFAULT_FLUSH_BATCH_SIZE);
-            _maxMemoryMapSize = GetConfiguration<long>("MaxMemoryMapSize", DEFAULT_MAX_MMAP_SIZE);
-            _blockSize = GetConfiguration<int>("BlockSize", DEFAULT_BLOCK_SIZE);
+            _flushBatchSize = GetConfiguration<int>("FlushBatchSize", DefaultFlushBatchSize);
+            _maxMemoryMapSize = GetConfiguration<long>("MaxMemoryMapSize", DefaultMaxMmapSize);
+            _blockSize = GetConfiguration<int>("BlockSize", DefaultBlockSize);
             _enableDax = GetConfiguration<bool>("EnableDax", true);
 
             // Validate configuration

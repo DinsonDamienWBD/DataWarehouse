@@ -33,8 +33,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
     {
         private string _baseStoragePath = string.Empty;
         private bool _enableAutoTagging = true;
+        internal bool EnableAutoTagging => _enableAutoTagging;
         private bool _enableClustering = true;
+        internal bool EnableClustering => _enableClustering;
         private double _similarityThreshold = 0.75;
+        internal double SimilarityThreshold => _similarityThreshold;
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly BoundedDictionary<string, SemanticMetadata> _semanticIndex = new BoundedDictionary<string, SemanticMetadata>(1000);
         private readonly BoundedDictionary<string, List<string>> _categoryIndex = new BoundedDictionary<string, List<string>>(1000);

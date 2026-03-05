@@ -38,7 +38,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private string _basePath = string.Empty;
         private double _minCompressionRatioThreshold = 1.05; // Must achieve 5% reduction
         private bool _enableParallelCompression = true;
+        internal bool EnableParallelCompression => _enableParallelCompression;
         private int _parallelChunkSize = 10_000_000; // 10MB chunks
+        internal int ParallelChunkSize => _parallelChunkSize;
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly BoundedDictionary<string, FileTypeProfile> _fileTypeProfiles = new BoundedDictionary<string, FileTypeProfile>(1000);
         private readonly BoundedDictionary<string, ObjectMetadata> _objectMetadata = new BoundedDictionary<string, ObjectMetadata>(1000);
@@ -47,7 +49,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private long _compressedFiles;
         private long _uncompressedFiles;
         // Static HashSet for O(1) contains check on every Store call (previously O(n) array scan).
-        private static readonly HashSet<string> _alreadyCompressedExtensions = new(StringComparer.OrdinalIgnoreCase)
+        private static readonly HashSet<string> AlreadyCompressedExtensions = new(StringComparer.OrdinalIgnoreCase)
         {
             ".zip", ".gz", ".7z", ".rar", ".tar.gz", ".bz2", ".xz",
             ".jpg", ".jpeg", ".png", ".gif", ".mp4", ".mp3", ".avi",
@@ -492,7 +494,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private CompressionDecision PredictCompressionStrategy(string fileType, byte[] data)
         {
             // Skip already-compressed formats
-            foreach (var ext in _alreadyCompressedExtensions)
+            foreach (var ext in AlreadyCompressedExtensions)
             {
                 if (fileType.Contains(ext.TrimStart('.')))
                 {

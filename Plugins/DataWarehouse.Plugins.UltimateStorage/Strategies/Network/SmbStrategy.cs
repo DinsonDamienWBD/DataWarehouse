@@ -42,6 +42,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private bool _useGuest = false;
         private SMBTransportType _transportType = SMBTransportType.DirectTCPTransport;
         private int _timeoutSeconds = 30;
+        internal int TimeoutSeconds => _timeoutSeconds;
         private int _maxBufferSize = 64 * 1024; // 64KB
         private bool _autoReconnect = true;
         private DateTime _lastConnectionTime = DateTime.MinValue;
@@ -270,7 +271,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 }
 
                 // Create/overwrite the file
-                object? fileHandle = null;
+                object? fileHandle;
                 FileStatus fileStatus;
                 var createStatus = _fileStore!.CreateFile(
                     out fileHandle,
@@ -370,7 +371,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             var filePath = GetFilePath(key);
 
             // Open the file for reading
-            object? fileHandle = null;
+            object? fileHandle;
             FileStatus fileStatus;
             var openStatus = _fileStore!.CreateFile(
                 out fileHandle,
@@ -472,7 +473,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             }
 
             // Delete the file by setting delete disposition
-            object? fileHandle = null;
+            object? fileHandle;
             FileStatus fileStatus;
             var openStatus = _fileStore!.CreateFile(
                 out fileHandle,
@@ -675,7 +676,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
                 await EnsureConnectedAsync(ct);
 
                 // Query filesystem information
-                object? fileHandle = null;
+                object? fileHandle;
                 FileStatus fileStatus;
                 var openStatus = _fileStore!.CreateFile(
                     out fileHandle,
@@ -1000,9 +1001,6 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         /// </summary>
         private string GenerateETag(FileDirectoryInformation dirInfo)
         {
-            if (dirInfo == null)
-                return Guid.NewGuid().ToString("N");
-
             var hash = HashCode.Combine(dirInfo.LastWriteTime.Ticks, dirInfo.EndOfFile);
             return hash.ToString("x");
         }

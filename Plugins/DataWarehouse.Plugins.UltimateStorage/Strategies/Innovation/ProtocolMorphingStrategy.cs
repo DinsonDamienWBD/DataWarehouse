@@ -57,7 +57,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 // Initialize protocol adapters
                 _protocolAdapters[StorageProtocol.S3] = new S3ProtocolAdapter(_basePath);
                 _protocolAdapters[StorageProtocol.Azure] = new AzureProtocolAdapter(_basePath);
-                _protocolAdapters[StorageProtocol.GCS] = new GCSProtocolAdapter(_basePath);
+                _protocolAdapters[StorageProtocol.Gcs] = new GcsProtocolAdapter(_basePath);
                 _protocolAdapters[StorageProtocol.Native] = new NativeProtocolAdapter(_basePath);
 
                 foreach (var adapter in _protocolAdapters.Values)
@@ -242,14 +242,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
             if (metadata.ContainsKey("X-Amz-Meta") || metadata.ContainsKey("x-amz-meta")) return StorageProtocol.S3;
             if (metadata.ContainsKey("X-Ms-Meta") || metadata.ContainsKey("x-ms-meta")) return StorageProtocol.Azure;
-            if (metadata.ContainsKey("X-Goog-Meta") || metadata.ContainsKey("x-goog-meta")) return StorageProtocol.GCS;
+            if (metadata.ContainsKey("X-Goog-Meta") || metadata.ContainsKey("x-goog-meta")) return StorageProtocol.Gcs;
 
             return StorageProtocol.Native;
         }
 
         #region Supporting Types
 
-        private enum StorageProtocol { S3, Azure, GCS, Native }
+        private enum StorageProtocol { S3, Azure, Gcs, Native }
 
         private class ProtocolMetadata
         {
@@ -346,9 +346,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
             // Production: Implement Azure-specific protocol translation
         }
 
-        private class GCSProtocolAdapter : NativeProtocolAdapter
+        private class GcsProtocolAdapter : NativeProtocolAdapter
         {
-            public GCSProtocolAdapter(string basePath) : base(Path.Combine(basePath, "gcs")) { }
+            public GcsProtocolAdapter(string basePath) : base(Path.Combine(basePath, "gcs")) { }
             // Production: Implement GCS-specific protocol translation
         }
 

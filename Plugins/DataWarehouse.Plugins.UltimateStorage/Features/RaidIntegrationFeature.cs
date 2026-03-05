@@ -173,23 +173,23 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             // Stripe data across backends based on RAID level
             switch (array.RaidLevel)
             {
-                case RaidLevel.RAID0:
+                case RaidLevel.Raid0:
                     await WriteRaid0Async(array, objectKey, data, ct);
                     break;
 
-                case RaidLevel.RAID1:
+                case RaidLevel.Raid1:
                     await WriteRaid1Async(array, objectKey, data, ct);
                     break;
 
-                case RaidLevel.RAID5:
+                case RaidLevel.Raid5:
                     await WriteRaid5Async(array, objectKey, data, ct);
                     break;
 
-                case RaidLevel.RAID6:
+                case RaidLevel.Raid6:
                     await WriteRaid6Async(array, objectKey, data, ct);
                     break;
 
-                case RaidLevel.RAID10:
+                case RaidLevel.Raid10:
                     await WriteRaid10Async(array, objectKey, data, ct);
                     break;
 
@@ -227,11 +227,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             // Read data with redundancy/parity based on RAID level
             byte[] data = array.RaidLevel switch
             {
-                RaidLevel.RAID0 => await ReadRaid0Async(array, objectKey, ct),
-                RaidLevel.RAID1 => await ReadRaid1Async(array, objectKey, ct),
-                RaidLevel.RAID5 => await ReadRaid5Async(array, objectKey, ct),
-                RaidLevel.RAID6 => await ReadRaid6Async(array, objectKey, ct),
-                RaidLevel.RAID10 => await ReadRaid10Async(array, objectKey, ct),
+                RaidLevel.Raid0 => await ReadRaid0Async(array, objectKey, ct),
+                RaidLevel.Raid1 => await ReadRaid1Async(array, objectKey, ct),
+                RaidLevel.Raid5 => await ReadRaid5Async(array, objectKey, ct),
+                RaidLevel.Raid6 => await ReadRaid6Async(array, objectKey, ct),
+                RaidLevel.Raid10 => await ReadRaid10Async(array, objectKey, ct),
                 _ => throw new NotSupportedException($"RAID level {array.RaidLevel} not supported")
             };
 
@@ -331,10 +331,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
             // to reconstruct the failed drive's contents. This requires full XOR parity engine
             // which is not implemented. For RAID 6 dual-parity reconstruction, Reed-Solomon
             // galois-field arithmetic is required.
-            if (array.RaidLevel == RaidLevel.RAID5 || array.RaidLevel == RaidLevel.RAID6)
+            if (array.RaidLevel == RaidLevel.Raid5 || array.RaidLevel == RaidLevel.Raid6)
             {
                 throw new NotSupportedException(
-                    $"RAID {(array.RaidLevel == RaidLevel.RAID5 ? 5 : 6)} rebuild requires XOR parity reconstruction (RAID 5) or " +
+                    $"RAID {(array.RaidLevel == RaidLevel.Raid5 ? 5 : 6)} rebuild requires XOR parity reconstruction (RAID 5) or " +
                     "Reed-Solomon dual-parity reconstruction (RAID 6), neither of which is implemented. " +
                     "Use RAID 1 or RAID 10 for supported rebuild operations.");
             }
@@ -555,11 +555,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         {
             var minRequired = level switch
             {
-                RaidLevel.RAID0 => 2,
-                RaidLevel.RAID1 => 2,
-                RaidLevel.RAID5 => 3,
-                RaidLevel.RAID6 => 4,
-                RaidLevel.RAID10 => 4,
+                RaidLevel.Raid0 => 2,
+                RaidLevel.Raid1 => 2,
+                RaidLevel.Raid5 => 3,
+                RaidLevel.Raid6 => 4,
+                RaidLevel.Raid10 => 4,
                 _ => 2
             };
 
@@ -568,7 +568,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 throw new ArgumentException($"RAID level {level} requires at least {minRequired} backends");
             }
 
-            if (level == RaidLevel.RAID10 && count % 2 != 0)
+            if (level == RaidLevel.Raid10 && count % 2 != 0)
             {
                 throw new ArgumentException("RAID 10 requires an even number of backends");
             }
@@ -578,11 +578,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         {
             return level switch
             {
-                RaidLevel.RAID0 => backendCount * perBackendCapacity,
-                RaidLevel.RAID1 => perBackendCapacity,
-                RaidLevel.RAID5 => (backendCount - 1) * perBackendCapacity,
-                RaidLevel.RAID6 => (backendCount - 2) * perBackendCapacity,
-                RaidLevel.RAID10 => (backendCount / 2) * perBackendCapacity,
+                RaidLevel.Raid0 => backendCount * perBackendCapacity,
+                RaidLevel.Raid1 => perBackendCapacity,
+                RaidLevel.Raid5 => (backendCount - 1) * perBackendCapacity,
+                RaidLevel.Raid6 => (backendCount - 2) * perBackendCapacity,
+                RaidLevel.Raid10 => (backendCount / 2) * perBackendCapacity,
                 _ => perBackendCapacity
             };
         }
@@ -591,11 +591,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         {
             var maxFailures = array.RaidLevel switch
             {
-                RaidLevel.RAID0 => 0,
-                RaidLevel.RAID1 => array.BackendIds.Count - 1,
-                RaidLevel.RAID5 => 1,
-                RaidLevel.RAID6 => 2,
-                RaidLevel.RAID10 => array.BackendIds.Count / 2,
+                RaidLevel.Raid0 => 0,
+                RaidLevel.Raid1 => array.BackendIds.Count - 1,
+                RaidLevel.Raid5 => 1,
+                RaidLevel.Raid6 => 2,
+                RaidLevel.Raid10 => array.BackendIds.Count / 2,
                 _ => 0
             };
 
@@ -625,7 +625,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         {
             // Process RAID status updates received from the RAID plugin via the message bus.
             // Update the local array state to reflect the authoritative status from T91 RAID plugin.
-            if (message?.Type == null || message.Payload == null)
+            if (message.Type == null || message.Payload == null)
                 return Task.CompletedTask;
 
             try
@@ -686,19 +686,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
     public enum RaidLevel
     {
         /// <summary>RAID 0 - Striping (no redundancy).</summary>
-        RAID0,
+        Raid0,
 
         /// <summary>RAID 1 - Mirroring.</summary>
-        RAID1,
+        Raid1,
 
         /// <summary>RAID 5 - Striping with distributed parity.</summary>
-        RAID5,
+        Raid5,
 
         /// <summary>RAID 6 - Striping with dual parity.</summary>
-        RAID6,
+        Raid6,
 
         /// <summary>RAID 10 - Mirrored stripes.</summary>
-        RAID10
+        Raid10
     }
 
     /// <summary>

@@ -1,6 +1,7 @@
 using DataWarehouse.SDK.Contracts.Storage;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net.Http;
@@ -45,19 +46,26 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
         private string? _s3Bucket = null;
         private bool _enableSnapshots = false;
         private string? _snapshotPolicy = null;
+        internal string? SnapshotPolicy => _snapshotPolicy;
         private bool _enableSnapMirror = false;
         private string? _snapMirrorDestination = null;
         private bool _enableDeduplication = true;
+        internal bool EnableDeduplication => _enableDeduplication;
         private bool _enableCompression = true;
         private bool _enableCompaction = false;
+        internal bool EnableCompaction => _enableCompaction;
         private bool _enableFabricPool = false;
         private string? _fabricPoolTier = null;
+        internal string? FabricPoolTier => _fabricPoolTier;
         private bool _enableSnapLock = false;
         private string? _snapLockType = null; // compliance, enterprise
+        internal string? SnapLockType => _snapLockType;
         private string? _qosPolicy = null;
+        internal string? QosPolicy => _qosPolicy;
         private int _timeoutSeconds = 300;
         private bool _validateCertificate = true;
         private string _apiVersion = "9.11";
+        internal string ApiVersion => _apiVersion;
         private int _maxRetries = 3;
         private int _retryDelayMs = 1000;
 
@@ -513,7 +521,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                     var name = record.GetProperty("name").GetString() ?? string.Empty;
                     var size = record.TryGetProperty("size", out var sizeElement) ? sizeElement.GetInt64() : 0L;
                     var modified = record.TryGetProperty("modified_time", out var modElement)
-                        ? DateTime.Parse(modElement.GetString() ?? DateTime.UtcNow.ToString())
+                        ? DateTime.Parse(modElement.GetString() ?? DateTime.UtcNow.ToString(CultureInfo.InvariantCulture))
                         : DateTime.UtcNow;
 
                     var relativePath = name.StartsWith(_basePath) ? name.Substring(_basePath.Length).TrimStart('/') : name;
@@ -552,7 +560,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
                     var key = item.GetProperty("Key").GetString() ?? string.Empty;
                     var size = item.GetProperty("Size").GetInt64();
-                    var lastModified = DateTime.Parse(item.GetProperty("LastModified").GetString() ?? DateTime.UtcNow.ToString());
+                    var lastModified = DateTime.Parse(item.GetProperty("LastModified").GetString() ?? DateTime.UtcNow.ToString(CultureInfo.InvariantCulture));
                     var etag = item.TryGetProperty("ETag", out var etagElement) ? etagElement.GetString()?.Trim('"') ?? string.Empty : string.Empty;
 
                     yield return new StorageObjectMetadata
@@ -602,7 +610,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
 
             var size = jsonDoc.RootElement.TryGetProperty("size", out var sizeElement) ? sizeElement.GetInt64() : 0L;
             var modified = jsonDoc.RootElement.TryGetProperty("modified_time", out var modElement)
-                ? DateTime.Parse(modElement.GetString() ?? DateTime.UtcNow.ToString())
+                ? DateTime.Parse(modElement.GetString() ?? DateTime.UtcNow.ToString(CultureInfo.InvariantCulture))
                 : DateTime.UtcNow;
 
             // Extract custom metadata if present
@@ -863,7 +871,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Enterprise
                     var name = record.GetProperty("name").GetString() ?? string.Empty;
                     var uuid = record.GetProperty("uuid").GetString() ?? string.Empty;
                     var created = record.TryGetProperty("create_time", out var createElement)
-                        ? DateTime.Parse(createElement.GetString() ?? DateTime.UtcNow.ToString())
+                        ? DateTime.Parse(createElement.GetString() ?? DateTime.UtcNow.ToString(CultureInfo.InvariantCulture))
                         : DateTime.UtcNow;
 
                     snapshots.Add(new SnapshotInfo

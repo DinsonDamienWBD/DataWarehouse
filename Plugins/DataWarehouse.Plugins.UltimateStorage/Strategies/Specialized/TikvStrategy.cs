@@ -42,6 +42,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
         private int _transactionRetryLimit = 5;
         private TimeSpan _httpTimeout = TimeSpan.FromSeconds(30);
         private TimeSpan _transactionTimeout = TimeSpan.FromSeconds(10);
+        internal TimeSpan TransactionTimeout => _transactionTimeout;
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly SemaphoreSlim _leaderDiscoveryLock = new(1, 1);
         private DateTime _lastLeaderDiscovery = DateTime.MinValue;
@@ -479,7 +480,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                     if (!string.IsNullOrEmpty(decodedKey))
                     {
                         // Get metadata
-                        StorageObjectMetadata? meta = null;
+                        StorageObjectMetadata? meta;
                         try
                         {
                             meta = await GetMetadataAsyncCore(decodedKey, ct);

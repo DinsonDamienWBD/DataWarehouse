@@ -50,6 +50,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private byte[]? _sseCustomerKey = null;
         private int _timeoutSeconds = 300;
         private long _multipartThresholdBytes = 64 * 1024 * 1024; // 64MB (MinIO default)
+        internal long MultipartThresholdBytes => _multipartThresholdBytes;
         private long _partSize = 10 * 1024 * 1024; // 10MB
         private int _maxRetries = 3;
         private int _retryDelayMs = 1000;

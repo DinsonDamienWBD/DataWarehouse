@@ -459,8 +459,14 @@ public sealed class MigrationValidationResult
     /// <summary>Validation errors.</summary>
     public List<string> Errors { get; set; } = [];
 
+    /// <summary>Whether any validation errors exist.</summary>
+    public bool HasErrors => Errors.Count > 0;
+
     /// <summary>Validation warnings.</summary>
     public List<string> Warnings { get; set; } = [];
+
+    /// <summary>Whether any validation warnings exist.</summary>
+    public bool HasWarnings => Warnings.Count > 0;
 }
 
 /// <summary>
@@ -506,6 +512,9 @@ public sealed class MigrationStep
 
     /// <summary>Migration recommendations.</summary>
     public List<string> Recommendations { get; set; } = [];
+
+    /// <summary>Whether any recommendations exist.</summary>
+    public bool HasRecommendations => Recommendations.Count > 0;
 }
 
 /// <summary>

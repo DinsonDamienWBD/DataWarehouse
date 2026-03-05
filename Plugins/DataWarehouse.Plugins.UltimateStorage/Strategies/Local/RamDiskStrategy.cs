@@ -94,7 +94,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             {
                 var expirationInterval = TimeSpan.FromSeconds(30);
                 _expirationTimer = new Timer(
-                    _ => _ = Task.Run(async () =>
+                    state => Task.Run(async () =>
                     {
                         try { await CleanupExpiredEntriesAsync().ConfigureAwait(false); }
                         catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[RamDiskStrategy.CleanupExpired] {ex.GetType().Name}: {ex.Message}"); }
@@ -109,7 +109,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             {
                 var pressureInterval = TimeSpan.FromSeconds(10);
                 _memoryPressureTimer = new Timer(
-                    _ => _ = Task.Run(async () =>
+                    state => Task.Run(async () =>
                     {
                         try { await CheckMemoryPressureAsync().ConfigureAwait(false); }
                         catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[RamDiskStrategy.CheckMemoryPressure] {ex.GetType().Name}: {ex.Message}"); }
@@ -129,7 +129,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             if (_autoSnapshot && !string.IsNullOrEmpty(_snapshotPath))
             {
                 _autoSnapshotTimer = new Timer(
-                    _ => _ = Task.Run(async () => { try { await SaveSnapshotAsync(CancellationToken.None).ConfigureAwait(false); } catch (Exception ex) { System.Diagnostics.Trace.TraceError($"Auto-snapshot failed: {ex.Message}"); } }),
+                    state => Task.Run(async () => { try { await SaveSnapshotAsync(CancellationToken.None).ConfigureAwait(false); } catch (Exception ex) { System.Diagnostics.Trace.TraceError($"Auto-snapshot failed: {ex.Message}"); } }),
                     null,
                     _autoSnapshotInterval,
                     _autoSnapshotInterval);

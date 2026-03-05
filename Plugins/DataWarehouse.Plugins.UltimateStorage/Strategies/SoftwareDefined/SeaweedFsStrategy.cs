@@ -46,6 +46,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         private string _rack = string.Empty;
         private int _ttlSeconds = 0; // 0 = no TTL
         private bool _enableGzip = false;
+        internal bool EnableGzip => _enableGzip;
         private int _chunkSizeBytes = 50 * 1024 * 1024; // 50MB chunks
         private int _largeFileThresholdBytes = 100 * 1024 * 1024; // 100MB
         private int _maxConcurrentChunks = 5;
@@ -223,8 +224,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
         private async Task<StorageObjectMetadata> StoreChunkedFileAsync(string key, Stream data, long dataLength, IDictionary<string, string>? metadata, CancellationToken ct)
         {
             var chunkCount = (int)Math.Ceiling((double)dataLength / _chunkSizeBytes);
-            var chunkFileIds = new List<ChunkInfo>();
-            using var semaphore = new SemaphoreSlim(_maxConcurrentChunks, _maxConcurrentChunks);
+            List<ChunkInfo> chunkFileIds;
+            var semaphore = new SemaphoreSlim(_maxConcurrentChunks, _maxConcurrentChunks);
 
             var uploadTasks = new List<Task<ChunkInfo>>();
 
@@ -268,7 +269,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.SoftwareDefined
                 uploadTasks.Add(uploadTask);
             }
 
-            chunkFileIds = (await Task.WhenAll(uploadTasks)).OrderBy(c => c.Index).ToList();
+            try
+            {
+                chunkFileIds = (await Task.WhenAll(uploadTasks)).OrderBy(c => c.Index).ToList();
+            }
+            finally
+            {
+                semaphore.Dispose();
+            }
 
             // Store chunk manifest in filer
             if (!string.IsNullOrWhiteSpace(_filerUrl))

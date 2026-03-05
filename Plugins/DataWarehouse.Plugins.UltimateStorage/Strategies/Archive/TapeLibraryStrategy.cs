@@ -40,8 +40,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         private bool _useMtx = true;
         private bool _enableWorm = false;
         private bool _enableHardwareCompression = true;
-        private LtoGeneration _ltoGeneration = LtoGeneration.LTO8;
+        internal bool EnableHardwareCompression => _enableHardwareCompression;
+        private LtoGeneration _ltoGeneration = LtoGeneration.Lto8;
         private int _maxConcurrentDrives = 1;
+        internal int MaxConcurrentDrives => _maxConcurrentDrives;
         private long _tapeCapacityBytes = 12L * 1024 * 1024 * 1024 * 1024; // 12TB for LTO-8
         private TimeSpan _mountTimeout = TimeSpan.FromMinutes(5);
         private TimeSpan _loadTimeout = TimeSpan.FromMinutes(2);
@@ -102,7 +104,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             _useMtx = GetConfiguration<bool>("UseMtx", !string.IsNullOrWhiteSpace(_libraryDevice));
             _enableWorm = GetConfiguration<bool>("EnableWorm", false);
             _enableHardwareCompression = GetConfiguration<bool>("EnableHardwareCompression", true);
-            _ltoGeneration = GetConfiguration<LtoGeneration>("LtoGeneration", LtoGeneration.LTO8);
+            _ltoGeneration = GetConfiguration<LtoGeneration>("LtoGeneration", LtoGeneration.Lto8);
             _maxConcurrentDrives = GetConfiguration<int>("MaxConcurrentDrives", 1);
             _mountTimeout = TimeSpan.FromSeconds(GetConfiguration<int>("MountTimeoutSeconds", 300));
             _loadTimeout = TimeSpan.FromSeconds(GetConfiguration<int>("LoadTimeoutSeconds", 120));
@@ -889,16 +891,16 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             out uint lpNumberOfBytesRead,
             IntPtr lpOverlapped);
 
-        private const uint GENERIC_READ = 0x80000000;
-        private const uint GENERIC_WRITE = 0x40000000;
-        private const uint OPEN_EXISTING = 3;
-        private const uint FILE_ATTRIBUTE_NORMAL = 0x80;
-        private const uint IOCTL_TAPE_ERASE = 0x00740000;
-        private const uint IOCTL_TAPE_PREPARE = 0x00740004;
-        private const uint IOCTL_TAPE_WRITE_MARKS = 0x00740008;
-        private const uint IOCTL_TAPE_GET_POSITION = 0x0074000C;
-        private const uint IOCTL_TAPE_SET_POSITION = 0x00740010;
-        private static readonly IntPtr INVALID_HANDLE_VALUE = new IntPtr(-1);
+        private const uint GenericRead = 0x80000000;
+        private const uint GenericWrite = 0x40000000;
+        private const uint OpenExisting = 3;
+        private const uint FileAttributeNormal = 0x80;
+        private const uint IoctlTapeErase = 0x00740000;
+        private const uint IoctlTapePrepare = 0x00740004;
+        private const uint IoctlTapeWriteMarks = 0x00740008;
+        private const uint IoctlTapeGetPosition = 0x0074000C;
+        private const uint IoctlTapeSetPosition = 0x00740010;
+        private static readonly IntPtr InvalidHandleValue = new IntPtr(-1);
 
         private async Task OpenTapeDriveAsync(CancellationToken ct)
         {
@@ -906,14 +908,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             {
                 _tapeHandle = CreateFile(
                     _driveDevice,
-                    GENERIC_READ | GENERIC_WRITE,
+                    GenericRead | GenericWrite,
                     0,
                     IntPtr.Zero,
-                    OPEN_EXISTING,
-                    FILE_ATTRIBUTE_NORMAL,
+                    OpenExisting,
+                    FileAttributeNormal,
                     IntPtr.Zero);
 
-                if (_tapeHandle == INVALID_HANDLE_VALUE)
+                if (_tapeHandle == InvalidHandleValue)
                 {
                     var error = Marshal.GetLastWin32Error();
                     throw new InvalidOperationException($"Failed to open tape drive '{_driveDevice}'. Error code: {error}");
@@ -936,7 +938,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             {
                 Marshal.Copy(prepareData, 0, inBuffer, prepareData.Length);
 
-                if (!DeviceIoControl(handle, IOCTL_TAPE_PREPARE, inBuffer, (uint)prepareData.Length, IntPtr.Zero, 0, out _, IntPtr.Zero))
+                if (!DeviceIoControl(handle, IoctlTapePrepare, inBuffer, (uint)prepareData.Length, IntPtr.Zero, 0, out _, IntPtr.Zero))
                 {
                     var error = Marshal.GetLastWin32Error();
                     throw new InvalidOperationException($"Failed to prepare tape. Error code: {error}");
@@ -986,7 +988,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             {
                 Marshal.Copy(markData, 0, inBuffer, markData.Length);
 
-                if (!DeviceIoControl(handle, IOCTL_TAPE_WRITE_MARKS, inBuffer, (uint)markData.Length, IntPtr.Zero, 0, out _, IntPtr.Zero))
+                if (!DeviceIoControl(handle, IoctlTapeWriteMarks, inBuffer, (uint)markData.Length, IntPtr.Zero, 0, out _, IntPtr.Zero))
                 {
                     var error = Marshal.GetLastWin32Error();
                     throw new IOException($"Failed to write tape mark. Error code: {error}");
@@ -1011,7 +1013,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             {
                 Marshal.Copy(positionData, 0, inBuffer, positionData.Length);
 
-                if (!DeviceIoControl(handle, IOCTL_TAPE_SET_POSITION, inBuffer, (uint)positionData.Length, IntPtr.Zero, 0, out _, IntPtr.Zero))
+                if (!DeviceIoControl(handle, IoctlTapeSetPosition, inBuffer, (uint)positionData.Length, IntPtr.Zero, 0, out _, IntPtr.Zero))
                 {
                     var error = Marshal.GetLastWin32Error();
                     throw new IOException($"Failed to seek tape to block {blockPosition}. Error code: {error}");
@@ -1078,8 +1080,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 }
 
                 // Try to open drive briefly
-                var handle = CreateFile(_driveDevice, GENERIC_READ, 0, IntPtr.Zero, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, IntPtr.Zero);
-                if (handle == INVALID_HANDLE_VALUE)
+                var handle = CreateFile(_driveDevice, GenericRead, 0, IntPtr.Zero, OpenExisting, FileAttributeNormal, IntPtr.Zero);
+                if (handle == InvalidHandleValue)
                 {
                     return false;
                 }
@@ -1116,7 +1118,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             }
 
             // Default to LTO-8 if detection fails
-            return LtoGeneration.LTO8;
+            return LtoGeneration.Lto8;
         }
 
         private LtoGeneration DetectLtoGenerationFromBarcode(string barcode)
@@ -1133,23 +1135,23 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
 
                 return genChar switch
                 {
-                    '7' => LtoGeneration.LTO7,
-                    '8' => LtoGeneration.LTO8,
-                    '9' => LtoGeneration.LTO9,
-                    _ => LtoGeneration.LTO8 // Default
+                    '7' => LtoGeneration.Lto7,
+                    '8' => LtoGeneration.Lto8,
+                    '9' => LtoGeneration.Lto9,
+                    _ => LtoGeneration.Lto8 // Default
                 };
             }
 
-            return LtoGeneration.LTO8;
+            return LtoGeneration.Lto8;
         }
 
         private long GetTapeCapacity(LtoGeneration generation)
         {
             return generation switch
             {
-                LtoGeneration.LTO7 => 6L * 1024 * 1024 * 1024 * 1024,   // 6TB uncompressed (15TB compressed)
-                LtoGeneration.LTO8 => 12L * 1024 * 1024 * 1024 * 1024,  // 12TB uncompressed (30TB compressed)
-                LtoGeneration.LTO9 => 18L * 1024 * 1024 * 1024 * 1024,  // 18TB uncompressed (45TB compressed)
+                LtoGeneration.Lto7 => 6L * 1024 * 1024 * 1024 * 1024,   // 6TB uncompressed (15TB compressed)
+                LtoGeneration.Lto8 => 12L * 1024 * 1024 * 1024 * 1024,  // 12TB uncompressed (30TB compressed)
+                LtoGeneration.Lto9 => 18L * 1024 * 1024 * 1024 * 1024,  // 18TB uncompressed (45TB compressed)
                 _ => 12L * 1024 * 1024 * 1024 * 1024                    // Default to LTO-8
             };
         }
@@ -1213,18 +1215,17 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         {
             timeout ??= TimeSpan.FromMinutes(5);
 
-            using var process = new System.Diagnostics.Process
+            var startInfo = new System.Diagnostics.ProcessStartInfo
             {
-                StartInfo = new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = command,
-                    Arguments = arguments,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
+                FileName = command,
+                Arguments = arguments,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
+            using var process = new System.Diagnostics.Process();
+            process.StartInfo = startInfo;
 
             process.Start();
 
@@ -1310,9 +1311,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
     public enum LtoGeneration
     {
         Unknown = 0,
-        LTO7 = 7,
-        LTO8 = 8,
-        LTO9 = 9
+        Lto7 = 7,
+        Lto8 = 8,
+        Lto9 = 9
     }
 
     /// <summary>

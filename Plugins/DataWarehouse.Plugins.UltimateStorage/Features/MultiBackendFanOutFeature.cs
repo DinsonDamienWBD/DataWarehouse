@@ -465,7 +465,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                     else
                     {
                         // Dispose losing streams
-                        try { r.stream.Dispose(); } catch { /* best-effort */ }
+                        try { await r.stream.DisposeAsync(); } catch { /* best-effort */ }
                     }
                 }
             }
@@ -641,8 +641,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
         /// <summary>List of backends that failed (thread-safe for concurrent mutation).</summary>
         public ConcurrentBag<string> FailedBackends { get; } = new();
 
+        /// <summary>Whether any backend failures occurred.</summary>
+        public bool HasFailures => !FailedBackends.IsEmpty;
+
         /// <summary>Error messages per backend.</summary>
         public ConcurrentDictionary<string, string> Errors { get; } = new();
+
+        /// <summary>Whether any errors were recorded.</summary>
+        public bool HasErrors => !Errors.IsEmpty;
 
         /// <summary>Whether the overall write operation succeeded according to the policy.</summary>
         public bool IsSuccess { get; set; }

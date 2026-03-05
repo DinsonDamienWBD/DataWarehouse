@@ -40,6 +40,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private string _region = "us-phoenix-1";
         private string _defaultStorageTier = "STANDARD";
         private bool _enableVersioning = false;
+        internal bool EnableVersioning => _enableVersioning;
         private bool _enableServerSideEncryption = false;
         private string? _kmsKeyId = null;
         private int _multipartThresholdBytes = 100 * 1024 * 1024; // 100MB
@@ -193,7 +194,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             }
 
             // Execute request
-            var response = await _client!.PutObject(request);
+            var response = await _client!.PutObject(request, null, ct);
 
             // Update statistics
             IncrementBytesStored(size);
@@ -222,8 +223,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             {
                 // Step 2: Upload parts in parallel
                 var partCount = (int)Math.Ceiling((double)dataLength / _multipartChunkSizeBytes);
-                var completedParts = new List<CommitMultipartUploadPartDetails>();
-                using var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
+                List<CommitMultipartUploadPartDetails> completedParts;
+                var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
 
                 var uploadTasks = new List<Task<CommitMultipartUploadPartDetails>>();
 
@@ -260,7 +261,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     uploadTasks.Add(uploadTask);
                 }
 
-                completedParts = (await Task.WhenAll(uploadTasks)).ToList();
+                try
+                {
+                    completedParts = (await Task.WhenAll(uploadTasks)).ToList();
+                }
+                finally
+                {
+                    semaphore.Dispose();
+                }
                 completedParts = completedParts.OrderBy(p => p.PartNum).ToList();
 
                 // Step 3: Commit multipart upload
@@ -311,7 +319,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 ObjectName = key
             };
 
-            var response = await _client!.GetObject(request);
+            var response = await _client!.GetObject(request, null, ct);
 
             // Copy to memory stream for consistent behavior
             var ms = new MemoryStream(65536);
@@ -350,7 +358,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 ObjectName = key
             };
 
-            await _client!.DeleteObject(request);
+            await _client!.DeleteObject(request, null, ct);
 
             // Update statistics
             if (size > 0)
@@ -374,7 +382,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     ObjectName = key
                 };
 
-                await _client!.HeadObject(request);
+                await _client!.HeadObject(request, null, ct);
 
                 IncrementOperationCounter(StorageOperationType.Exists);
 
@@ -409,7 +417,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     Limit = 1000 // Maximum allowed by OCI
                 };
 
-                var response = await _client!.ListObjects(request);
+                var response = await _client!.ListObjects(request, null, ct);
 
                 if (response.ListObjects != null && response.ListObjects.Objects != null)
                 {
@@ -458,7 +466,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 ObjectName = key
             };
 
-            var response = await _client!.HeadObject(request);
+            var response = await _client!.HeadObject(request, null, ct);
 
             // Extract custom metadata
             var customMetadata = new Dictionary<string, string>();
@@ -500,7 +508,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 };
 
                 var sw = System.Diagnostics.Stopwatch.StartNew();
-                var response = await _client!.GetBucket(request);
+                var response = await _client!.GetBucket(request, null, ct);
                 sw.Stop();
 
                 return new StorageHealthInfo
@@ -562,7 +570,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 }
             };
 
-            var response = await _client!.CreatePreauthenticatedRequest(request);
+            var response = await _client!.CreatePreauthenticatedRequest(request, null, ct);
 
             return response.PreauthenticatedRequest.AccessUri;
         }
@@ -598,7 +606,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 }
             };
 
-            await _client!.CopyObject(request);
+            await _client!.CopyObject(request, null, ct);
         }
 
         /// <summary>
@@ -626,7 +634,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 }
             };
 
-            await _client!.UpdateObjectStorageTier(request);
+            await _client!.UpdateObjectStorageTier(request, null, ct);
         }
 
         /// <summary>
@@ -654,7 +662,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 }
             };
 
-            await _client!.RestoreObjects(request);
+            await _client!.RestoreObjects(request, null, ct);
         }
 
         /// <summary>
@@ -683,7 +691,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 }
             };
 
-            await _client!.RenameObject(request);
+            await _client!.RenameObject(request, null, ct);
         }
 
         private async Task<string> CreateMultipartUploadAsync(string key, IDictionary<string, string>? metadata, CancellationToken ct)
@@ -711,7 +719,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 request.CreateMultipartUploadDetails.Metadata = new Dictionary<string, string>(metadata);
             }
 
-            var response = await _client!.CreateMultipartUpload(request);
+            var response = await _client!.CreateMultipartUpload(request, null, ct);
 
             if (string.IsNullOrEmpty(response.MultipartUpload.UploadId))
             {
@@ -740,7 +748,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 UploadPartBody = ms
             };
 
-            var response = await _client!.UploadPart(request);
+            var response = await _client!.UploadPart(request, null, ct);
 
             return new CommitMultipartUploadPartDetails
             {
@@ -767,7 +775,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 }
             };
 
-            return await _client!.CommitMultipartUpload(request);
+            return await _client!.CommitMultipartUpload(request, null, ct);
         }
 
         private async Task AbortMultipartUploadAsync(string key, string uploadId, CancellationToken ct)
@@ -780,7 +788,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                 UploadId = uploadId
             };
 
-            await _client!.AbortMultipartUpload(request);
+            await _client!.AbortMultipartUpload(request, null, ct);
         }
 
         #endregion

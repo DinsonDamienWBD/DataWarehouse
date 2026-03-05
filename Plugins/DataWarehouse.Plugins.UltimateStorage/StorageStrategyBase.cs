@@ -140,25 +140,23 @@ namespace DataWarehouse.Plugins.UltimateStorage
 
         /// <summary>
         /// Disposes resources used by this storage strategy.
+        /// Uses the proper Dispose(bool) pattern from the SDK base class.
         /// </summary>
-        public new virtual void Dispose()
+        protected override void Dispose(bool disposing)
         {
             if (_isDisposed)
             {
                 return;
             }
 
-            // No sync resources to dispose in base class
-            // Derived classes should override if they have sync resources
-
             _isDisposed = true;
-            GC.SuppressFinalize(this);
+            base.Dispose(disposing);
         }
 
         /// <summary>
-        /// Asynchronously disposes resources.
+        /// Asynchronously disposes resources via SDK base DisposeAsyncCore pattern.
         /// </summary>
-        public new async ValueTask DisposeAsync()
+        protected override async ValueTask DisposeAsyncCore()
         {
             if (_isDisposed)
             {
@@ -168,7 +166,7 @@ namespace DataWarehouse.Plugins.UltimateStorage
             await DisposeCoreAsync();
 
             _isDisposed = true;
-            GC.SuppressFinalize(this);
+            await base.DisposeAsyncCore();
         }
 
         /// <summary>

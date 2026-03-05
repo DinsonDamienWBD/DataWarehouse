@@ -36,6 +36,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
         private string _defaultExportFormat = "json"; // json, csv, binary
         private bool _useTransactions = true;
         private int _batchSize = 1000;
+        internal int BatchSize => _batchSize;
         private readonly SemaphoreSlim _connectionLock = new(1, 1);
 
         public override string StrategyId => "odbc-connector";
@@ -149,7 +150,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 ? cmd
                 : ConstructInsertCommand(target, parameters);
 
-            long rowsAffected = 0;
+            long rowsAffected;
 
             using var connection = new OdbcConnection(_connectionString);
             connection.ConnectionTimeout = _connectionTimeout;
@@ -440,7 +441,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
             var safeMetaTable = ValidateSqlIdentifier(target, "table");
             var countQuery = $"SELECT COUNT(*) FROM {safeMetaTable}";
-            long rowCount = 0;
+            long rowCount;
 
             using (var command = new OdbcCommand(countQuery, connection))
             {
@@ -641,7 +642,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
 
                     writer.WritePropertyName(fieldName);
 
-                    if (value == null || value == DBNull.Value)
+                    if (value is DBNull)
                     {
                         writer.WriteNullValue();
                     }
@@ -705,7 +706,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
                 await writer.WriteLineAsync(string.Join(",", values).AsMemory(), ct);
             }
 
-            await writer.FlushAsync();
+            await writer.FlushAsync(ct);
         }
 
         /// <summary>
@@ -745,7 +746,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
         /// </summary>
         private void WriteValueAsBinary(BinaryWriter writer, object? value)
         {
-            if (value == null || value == DBNull.Value)
+            if (value is null or DBNull)
             {
                 writer.Write((byte)0); // Null marker
             }

@@ -794,13 +794,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
                 return StorageTier.Archive;
 
             var storageClassValue = storageClass.Value;
-            if (storageClassValue == S3StorageClass.Glacier)
-                return StorageTier.Archive;
             if (storageClassValue == S3StorageClass.GlacierInstantRetrieval)
                 return StorageTier.Cold;
-            if (storageClassValue == S3StorageClass.DeepArchive)
-                return StorageTier.Archive;
 
+            // Glacier, DeepArchive, and all other classes map to Archive
             return StorageTier.Archive;
         }
 

@@ -34,7 +34,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly BoundedDictionary<string, List<string>> _objectRegions = new BoundedDictionary<string, List<string>>(1000);
         private int _replicationRegions = 3;
         private bool _enablePredictiveReplication = true;
+        internal bool EnablePredictiveReplication => _enablePredictiveReplication;
         private bool _enableLatencyRouting = true;
+        internal bool EnableLatencyRouting => _enableLatencyRouting;
         private readonly SemaphoreSlim _initLock = new(1, 1);
 
         public override string StrategyId => "teleport-storage";
@@ -128,7 +130,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                         {
                             Directory.CreateDirectory(regionDir);
                         }
-                        await File.WriteAllBytesAsync(regionPath, dataBytes);
+                        await File.WriteAllBytesAsync(regionPath, dataBytes, CancellationToken.None);
                     }
                 }
                 catch (Exception ex)

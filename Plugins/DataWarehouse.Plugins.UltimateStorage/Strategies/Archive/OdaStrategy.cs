@@ -40,15 +40,19 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         private string _mountPoint = string.Empty;
         private bool _useRestApi = true;
         private bool _useScsiCommands = false;
+        internal bool UseScsiCommands => _useScsiCommands;
         private bool _enableWorm = false;
         private bool _enableMediaSpanning = true;
         private bool _enableErrorCorrection = true;
         private OpticalMediaType _mediaType = OpticalMediaType.BluRayR;
         private int _maxConcurrentDrives = 1;
+        internal int MaxConcurrentDrives => _maxConcurrentDrives;
         private long _cartridgeCapacityBytes = 300L * 1024 * 1024 * 1024; // 300GB for BD-R
         private TimeSpan _loadTimeout = TimeSpan.FromMinutes(3);
         private TimeSpan _writeVerificationTimeout = TimeSpan.FromMinutes(10);
+        internal TimeSpan WriteVerificationTimeout => _writeVerificationTimeout;
         private int _maxRetryAttempts = 3;
+        internal int MaxRetryAttempts => _maxRetryAttempts;
 
         private readonly SemaphoreSlim _driveLock = new(1, 1);
         // Use ConcurrentDictionary (unbounded) instead of BoundedDictionary(1000) so that
@@ -307,7 +311,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             try
             {
                 // BD-RE supports deletion, BD-R does not
-                if (_mediaType == OpticalMediaType.BluRayRE && !_enableWorm)
+                if (_mediaType == OpticalMediaType.BluRayRe && !_enableWorm)
                 {
                     if (_currentLoadedCartridge != entry.CartridgeBarcode)
                     {
@@ -881,11 +885,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
             {
                 OpticalMediaType.BluRayR => 25L * 1024 * 1024 * 1024,      // 25GB single-layer
                 OpticalMediaType.BluRayRDualLayer => 50L * 1024 * 1024 * 1024,  // 50GB dual-layer
-                OpticalMediaType.BluRayRXL => 100L * 1024 * 1024 * 1024,   // 100GB XL
-                OpticalMediaType.BluRayRE => 25L * 1024 * 1024 * 1024,     // 25GB rewritable
+                OpticalMediaType.BluRayRxl => 100L * 1024 * 1024 * 1024,   // 100GB XL
+                OpticalMediaType.BluRayRe => 25L * 1024 * 1024 * 1024,     // 25GB rewritable
                 OpticalMediaType.MDisc => 25L * 1024 * 1024 * 1024,        // 25GB M-DISC
                 OpticalMediaType.ArchivalDisc => 300L * 1024 * 1024 * 1024, // 300GB Archival Disc
-                OpticalMediaType.UltraHDBluRay => 66L * 1024 * 1024 * 1024, // 66GB UHD
+                OpticalMediaType.UltraHdBluRay => 66L * 1024 * 1024 * 1024, // 66GB UHD
                 _ => 25L * 1024 * 1024 * 1024                               // Default to 25GB
             };
         }
@@ -976,11 +980,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Archive
         Unknown = 0,
         BluRayR = 1,
         BluRayRDualLayer = 2,
-        BluRayRXL = 3,
-        BluRayRE = 4,
+        BluRayRxl = 3,
+        BluRayRe = 4,
         MDisc = 5,
         ArchivalDisc = 6,
-        UltraHDBluRay = 7
+        UltraHdBluRay = 7
     }
 
     /// <summary>

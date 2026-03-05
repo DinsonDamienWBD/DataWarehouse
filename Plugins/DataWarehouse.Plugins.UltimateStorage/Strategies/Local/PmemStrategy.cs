@@ -54,8 +54,10 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         private bool _useDaxMode = true;
         private bool _useTransactionalWrites = true;
         private bool _useNonTemporalStores = true;
+        internal bool UseNonTemporalStores => _useNonTemporalStores;
         private FlushStrategy _flushStrategy = FlushStrategy.ClwbOptimized;
         private int _alignmentBytes = 64; // Cache line size
+        internal int AlignmentBytes => _alignmentBytes;
         private long _maxMappedFileSize = 256L * 1024 * 1024 * 1024; // 256GB max per mapping
         private PmemDeviceInfo? _deviceInfo;
         private DateTime _lastHealthCheck = DateTime.MinValue;
@@ -148,7 +150,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
             try
             {
                 var startTime = DateTime.UtcNow;
-                long bytesWritten = 0;
+                long bytesWritten;
 
                 // Determine file size for pre-allocation
                 var fileSize = data.CanSeek ? data.Length - data.Position : 0;
@@ -736,7 +738,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
                     HealthState = PmemHealthState.Healthy, // Would query actual health in production
                     WearLevelPercent = 0, // Would query from device in production
                     TemperatureCelsius = 45, // Would query from device in production
-                    SupportsDAX = await ValidateDaxModeAsync(ct),
+                    SupportsDax = await ValidateDaxModeAsync(ct),
                     NamespaceId = "ns0.0", // Would query from ndctl in production
                     RegionId = "region0", // Would query from ndctl in production
                     InterleaveSets = 1
@@ -1082,7 +1084,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Local
         public int TemperatureCelsius { get; set; }
 
         /// <summary>Whether DAX mode is supported and enabled.</summary>
-        public bool SupportsDAX { get; set; }
+        public bool SupportsDax { get; set; }
 
         /// <summary>PMEM namespace identifier.</summary>
         public string NamespaceId { get; set; } = string.Empty;

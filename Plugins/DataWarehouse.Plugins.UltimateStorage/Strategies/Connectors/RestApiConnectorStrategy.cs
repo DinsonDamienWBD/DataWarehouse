@@ -38,6 +38,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Connectors
         private string? _apiKeyHeader = "X-API-Key";
         private int _timeoutSeconds = 60;
         private int _maxRetries = 3;
+        internal int MaxRetriesConfig => _maxRetries;
         private bool _useCompression = true;
         private readonly SemaphoreSlim _httpLock = new(10, 10);
 

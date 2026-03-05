@@ -53,19 +53,24 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private string _subsystemNqn = string.Empty;
         private string _hostNqn = string.Empty;
         private int _namespaceId = 1;
-        private NvmeOfTransportType _transportType = NvmeOfTransportType.TCP;
+        private NvmeOfTransportType _transportType = NvmeOfTransportType.Tcp;
         private int _queueSize = 128;
         private int _keepAliveIntervalSeconds = 60;
         private bool _enableMultipath = true;
+        internal bool EnableMultipath => _enableMultipath;
         private bool _enableAuthentication = false;
         private string _authenticationSecret = string.Empty;
         private string _authenticationProtocol = "DH-HMAC-CHAP";
+        internal string AuthenticationProtocol => _authenticationProtocol;
         private int _blockSize = 4096; // 4KB default block size
         private string _basePath = string.Empty;
+        internal string BasePath => _basePath;
         private string _managementApiUrl = string.Empty;
         private bool _useInBandAuth = false;
+        internal bool UseInBandAuth => _useInBandAuth;
         private int _numberOfQueues = 4;
         private int _timeoutSeconds = 30;
+        internal int TimeoutSeconds => _timeoutSeconds;
         private string _discoveryServiceAddress = string.Empty;
         private int _discoveryServicePort = 8009;
 
@@ -169,11 +174,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
             var transportTypeStr = GetConfiguration<string>("TransportType", "TCP");
             _transportType = transportTypeStr.ToUpperInvariant() switch
             {
-                "RDMA" => NvmeOfTransportType.RDMA,
-                "FC" => NvmeOfTransportType.FC,
-                "TCP" => NvmeOfTransportType.TCP,
+                "RDMA" => NvmeOfTransportType.Rdma,
+                "FC" => NvmeOfTransportType.Fc,
+                "TCP" => NvmeOfTransportType.Tcp,
                 "LOOP" => NvmeOfTransportType.Loop,
-                _ => NvmeOfTransportType.TCP
+                _ => NvmeOfTransportType.Tcp
             };
 
             // Validate authentication configuration
@@ -1045,13 +1050,13 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
     public enum NvmeOfTransportType
     {
         /// <summary>RDMA transport (RoCE, iWARP, InfiniBand) - highest performance.</summary>
-        RDMA,
+        Rdma,
 
         /// <summary>Fibre Channel transport - traditional SAN.</summary>
-        FC,
+        Fc,
 
         /// <summary>TCP transport - standard Ethernet networks.</summary>
-        TCP,
+        Tcp,
 
         /// <summary>Local loopback - for testing.</summary>
         Loop

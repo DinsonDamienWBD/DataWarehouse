@@ -64,7 +64,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
 
             // Start lag monitoring timer
             _lagMonitorTimer = new Timer(
-                callback: async _ => await MonitorReplicationLagAsync(),
+                callback: _ => Task.Run(async () =>
+                {
+                    try { await MonitorReplicationLagAsync(); }
+                    catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[ReplicationIntegration.LagMonitor] {ex.GetType().Name}: {ex.Message}"); }
+                }),
                 state: null,
                 dueTime: _lagMonitorInterval,
                 period: _lagMonitorInterval);
@@ -262,7 +266,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Features
                 var capturedGroup = group;
                 var capturedKey = objectKey;
                 var capturedData = (byte[])data.Clone();
-                var capturedMetadata = metadata != null ? new Dictionary<string, string>(metadata) : null;
+                var capturedMetadata = new Dictionary<string, string>(metadata);
                 _ = Task.Run(async () =>
                 {
                     try

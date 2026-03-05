@@ -773,7 +773,7 @@ public sealed class SearchScalingManager : IScalableSubsystem, IDisposable
     /// <summary>
     /// Static read-only stop word set shared across all calls to avoid per-call allocations.
     /// </summary>
-    private static readonly HashSet<string> _stopWords = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> StopWords = new(StringComparer.OrdinalIgnoreCase)
     {
         "the", "a", "an", "is", "are", "was", "were", "be", "been",
         "being", "have", "has", "had", "do", "does", "did", "will",
@@ -791,7 +791,7 @@ public sealed class SearchScalingManager : IScalableSubsystem, IDisposable
         var tokens = text.ToLowerInvariant()
             .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
 
-        return tokens.Where(t => !_stopWords.Contains(t) && t.Length > 1).ToArray();
+        return tokens.Where(t => !StopWords.Contains(t) && t.Length > 1).ToArray();
     }
 
     /// <summary>

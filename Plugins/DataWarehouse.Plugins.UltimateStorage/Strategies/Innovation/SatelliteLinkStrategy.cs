@@ -24,6 +24,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly ConcurrentQueue<SatelliteBundle> _uploadQueue = new();
         private readonly ConcurrentQueue<SatelliteBundle> _downloadQueue = new();
+        internal int DownloadQueueCount => _downloadQueue.Count;
         private readonly BoundedDictionary<string, ObjectMetadata> _metadata = new BoundedDictionary<string, ObjectMetadata>(1000);
         private Timer? _transmissionTimer;
         private bool _satelliteOnline = false;
@@ -48,7 +49,11 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 Directory.CreateDirectory(_queuePath);
 
                 // Simulate orbital passes (satellite available periodically)
-                _transmissionTimer = new Timer(async _ => await SimulateOrbitalPassAsync(CancellationToken.None), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
+                _transmissionTimer = new Timer(_ => Task.Run(async () =>
+                {
+                    try { await SimulateOrbitalPassAsync(CancellationToken.None); }
+                    catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[SatelliteLinkStrategy] {ex.GetType().Name}: {ex.Message}"); }
+                }), null, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(30));
 
                 await LoadQueueAsync(ct);
             }

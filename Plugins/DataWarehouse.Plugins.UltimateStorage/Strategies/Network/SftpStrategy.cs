@@ -63,7 +63,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         private int _operationTimeoutSeconds = 120;
         private int _bufferSize = 32 * 1024; // 32KB default
         private int _maxPacketSize = 64 * 1024; // 64KB default
+        internal int MaxPacketSize => _maxPacketSize;
         private bool _enableCompression = false;
+        internal bool EnableCompression => _enableCompression;
         private int _keepAliveIntervalSeconds = 60;
         private bool _autoReconnect = true;
 
@@ -75,6 +77,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
         // File operation settings
         private bool _useAtomicWrites = true;
         private bool _preserveTimestamps = true;
+        internal bool PreserveTimestamps => _preserveTimestamps;
         private string _filePermissions = "644"; // rw-r--r--
         private string _directoryPermissions = "755"; // rwxr-xr-x
 
@@ -302,7 +305,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Network
 
                 if (keyFiles.Count > 0)
                 {
-                    authMethods.Add(new PrivateKeyAuthenticationMethod(username, keyFiles.ToArray()));
+                    authMethods.Add(new PrivateKeyAuthenticationMethod(username, keyFiles.Cast<IPrivateKeySource>().ToArray()));
                 }
             }
 

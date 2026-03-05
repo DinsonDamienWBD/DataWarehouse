@@ -36,7 +36,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private int _minChunkSize = 256;
         private int _maxChunkSize = 1024;
         private int _targetChunkSize = 512;
-        private int _cacheSizeMB = 256;
+        private int _cacheSizeMb = 256;
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly BoundedDictionary<string, ChunkManifest> _manifests = new BoundedDictionary<string, ChunkManifest>(1000);
         private readonly BoundedDictionary<string, byte[]> _chunkCache = new BoundedDictionary<string, byte[]>(1000);
@@ -83,7 +83,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 _minChunkSize = GetConfiguration("MinChunkSize", 256);
                 _maxChunkSize = GetConfiguration("MaxChunkSize", 1024);
                 _targetChunkSize = GetConfiguration("TargetChunkSize", 512);
-                _cacheSizeMB = GetConfiguration("CacheSizeMB", 256);
+                _cacheSizeMb = GetConfiguration("CacheSizeMB", 256);
 
                 if (_minChunkSize < 64 || _minChunkSize > _targetChunkSize)
                 {
@@ -595,7 +595,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 if (_chunkCache.ContainsKey(chunkHash))
                     return;
 
-                var cacheLimitBytes = _cacheSizeMB * 1024L * 1024L;
+                var cacheLimitBytes = _cacheSizeMb * 1024L * 1024L;
 
                 // Evict if needed
                 while (_currentCacheSize + chunkData.Length > cacheLimitBytes && _cacheOrder.Count > 0)

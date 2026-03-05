@@ -48,6 +48,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         private int _retryDelayMs = 1000;
         private string _satellite = "us1.storj.io"; // Default satellite
         private bool _useSignatureV4 = true; // Use AWS Signature V4 by default (V2 deprecated)
+        internal bool UseSignatureV4 => _useSignatureV4;
 
         // Storj-specific configuration
         private bool _enableErasureCoding = true; // Always enabled on Storj
@@ -275,7 +276,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
             {
                 // Step 2: Upload parts in parallel
                 var partCount = (int)Math.Ceiling((double)dataLength / _multipartChunkSizeBytes);
-                var completedParts = new List<CompletedPart>();
+                List<CompletedPart> completedParts;
                 var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
 
                 var uploadTasks = new List<Task<CompletedPart>>();

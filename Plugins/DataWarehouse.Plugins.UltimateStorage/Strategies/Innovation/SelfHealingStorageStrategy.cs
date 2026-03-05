@@ -40,7 +40,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
         private int _scrubbingIntervalHours = 24;
         private bool _enableAutoRepair = true;
         private bool _enableProactiveReplication = true;
+        internal bool EnableProactiveReplication => _enableProactiveReplication;
         private double _corruptionThreshold = 0.01; // 1% corruption triggers repair
+        internal double CorruptionThreshold => _corruptionThreshold;
         private readonly SemaphoreSlim _initLock = new(1, 1);
         private readonly BoundedDictionary<string, ObjectHealthRecord> _healthRecords = new BoundedDictionary<string, ObjectHealthRecord>(1000);
         private readonly BoundedDictionary<string, List<ReplicaInfo>> _replicas = new BoundedDictionary<string, List<ReplicaInfo>>(1000);
@@ -121,14 +123,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
 
                 // Start health check timer
                 _healthCheckTimer = new Timer(
-                    async _ => await PerformHealthChecksAsync(CancellationToken.None),
+                    _ => Task.Run(async () => { try { await PerformHealthChecksAsync(CancellationToken.None); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[SelfHealing.HealthCheck] {ex.GetType().Name}: {ex.Message}"); } }),
                     null,
                     TimeSpan.FromSeconds(_healthCheckIntervalSeconds),
                     TimeSpan.FromSeconds(_healthCheckIntervalSeconds));
 
                 // Start scrubbing timer
                 _scrubbingTimer = new Timer(
-                    async _ => await PerformScrubbingAsync(CancellationToken.None),
+                    _ => Task.Run(async () => { try { await PerformScrubbingAsync(CancellationToken.None); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[SelfHealing.Scrubbing] {ex.GetType().Name}: {ex.Message}"); } }),
                     null,
                     TimeSpan.FromHours(_scrubbingIntervalHours),
                     TimeSpan.FromHours(_scrubbingIntervalHours));
@@ -137,7 +139,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Innovation
                 if (_enableAutoRepair)
                 {
                     _repairWorkerTimer = new Timer(
-                        async _ => await ProcessRepairQueueAsync(CancellationToken.None),
+                        _ => Task.Run(async () => { try { await ProcessRepairQueueAsync(CancellationToken.None); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[SelfHealing.RepairWorker] {ex.GetType().Name}: {ex.Message}"); } }),
                         null,
                         TimeSpan.FromSeconds(10),
                         TimeSpan.FromSeconds(10));

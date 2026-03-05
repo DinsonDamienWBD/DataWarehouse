@@ -413,7 +413,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                 }
 
                 // Get metadata
-                StorageObjectMetadata? meta = null;
+                StorageObjectMetadata? meta;
                 try
                 {
                     meta = await GetMetadataAsyncCore(key, ct);
@@ -425,10 +425,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Specialized
                     continue;
                 }
 
-                if (meta != null)
-                {
-                    yield return meta;
-                }
+                yield return meta;
 
                 await Task.Yield();
             }

@@ -51,6 +51,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         private string _sseAlgorithm = "AES256"; // AES256, aws:kms, aws:kms:dsse
         private string? _kmsKeyId = null;
         private bool _enableVersioning = false;
+        internal bool EnableVersioning => _enableVersioning;
         private bool _enableTransferAcceleration = false;
         private int _timeoutSeconds = 300;
         private int _multipartThresholdBytes = 100 * 1024 * 1024; // 100MB
@@ -839,8 +840,8 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
             try
             {
                 var partCount = (int)Math.Ceiling((double)dataLength / _multipartChunkSizeBytes);
-                var completedParts = new List<ManualCompletedPart>();
-                using var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
+                List<ManualCompletedPart> completedParts;
+                var semaphore = new SemaphoreSlim(_maxConcurrentParts, _maxConcurrentParts);
                 var uploadTasks = new List<Task<ManualCompletedPart>>();
 
                 for (int partNumber = 1; partNumber <= partCount; partNumber++)
@@ -873,7 +874,14 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
                     uploadTasks.Add(uploadTask);
                 }
 
-                completedParts = (await Task.WhenAll(uploadTasks)).ToList();
+                try
+                {
+                    completedParts = (await Task.WhenAll(uploadTasks)).ToList();
+                }
+                finally
+                {
+                    semaphore.Dispose();
+                }
                 completedParts = completedParts.OrderBy(p => p.PartNumber).ToList();
 
                 var etag = await CompleteMultipartUploadAsync(key, uploadId, completedParts, ct);
@@ -1464,7 +1472,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
         /// <summary>
         /// Gracefully shuts down S3 client with timeout for pending operations.
         /// </summary>
-        protected override async Task ShutdownAsyncCore(CancellationToken ct = default)
+        protected override async Task ShutdownAsyncCore(CancellationToken ct)
         {
             using var timeoutCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(ct, timeoutCts.Token);
@@ -1487,7 +1495,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Cloud
 
             try
             {
-                await ShutdownAsyncCore();
+                await ShutdownAsyncCore(CancellationToken.None);
             }
             catch
             {

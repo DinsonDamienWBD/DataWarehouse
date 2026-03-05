@@ -54,7 +54,9 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         private int _maxRetries = 3;
         private int _retryDelayMs = 1000;
         private int _uploadChunkSize = 40 * 1024 * 1024; // 40 MB chunks (Sia sector size)
+        internal int UploadChunkSize => _uploadChunkSize;
         private int _maxConcurrentUploads = 3;
+        internal int MaxConcurrentUploads => _maxConcurrentUploads;
 
         // Health monitoring
         private double _minHealthScore = 0.75; // Minimum health score (0.0 to 1.0)
@@ -1005,7 +1007,7 @@ namespace DataWarehouse.Plugins.UltimateStorage.Strategies.Decentralized
         public string? Commit { get; set; }
 
         [JsonPropertyName("os")]
-        public string? OS { get; set; }
+        public string? Os { get; set; }
 
         [JsonPropertyName("buildTime")]
         public string? BuildTime { get; set; }
