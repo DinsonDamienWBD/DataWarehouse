@@ -426,7 +426,7 @@ public enum ComputeRuntime
     /// WebAssembly (WASM) runtime.
     /// Sandboxed, portable, near-native performance.
     /// </summary>
-    WASM = 1,
+    Wasm = 1,
 
     /// <summary>
     /// Python runtime (CPython, PyPy, etc.).
@@ -456,7 +456,7 @@ public enum ComputeRuntime
     /// Java Virtual Machine (JVM).
     /// Managed, JIT-compiled, mature ecosystem.
     /// </summary>
-    JVM = 6,
+    Jvm = 6,
 
     /// <summary>
     /// Lua runtime (Lua, LuaJIT).
@@ -474,7 +474,7 @@ public enum ComputeRuntime
     /// PHP runtime (Zend Engine).
     /// Web-oriented, dynamic, widely deployed.
     /// </summary>
-    PHP = 9,
+    Php = 9,
 
     /// <summary>
     /// R runtime for statistical computing.
@@ -492,7 +492,7 @@ public enum ComputeRuntime
     /// Erlang/Elixir BEAM VM.
     /// Concurrent, distributed, fault-tolerant.
     /// </summary>
-    BEAM = 12,
+    Beam = 12,
 
     /// <summary>
     /// Deno runtime (secure TypeScript/JavaScript).

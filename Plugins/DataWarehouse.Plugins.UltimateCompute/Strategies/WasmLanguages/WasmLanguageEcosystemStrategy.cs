@@ -38,10 +38,10 @@ internal sealed class WasmLanguageEcosystemStrategy : ComputeRuntimeStrategyBase
     public override string StrategyName => "WASM Language Ecosystem";
 
     /// <inheritdoc/>
-    public override ComputeRuntime Runtime => ComputeRuntime.WASM;
+    public override ComputeRuntime Runtime => ComputeRuntime.Wasm;
 
     /// <inheritdoc/>
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.WASM];
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.Wasm];
 
     /// <inheritdoc/>
     public override ComputeCapabilities Capabilities => new(

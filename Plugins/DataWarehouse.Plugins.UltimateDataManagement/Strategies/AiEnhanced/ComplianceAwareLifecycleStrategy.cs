@@ -12,37 +12,37 @@ public enum ComplianceFramework
     /// <summary>
     /// General Data Protection Regulation.
     /// </summary>
-    GDPR,
+    Gdpr,
 
     /// <summary>
     /// Health Insurance Portability and Accountability Act.
     /// </summary>
-    HIPAA,
+    Hipaa,
 
     /// <summary>
     /// Payment Card Industry Data Security Standard.
     /// </summary>
-    PCI_DSS,
+    PciDss,
 
     /// <summary>
     /// Sarbanes-Oxley Act.
     /// </summary>
-    SOX,
+    Sox,
 
     /// <summary>
     /// California Consumer Privacy Act.
     /// </summary>
-    CCPA,
+    Ccpa,
 
     /// <summary>
     /// Federal Information Security Management Act.
     /// </summary>
-    FISMA,
+    Fisma,
 
     /// <summary>
     /// ISO 27001 Information Security.
     /// </summary>
-    ISO27001,
+    Iso27001,
 
     /// <summary>
     /// Custom or internal policy.
@@ -595,23 +595,23 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
 
         if (piiTypes.Contains("SSN") || piiTypes.Contains("EMAIL") || piiTypes.Contains("NAME"))
         {
-            frameworks.Add(ComplianceFramework.GDPR);
-            frameworks.Add(ComplianceFramework.CCPA);
+            frameworks.Add(ComplianceFramework.Gdpr);
+            frameworks.Add(ComplianceFramework.Ccpa);
         }
 
         if (piiTypes.Contains("HEALTH_INFO") || piiTypes.Contains("PATIENT_ID"))
         {
-            frameworks.Add(ComplianceFramework.HIPAA);
+            frameworks.Add(ComplianceFramework.Hipaa);
         }
 
         if (piiTypes.Contains("CREDIT_CARD") || piiTypes.Contains("CVV"))
         {
-            frameworks.Add(ComplianceFramework.PCI_DSS);
+            frameworks.Add(ComplianceFramework.PciDss);
         }
 
         if (metadata?.ContainsKey("financial") == true)
         {
-            frameworks.Add(ComplianceFramework.SOX);
+            frameworks.Add(ComplianceFramework.Sox);
         }
 
         return frameworks.Distinct().ToList();
@@ -685,13 +685,13 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
             controls.Add("role-based-access");
         }
 
-        if (frameworks.Contains(ComplianceFramework.HIPAA))
+        if (frameworks.Contains(ComplianceFramework.Hipaa))
         {
             controls.Add("audit-trail");
             controls.Add("access-controls");
         }
 
-        if (frameworks.Contains(ComplianceFramework.PCI_DSS))
+        if (frameworks.Contains(ComplianceFramework.PciDss))
         {
             controls.Add("strong-encryption");
             controls.Add("key-management");
@@ -702,13 +702,13 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
 
     private static TimeSpan GetDefaultRetention(List<ComplianceFramework> frameworks)
     {
-        if (frameworks.Contains(ComplianceFramework.SOX))
+        if (frameworks.Contains(ComplianceFramework.Sox))
             return TimeSpan.FromDays(7 * 365); // 7 years
-        if (frameworks.Contains(ComplianceFramework.HIPAA))
+        if (frameworks.Contains(ComplianceFramework.Hipaa))
             return TimeSpan.FromDays(6 * 365); // 6 years
-        if (frameworks.Contains(ComplianceFramework.GDPR))
+        if (frameworks.Contains(ComplianceFramework.Gdpr))
             return TimeSpan.FromDays(365); // 1 year default
-        if (frameworks.Contains(ComplianceFramework.PCI_DSS))
+        if (frameworks.Contains(ComplianceFramework.PciDss))
             return TimeSpan.FromDays(365); // 1 year
 
         return TimeSpan.FromDays(90); // Default 90 days
@@ -731,7 +731,7 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
         {
             PolicyId = "gdpr-default",
             Name = "GDPR Default Retention",
-            Frameworks = new[] { ComplianceFramework.GDPR },
+            Frameworks = new[] { ComplianceFramework.Gdpr },
             MinRetention = TimeSpan.FromDays(365),
             MaxRetention = TimeSpan.FromDays(3 * 365),
             DisposalMethod = "secure-delete"
@@ -741,7 +741,7 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
         {
             PolicyId = "hipaa-default",
             Name = "HIPAA Retention",
-            Frameworks = new[] { ComplianceFramework.HIPAA },
+            Frameworks = new[] { ComplianceFramework.Hipaa },
             MinRetention = TimeSpan.FromDays(6 * 365),
             DisposalMethod = "certified-destruction"
         });
@@ -750,7 +750,7 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
         {
             PolicyId = "pci-default",
             Name = "PCI-DSS Retention",
-            Frameworks = new[] { ComplianceFramework.PCI_DSS },
+            Frameworks = new[] { ComplianceFramework.PciDss },
             MinRetention = TimeSpan.FromDays(365),
             DisposalMethod = "secure-delete"
         });
@@ -759,7 +759,7 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
         {
             PolicyId = "sox-default",
             Name = "SOX Retention",
-            Frameworks = new[] { ComplianceFramework.SOX },
+            Frameworks = new[] { ComplianceFramework.Sox },
             MinRetention = TimeSpan.FromDays(7 * 365),
             DisposalMethod = "certified-destruction"
         });

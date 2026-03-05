@@ -206,9 +206,9 @@ public sealed class ToxicDataPurgeStrategy : ConsciousnessStrategyBase
             factors.Add($"Liability factors: {string.Join(", ", score.Liability.LiabilityFactors)}");
         }
 
-        if (score.Liability.DetectedPIITypes.Count > 0)
+        if (score.Liability.DetectedPiiTypes.Count > 0)
         {
-            factors.Add($"Detected PII: {string.Join(", ", score.Liability.DetectedPIITypes)}");
+            factors.Add($"Detected PII: {string.Join(", ", score.Liability.DetectedPiiTypes)}");
         }
 
         if (score.Liability.ApplicableRegulations.Count > 0)

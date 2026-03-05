@@ -76,7 +76,7 @@ public sealed class DiskSpinDownStrategy : SustainabilityStrategyBase
             _disks.TryGetValue(diskId, out disk);
         }
 
-        if (disk == null || disk.Type != DiskType.HDD) return;
+        if (disk == null || disk.Type != DiskType.Hdd) return;
 
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
         {
@@ -134,16 +134,16 @@ public sealed class DiskSpinDownStrategy : SustainabilityStrategyBase
 
                         // Determine disk type from rotational flag
                         var rotationalPath = Path.Combine(deviceDir, "queue", "rotational");
-                        var diskType = DiskType.SSD;
+                        var diskType = DiskType.Ssd;
                         if (File.Exists(rotationalPath))
                         {
                             var rotational = File.ReadAllText(rotationalPath).Trim();
-                            diskType = rotational == "1" ? DiskType.HDD : DiskType.SSD;
+                            diskType = rotational == "1" ? DiskType.Hdd : DiskType.Ssd;
                         }
 
                         // Check for NVMe
                         if (deviceName.StartsWith("nvme", StringComparison.Ordinal))
-                            diskType = DiskType.NVMe;
+                            diskType = DiskType.NvMe;
 
                         discovered[deviceName] = new DiskState
                         {
@@ -180,7 +180,7 @@ public sealed class DiskSpinDownStrategy : SustainabilityStrategyBase
                 disk.IdleSeconds += 60;
             }
             actions = _disks.Values
-                .Where(d => d.Type == DiskType.HDD && d.IdleSeconds >= SpinDownSeconds && !d.IsSpunDown)
+                .Where(d => d.Type == DiskType.Hdd && d.IdleSeconds >= SpinDownSeconds && !d.IsSpunDown)
                 .Select(d => (d.Id, true))
                 .ToList();
         }
@@ -195,7 +195,7 @@ public sealed class DiskSpinDownStrategy : SustainabilityStrategyBase
     {
         ClearRecommendations();
         int activeHdds;
-        lock (_lock) { activeHdds = _disks.Values.Count(d => d.Type == DiskType.HDD && !d.IsSpunDown); }
+        lock (_lock) { activeHdds = _disks.Values.Count(d => d.Type == DiskType.Hdd && !d.IsSpunDown); }
         if (activeHdds > 0)
         {
             AddRecommendation(new SustainabilityRecommendation
@@ -212,7 +212,7 @@ public sealed class DiskSpinDownStrategy : SustainabilityStrategyBase
 }
 
 /// <summary>Disk type.</summary>
-public enum DiskType { HDD, SSD, NVMe }
+public enum DiskType { Hdd, Ssd, NvMe }
 
 /// <summary>Disk state.</summary>
 public sealed class DiskState

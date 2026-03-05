@@ -35,10 +35,10 @@ internal sealed class WasmLanguageBenchmarkStrategy : ComputeRuntimeStrategyBase
     public override string StrategyName => "WASM Language Benchmark";
 
     /// <inheritdoc/>
-    public override ComputeRuntime Runtime => ComputeRuntime.WASM;
+    public override ComputeRuntime Runtime => ComputeRuntime.Wasm;
 
     /// <inheritdoc/>
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.WASM];
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.Wasm];
 
     /// <inheritdoc/>
     public override ComputeCapabilities Capabilities => new(

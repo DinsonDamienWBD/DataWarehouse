@@ -114,7 +114,7 @@ namespace DataWarehouse.Tests.Compliance
         public void AuditControls_RetentionPeriod_MustBeSixYears()
         {
             // Requirement: HIPAA requires 6-year retention
-            var retentionPolicy = new AuditRetentionPolicy(ComplianceFramework.HIPAA);
+            var retentionPolicy = new AuditRetentionPolicy(ComplianceFramework.Hipaa);
             Assert.Equal(TimeSpan.FromDays(6 * 365), retentionPolicy.MinimumRetention);
         }
 
@@ -1050,7 +1050,7 @@ namespace DataWarehouse.Tests.Compliance
         {
             MinimumRetention = framework switch
             {
-                ComplianceFramework.HIPAA => TimeSpan.FromDays(6 * 365),
+                ComplianceFramework.Hipaa => TimeSpan.FromDays(6 * 365),
                 ComplianceFramework.PciDss => TimeSpan.FromDays(365),
                 ComplianceFramework.Sox => TimeSpan.FromDays(7 * 365),
                 _ => TimeSpan.FromDays(365)

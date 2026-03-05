@@ -68,7 +68,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
         {
             ValidateDiskConfiguration(new DiskInfo[diskCount].Select((_, i) =>
-                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
+                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.Hdd, $"bay{i}")));
 
             // Data disks are at bit positions that are not powers of 2
             var dataDisks = new List<int>();
@@ -505,7 +505,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
         {
             ValidateDiskConfiguration(new DiskInfo[diskCount].Select((_, i) =>
-                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
+                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.Hdd, $"bay{i}")));
 
             // Last disk is always parity (dedicated)
             var dataDisks = Enumerable.Range(0, diskCount - 1).ToArray();
@@ -854,7 +854,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
         {
             ValidateDiskConfiguration(new DiskInfo[diskCount].Select((_, i) =>
-                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
+                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.Hdd, $"bay{i}")));
 
             // Last disk is dedicated parity (never rotates)
             var dataDisks = Enumerable.Range(0, diskCount - 1).ToArray();

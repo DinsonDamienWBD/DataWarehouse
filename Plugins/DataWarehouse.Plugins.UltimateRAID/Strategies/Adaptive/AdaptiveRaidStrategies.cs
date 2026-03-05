@@ -1258,9 +1258,9 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
         {
             return tier switch
             {
-                StorageTier.Hot => allDisks.Where(d => d.DiskType == DiskType.SSD || d.DiskType == DiskType.NVMe).ToList(),
-                StorageTier.Warm => allDisks.Where(d => d.DiskType == DiskType.SSD || d.DiskType == DiskType.HDD).Take(6).ToList(),
-                StorageTier.Cold => allDisks.Where(d => d.DiskType == DiskType.HDD).ToList(),
+                StorageTier.Hot => allDisks.Where(d => d.DiskType == DiskType.Ssd || d.DiskType == DiskType.NvMe).ToList(),
+                StorageTier.Warm => allDisks.Where(d => d.DiskType == DiskType.Ssd || d.DiskType == DiskType.Hdd).Take(6).ToList(),
+                StorageTier.Cold => allDisks.Where(d => d.DiskType == DiskType.Hdd).ToList(),
                 _ => allDisks
             };
         }
@@ -2682,17 +2682,17 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
         {
             var baseThroughput = diskType switch
             {
-                DiskType.NVMe => 3500.0, // MB/s per drive
-                DiskType.SSD => 550.0,
-                DiskType.HDD => 180.0,
+                DiskType.NvMe => 3500.0, // MB/s per drive
+                DiskType.Ssd => 550.0,
+                DiskType.Hdd => 180.0,
                 _ => 150.0
             };
 
             var baseIops = diskType switch
             {
-                DiskType.NVMe => 500_000,
-                DiskType.SSD => 100_000,
-                DiskType.HDD => 200,
+                DiskType.NvMe => 500_000,
+                DiskType.Ssd => 100_000,
+                DiskType.Hdd => 200,
                 _ => 150
             };
 
@@ -2733,7 +2733,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
 
         private string IdentifyBottleneck(RaidLevel level, DiskType diskType, WorkloadClassification workload)
         {
-            if (diskType == DiskType.HDD && workload == WorkloadClassification.RandomWrite)
+            if (diskType == DiskType.Hdd && workload == WorkloadClassification.RandomWrite)
                 return "HDD random write latency; consider SSD tier or write caching";
             if (level == RaidLevel.Raid6 && workload == WorkloadClassification.RandomWrite)
                 return "RAID 6 dual parity write amplification; consider RAID 10 for write-heavy workloads";

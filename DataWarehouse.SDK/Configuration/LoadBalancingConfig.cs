@@ -627,8 +627,10 @@ public sealed class LoadBalancingManager
             return SelectRoundRobin(nodes);
         }
 
-        var hash = affinityKey.GetHashCode();
-        var index = Math.Abs(hash) % nodes.Count;
+        // Use XxHash32 for deterministic consistent hashing (string.GetHashCode is non-deterministic across processes)
+        var hashBytes = System.Text.Encoding.UTF8.GetBytes(affinityKey);
+        var hash = System.IO.Hashing.XxHash32.HashToUInt32(hashBytes);
+        var index = (int)(hash % (uint)nodes.Count);
         return nodes[index].NodeId;
     }
 

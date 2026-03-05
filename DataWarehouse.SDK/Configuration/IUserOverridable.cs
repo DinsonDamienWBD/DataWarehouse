@@ -385,8 +385,13 @@ public static class ParameterValidator
         {
             try
             {
-                if (!System.Text.RegularExpressions.Regex.IsMatch(strVal, parameter.RegexPattern))
+                if (!System.Text.RegularExpressions.Regex.IsMatch(strVal, parameter.RegexPattern,
+                    System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromSeconds(1)))
                     errors.Add($"Parameter '{parameter.Name}' must match pattern: {parameter.RegexPattern}.");
+            }
+            catch (System.Text.RegularExpressions.RegexMatchTimeoutException)
+            {
+                errors.Add($"Parameter '{parameter.Name}' regex pattern timed out (possible ReDoS): {parameter.RegexPattern}.");
             }
             catch (System.Text.RegularExpressions.RegexParseException)
             {

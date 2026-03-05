@@ -19,13 +19,13 @@ internal sealed class WasmerStrategy : ComputeRuntimeStrategyBase
     public override string StrategyName => "Wasmer";
 
     /// <inheritdoc/>
-    public override ComputeRuntime Runtime => ComputeRuntime.WASM;
+    public override ComputeRuntime Runtime => ComputeRuntime.Wasm;
 
     /// <inheritdoc/>
     public override ComputeCapabilities Capabilities => ComputeCapabilities.CreateWasmDefaults();
 
     /// <inheritdoc/>
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.WASM];
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.Wasm];
 
     /// <inheritdoc/>
     public override async Task InitializeAsync(CancellationToken cancellationToken = default)

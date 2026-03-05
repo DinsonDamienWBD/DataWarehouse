@@ -81,14 +81,14 @@ namespace DataWarehouse.Tests.Infrastructure
         }
 
         [Theory]
-        [InlineData(ComplianceFramework.GDPR, 0)]
-        [InlineData(ComplianceFramework.HIPAA, 1)]
-        [InlineData(ComplianceFramework.SOX, 2)]
-        [InlineData(ComplianceFramework.PCIDSS, 3)]
-        [InlineData(ComplianceFramework.FedRAMP, 4)]
-        [InlineData(ComplianceFramework.SOC2, 5)]
-        [InlineData(ComplianceFramework.ISO27001, 6)]
-        [InlineData(ComplianceFramework.CCPA, 7)]
+        [InlineData(ComplianceFramework.Gdpr, 0)]
+        [InlineData(ComplianceFramework.Hipaa, 1)]
+        [InlineData(ComplianceFramework.Sox, 2)]
+        [InlineData(ComplianceFramework.PciDss, 3)]
+        [InlineData(ComplianceFramework.FedRamp, 4)]
+        [InlineData(ComplianceFramework.Soc2, 5)]
+        [InlineData(ComplianceFramework.Iso27001, 6)]
+        [InlineData(ComplianceFramework.Ccpa, 7)]
         public void ComplianceFramework_HasCorrectValues(ComplianceFramework framework, int expected)
         {
             Assert.Equal(expected, (int)framework);
@@ -110,17 +110,17 @@ namespace DataWarehouse.Tests.Infrastructure
                     Category = ComplianceControlCategory.Encryption,
                     Severity = ComplianceSeverity.High,
                     IsAutomated = true,
-                    Framework = ComplianceFramework.GDPR
+                    Framework = ComplianceFramework.Gdpr
                 }
             };
 
             var requirements = new ComplianceRequirements
             {
-                Framework = ComplianceFramework.GDPR,
+                Framework = ComplianceFramework.Gdpr,
                 Controls = controls
             };
 
-            Assert.Equal(ComplianceFramework.GDPR, requirements.Framework);
+            Assert.Equal(ComplianceFramework.Gdpr, requirements.Framework);
             Assert.Single(requirements.Controls);
             Assert.Equal("GDPR-Art.32", requirements.Controls[0].ControlId);
         }
@@ -130,7 +130,7 @@ namespace DataWarehouse.Tests.Infrastructure
         {
             var requirements = new ComplianceRequirements
             {
-                Framework = ComplianceFramework.HIPAA,
+                Framework = ComplianceFramework.Hipaa,
                 Controls = new List<ComplianceControl>()
             };
 
@@ -150,13 +150,13 @@ namespace DataWarehouse.Tests.Infrastructure
         {
             var result = new ComplianceAssessmentResult
             {
-                Framework = ComplianceFramework.SOC2,
+                Framework = ComplianceFramework.Soc2,
                 IsCompliant = true,
                 ComplianceScore = 0.95,
                 Violations = new List<ComplianceViolation>()
             };
 
-            Assert.Equal(ComplianceFramework.SOC2, result.Framework);
+            Assert.Equal(ComplianceFramework.Soc2, result.Framework);
             Assert.True(result.IsCompliant);
             Assert.Equal(0.95, result.ComplianceScore);
             Assert.Empty(result.Violations);
@@ -192,7 +192,7 @@ namespace DataWarehouse.Tests.Infrastructure
 
             var result = new ComplianceAssessmentResult
             {
-                Framework = ComplianceFramework.HIPAA,
+                Framework = ComplianceFramework.Hipaa,
                 IsCompliant = false,
                 ComplianceScore = 0.6,
                 Violations = violations
@@ -264,14 +264,14 @@ namespace DataWarehouse.Tests.Infrastructure
                 Category = ComplianceControlCategory.AccessControl,
                 Severity = ComplianceSeverity.High,
                 IsAutomated = true,
-                Framework = ComplianceFramework.SOC2,
+                Framework = ComplianceFramework.Soc2,
                 RemediationGuidance = "Implement MFA for all access"
             };
 
             Assert.Equal("SOC2-CC6.1", control.ControlId);
             Assert.Equal(ComplianceControlCategory.AccessControl, control.Category);
             Assert.True(control.IsAutomated);
-            Assert.Equal(ComplianceFramework.SOC2, control.Framework);
+            Assert.Equal(ComplianceFramework.Soc2, control.Framework);
             Assert.Equal("Implement MFA for all access", control.RemediationGuidance);
         }
 

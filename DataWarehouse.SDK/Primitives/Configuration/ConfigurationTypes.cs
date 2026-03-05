@@ -37,7 +37,7 @@ public enum DeploymentEnvironment
     Development = 1,
 
     /// <summary>Continuous integration environment.</summary>
-    CI = 2,
+    Ci = 2,
 
     /// <summary>Testing or QA environment.</summary>
     Testing = 3,
@@ -70,22 +70,22 @@ public enum CloudProvider
     None = 0,
 
     /// <summary>Amazon Web Services.</summary>
-    AWS = 1,
+    Aws = 1,
 
     /// <summary>Microsoft Azure.</summary>
     Azure = 2,
 
     /// <summary>Google Cloud Platform.</summary>
-    GCP = 3,
+    Gcp = 3,
 
     /// <summary>Alibaba Cloud.</summary>
     AlibabaCloud = 4,
 
     /// <summary>Oracle Cloud Infrastructure.</summary>
-    OCI = 5,
+    Oci = 5,
 
     /// <summary>IBM Cloud.</summary>
-    IBM = 6,
+    Ibm = 6,
 
     /// <summary>DigitalOcean.</summary>
     DigitalOcean = 7,
@@ -103,16 +103,16 @@ public enum DiskType
     Unknown = 0,
 
     /// <summary>Traditional hard disk drive.</summary>
-    HDD = 1,
+    Hdd = 1,
 
     /// <summary>Solid-state drive.</summary>
-    SSD = 2,
+    Ssd = 2,
 
     /// <summary>NVMe (Non-Volatile Memory Express) drive.</summary>
-    NVMe = 3,
+    NvMe = 3,
 
     /// <summary>Network-attached storage.</summary>
-    NAS = 4,
+    Nas = 4,
 
     /// <summary>Cloud object storage (e.g., S3, Azure Blob).</summary>
     CloudObject = 5,

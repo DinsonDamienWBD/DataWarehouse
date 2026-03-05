@@ -39,7 +39,7 @@ internal sealed class AdaptiveRuntimeSelectionStrategy : ComputeRuntimeStrategyB
         MemoryIsolation: MemoryIsolationLevel.Process);
     /// <inheritdoc/>
     public override IReadOnlyList<ComputeRuntime> SupportedRuntimes =>
-        [ComputeRuntime.WASM, ComputeRuntime.Container, ComputeRuntime.Native, ComputeRuntime.Custom];
+        [ComputeRuntime.Wasm, ComputeRuntime.Container, ComputeRuntime.Native, ComputeRuntime.Custom];
 
     /// <inheritdoc/>
     public override async Task<ComputeResult> ExecuteAsync(ComputeTask task, CancellationToken cancellationToken = default)

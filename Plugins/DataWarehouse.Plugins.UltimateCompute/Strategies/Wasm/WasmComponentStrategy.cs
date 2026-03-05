@@ -16,13 +16,13 @@ internal sealed class WasmComponentStrategy : ComputeRuntimeStrategyBase
     public override string StrategyName => "WASM Component Model";
 
     /// <inheritdoc/>
-    public override ComputeRuntime Runtime => ComputeRuntime.WASM;
+    public override ComputeRuntime Runtime => ComputeRuntime.Wasm;
 
     /// <inheritdoc/>
     public override ComputeCapabilities Capabilities => ComputeCapabilities.CreateWasmDefaults();
 
     /// <inheritdoc/>
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.WASM];
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.Wasm];
 
     /// <inheritdoc/>
     public override async Task InitializeAsync(CancellationToken cancellationToken = default)

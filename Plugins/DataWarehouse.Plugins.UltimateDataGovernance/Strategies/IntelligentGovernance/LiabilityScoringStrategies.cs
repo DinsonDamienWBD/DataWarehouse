@@ -860,9 +860,9 @@ public sealed class BreachRiskLiabilityStrategy : ConsciousnessStrategyBase
 /// Implements <see cref="ILiabilityScorer"/> and extends <see cref="ConsciousnessStrategyBase"/>.
 /// </summary>
 /// <remarks>
-/// Default weights: PIIPresence=0.20, PHIPresence=0.15, PCIPresence=0.15,
+/// Default weights: PiiPresence=0.20, PhiPresence=0.15, PciPresence=0.15,
 /// ClassificationLevel=0.10, RetentionObligation=0.15, RegulatoryExposure=0.15, BreachRisk=0.10.
-/// Merges DetectedPIITypes and ApplicableRegulations from dimension strategies.
+/// Merges DetectedPiiTypes and ApplicableRegulations from dimension strategies.
 /// </remarks>
 public sealed class CompositeLiabilityScoringStrategy : ConsciousnessStrategyBase, ILiabilityScorer
 {
@@ -879,9 +879,9 @@ public sealed class CompositeLiabilityScoringStrategy : ConsciousnessStrategyBas
     private static readonly IReadOnlyDictionary<LiabilityDimension, double> DefaultWeights =
         new Dictionary<LiabilityDimension, double>
         {
-            [LiabilityDimension.PIIPresence] = 0.20,
-            [LiabilityDimension.PHIPresence] = 0.15,
-            [LiabilityDimension.PCIPresence] = 0.15,
+            [LiabilityDimension.PiiPresence] = 0.20,
+            [LiabilityDimension.PhiPresence] = 0.15,
+            [LiabilityDimension.PciPresence] = 0.15,
             [LiabilityDimension.ClassificationLevel] = 0.10,
             [LiabilityDimension.RetentionObligation] = 0.15,
             [LiabilityDimension.RegulatoryExposure] = 0.15,
@@ -921,16 +921,16 @@ public sealed class CompositeLiabilityScoringStrategy : ConsciousnessStrategyBas
 
         // Score each dimension
         var piiResult = await _piiStrategy.ScoreAsync(data, metadata, ct).ConfigureAwait(false);
-        dimensionScores[LiabilityDimension.PIIPresence] = piiResult.Score;
+        dimensionScores[LiabilityDimension.PiiPresence] = piiResult.Score;
         allFactors.AddRange(piiResult.Factors);
         detectedPiiTypes.AddRange(piiResult.DetectedTypes);
 
         var phiResult = await _phiStrategy.ScoreAsync(data, metadata, ct).ConfigureAwait(false);
-        dimensionScores[LiabilityDimension.PHIPresence] = phiResult.Score;
+        dimensionScores[LiabilityDimension.PhiPresence] = phiResult.Score;
         allFactors.AddRange(phiResult.Factors);
 
         var pciResult = await _pciStrategy.ScoreAsync(data, metadata, ct).ConfigureAwait(false);
-        dimensionScores[LiabilityDimension.PCIPresence] = pciResult.Score;
+        dimensionScores[LiabilityDimension.PciPresence] = pciResult.Score;
         allFactors.AddRange(pciResult.Factors);
 
         var classificationResult = await _classificationStrategy.ScoreAsync(metadata, ct).ConfigureAwait(false);
@@ -964,7 +964,7 @@ public sealed class CompositeLiabilityScoringStrategy : ConsciousnessStrategyBas
             OverallScore: overallScore,
             DimensionScores: dimensionScores,
             LiabilityFactors: allFactors.AsReadOnly(),
-            DetectedPIITypes: detectedPiiTypes.Distinct().ToList().AsReadOnly(),
+            DetectedPiiTypes: detectedPiiTypes.Distinct().ToList().AsReadOnly(),
             ApplicableRegulations: applicableRegulations.Distinct().ToList().AsReadOnly(),
             ScoredAt: DateTime.UtcNow);
     }

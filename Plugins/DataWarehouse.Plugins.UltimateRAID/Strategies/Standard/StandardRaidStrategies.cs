@@ -329,7 +329,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
         {
             ValidateDiskConfiguration(new DiskInfo[diskCount].Select((_, i) =>
-                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
+                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.Hdd, $"bay{i}")));
 
             // All disks contain the same data
             var dataDisks = new int[] { 0 };
@@ -594,7 +594,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
         {
             ValidateDiskConfiguration(new DiskInfo[diskCount].Select((_, i) =>
-                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
+                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.Hdd, $"bay{i}")));
 
             var stripeIndex = blockIndex / (diskCount - 1);
             var parityDisk = (int)(stripeIndex % diskCount);
@@ -987,7 +987,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
         public override StripeInfo CalculateStripe(long blockIndex, int diskCount)
         {
             ValidateDiskConfiguration(new DiskInfo[diskCount].Select((_, i) =>
-                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
+                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.Hdd, $"bay{i}")));
 
             var stripeIndex = blockIndex / (diskCount - 2);
             var pParityDisk = (int)(stripeIndex % diskCount);
@@ -1380,7 +1380,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Standard
                 throw new ArgumentException("RAID 10 requires an even number of disks");
 
             ValidateDiskConfiguration(new DiskInfo[diskCount].Select((_, i) =>
-                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.HDD, $"bay{i}")));
+                new DiskInfo($"disk{i}", 0, 0, SdkDiskHealthStatus.Healthy, DiskType.Hdd, $"bay{i}")));
 
             var mirrorPairs = diskCount / 2;
             var stripeIndex = blockIndex / mirrorPairs;

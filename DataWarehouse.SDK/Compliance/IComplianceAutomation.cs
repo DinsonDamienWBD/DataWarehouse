@@ -7,10 +7,10 @@ namespace DataWarehouse.SDK.Compliance;
 public enum ComplianceFramework
 {
     /// <summary>EU General Data Protection Regulation - Personal data protection</summary>
-    GDPR,
+    Gdpr,
 
     /// <summary>US Health Insurance Portability and Accountability Act - Healthcare data</summary>
-    HIPAA,
+    Hipaa,
 
     /// <summary>Payment Card Industry Data Security Standard - Payment card data</summary>
     PciDss,

@@ -630,7 +630,7 @@ public sealed class KeyReplicationResult
     public DateTimeOffset ReplicatedAt { get; init; }
 }
 
-public enum ComplianceFramework { GDPR, HIPAA, SOC2, PCI_DSS, CCPA, ISO27001 }
+public enum ComplianceFramework { Gdpr, Hipaa, Soc2, PciDss, Ccpa, Iso27001 }
 
 public sealed class CompliancePolicy
 {

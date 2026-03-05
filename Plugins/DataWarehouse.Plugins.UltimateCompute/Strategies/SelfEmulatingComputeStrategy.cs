@@ -35,7 +35,7 @@ internal sealed class SelfEmulatingComputeStrategy : ComputeRuntimeStrategyBase
     public override string StrategyName => "Self-Emulating Objects";
 
     /// <inheritdoc/>
-    public override ComputeRuntime Runtime => ComputeRuntime.WASM;
+    public override ComputeRuntime Runtime => ComputeRuntime.Wasm;
 
     /// <inheritdoc/>
     public override ComputeCapabilities Capabilities => new(
@@ -49,7 +49,7 @@ internal sealed class SelfEmulatingComputeStrategy : ComputeRuntimeStrategyBase
     );
 
     /// <inheritdoc/>
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.WASM];
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.Wasm];
 
     /// <inheritdoc/>
     public override string Description =>

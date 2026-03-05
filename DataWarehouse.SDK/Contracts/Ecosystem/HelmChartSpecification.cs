@@ -498,7 +498,7 @@ public static class HelmChartSpecification
         sb.AppendLine("    {{- include \"datawarehouse.labels\" . | nindent 4 }}");
         sb.AppendLine("type: Opaque");
         sb.AppendLine("data:");
-        sb.AppendLine("  admin-password: {{ .Values.adminPassword | default \"changeme\" | b64enc | quote }}");
+        sb.AppendLine("  admin-password: {{ required \"adminPassword must be set explicitly (do not use defaults)\" .Values.adminPassword | b64enc | quote }}");
         return sb.ToString();
     }
 

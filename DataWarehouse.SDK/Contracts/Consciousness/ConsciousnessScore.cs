@@ -64,11 +64,11 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
     public enum LiabilityDimension
     {
         /// <summary>Presence of personally identifiable information.</summary>
-        PIIPresence,
+        PiiPresence,
         /// <summary>Presence of protected health information.</summary>
-        PHIPresence,
+        PhiPresence,
         /// <summary>Presence of payment card industry data.</summary>
-        PCIPresence,
+        PciPresence,
         /// <summary>Data classification level (public, internal, confidential, restricted).</summary>
         ClassificationLevel,
         /// <summary>Legal or regulatory retention obligations.</summary>
@@ -98,14 +98,14 @@ namespace DataWarehouse.SDK.Contracts.Consciousness
     /// <param name="OverallScore">Aggregate liability score from 0 (no liability) to 100 (maximum liability).</param>
     /// <param name="DimensionScores">Per-dimension breakdown of the liability score.</param>
     /// <param name="LiabilityFactors">Human-readable descriptions of what drives this object's liability.</param>
-    /// <param name="DetectedPIITypes">Types of PII detected (e.g., SSN, email, phone).</param>
+    /// <param name="DetectedPiiTypes">Types of PII detected (e.g., SSN, email, phone).</param>
     /// <param name="ApplicableRegulations">Regulations that apply to this data (e.g., GDPR, HIPAA, CCPA).</param>
     /// <param name="ScoredAt">UTC timestamp when this liability score was computed.</param>
     public sealed record LiabilityScore(
         double OverallScore,
         IReadOnlyDictionary<LiabilityDimension, double> DimensionScores,
         IReadOnlyList<string> LiabilityFactors,
-        IReadOnlyList<string> DetectedPIITypes,
+        IReadOnlyList<string> DetectedPiiTypes,
         IReadOnlyList<string> ApplicableRegulations,
         DateTime ScoredAt);
 

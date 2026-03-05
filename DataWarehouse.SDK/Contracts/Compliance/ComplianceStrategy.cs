@@ -18,49 +18,49 @@ namespace DataWarehouse.SDK.Contracts.Compliance
         /// General Data Protection Regulation (European Union).
         /// Privacy and data protection for EU residents.
         /// </summary>
-        GDPR = 0,
+        Gdpr = 0,
 
         /// <summary>
         /// Health Insurance Portability and Accountability Act (United States).
         /// Security and privacy for protected health information (PHI).
         /// </summary>
-        HIPAA = 1,
+        Hipaa = 1,
 
         /// <summary>
         /// Sarbanes-Oxley Act (United States).
         /// Financial record retention and accuracy for public companies.
         /// </summary>
-        SOX = 2,
+        Sox = 2,
 
         /// <summary>
         /// Payment Card Industry Data Security Standard.
         /// Security requirements for organizations handling credit card data.
         /// </summary>
-        PCIDSS = 3,
+        PciDss = 3,
 
         /// <summary>
         /// Federal Risk and Authorization Management Program (United States).
         /// Cloud security for federal government agencies.
         /// </summary>
-        FedRAMP = 4,
+        FedRamp = 4,
 
         /// <summary>
         /// Service Organization Control 2.
         /// Security, availability, processing integrity, confidentiality, and privacy controls.
         /// </summary>
-        SOC2 = 5,
+        Soc2 = 5,
 
         /// <summary>
         /// ISO/IEC 27001 Information Security Management System.
         /// International standard for information security.
         /// </summary>
-        ISO27001 = 6,
+        Iso27001 = 6,
 
         /// <summary>
         /// California Consumer Privacy Act (United States).
         /// Privacy rights for California residents.
         /// </summary>
-        CCPA = 7
+        Ccpa = 7
     }
 
     /// <summary>

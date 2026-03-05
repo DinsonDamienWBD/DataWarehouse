@@ -26,10 +26,10 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.WasmLanguages;
 internal abstract class WasmLanguageStrategyBase : ComputeRuntimeStrategyBase
 {
     /// <inheritdoc/>
-    public override ComputeRuntime Runtime => ComputeRuntime.WASM;
+    public override ComputeRuntime Runtime => ComputeRuntime.Wasm;
 
     /// <inheritdoc/>
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.WASM];
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.Wasm];
 
     /// <summary>
     /// Gets the language-specific WASM compilation metadata including toolchain, compile command,

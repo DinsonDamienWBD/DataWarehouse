@@ -30,7 +30,7 @@ internal sealed class WasmInterpreterStrategy : ComputeRuntimeStrategyBase
     public override string StrategyName => "WASM Interpreter (Built-in)";
 
     /// <inheritdoc/>
-    public override ComputeRuntime Runtime => ComputeRuntime.WASM;
+    public override ComputeRuntime Runtime => ComputeRuntime.Wasm;
 
     /// <inheritdoc/>
     public override ComputeCapabilities Capabilities => new(
@@ -44,7 +44,7 @@ internal sealed class WasmInterpreterStrategy : ComputeRuntimeStrategyBase
     );
 
     /// <inheritdoc/>
-    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.WASM];
+    public override IReadOnlyList<ComputeRuntime> SupportedRuntimes => [ComputeRuntime.Wasm];
 
     /// <inheritdoc/>
     public override string Description =>

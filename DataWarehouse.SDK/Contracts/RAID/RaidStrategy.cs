@@ -545,17 +545,17 @@ namespace DataWarehouse.SDK.Contracts.RAID
         /// <summary>
         /// Hard Disk Drive (spinning platters).
         /// </summary>
-        HDD = 0,
+        Hdd = 0,
 
         /// <summary>
         /// Solid State Drive.
         /// </summary>
-        SSD = 1,
+        Ssd = 1,
 
         /// <summary>
         /// NVMe SSD.
         /// </summary>
-        NVMe = 2,
+        NvMe = 2,
 
         /// <summary>
         /// Optane persistent memory.
