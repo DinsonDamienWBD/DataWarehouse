@@ -2712,9 +2712,9 @@ STAGE 4: CI/CD Fortress
   4. `dotnet test` passes after each commit (post-commit sanity check)
 **Plans**: 5 plans
 Plans:
-- [ ] 096-01-PLAN.md — Findings 1-218 (Accelerators through ColumnarRegionEngine)
-- [ ] 096-02-PLAN.md — Findings 219-467 (Post-ColumnarRegionEngine through Contracts/Spatial)
-- [ ] 096-03-PLAN.md — Findings 468-710 (Post-Contracts/Spatial through ExtentTree)
+- [x] 096-01-PLAN.md — Findings 1-218 (Accelerators through ColumnarRegionEngine)
+- [x] 096-02-PLAN.md — Findings 219-467 (Post-ColumnarRegionEngine through Contracts/Spatial)
+- [x] 096-03-PLAN.md — Findings 468-710 (Post-Contracts/Spatial through ExtentTree)
 - [ ] 096-04-PLAN.md — Findings 711-954 (FaultToleranceConfig through ICacheableStorage)
 - [ ] 096-05-PLAN.md — Findings 955-1249 (ICarbonAwareStorage through IoUringBindings)
 
