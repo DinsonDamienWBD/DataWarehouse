@@ -13,7 +13,7 @@ public sealed class SerpentStrategy : EncryptionStrategyBase
     private const int KeySize = 32; // 256 bits
     private const int NonceSize = 16;
     private const int TagSize = 32; // HMAC-SHA256
-    private const uint PHI = 0x9E3779B9;
+    private const uint Phi = 0x9E3779B9;
 
     /// <inheritdoc/>
     public override string StrategyId => "serpent-256-ctr-hmac";
@@ -149,7 +149,7 @@ public sealed class SerpentStrategy : EncryptionStrategyBase
 
         for (int i = 8; i < 140; i++)
         {
-            var t = w[i - 8] ^ w[i - 5] ^ w[i - 3] ^ w[i - 1] ^ PHI ^ (uint)(i - 8);
+            var t = w[i - 8] ^ w[i - 5] ^ w[i - 3] ^ w[i - 1] ^ Phi ^ (uint)(i - 8);
             w[i] = RotateLeft(t, 11);
         }
 
@@ -180,7 +180,7 @@ public sealed class SerpentStrategy : EncryptionStrategyBase
         for (int i = 0; i < 4; i++)
             x[i] = BitConverter.ToUInt32(block, i * 4);
 
-        ApplyIP(x);
+        ApplyIp(x);
 
         for (int round = 0; round < 32; round++)
         {
@@ -200,7 +200,7 @@ public sealed class SerpentStrategy : EncryptionStrategyBase
         x[2] ^= subkeys[130];
         x[3] ^= subkeys[131];
 
-        ApplyFP(x);
+        ApplyFp(x);
 
         var output = new byte[16];
         for (int i = 0; i < 4; i++)
@@ -282,32 +282,32 @@ public sealed class SerpentStrategy : EncryptionStrategyBase
         x[2] = RotateLeft(x[2], 22);
     }
 
-    private static void ApplyIP(uint[] x)
+    private static void ApplyIp(uint[] x)
     {
         uint t0 = x[0], t1 = x[1], t2 = x[2], t3 = x[3];
-        SWAPMOVE(ref t0, ref t1, 0x55555555, 1);
-        SWAPMOVE(ref t2, ref t3, 0x55555555, 1);
-        SWAPMOVE(ref t0, ref t2, 0x33333333, 2);
-        SWAPMOVE(ref t1, ref t3, 0x33333333, 2);
-        SWAPMOVE(ref t0, ref t1, 0x0F0F0F0F, 4);
-        SWAPMOVE(ref t2, ref t3, 0x0F0F0F0F, 4);
+        SwapMove(ref t0, ref t1, 0x55555555, 1);
+        SwapMove(ref t2, ref t3, 0x55555555, 1);
+        SwapMove(ref t0, ref t2, 0x33333333, 2);
+        SwapMove(ref t1, ref t3, 0x33333333, 2);
+        SwapMove(ref t0, ref t1, 0x0F0F0F0F, 4);
+        SwapMove(ref t2, ref t3, 0x0F0F0F0F, 4);
         x[0] = t0; x[1] = t1; x[2] = t2; x[3] = t3;
     }
 
-    private static void ApplyFP(uint[] x)
+    private static void ApplyFp(uint[] x)
     {
         uint t0 = x[0], t1 = x[1], t2 = x[2], t3 = x[3];
-        SWAPMOVE(ref t2, ref t3, 0x0F0F0F0F, 4);
-        SWAPMOVE(ref t0, ref t1, 0x0F0F0F0F, 4);
-        SWAPMOVE(ref t1, ref t3, 0x33333333, 2);
-        SWAPMOVE(ref t0, ref t2, 0x33333333, 2);
-        SWAPMOVE(ref t2, ref t3, 0x55555555, 1);
-        SWAPMOVE(ref t0, ref t1, 0x55555555, 1);
+        SwapMove(ref t2, ref t3, 0x0F0F0F0F, 4);
+        SwapMove(ref t0, ref t1, 0x0F0F0F0F, 4);
+        SwapMove(ref t1, ref t3, 0x33333333, 2);
+        SwapMove(ref t0, ref t2, 0x33333333, 2);
+        SwapMove(ref t2, ref t3, 0x55555555, 1);
+        SwapMove(ref t0, ref t1, 0x55555555, 1);
         x[0] = t0; x[1] = t1; x[2] = t2; x[3] = t3;
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void SWAPMOVE(ref uint a, ref uint b, uint mask, int shift)
+    private static void SwapMove(ref uint a, ref uint b, uint mask, int shift)
     {
         uint t = ((a >> shift) ^ b) & mask;
         b ^= t;
@@ -406,7 +406,7 @@ public sealed class TwofishStrategy : EncryptionStrategyBase
     };
 
     // Reed-Solomon matrix for key schedule
-    private static readonly byte[,] RS = new byte[,]
+    private static readonly byte[,] Rs = new byte[,]
     {
         { 0x01, 0xA4, 0x55, 0x87, 0x5A, 0x58, 0xDB, 0x9E },
         { 0xA4, 0x56, 0x82, 0xF3, 0x1E, 0xC6, 0x68, 0xE5 },
@@ -502,13 +502,13 @@ public sealed class TwofishStrategy : EncryptionStrategyBase
         int keyLen = key.Length;
         ctx.KeyLength = keyLen / 8;
 
-        var Me = new uint[ctx.KeyLength];
-        var Mo = new uint[ctx.KeyLength];
+        var me = new uint[ctx.KeyLength];
+        var mo = new uint[ctx.KeyLength];
 
         for (int i = 0; i < ctx.KeyLength; i++)
         {
-            Me[i] = BitConverter.ToUInt32(key, 8 * i);
-            Mo[i] = BitConverter.ToUInt32(key, 8 * i + 4);
+            me[i] = BitConverter.ToUInt32(key, 8 * i);
+            mo[i] = BitConverter.ToUInt32(key, 8 * i + 4);
         }
 
         for (int i = 0; i < ctx.KeyLength; i++)
@@ -519,12 +519,12 @@ public sealed class TwofishStrategy : EncryptionStrategyBase
         uint rho = 0x01010101;
         for (int i = 0; i < 20; i++)
         {
-            uint A = HFunction(2 * (uint)i * rho, Me, ctx.KeyLength);
-            uint B = HFunction((2 * (uint)i + 1) * rho, Mo, ctx.KeyLength);
-            B = RotateLeft(B, 8);
+            uint a = HFunction(2 * (uint)i * rho, me, ctx.KeyLength);
+            uint b = HFunction((2 * (uint)i + 1) * rho, mo, ctx.KeyLength);
+            b = RotateLeft(b, 8);
 
-            ctx.SubKeys[2 * i] = A + B;
-            ctx.SubKeys[2 * i + 1] = RotateLeft(A + 2 * B, 9);
+            ctx.SubKeys[2 * i] = a + b;
+            ctx.SubKeys[2 * i + 1] = RotateLeft(a + 2 * b, 9);
         }
 
         return ctx;
@@ -538,51 +538,51 @@ public sealed class TwofishStrategy : EncryptionStrategyBase
             result[i] = 0;
             for (int j = 0; j < 8; j++)
             {
-                result[i] ^= GfMult(RS[i, j], key[offset + j], 0x14D);
+                result[i] ^= GfMult(Rs[i, j], key[offset + j], 0x14D);
             }
         }
         return BitConverter.ToUInt32(result, 0);
     }
 
-    private static uint HFunction(uint X, uint[] L, int k)
+    private static uint HFunction(uint x, uint[] l, int k)
     {
         byte[] y = new byte[4];
-        y[0] = (byte)X;
-        y[1] = (byte)(X >> 8);
-        y[2] = (byte)(X >> 16);
-        y[3] = (byte)(X >> 24);
+        y[0] = (byte)x;
+        y[1] = (byte)(x >> 8);
+        y[2] = (byte)(x >> 16);
+        y[3] = (byte)(x >> 24);
 
         if (k == 4)
         {
-            y[0] = Q1[y[0] ^ (byte)L[3]];
-            y[1] = Q0[y[1] ^ (byte)(L[3] >> 8)];
-            y[2] = Q0[y[2] ^ (byte)(L[3] >> 16)];
-            y[3] = Q1[y[3] ^ (byte)(L[3] >> 24)];
+            y[0] = Q1[y[0] ^ (byte)l[3]];
+            y[1] = Q0[y[1] ^ (byte)(l[3] >> 8)];
+            y[2] = Q0[y[2] ^ (byte)(l[3] >> 16)];
+            y[3] = Q1[y[3] ^ (byte)(l[3] >> 24)];
         }
 
         if (k >= 3)
         {
-            y[0] = Q1[y[0] ^ (byte)L[2]];
-            y[1] = Q1[y[1] ^ (byte)(L[2] >> 8)];
-            y[2] = Q0[y[2] ^ (byte)(L[2] >> 16)];
-            y[3] = Q0[y[3] ^ (byte)(L[2] >> 24)];
+            y[0] = Q1[y[0] ^ (byte)l[2]];
+            y[1] = Q1[y[1] ^ (byte)(l[2] >> 8)];
+            y[2] = Q0[y[2] ^ (byte)(l[2] >> 16)];
+            y[3] = Q0[y[3] ^ (byte)(l[2] >> 24)];
         }
 
-        y[0] = Q1[Q0[Q0[y[0] ^ (byte)L[1]] ^ (byte)L[0]]];
-        y[1] = Q0[Q0[Q1[y[1] ^ (byte)(L[1] >> 8)] ^ (byte)(L[0] >> 8)]];
-        y[2] = Q1[Q1[Q0[y[2] ^ (byte)(L[1] >> 16)] ^ (byte)(L[0] >> 16)]];
-        y[3] = Q0[Q1[Q1[y[3] ^ (byte)(L[1] >> 24)] ^ (byte)(L[0] >> 24)]];
+        y[0] = Q1[Q0[Q0[y[0] ^ (byte)l[1]] ^ (byte)l[0]]];
+        y[1] = Q0[Q0[Q1[y[1] ^ (byte)(l[1] >> 8)] ^ (byte)(l[0] >> 8)]];
+        y[2] = Q1[Q1[Q0[y[2] ^ (byte)(l[1] >> 16)] ^ (byte)(l[0] >> 16)]];
+        y[3] = Q0[Q1[Q1[y[3] ^ (byte)(l[1] >> 24)] ^ (byte)(l[0] >> 24)]];
 
-        return ApplyMDS(y);
+        return ApplyMds(y);
     }
 
-    private static uint GFunction(uint X, uint[] sBoxKeys, int k)
+    private static uint GFunction(uint x, uint[] sBoxKeys, int k)
     {
         byte[] y = new byte[4];
-        y[0] = (byte)X;
-        y[1] = (byte)(X >> 8);
-        y[2] = (byte)(X >> 16);
-        y[3] = (byte)(X >> 24);
+        y[0] = (byte)x;
+        y[1] = (byte)(x >> 8);
+        y[2] = (byte)(x >> 16);
+        y[3] = (byte)(x >> 24);
 
         if (k == 4)
         {
@@ -605,10 +605,10 @@ public sealed class TwofishStrategy : EncryptionStrategyBase
         y[2] = Q1[Q1[Q0[y[2] ^ (byte)(sBoxKeys[1] >> 16)] ^ (byte)(sBoxKeys[0] >> 16)]];
         y[3] = Q0[Q1[Q1[y[3] ^ (byte)(sBoxKeys[1] >> 24)] ^ (byte)(sBoxKeys[0] >> 24)]];
 
-        return ApplyMDS(y);
+        return ApplyMds(y);
     }
 
-    private static uint ApplyMDS(byte[] y)
+    private static uint ApplyMds(byte[] y)
     {
         byte[] result = new byte[4];
 
@@ -645,52 +645,52 @@ public sealed class TwofishStrategy : EncryptionStrategyBase
         return (byte)result;
     }
 
-    private static void FFunction(uint R0, uint R1, uint[] sBoxKeys, int k,
-                                  uint subKey0, uint subKey1, out uint F0, out uint F1)
+    private static void FFunction(uint r0, uint r1, uint[] sBoxKeys, int k,
+                                  uint subKey0, uint subKey1, out uint f0, out uint f1)
     {
-        uint T0 = GFunction(R0, sBoxKeys, k);
-        uint T1 = GFunction(RotateLeft(R1, 8), sBoxKeys, k);
+        uint t0 = GFunction(r0, sBoxKeys, k);
+        uint t1 = GFunction(RotateLeft(r1, 8), sBoxKeys, k);
 
-        F0 = T0 + T1 + subKey0;
-        F1 = T0 + 2 * T1 + subKey1;
+        f0 = t0 + t1 + subKey0;
+        f1 = t0 + 2 * t1 + subKey1;
     }
 
     private static byte[] TwofishEncryptBlock(byte[] block, TwofishContext ctx)
     {
-        uint R0 = BitConverter.ToUInt32(block, 0) ^ ctx.SubKeys[0];
-        uint R1 = BitConverter.ToUInt32(block, 4) ^ ctx.SubKeys[1];
-        uint R2 = BitConverter.ToUInt32(block, 8) ^ ctx.SubKeys[2];
-        uint R3 = BitConverter.ToUInt32(block, 12) ^ ctx.SubKeys[3];
+        uint r0 = BitConverter.ToUInt32(block, 0) ^ ctx.SubKeys[0];
+        uint r1 = BitConverter.ToUInt32(block, 4) ^ ctx.SubKeys[1];
+        uint r2 = BitConverter.ToUInt32(block, 8) ^ ctx.SubKeys[2];
+        uint r3 = BitConverter.ToUInt32(block, 12) ^ ctx.SubKeys[3];
 
         for (int round = 0; round < 16; round++)
         {
-            FFunction(R0, R1, ctx.SBoxKeys, ctx.KeyLength,
+            FFunction(r0, r1, ctx.SBoxKeys, ctx.KeyLength,
                      ctx.SubKeys[8 + 2 * round], ctx.SubKeys[9 + 2 * round],
-                     out uint F0, out uint F1);
+                     out uint f0, out uint f1);
 
-            R2 = RotateRight(R2 ^ F0, 1);
-            R3 = RotateLeft(R3, 1) ^ F1;
+            r2 = RotateRight(r2 ^ f0, 1);
+            r3 = RotateLeft(r3, 1) ^ f1;
 
             if (round < 15)
             {
-                (R0, R2) = (R2, R0);
-                (R1, R3) = (R3, R1);
+                (r0, r2) = (r2, r0);
+                (r1, r3) = (r3, r1);
             }
         }
 
-        (R0, R2) = (R2, R0);
-        (R1, R3) = (R3, R1);
+        (r0, r2) = (r2, r0);
+        (r1, r3) = (r3, r1);
 
-        R0 ^= ctx.SubKeys[4];
-        R1 ^= ctx.SubKeys[5];
-        R2 ^= ctx.SubKeys[6];
-        R3 ^= ctx.SubKeys[7];
+        r0 ^= ctx.SubKeys[4];
+        r1 ^= ctx.SubKeys[5];
+        r2 ^= ctx.SubKeys[6];
+        r3 ^= ctx.SubKeys[7];
 
         var output = new byte[16];
-        BitConverter.GetBytes(R0).CopyTo(output, 0);
-        BitConverter.GetBytes(R1).CopyTo(output, 4);
-        BitConverter.GetBytes(R2).CopyTo(output, 8);
-        BitConverter.GetBytes(R3).CopyTo(output, 12);
+        BitConverter.GetBytes(r0).CopyTo(output, 0);
+        BitConverter.GetBytes(r1).CopyTo(output, 4);
+        BitConverter.GetBytes(r2).CopyTo(output, 8);
+        BitConverter.GetBytes(r3).CopyTo(output, 12);
 
         return output;
     }

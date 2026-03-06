@@ -49,6 +49,8 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Asymmetric;
 public sealed class RsaOaepStrategy : EncryptionStrategyBase
 {
     private readonly SecureRandom _secureRandom;
+    /// <summary>Gets the secure random instance for testing/diagnostics.</summary>
+    internal SecureRandom SecureRandomInstance => _secureRandom;
     private readonly int _keySize;
 
     /// <inheritdoc/>
@@ -365,6 +367,8 @@ public sealed class RsaOaepStrategy : EncryptionStrategyBase
 public sealed class RsaPkcs1Strategy : EncryptionStrategyBase
 {
     private readonly SecureRandom _secureRandom;
+    /// <summary>Gets the secure random instance for testing/diagnostics.</summary>
+    internal SecureRandom SecureRandomInstance => _secureRandom;
     private readonly int _keySize;
 
     /// <inheritdoc/>

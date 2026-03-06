@@ -339,7 +339,7 @@ public sealed class TransitPolicyProvider : ITransitPolicyProvider
 /// <param name="PreferredCipher">The endpoint's preferred cipher (best performance).</param>
 /// <param name="MaxThroughputMBps">Estimated maximum encryption throughput in MB/s.</param>
 /// <param name="IsBatteryPowered">Whether the device is battery-powered (affects algorithm selection).</param>
-/// <param name="MemoryConstrainedMB">Available memory for cryptographic operations (null = unconstrained).</param>
+/// <param name="MemoryConstrainedMb">Available memory for cryptographic operations (null = unconstrained).</param>
 public sealed record EndpointCapabilities(
     string EndpointType,
     string OperatingSystem,
@@ -349,7 +349,7 @@ public sealed record EndpointCapabilities(
     string PreferredCipher,
     int MaxThroughputMBps,
     bool IsBatteryPowered,
-    int? MemoryConstrainedMB
+    int? MemoryConstrainedMb
 )
 {
     /// <summary>
@@ -448,7 +448,7 @@ public sealed class EndpointCapabilitiesDetector : IEndpointCapabilitiesDetector
                 PreferredCipher: "AES-256-GCM",
                 MaxThroughputMBps: 2000,
                 IsBatteryPowered: false,
-                MemoryConstrainedMB: null
+                MemoryConstrainedMb: null
             ),
 
             ["macOS Desktop"] = new(
@@ -464,7 +464,7 @@ public sealed class EndpointCapabilitiesDetector : IEndpointCapabilitiesDetector
                 PreferredCipher: "AES-256-GCM",
                 MaxThroughputMBps: 2500,
                 IsBatteryPowered: false,
-                MemoryConstrainedMB: null
+                MemoryConstrainedMb: null
             ),
 
             ["Linux Desktop"] = new(
@@ -480,7 +480,7 @@ public sealed class EndpointCapabilitiesDetector : IEndpointCapabilitiesDetector
                 PreferredCipher: "AES-256-GCM",
                 MaxThroughputMBps: 1800,
                 IsBatteryPowered: false,
-                MemoryConstrainedMB: null
+                MemoryConstrainedMb: null
             ),
 
             // T6.2.2: Mobile Capabilities
@@ -496,7 +496,7 @@ public sealed class EndpointCapabilitiesDetector : IEndpointCapabilitiesDetector
                 PreferredCipher: "ChaCha20-Poly1305", // Better without AES-NI
                 MaxThroughputMBps: 300,
                 IsBatteryPowered: true,
-                MemoryConstrainedMB: 2048
+                MemoryConstrainedMb: 2048
             ),
 
             ["Android Mobile"] = new(
@@ -511,7 +511,7 @@ public sealed class EndpointCapabilitiesDetector : IEndpointCapabilitiesDetector
                 PreferredCipher: "ChaCha20-Poly1305",
                 MaxThroughputMBps: 250,
                 IsBatteryPowered: true,
-                MemoryConstrainedMB: 1024
+                MemoryConstrainedMb: 1024
             ),
 
             // T6.2.3: IoT Capabilities
@@ -527,7 +527,7 @@ public sealed class EndpointCapabilitiesDetector : IEndpointCapabilitiesDetector
                 PreferredCipher: "ChaCha20-Poly1305",
                 MaxThroughputMBps: 50,
                 IsBatteryPowered: true,
-                MemoryConstrainedMB: 256
+                MemoryConstrainedMb: 256
             ),
 
             // T6.2.4: Browser Capabilities
@@ -543,7 +543,7 @@ public sealed class EndpointCapabilitiesDetector : IEndpointCapabilitiesDetector
                 PreferredCipher: "AES-256-GCM",
                 MaxThroughputMBps: 100,
                 IsBatteryPowered: false,
-                MemoryConstrainedMB: 512
+                MemoryConstrainedMb: 512
             )
         };
     }
@@ -578,7 +578,7 @@ public sealed class EndpointCapabilitiesDetector : IEndpointCapabilitiesDetector
             PreferredCipher: preferredCipher,
             MaxThroughputMBps: maxThroughput,
             IsBatteryPowered: isBatteryPowered,
-            MemoryConstrainedMB: memoryConstraint
+            MemoryConstrainedMb: memoryConstraint
         );
     }
 

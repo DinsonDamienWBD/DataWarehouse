@@ -557,9 +557,9 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
                 var c2 = new BigInteger(c2Bytes, isUnsigned: true, isBigEndian: true);
 
                 // m = c2 * (c1^x)^(-1) mod p
-                var c1x = BigInteger.ModPow(c1, x, p);
-                var c1xInv = BigInteger.ModPow(c1x, p - 2, p); // Fermat's little theorem
-                var m = (c2 * c1xInv) % p;
+                var c1X = BigInteger.ModPow(c1, x, p);
+                var c1XInv = BigInteger.ModPow(c1X, p - 2, p); // Fermat's little theorem
+                var m = (c2 * c1XInv) % p;
 
                 return m.ToByteArray(isUnsigned: true, isBigEndian: true);
             }, cancellationToken);
@@ -617,21 +617,21 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
 
             using var ms1 = new System.IO.MemoryStream(ciphertext1);
             using var reader1 = new System.IO.BinaryReader(ms1);
-            var c1_1Len = reader1.ReadInt32();
-            var c1_1 = new BigInteger(reader1.ReadBytes(c1_1Len), isUnsigned: true, isBigEndian: true);
-            var c1_2Len = reader1.ReadInt32();
-            var c1_2 = new BigInteger(reader1.ReadBytes(c1_2Len), isUnsigned: true, isBigEndian: true);
+            var c11Len = reader1.ReadInt32();
+            var c11 = new BigInteger(reader1.ReadBytes(c11Len), isUnsigned: true, isBigEndian: true);
+            var c12Len = reader1.ReadInt32();
+            var c12 = new BigInteger(reader1.ReadBytes(c12Len), isUnsigned: true, isBigEndian: true);
 
             using var ms2 = new System.IO.MemoryStream(ciphertext2);
             using var reader2 = new System.IO.BinaryReader(ms2);
-            var c2_1Len = reader2.ReadInt32();
-            var c2_1 = new BigInteger(reader2.ReadBytes(c2_1Len), isUnsigned: true, isBigEndian: true);
-            var c2_2Len = reader2.ReadInt32();
-            var c2_2 = new BigInteger(reader2.ReadBytes(c2_2Len), isUnsigned: true, isBigEndian: true);
+            var c21Len = reader2.ReadInt32();
+            var c21 = new BigInteger(reader2.ReadBytes(c21Len), isUnsigned: true, isBigEndian: true);
+            var c22Len = reader2.ReadInt32();
+            var c22 = new BigInteger(reader2.ReadBytes(c22Len), isUnsigned: true, isBigEndian: true);
 
             // Component-wise multiplication
-            var r1 = (c1_1 * c2_1) % _p!.Value;
-            var r2 = (c1_2 * c2_2) % _p!.Value;
+            var r1 = (c11 * c21) % _p!.Value;
+            var r2 = (c12 * c22) % _p!.Value;
 
             using var result = new System.IO.MemoryStream();
             using var writer = new System.IO.BinaryWriter(result);
@@ -779,6 +779,8 @@ namespace DataWarehouse.Plugins.UltimateEncryption.Strategies.Homomorphic
         private BigInteger? _x; // Non-residue
         private BigInteger? _p;
         private BigInteger? _q;
+        /// <summary>Gets the factor q used by this strategy (exposed for testing/diagnostics).</summary>
+        internal BigInteger? QFactor => _q;
 
         /// <inheritdoc/>
         public override CipherInfo CipherInfo => new()

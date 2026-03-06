@@ -58,6 +58,8 @@ public sealed class MigrationWorker : IDisposable
 
     private CancellationTokenSource? _processingCts;
     private Task? _processingTask;
+    /// <summary>Gets the current processing task (exposed for diagnostics).</summary>
+    internal Task? ProcessingTask => _processingTask;
     private volatile bool _paused;
     private readonly SemaphoreSlim _pauseGate = new(1, 1);
     private long _successCount;

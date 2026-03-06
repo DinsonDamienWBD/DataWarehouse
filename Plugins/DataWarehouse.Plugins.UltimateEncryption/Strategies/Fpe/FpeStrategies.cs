@@ -134,25 +134,25 @@ public sealed class Ff1Strategy : EncryptionStrategyBase
         // LOW-2958: v = n - u removed — variable was computed but never used.
 
         // Split the numeral string into two halves
-        var A = numeralString.Substring(0, u);
-        var B = numeralString.Substring(u);
+        var a = numeralString.Substring(0, u);
+        var b = numeralString.Substring(u);
 
         // FF1 uses 10 rounds for the Feistel network
         const int rounds = 10;
 
         for (int i = 0; i < rounds; i++)
         {
-            // Compute round function: C = (NUM(A) + F(B, i)) mod radix^u
-            var roundKey = ComputeRoundKey(key, tweak, i, B, radix, n);
-            var c = (NumeralStringToNumber(A, radix) + roundKey) % BigInteger.Pow(radix, A.Length);
-            var C = NumberToNumeralString(c, radix, A.Length);
+            // Compute round function: c = (NUM(a) + F(b, i)) mod radix^u
+            var roundKey = ComputeRoundKey(key, tweak, i, b, radix, n);
+            var c = (NumeralStringToNumber(a, radix) + roundKey) % BigInteger.Pow(radix, a.Length);
+            var next = NumberToNumeralString(c, radix, a.Length);
 
             // Swap halves
-            A = B;
-            B = C;
+            a = b;
+            b = next;
         }
 
-        return A + B;
+        return a + b;
     }
 
     /// <summary>
@@ -172,22 +172,22 @@ public sealed class Ff1Strategy : EncryptionStrategyBase
         var u = n / 2;
         // LOW-2958: v = n - u removed — variable was computed but never used.
 
-        var A = numeralString.Substring(0, u);
-        var B = numeralString.Substring(u);
+        var a = numeralString.Substring(0, u);
+        var b = numeralString.Substring(u);
 
         const int rounds = 10;
 
         // Reverse the Feistel rounds
         for (int i = rounds - 1; i >= 0; i--)
         {
-            var C = B;
-            B = A;
+            var prev = b;
+            b = a;
 
-            var roundKey = ComputeRoundKey(key, tweak, i, B, radix, n);
-            var numA = (NumeralStringToNumber(C, radix) - roundKey);
+            var roundKey = ComputeRoundKey(key, tweak, i, b, radix, n);
+            var numA = (NumeralStringToNumber(prev, radix) - roundKey);
 
             // Handle negative modulo
-            var modulus = BigInteger.Pow(radix, C.Length);
+            var modulus = BigInteger.Pow(radix, prev.Length);
             if (numA < 0)
             {
                 numA = ((numA % modulus) + modulus) % modulus;
@@ -197,10 +197,10 @@ public sealed class Ff1Strategy : EncryptionStrategyBase
                 numA = numA % modulus;
             }
 
-            A = NumberToNumeralString(numA, radix, C.Length);
+            a = NumberToNumeralString(numA, radix, prev.Length);
         }
 
-        return A + B;
+        return a + b;
     }
 
     /// <summary>
@@ -436,31 +436,31 @@ public sealed class Ff3Strategy : EncryptionStrategyBase
         var u = n / 2;
         // LOW-2958: v = n - u removed — variable was computed but never used.
 
-        // Split tweak into TL (left 4 bytes) and TR (right 4 bytes)
-        var TL = new byte[4];
-        var TR = new byte[4];
-        Buffer.BlockCopy(tweak, 0, TL, 0, 4);
-        Buffer.BlockCopy(tweak, 4, TR, 0, 4);
+        // Split tweak into tl (left 4 bytes) and tr (right 4 bytes)
+        var tl = new byte[4];
+        var tr = new byte[4];
+        Buffer.BlockCopy(tweak, 0, tl, 0, 4);
+        Buffer.BlockCopy(tweak, 4, tr, 0, 4);
 
-        var A = numeralString.Substring(0, u);
-        var B = numeralString.Substring(u);
+        var a = numeralString.Substring(0, u);
+        var b = numeralString.Substring(u);
 
         // FF3-1 uses 8 rounds
         const int rounds = 8;
 
         for (int i = 0; i < rounds; i++)
         {
-            var T = (i % 2 == 0) ? TL : TR;
-            var W = ComputeFf3RoundKey(key, T, i, B);
+            var t = (i % 2 == 0) ? tl : tr;
+            var w = ComputeFf3RoundKey(key, t, i, b);
 
-            var c = (NumeralStringToNumber(A, radix) + W) % BigInteger.Pow(radix, A.Length);
-            var C = NumberToNumeralString(c, radix, A.Length);
+            var c = (NumeralStringToNumber(a, radix) + w) % BigInteger.Pow(radix, a.Length);
+            var next = NumberToNumeralString(c, radix, a.Length);
 
-            A = B;
-            B = C;
+            a = b;
+            b = next;
         }
 
-        return A + B;
+        return a + b;
     }
 
     /// <summary>
@@ -472,26 +472,26 @@ public sealed class Ff3Strategy : EncryptionStrategyBase
         var u = n / 2;
         // LOW-2958: v = n - u removed — variable was computed but never used.
 
-        var TL = new byte[4];
-        var TR = new byte[4];
-        Buffer.BlockCopy(tweak, 0, TL, 0, 4);
-        Buffer.BlockCopy(tweak, 4, TR, 0, 4);
+        var tl = new byte[4];
+        var tr = new byte[4];
+        Buffer.BlockCopy(tweak, 0, tl, 0, 4);
+        Buffer.BlockCopy(tweak, 4, tr, 0, 4);
 
-        var A = numeralString.Substring(0, u);
-        var B = numeralString.Substring(u);
+        var a = numeralString.Substring(0, u);
+        var b = numeralString.Substring(u);
 
         const int rounds = 8;
 
         for (int i = rounds - 1; i >= 0; i--)
         {
-            var C = B;
-            B = A;
+            var prev = b;
+            b = a;
 
-            var T = (i % 2 == 0) ? TL : TR;
-            var W = ComputeFf3RoundKey(key, T, i, B);
+            var t = (i % 2 == 0) ? tl : tr;
+            var w = ComputeFf3RoundKey(key, t, i, b);
 
-            var numA = (NumeralStringToNumber(C, radix) - W);
-            var modulus = BigInteger.Pow(radix, C.Length);
+            var numA = (NumeralStringToNumber(prev, radix) - w);
+            var modulus = BigInteger.Pow(radix, prev.Length);
 
             if (numA < 0)
             {
@@ -502,10 +502,10 @@ public sealed class Ff3Strategy : EncryptionStrategyBase
                 numA = numA % modulus;
             }
 
-            A = NumberToNumeralString(numA, radix, C.Length);
+            a = NumberToNumeralString(numA, radix, prev.Length);
         }
 
-        return A + B;
+        return a + b;
     }
 
     /// <summary>
@@ -531,19 +531,19 @@ public sealed class Ff3Strategy : EncryptionStrategyBase
         inputBlock[4] = (byte)round;
 
         // Encode the half string as a number and store in remaining 11 bytes
-        const int NumeralFieldBytes = 11; // bytes 5-15
+        const int numeralFieldBytes = 11; // bytes 5-15
         var numHalf = NumeralStringToNumber(half, 10);
         var numHalfBytes = numHalf.ToByteArray(isUnsigned: true, isBigEndian: true);
-        if (numHalfBytes.Length <= NumeralFieldBytes)
+        if (numHalfBytes.Length <= numeralFieldBytes)
         {
             // Right-align within the 11-byte field
-            var offset = 5 + (NumeralFieldBytes - numHalfBytes.Length);
+            var offset = 5 + (numeralFieldBytes - numHalfBytes.Length);
             Buffer.BlockCopy(numHalfBytes, 0, inputBlock, offset, numHalfBytes.Length);
         }
         else
         {
             // Truncate: take the last 11 bytes (least significant) to fit the field
-            Buffer.BlockCopy(numHalfBytes, numHalfBytes.Length - NumeralFieldBytes, inputBlock, 5, NumeralFieldBytes);
+            Buffer.BlockCopy(numHalfBytes, numHalfBytes.Length - numeralFieldBytes, inputBlock, 5, numeralFieldBytes);
         }
 
         using var encryptor = aes.CreateEncryptor();

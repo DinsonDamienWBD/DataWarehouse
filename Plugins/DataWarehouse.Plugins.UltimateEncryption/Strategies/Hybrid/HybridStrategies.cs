@@ -138,7 +138,7 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
             Buffer.BlockCopy(key, 2 + ecdhPublicKeyLen + 4, ntruPublicKeyBytes, 0, ntruPublicKeyLen);
 
             // Derive classical shared secret using ECDH (with recipient's ECDH public key)
-            var recipientEcdhPublic = DecodeECPublicKeyFromBytes(ecdhPublicKeyBytes);
+            var recipientEcdhPublic = DecodeEcPublicKeyFromBytes(ecdhPublicKeyBytes);
             var ecdhAgreement = new ECDHBasicAgreement();
             ecdhAgreement.Init(ecdhKeyPair.Private);
             var classicalSecret = ecdhAgreement.CalculateAgreement(recipientEcdhPublic).ToByteArrayUnsigned();
@@ -225,8 +225,8 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
             Buffer.BlockCopy(key, 2 + ecdhPrivKeyLen, ntruPrivKeyBytes, 0, ntruPrivKeyBytes.Length);
 
             // Derive classical secret using recipient's ECDH private key
-            var recipientEcdhPrivate = DecodeECPrivateKey(ecdhPrivKeyBytes);
-            var senderEcdhPublic = DecodeECPublicKeyFromBytes(ecdhPublicKey);
+            var recipientEcdhPrivate = DecodeEcPrivateKey(ecdhPrivKeyBytes);
+            var senderEcdhPublic = DecodeEcPublicKeyFromBytes(ecdhPublicKey);
             var ecdhAgreement = new ECDHBasicAgreement();
             ecdhAgreement.Init(recipientEcdhPrivate);
             var classicalSecret = ecdhAgreement.CalculateAgreement(senderEcdhPublic).ToByteArrayUnsigned();
@@ -338,7 +338,7 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
     /// <summary>
     /// Decodes EC private key from raw big-endian bytes.
     /// </summary>
-    private static ECPrivateKeyParameters DecodeECPrivateKey(byte[] keyMaterial)
+    private static ECPrivateKeyParameters DecodeEcPrivateKey(byte[] keyMaterial)
     {
         var curve = ECNamedCurveTable.GetByName("P-384");
         var d = new Org.BouncyCastle.Math.BigInteger(1, keyMaterial);
@@ -349,7 +349,7 @@ public sealed class HybridAesKyberStrategy : EncryptionStrategyBase
     /// <summary>
     /// Decodes EC public key from raw encoded bytes.
     /// </summary>
-    private static ECPublicKeyParameters DecodeECPublicKeyFromBytes(byte[] encodedKey)
+    private static ECPublicKeyParameters DecodeEcPublicKeyFromBytes(byte[] encodedKey)
     {
         var curve = ECNamedCurveTable.GetByName("P-384");
         var point = curve.Curve.DecodePoint(encodedKey);
@@ -460,7 +460,7 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
             Buffer.BlockCopy(key, 2 + ecdhPublicKeyLen2 + 4, ntruPublicKeyBytes2, 0, ntruPublicKeyLen2);
 
             // Derive classical shared secret using recipient's ECDH public key
-            var recipientEcdhPublic = DecodeECPublicKeyFromBytes(ecdhPublicKeyBytes2);
+            var recipientEcdhPublic = DecodeEcPublicKeyFromBytes(ecdhPublicKeyBytes2);
             var ecdhAgreement = new ECDHBasicAgreement();
             ecdhAgreement.Init(ecdhKeyPair.Private);
             var classicalSecret = ecdhAgreement.CalculateAgreement(recipientEcdhPublic).ToByteArrayUnsigned();
@@ -540,8 +540,8 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
             var ntruPrivKeyBytes2 = new byte[key.Length - 2 - ecdhPrivKeyLen2];
             Buffer.BlockCopy(key, 2 + ecdhPrivKeyLen2, ntruPrivKeyBytes2, 0, ntruPrivKeyBytes2.Length);
 
-            var recipientEcdhPrivate = DecodeECPrivateKey(ecdhPrivKeyBytes2);
-            var senderEcdhPublic = DecodeECPublicKeyFromBytes(ecdhPublicKey);
+            var recipientEcdhPrivate = DecodeEcPrivateKey(ecdhPrivKeyBytes2);
+            var senderEcdhPublic = DecodeEcPublicKeyFromBytes(ecdhPublicKey);
             var ecdhAgreement = new ECDHBasicAgreement();
             ecdhAgreement.Init(recipientEcdhPrivate);
             var classicalSecret = ecdhAgreement.CalculateAgreement(senderEcdhPublic).ToByteArrayUnsigned();
@@ -635,7 +635,7 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
         return (compositePublicKey, compositePrivateKey);
     }
 
-    private static ECPrivateKeyParameters DecodeECPrivateKey(byte[] keyMaterial)
+    private static ECPrivateKeyParameters DecodeEcPrivateKey(byte[] keyMaterial)
     {
         var curve = ECNamedCurveTable.GetByName("P-384");
         var d = new Org.BouncyCastle.Math.BigInteger(1, keyMaterial);
@@ -643,7 +643,7 @@ public sealed class HybridChaChaKyberStrategy : EncryptionStrategyBase
         return new ECPrivateKeyParameters(d, ecDomainParams);
     }
 
-    private static ECPublicKeyParameters DecodeECPublicKeyFromBytes(byte[] encodedKey)
+    private static ECPublicKeyParameters DecodeEcPublicKeyFromBytes(byte[] encodedKey)
     {
         var curve = ECNamedCurveTable.GetByName("P-384");
         var point = curve.Curve.DecodePoint(encodedKey);
