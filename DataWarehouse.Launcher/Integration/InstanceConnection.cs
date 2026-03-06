@@ -100,7 +100,7 @@ public sealed class InstanceCapabilities
     /// <summary>
     /// Whether the instance has AI capabilities.
     /// </summary>
-    public bool HasAICapabilities { get; set; }
+    public bool HasAiCapabilities { get; set; }
 
     /// <summary>
     /// Checks if a feature is supported.

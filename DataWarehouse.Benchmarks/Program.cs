@@ -58,21 +58,21 @@ public class StorageBenchmarks
     }
 
     [Benchmark(Description = "Write 1KB")]
-    public void Write1KB()
+    public void Write1Kb()
     {
         var key = Guid.NewGuid().ToString();
         _storage[key] = _smallData.ToArray();
     }
 
     [Benchmark(Description = "Write 1MB")]
-    public void Write1MB()
+    public void Write1Mb()
     {
         var key = Guid.NewGuid().ToString();
         _storage[key] = _mediumData.ToArray();
     }
 
     [Benchmark(Description = "Read 1KB")]
-    public byte[]? Read1KB()
+    public byte[]? Read1Kb()
     {
         var key = "test-small";
         _storage[key] = _smallData;
@@ -80,7 +80,7 @@ public class StorageBenchmarks
     }
 
     [Benchmark(Description = "Read 1MB")]
-    public byte[]? Read1MB()
+    public byte[]? Read1Mb()
     {
         var key = "test-medium";
         _storage[key] = _mediumData;
@@ -120,18 +120,18 @@ public class StorageBenchmarks
 [RankColumn]
 public class CryptoBenchmarks
 {
-    private byte[] _data1MB = null!; // Initialized in [GlobalSetup]
+    private byte[] _data1Mb = null!; // Initialized in [GlobalSetup]
     private byte[] _key = null!; // Initialized in [GlobalSetup]
     private byte[] _iv = null!; // Initialized in [GlobalSetup]
 
     [GlobalSetup]
     public void Setup()
     {
-        _data1MB = new byte[1024 * 1024];
+        _data1Mb = new byte[1024 * 1024];
         _key = new byte[32]; // AES-256
         _iv = new byte[16];
 
-        RandomNumberGenerator.Fill(_data1MB);
+        RandomNumberGenerator.Fill(_data1Mb);
         RandomNumberGenerator.Fill(_key);
         RandomNumberGenerator.Fill(_iv);
     }
@@ -139,13 +139,13 @@ public class CryptoBenchmarks
     [Benchmark(Description = "SHA256 Hash 1MB")]
     public byte[] Sha256Hash()
     {
-        return SHA256.HashData(_data1MB);
+        return SHA256.HashData(_data1Mb);
     }
 
     [Benchmark(Description = "SHA512 Hash 1MB")]
     public byte[] Sha512Hash()
     {
-        return SHA512.HashData(_data1MB);
+        return SHA512.HashData(_data1Mb);
     }
 
     [Benchmark(Description = "AES Encrypt 1MB")]
@@ -156,7 +156,7 @@ public class CryptoBenchmarks
         aes.IV = _iv;
 
         using var encryptor = aes.CreateEncryptor();
-        return encryptor.TransformFinalBlock(_data1MB, 0, _data1MB.Length);
+        return encryptor.TransformFinalBlock(_data1Mb, 0, _data1Mb.Length);
     }
 
     [Benchmark(Description = "AES Decrypt 1MB")]
@@ -167,7 +167,7 @@ public class CryptoBenchmarks
         aes.IV = _iv;
 
         using var encryptor = aes.CreateEncryptor();
-        var encrypted = encryptor.TransformFinalBlock(_data1MB, 0, _data1MB.Length);
+        var encrypted = encryptor.TransformFinalBlock(_data1Mb, 0, _data1Mb.Length);
 
         using var decryptor = aes.CreateDecryptor();
         return decryptor.TransformFinalBlock(encrypted, 0, encrypted.Length);

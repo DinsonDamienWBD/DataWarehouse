@@ -172,7 +172,7 @@ public sealed class SemanticSyncPlugin : OrchestrationPluginBase
         await base.OnStartCoreAsync(ct);
 
         // Step 1: Resolve optional IAiProvider from kernel services (null if unavailable)
-        IAiProvider? aiProvider = ResolveAIProvider();
+        IAiProvider? aiProvider = ResolveAiProvider();
 
         // Step 2: Create helper instances
         var localModelManager = new LocalModelManager();
@@ -194,7 +194,7 @@ public sealed class SemanticSyncPlugin : OrchestrationPluginBase
         // Step 3: Create strategies (dependency injection by construction)
         var embeddingClassifier = aiProvider is not null
             ? new EmbeddingClassifier(aiProvider)
-            : new EmbeddingClassifier(NullAIProvider.Instance);
+            : new EmbeddingClassifier(NullAiProvider.Instance);
         var ruleClassifier = new RuleBasedClassifier();
         _hybridClassifier = new HybridClassifier(embeddingClassifier, ruleClassifier, 0.7);
 
@@ -485,7 +485,7 @@ public sealed class SemanticSyncPlugin : OrchestrationPluginBase
     /// Attempts to resolve an IAiProvider. Returns null if unavailable (edge/air-gapped environments).
     /// All strategies handle null AI provider gracefully with fallback behavior.
     /// </summary>
-    private static IAiProvider? ResolveAIProvider()
+    private static IAiProvider? ResolveAiProvider()
     {
         // AI provider is not injected by kernel services.
         // In production, it would be resolved via service registry or message bus request.
@@ -655,14 +655,14 @@ public sealed class SemanticSyncPlugin : OrchestrationPluginBase
 /// non-AI behavior (rule-based classification, extraction-based summarization, etc.).
 /// </summary>
 [SdkCompatibility("5.0.0", Notes = "Phase 60: Null AI provider for graceful degradation")]
-internal sealed class NullAIProvider : IAiProvider
+internal sealed class NullAiProvider : IAiProvider
 {
     /// <summary>
     /// Singleton instance of the null AI provider.
     /// </summary>
-    public static readonly NullAIProvider Instance = new();
+    public static readonly NullAiProvider Instance = new();
 
-    private NullAIProvider() { }
+    private NullAiProvider() { }
 
     /// <inheritdoc/>
     public string ProviderId => "null";

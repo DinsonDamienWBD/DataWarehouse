@@ -11,12 +11,12 @@ namespace DataWarehouse.Plugins.UltimateDocGen;
 
 #region Strategy Types
 
-public enum DocGenCategory { ApiDoc, SchemaDoc, OutputFormat, ChangeLog, Interactive, AIEnhanced }
+public enum DocGenCategory { ApiDoc, SchemaDoc, OutputFormat, ChangeLog, Interactive, AiEnhanced }
 public enum OutputFormat { Markdown, Html, Json, Yaml, AsciiDoc, ReStructuredText, Pdf, DocBook }
 
 public sealed record DocGenCapabilities(
     OutputFormat[] SupportedFormats, bool SupportsAsync, bool SupportsIncremental,
-    bool SupportsTemplates, bool SupportsCustomization, bool SupportsAIEnhanced);
+    bool SupportsTemplates, bool SupportsCustomization, bool SupportsAiEnhanced);
 
 public sealed record DocGenCharacteristics
 {
@@ -190,7 +190,7 @@ public sealed class OpenApiDocStrategy : DocGenStrategyBase
     }
 }
 
-public sealed class GraphQLSchemaDocStrategy : DocGenStrategyBase
+public sealed class GraphQlSchemaDocStrategy : DocGenStrategyBase
 {
     public override DocGenCharacteristics Characteristics { get; } = new()
     {
@@ -594,12 +594,12 @@ public sealed class InteractiveDocStrategy : DocGenStrategyBase
     }
 }
 
-public sealed class AIEnhancedDocStrategy : DocGenStrategyBase
+public sealed class AiEnhancedDocStrategy : DocGenStrategyBase
 {
     public override DocGenCharacteristics Characteristics { get; } = new()
     {
-        StrategyName = "AIEnhancedDoc", Description = "AI-enhanced documentation with auto-generation",
-        Category = DocGenCategory.AIEnhanced,
+        StrategyName = "AiEnhancedDoc", Description = "AI-enhanced documentation with auto-generation",
+        Category = DocGenCategory.AiEnhanced,
         Capabilities = new([OutputFormat.Markdown, OutputFormat.Html], true, true, true, true, true),
         Tags = ["ai", "enhanced", "auto-generate"]
     };
@@ -691,7 +691,7 @@ public sealed class UltimateDocGenPlugin : PlatformPluginBase, IDisposable
         // Base-class dual-registration will become possible when DocGenStrategyBase extends StrategyBase.
         // For now, the local DocGenStrategyRegistry is the authoritative lookup layer.
         _registry.Register(new OpenApiDocStrategy());
-        _registry.Register(new GraphQLSchemaDocStrategy());
+        _registry.Register(new GraphQlSchemaDocStrategy());
         _registry.Register(new GrpcDocStrategy());
         _registry.Register(new DatabaseSchemaDocStrategy());
         _registry.Register(new JsonSchemaDocStrategy());
@@ -699,7 +699,7 @@ public sealed class UltimateDocGenPlugin : PlatformPluginBase, IDisposable
         _registry.Register(new HtmlOutputStrategy());
         _registry.Register(new ChangeLogDocStrategy());
         _registry.Register(new InteractiveDocStrategy());
-        _registry.Register(new AIEnhancedDocStrategy());
+        _registry.Register(new AiEnhancedDocStrategy());
     }
 
     public override async Task<HandshakeResponse> OnHandshakeAsync(HandshakeRequest request)
