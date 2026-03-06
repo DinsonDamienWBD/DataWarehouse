@@ -127,7 +127,7 @@ public sealed class JitteredExponentialBackoffStrategy : ResilienceStrategyBase
     private readonly TimeSpan _maxDelay;
     private readonly double _multiplier;
     private readonly double _jitterFactor;
-    private static readonly Random _random = Random.Shared;
+    // Finding: Use Random.Shared directly (static readonly PascalCase)
 
     public JitteredExponentialBackoffStrategy()
         : this(maxRetries: 3, initialDelay: TimeSpan.FromMilliseconds(500), maxDelay: TimeSpan.FromSeconds(30), multiplier: 2.0, jitterFactor: 0.5)
@@ -211,7 +211,7 @@ public sealed class JitteredExponentialBackoffStrategy : ResilienceStrategyBase
     private TimeSpan CalculateJitteredDelay(int attempt)
     {
         var baseDelay = _initialDelay.TotalMilliseconds * Math.Pow(_multiplier, attempt - 1);
-        var jitter = baseDelay * _jitterFactor * (_random.NextDouble() * 2 - 1); // +/- jitterFactor
+        var jitter = baseDelay * _jitterFactor * (Random.Shared.NextDouble() * 2 - 1); // +/- jitterFactor
         var delay = Math.Max(0, baseDelay + jitter);
         return TimeSpan.FromMilliseconds(Math.Min(delay, _maxDelay.TotalMilliseconds));
     }
@@ -586,7 +586,7 @@ public sealed class DecorrelatedJitterRetryStrategy : ResilienceStrategyBase
     private readonly int _maxRetries;
     private readonly TimeSpan _baseDelay;
     private readonly TimeSpan _maxDelay;
-    private static readonly Random _random = Random.Shared;
+    // Finding: Use Random.Shared directly (static readonly PascalCase)
 
     public DecorrelatedJitterRetryStrategy()
         : this(maxRetries: 3, baseDelay: TimeSpan.FromMilliseconds(500), maxDelay: TimeSpan.FromSeconds(30))
@@ -670,7 +670,7 @@ public sealed class DecorrelatedJitterRetryStrategy : ResilienceStrategyBase
         // Decorrelated jitter: sleep = min(cap, random_between(base, sleep * 3))
         var min = _baseDelay.TotalMilliseconds;
         var max = previousDelay.TotalMilliseconds * 3;
-        var delay = min + _random.NextDouble() * (max - min);
+        var delay = min + Random.Shared.NextDouble() * (max - min);
         delay = Math.Min(delay, _maxDelay.TotalMilliseconds);
         previousDelay = TimeSpan.FromMilliseconds(delay);
         return previousDelay;

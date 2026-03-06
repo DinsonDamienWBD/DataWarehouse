@@ -88,7 +88,7 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
     private readonly List<(string regionId, string endpoint, int priority, bool isHealthy)> _regions = new();
     private string? _activeRegionId;
     private readonly object _lock = new();
-    private readonly TimeSpan _healthCheckInterval;
+    internal TimeSpan HealthCheckInterval { get; }
     private readonly int _failureThreshold;
     private int _consecutiveFailures;
     private DateTimeOffset _lastHealthCheck = DateTimeOffset.MinValue;
@@ -102,7 +102,7 @@ public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
     {
         if (healthCheckInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(healthCheckInterval), "Health check interval must be positive.");
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(failureThreshold);
-        _healthCheckInterval = healthCheckInterval;
+        HealthCheckInterval = healthCheckInterval;
         _failureThreshold = failureThreshold;
     }
 
@@ -601,7 +601,7 @@ public sealed class MultiRegionDisasterRecoveryStrategy : ResilienceStrategyBase
     private string? _primaryRegionId;
     private DisasterRecoveryMode _mode = DisasterRecoveryMode.Normal;
     private readonly bool _activeActive;
-    private readonly TimeSpan _syncInterval;
+    internal TimeSpan SyncInterval { get; }
     private readonly object _lock = new();
 
     private sealed class RegionState
@@ -622,7 +622,7 @@ public sealed class MultiRegionDisasterRecoveryStrategy : ResilienceStrategyBase
     public MultiRegionDisasterRecoveryStrategy(bool activeActive, TimeSpan syncInterval)
     {
         _activeActive = activeActive;
-        _syncInterval = syncInterval;
+        SyncInterval = syncInterval;
     }
 
     public override string StrategyId => "disaster-recovery-multi-region";
@@ -1073,7 +1073,7 @@ public sealed class DataCenterFailoverStrategy : ResilienceStrategyBase
     private readonly List<DataCenterInfo> _dataCenters = new();
     private string? _activeDataCenterId;
     private DisasterRecoveryMode _mode = DisasterRecoveryMode.Normal;
-    private readonly TimeSpan _failoverTimeout;
+    internal TimeSpan FailoverTimeout { get; }
     private readonly object _lock = new();
 
     private sealed class DataCenterInfo
@@ -1095,7 +1095,7 @@ public sealed class DataCenterFailoverStrategy : ResilienceStrategyBase
     public DataCenterFailoverStrategy(TimeSpan failoverTimeout)
     {
         if (failoverTimeout <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(failoverTimeout), "Failover timeout must be positive.");
-        _failoverTimeout = failoverTimeout;
+        FailoverTimeout = failoverTimeout;
     }
 
     public override string StrategyId => "disaster-recovery-datacenter-failover";

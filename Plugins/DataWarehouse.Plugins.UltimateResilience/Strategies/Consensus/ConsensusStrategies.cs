@@ -19,21 +19,21 @@ public sealed class RaftConsensusStrategy : ResilienceStrategyBase
 {
     private RaftState _state = RaftState.Follower;
     private long _currentTerm;
-    private string? _votedFor;
+    internal string? VotedFor { get; set; }
     private string? _leaderId;
     private readonly BoundedDictionary<string, long> _nextIndex = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, long> _matchIndex = new BoundedDictionary<string, long>(1000);
-    private readonly List<(long term, object command)> _log = new();
+    internal List<(long term, object command)> LogEntries { get; } = new();
 #pragma warning disable CS0649 // _commitIndex is assigned during network replication (requires configured endpoints)
     private long _commitIndex;
 #pragma warning restore CS0649
     private DateTimeOffset _lastHeartbeat = DateTimeOffset.UtcNow;
     private readonly object _stateLock = new();
 
-    private readonly string _nodeId;
+    internal string NodeId { get; }
     private readonly List<string> _clusterNodes;
     private readonly TimeSpan _electionTimeout;
-    private readonly TimeSpan _heartbeatInterval;
+    internal TimeSpan HeartbeatInterval { get; }
 
     public RaftConsensusStrategy()
         : this(
@@ -54,10 +54,10 @@ public sealed class RaftConsensusStrategy : ResilienceStrategyBase
         if (heartbeatInterval <= TimeSpan.Zero)
             throw new ArgumentOutOfRangeException(nameof(heartbeatInterval), "Heartbeat interval must be positive.");
 
-        _nodeId = nodeId;
+        NodeId = nodeId;
         _clusterNodes = clusterNodes;
         _electionTimeout = electionTimeout;
-        _heartbeatInterval = heartbeatInterval;
+        HeartbeatInterval = heartbeatInterval;
     }
 
     public override string StrategyId => "consensus-raft";
@@ -112,7 +112,7 @@ public sealed class RaftConsensusStrategy : ResilienceStrategyBase
         {
             _state = RaftState.Candidate;
             _currentTerm++;
-            _votedFor = _nodeId;
+            VotedFor = NodeId;
         }
 
         // Cluster endpoints must be configured for actual RPC communication.
@@ -134,7 +134,7 @@ public sealed class RaftConsensusStrategy : ResilienceStrategyBase
 
         lock (_stateLock)
         {
-            _log.Add((_currentTerm, command));
+            LogEntries.Add((_currentTerm, command));
         }
 
         // AppendEntries RPC requires configured network transport
@@ -238,8 +238,8 @@ public sealed class PaxosConsensusStrategy : ResilienceStrategyBase
     private readonly BoundedDictionary<long, object?> _promises = new BoundedDictionary<long, object?>(1000);
     private readonly object _stateLock = new();
 
-    private readonly string _nodeId;
-    private readonly int _quorumSize;
+    internal string NodeId { get; }
+    internal int QuorumSize { get; }
 
     public PaxosConsensusStrategy()
         : this(nodeId: Guid.NewGuid().ToString("N")[..8], quorumSize: 3)
@@ -248,8 +248,8 @@ public sealed class PaxosConsensusStrategy : ResilienceStrategyBase
 
     public PaxosConsensusStrategy(string nodeId, int quorumSize)
     {
-        _nodeId = nodeId;
-        _quorumSize = quorumSize;
+        NodeId = nodeId;
+        QuorumSize = quorumSize;
     }
 
     public override string StrategyId => "consensus-paxos";
@@ -319,7 +319,7 @@ public sealed class PaxosConsensusStrategy : ResilienceStrategyBase
                 Metadata =
                 {
                     ["proposalNumber"] = _proposalNumber,
-                    ["quorumSize"] = _quorumSize
+                    ["quorumSize"] = QuorumSize
                 }
             };
         }
@@ -352,9 +352,9 @@ public sealed class PbftConsensusStrategy : ResilienceStrategyBase
     private readonly BoundedDictionary<long, object> _committed = new BoundedDictionary<long, object>(1000);
     private readonly object _stateLock = new();
 
-    private readonly string _nodeId;
-    private readonly int _totalNodes;
-    private readonly int _faultyNodes;
+    internal string NodeId { get; }
+    internal int TotalNodes { get; }
+    internal int FaultyNodes { get; }
 
     public PbftConsensusStrategy()
         : this(nodeId: Guid.NewGuid().ToString("N")[..8], totalNodes: 4, faultyNodes: 1)
@@ -363,9 +363,9 @@ public sealed class PbftConsensusStrategy : ResilienceStrategyBase
 
     public PbftConsensusStrategy(string nodeId, int totalNodes, int faultyNodes)
     {
-        _nodeId = nodeId;
-        _totalNodes = totalNodes;
-        _faultyNodes = faultyNodes;
+        NodeId = nodeId;
+        TotalNodes = totalNodes;
+        FaultyNodes = faultyNodes;
     }
 
     public override string StrategyId => "consensus-pbft";
@@ -468,8 +468,8 @@ public sealed class ZabConsensusStrategy : ResilienceStrategyBase
     private readonly BoundedDictionary<long, int> _ackCounts = new BoundedDictionary<long, int>(1000);
     private readonly object _stateLock = new();
 
-    private readonly string _nodeId;
-    private readonly int _quorumSize;
+    internal string NodeId { get; }
+    internal int QuorumSize { get; }
 
     public ZabConsensusStrategy()
         : this(nodeId: Guid.NewGuid().ToString("N")[..8], quorumSize: 3)
@@ -478,8 +478,8 @@ public sealed class ZabConsensusStrategy : ResilienceStrategyBase
 
     public ZabConsensusStrategy(string nodeId, int quorumSize)
     {
-        _nodeId = nodeId;
-        _quorumSize = quorumSize;
+        NodeId = nodeId;
+        QuorumSize = quorumSize;
     }
 
     public override string StrategyId => "consensus-zab";
@@ -609,11 +609,11 @@ public sealed class ViewstampedReplicationStrategy : ResilienceStrategyBase
     private long _commitNumber;
 #pragma warning restore CS0649
     private bool _isPrimary;
-    private readonly BoundedDictionary<long, object> _log = new BoundedDictionary<long, object>(1000);
+    private readonly BoundedDictionary<long, object> LogEntries = new BoundedDictionary<long, object>(1000);
     private readonly object _stateLock = new();
 
-    private readonly string _nodeId;
-    private readonly int _replicaCount;
+    internal string NodeId { get; }
+    internal int ReplicaCount { get; }
 
     public ViewstampedReplicationStrategy()
         : this(nodeId: Guid.NewGuid().ToString("N")[..8], replicaCount: 3)
@@ -622,8 +622,8 @@ public sealed class ViewstampedReplicationStrategy : ResilienceStrategyBase
 
     public ViewstampedReplicationStrategy(string nodeId, int replicaCount)
     {
-        _nodeId = nodeId;
-        _replicaCount = replicaCount;
+        NodeId = nodeId;
+        ReplicaCount = replicaCount;
     }
 
     public override string StrategyId => "consensus-viewstamped";
@@ -653,7 +653,7 @@ public sealed class ViewstampedReplicationStrategy : ResilienceStrategyBase
         lock (_stateLock)
         {
             _opNumber++;
-            _log[_opNumber] = request;
+            LogEntries[_opNumber] = request;
         }
 
         // PREPARE/COMMIT require network transport to backup replicas

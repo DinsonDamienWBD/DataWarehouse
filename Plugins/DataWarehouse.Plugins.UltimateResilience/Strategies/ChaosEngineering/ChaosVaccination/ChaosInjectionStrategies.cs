@@ -193,7 +193,7 @@ public sealed class ImmuneAutoRemediationStrategy : ChaosVaccinationStrategyBase
 /// </remarks>
 public sealed class BlastRadiusGuardStrategy : ChaosVaccinationStrategyBase
 {
-    private readonly string[] _targetPlugins;
+    internal string[] TargetPlugins { get; }
     private readonly int _maxDurationMs;
 
     /// <inheritdoc />
@@ -208,7 +208,7 @@ public sealed class BlastRadiusGuardStrategy : ChaosVaccinationStrategyBase
         string[] targetPlugins,
         int maxDurationMs = 120_000)
     {
-        _targetPlugins = targetPlugins ?? throw new ArgumentNullException(nameof(targetPlugins));
+        TargetPlugins = targetPlugins ?? throw new ArgumentNullException(nameof(targetPlugins));
         _maxDurationMs = maxDurationMs;
 
         if (targetPlugins.Length == 0)

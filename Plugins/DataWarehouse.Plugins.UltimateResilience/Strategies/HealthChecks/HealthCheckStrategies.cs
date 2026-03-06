@@ -53,7 +53,7 @@ public sealed class HealthCheckResult
 public sealed class LivenessHealthCheckStrategy : ResilienceStrategyBase
 {
     private readonly List<Func<CancellationToken, Task<bool>>> _checks = new();
-    private HealthCheckResult? _lastResult;
+    internal HealthCheckResult? LastResultValue { get; set; }
     private readonly object _lock = new();
 
     public LivenessHealthCheckStrategy()
@@ -78,7 +78,7 @@ public sealed class LivenessHealthCheckStrategy : ResilienceStrategyBase
     };
 
     /// <summary>Gets the last health check result.</summary>
-    public HealthCheckResult? LastResult => _lastResult;
+    public HealthCheckResult? LastResult => LastResultValue;
 
     /// <summary>
     /// Adds a liveness check.
@@ -145,7 +145,7 @@ public sealed class LivenessHealthCheckStrategy : ResilienceStrategyBase
     {
         lock (_lock)
         {
-            _lastResult = result;
+            LastResultValue = result;
         }
         return result;
     }
@@ -200,7 +200,7 @@ public sealed class LivenessHealthCheckStrategy : ResilienceStrategyBase
     }
 
     protected override string? GetCurrentState() =>
-        _lastResult != null ? $"{_lastResult.Status} ({_lastResult.Duration.TotalMilliseconds:F1}ms)" : "Not checked";
+        LastResult != null ? $"{LastResult.Status} ({LastResult.Duration.TotalMilliseconds:F1}ms)" : "Not checked";
 }
 
 /// <summary>
@@ -209,7 +209,7 @@ public sealed class LivenessHealthCheckStrategy : ResilienceStrategyBase
 public sealed class ReadinessHealthCheckStrategy : ResilienceStrategyBase
 {
     private readonly List<(string name, Func<CancellationToken, Task<HealthCheckResult>> check)> _checks = new();
-    private HealthCheckResult? _lastResult;
+    internal HealthCheckResult? LastResultValue { get; set; }
     private readonly object _lock = new();
 
     public ReadinessHealthCheckStrategy()
@@ -234,7 +234,7 @@ public sealed class ReadinessHealthCheckStrategy : ResilienceStrategyBase
     };
 
     /// <summary>Gets the last health check result.</summary>
-    public HealthCheckResult? LastResult => _lastResult;
+    public HealthCheckResult? LastResult => LastResultValue;
 
     /// <summary>
     /// Adds a readiness check.
@@ -321,7 +321,7 @@ public sealed class ReadinessHealthCheckStrategy : ResilienceStrategyBase
 
         lock (_lock)
         {
-            _lastResult = finalResult;
+            LastResultValue = finalResult;
         }
 
         return finalResult;
@@ -379,9 +379,9 @@ public sealed class ReadinessHealthCheckStrategy : ResilienceStrategyBase
 
     protected override string? GetCurrentState()
     {
-        if (_lastResult == null) return "Not checked";
-        var healthy = _lastResult.Components.Count(c => c.Value.Status == HealthStatus.Healthy);
-        return $"{_lastResult.Status} ({healthy}/{_lastResult.Components.Count} healthy)";
+        if (LastResult == null) return "Not checked";
+        var healthy = LastResult.Components.Count(c => c.Value.Status == HealthStatus.Healthy);
+        return $"{LastResult.Status} ({healthy}/{LastResult.Components.Count} healthy)";
     }
 }
 
@@ -391,7 +391,7 @@ public sealed class ReadinessHealthCheckStrategy : ResilienceStrategyBase
 public sealed class StartupProbeHealthCheckStrategy : ResilienceStrategyBase
 {
     private bool _startupComplete;
-    private HealthCheckResult? _lastResult;
+    internal HealthCheckResult? LastResultValue { get; set; }
     private readonly Func<CancellationToken, Task<bool>> _startupCheck;
     private readonly TimeSpan _timeout;
     private readonly TimeSpan _checkInterval;
@@ -474,7 +474,7 @@ public sealed class StartupProbeHealthCheckStrategy : ResilienceStrategyBase
 
                     lock (_lock)
                     {
-                        _lastResult = successResult;
+                        LastResultValue = successResult;
                     }
 
                     return successResult;
@@ -504,7 +504,7 @@ public sealed class StartupProbeHealthCheckStrategy : ResilienceStrategyBase
 
         lock (_lock)
         {
-            _lastResult = failureResult;
+            LastResultValue = failureResult;
         }
 
         return failureResult;
@@ -518,7 +518,7 @@ public sealed class StartupProbeHealthCheckStrategy : ResilienceStrategyBase
         lock (_lock)
         {
             _startupComplete = true;
-            _lastResult = new HealthCheckResult
+            LastResultValue = new HealthCheckResult
             {
                 Status = HealthStatus.Healthy,
                 Description = "Startup marked complete manually"
@@ -589,7 +589,7 @@ public sealed class StartupProbeHealthCheckStrategy : ResilienceStrategyBase
 public sealed class DeepHealthCheckStrategy : ResilienceStrategyBase
 {
     private readonly List<(string name, Func<CancellationToken, Task<HealthCheckResult>> check, bool critical)> _checks = new();
-    private HealthCheckResult? _lastResult;
+    internal HealthCheckResult? LastResultValue { get; set; }
     private readonly TimeSpan _cacheValidity;
     private DateTimeOffset _lastCheckTime = DateTimeOffset.MinValue;
     private readonly object _lock = new();
@@ -623,7 +623,7 @@ public sealed class DeepHealthCheckStrategy : ResilienceStrategyBase
     };
 
     /// <summary>Gets the last health check result.</summary>
-    public HealthCheckResult? LastResult => _lastResult;
+    public HealthCheckResult? LastResult => LastResultValue;
 
     /// <summary>
     /// Adds a dependency check.
@@ -674,9 +674,9 @@ public sealed class DeepHealthCheckStrategy : ResilienceStrategyBase
         // Check cache
         lock (_lock)
         {
-            if (_lastResult != null && DateTimeOffset.UtcNow - _lastCheckTime < _cacheValidity)
+            if (LastResult != null && DateTimeOffset.UtcNow - _lastCheckTime < _cacheValidity)
             {
-                return _lastResult;
+                return LastResult;
             }
         }
 
@@ -748,7 +748,7 @@ public sealed class DeepHealthCheckStrategy : ResilienceStrategyBase
 
         lock (_lock)
         {
-            _lastResult = finalResult;
+            LastResultValue = finalResult;
             _lastCheckTime = DateTimeOffset.UtcNow;
         }
 
@@ -807,9 +807,9 @@ public sealed class DeepHealthCheckStrategy : ResilienceStrategyBase
 
     protected override string? GetCurrentState()
     {
-        if (_lastResult == null) return "Not checked";
-        var healthy = _lastResult.Components.Count(c => c.Value.Status == HealthStatus.Healthy);
-        return $"{_lastResult.Status} ({healthy}/{_lastResult.Components.Count} healthy)";
+        if (LastResult == null) return "Not checked";
+        var healthy = LastResult.Components.Count(c => c.Value.Status == HealthStatus.Healthy);
+        return $"{LastResult.Status} ({healthy}/{LastResult.Components.Count} healthy)";
     }
 }
 

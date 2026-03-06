@@ -15,7 +15,7 @@ public sealed class FaultInjectionStrategy : ResilienceStrategyBase
     private readonly double _faultRate;
     private readonly Type[] _exceptionTypes;
     private readonly string[]? _faultMessages;
-    private static readonly Random _random = Random.Shared;
+    // Finding: Use Random.Shared directly (static readonly PascalCase)
     private volatile bool _enabled = true;
 
     public FaultInjectionStrategy()
@@ -64,9 +64,9 @@ public sealed class FaultInjectionStrategy : ResilienceStrategyBase
     /// </summary>
     private Exception CreateFault()
     {
-        var exceptionType = _exceptionTypes[_random.Next(_exceptionTypes.Length)];
+        var exceptionType = _exceptionTypes[Random.Shared.Next(_exceptionTypes.Length)];
         var message = _faultMessages != null && _faultMessages.Length > 0
-            ? _faultMessages[_random.Next(_faultMessages.Length)]
+            ? _faultMessages[Random.Shared.Next(_faultMessages.Length)]
             : "Chaos engineering: injected fault";
 
         try
@@ -86,7 +86,7 @@ public sealed class FaultInjectionStrategy : ResilienceStrategyBase
     {
         var startTime = DateTimeOffset.UtcNow;
 
-        if (_enabled && _random.NextDouble() < _faultRate)
+        if (_enabled && Random.Shared.NextDouble() < _faultRate)
         {
             var fault = CreateFault();
             return new ResilienceResult<T>
@@ -141,7 +141,7 @@ public sealed class LatencyInjectionStrategy : ResilienceStrategyBase
     private readonly double _injectionRate;
     private readonly TimeSpan _minLatency;
     private readonly TimeSpan _maxLatency;
-    private static readonly Random _random = Random.Shared;
+    // Finding: Use Random.Shared directly (static readonly PascalCase)
     private volatile bool _enabled = true;
 
     public LatencyInjectionStrategy()
@@ -189,7 +189,7 @@ public sealed class LatencyInjectionStrategy : ResilienceStrategyBase
     private TimeSpan GetRandomLatency()
     {
         var range = _maxLatency.TotalMilliseconds - _minLatency.TotalMilliseconds;
-        var latency = _minLatency.TotalMilliseconds + _random.NextDouble() * range;
+        var latency = _minLatency.TotalMilliseconds + Random.Shared.NextDouble() * range;
         return TimeSpan.FromMilliseconds(latency);
     }
 
@@ -201,7 +201,7 @@ public sealed class LatencyInjectionStrategy : ResilienceStrategyBase
         var startTime = DateTimeOffset.UtcNow;
         TimeSpan? injectedLatency = null;
 
-        if (_enabled && _random.NextDouble() < _injectionRate)
+        if (_enabled && Random.Shared.NextDouble() < _injectionRate)
         {
             injectedLatency = GetRandomLatency();
             await Task.Delay(injectedLatency.Value, cancellationToken);
@@ -252,7 +252,7 @@ public sealed class LatencyInjectionStrategy : ResilienceStrategyBase
 public sealed class ProcessTerminationStrategy : ResilienceStrategyBase
 {
     private readonly double _terminationRate;
-    private static readonly Random _random = Random.Shared;
+    // Finding: Use Random.Shared directly (static readonly PascalCase)
     private volatile bool _enabled = true;
     private readonly Action? _onTermination;
 
@@ -299,7 +299,7 @@ public sealed class ProcessTerminationStrategy : ResilienceStrategyBase
     {
         var startTime = DateTimeOffset.UtcNow;
 
-        if (_enabled && _random.NextDouble() < _terminationRate)
+        if (_enabled && Random.Shared.NextDouble() < _terminationRate)
         {
             // Execute callback instead of actually terminating
             _onTermination?.Invoke();
@@ -354,7 +354,7 @@ public sealed class ResourceExhaustionStrategy : ResilienceStrategyBase
 {
     private readonly double _exhaustionRate;
     private readonly string[] _resourceTypes;
-    private static readonly Random _random = Random.Shared;
+    // Finding: Use Random.Shared directly (static readonly PascalCase)
     private volatile bool _enabled = true;
 
     public ResourceExhaustionStrategy()
@@ -402,15 +402,15 @@ public sealed class ResourceExhaustionStrategy : ResilienceStrategyBase
     {
         var startTime = DateTimeOffset.UtcNow;
 
-        if (_enabled && _random.NextDouble() < _exhaustionRate)
+        if (_enabled && Random.Shared.NextDouble() < _exhaustionRate)
         {
-            var resourceType = _resourceTypes[_random.Next(_resourceTypes.Length)];
+            var resourceType = _resourceTypes[Random.Shared.Next(_resourceTypes.Length)];
             var exception = resourceType switch
             {
                 "memory" => new OutOfMemoryException("Chaos engineering: simulated memory exhaustion"),
                 "cpu" => new InvalidOperationException("Chaos engineering: simulated CPU saturation"),
                 "connections" => new InvalidOperationException("Chaos engineering: connection pool exhausted"),
-                "disk" => new IOException("Chaos engineering: disk space exhausted"),
+                "disk" => new ChaosIoException("Chaos engineering: disk space exhausted"),
                 _ => new Exception($"Chaos engineering: {resourceType} exhaustion")
             };
 
@@ -465,7 +465,7 @@ public sealed class NetworkPartitionStrategy : ResilienceStrategyBase
 {
     private readonly double _partitionRate;
     private readonly TimeSpan _partitionDuration;
-    private static readonly Random _random = Random.Shared;
+    // Finding: Use Random.Shared directly (static readonly PascalCase)
     private volatile bool _enabled = true;
     private DateTimeOffset _partitionEnd = DateTimeOffset.MinValue;
     private readonly object _lock = new();
@@ -547,7 +547,7 @@ public sealed class NetworkPartitionStrategy : ResilienceStrategyBase
             }
 
             // Randomly start a partition
-            if (_enabled && _random.NextDouble() < _partitionRate)
+            if (_enabled && Random.Shared.NextDouble() < _partitionRate)
             {
                 _partitionEnd = DateTimeOffset.UtcNow + _partitionDuration;
 
@@ -615,7 +615,7 @@ public sealed class ChaosMonkeyStrategy : ResilienceStrategyBase
 {
     private readonly List<(string name, ResilienceStrategyBase strategy, double weight)> _chaosStrategies = new();
     private readonly object _chaosStrategiesLock = new();
-    private static readonly Random _random = Random.Shared;
+    // Finding: Use Random.Shared directly (static readonly PascalCase)
     private volatile bool _enabled = true;
     private readonly double _overallRate;
 
@@ -674,7 +674,7 @@ public sealed class ChaosMonkeyStrategy : ResilienceStrategyBase
 
     private ResilienceStrategyBase? SelectRandomChaos()
     {
-        if (!_enabled || _random.NextDouble() >= _overallRate)
+        if (!_enabled || Random.Shared.NextDouble() >= _overallRate)
             return null;
 
         (string name, ResilienceStrategyBase strategy, double weight)[] snapshot;
@@ -686,7 +686,7 @@ public sealed class ChaosMonkeyStrategy : ResilienceStrategyBase
         if (snapshot.Length == 0) return null;
 
         var totalWeight = snapshot.Sum(s => s.weight);
-        var randomValue = _random.NextDouble() * totalWeight;
+        var randomValue = Random.Shared.NextDouble() * totalWeight;
         var cumulative = 0.0;
 
         foreach (var (_, strategy, weight) in snapshot)
@@ -770,9 +770,9 @@ public sealed class ChaosNetworkPartitionException : Exception
 /// <summary>
 /// IO exception for simulated disk issues.
 /// </summary>
-public sealed class IOException : Exception
+public sealed class ChaosIoException : Exception
 {
-    public IOException(string message) : base(message) { }
+    public ChaosIoException(string message) : base(message) { }
 }
 
 internal static class TimeSpanExtensions

@@ -56,8 +56,8 @@ public sealed class LoadBalancerEndpoint
 /// </summary>
 public abstract class LoadBalancingStrategyBase : ResilienceStrategyBase
 {
-    protected readonly List<LoadBalancerEndpoint> _endpoints = new();
-    protected readonly object _endpointsLock = new();
+    protected readonly List<LoadBalancerEndpoint> Endpoints = new();
+    protected readonly object EndpointsLock = new();
 
     public override string Category => "LoadBalancing";
 
@@ -66,9 +66,9 @@ public abstract class LoadBalancingStrategyBase : ResilienceStrategyBase
     /// </summary>
     public virtual void AddEndpoint(LoadBalancerEndpoint endpoint)
     {
-        lock (_endpointsLock)
+        lock (EndpointsLock)
         {
-            _endpoints.Add(endpoint);
+            Endpoints.Add(endpoint);
         }
     }
 
@@ -77,9 +77,9 @@ public abstract class LoadBalancingStrategyBase : ResilienceStrategyBase
     /// </summary>
     public virtual bool RemoveEndpoint(string endpointId)
     {
-        lock (_endpointsLock)
+        lock (EndpointsLock)
         {
-            return _endpoints.RemoveAll(e => e.EndpointId == endpointId) > 0;
+            return Endpoints.RemoveAll(e => e.EndpointId == endpointId) > 0;
         }
     }
 
@@ -88,9 +88,9 @@ public abstract class LoadBalancingStrategyBase : ResilienceStrategyBase
     /// </summary>
     public virtual IReadOnlyList<LoadBalancerEndpoint> GetEndpoints()
     {
-        lock (_endpointsLock)
+        lock (EndpointsLock)
         {
-            return _endpoints.ToList();
+            return Endpoints.ToList();
         }
     }
 
@@ -99,9 +99,9 @@ public abstract class LoadBalancingStrategyBase : ResilienceStrategyBase
     /// </summary>
     protected virtual IReadOnlyList<LoadBalancerEndpoint> GetHealthyEndpoints()
     {
-        lock (_endpointsLock)
+        lock (EndpointsLock)
         {
-            return _endpoints.Where(e => e.IsHealthy).ToList();
+            return Endpoints.Where(e => e.IsHealthy).ToList();
         }
     }
 
@@ -240,17 +240,17 @@ public sealed class WeightedRoundRobinLoadBalancingStrategy : LoadBalancingStrat
 
     private void RecalculateWeights()
     {
-        lock (_endpointsLock)
+        lock (EndpointsLock)
         {
-            if (_endpoints.Count == 0)
+            if (Endpoints.Count == 0)
             {
                 _maxWeight = 0;
                 _gcd = 1;
                 return;
             }
 
-            _maxWeight = _endpoints.Max(e => e.Weight);
-            _gcd = _endpoints.Aggregate(_endpoints[0].Weight, (acc, e) => Gcd(acc, e.Weight));
+            _maxWeight = Endpoints.Max(e => e.Weight);
+            _gcd = Endpoints.Aggregate(Endpoints[0].Weight, (acc, e) => Gcd(acc, e.Weight));
         }
     }
 
@@ -267,7 +267,7 @@ public sealed class WeightedRoundRobinLoadBalancingStrategy : LoadBalancingStrat
 
     public override LoadBalancerEndpoint? SelectEndpoint(ResilienceContext? context = null)
     {
-        lock (_endpointsLock)
+        lock (EndpointsLock)
         {
             var healthy = GetHealthyEndpoints();
             if (healthy.Count == 0) return null;
@@ -437,7 +437,7 @@ public sealed class LeastConnectionsLoadBalancingStrategy : LoadBalancingStrateg
 /// </summary>
 public sealed class RandomLoadBalancingStrategy : LoadBalancingStrategyBase
 {
-    private static readonly Random _random = Random.Shared;
+    // Finding: Use Random.Shared directly (static readonly PascalCase)
 
     public override string StrategyId => "lb-random";
     public override string StrategyName => "Random Load Balancer";
@@ -460,10 +460,8 @@ public sealed class RandomLoadBalancingStrategy : LoadBalancingStrategyBase
         var healthy = GetHealthyEndpoints();
         if (healthy.Count == 0) return null;
 
-        lock (_random)
-        {
-            return healthy[_random.Next(healthy.Count)];
-        }
+        // Random.Shared is thread-safe — no lock needed
+        return healthy[Random.Shared.Next(healthy.Count)];
     }
 
     protected override async Task<ResilienceResult<T>> ExecuteCoreAsync<T>(
@@ -551,14 +549,14 @@ public sealed class IpHashLoadBalancingStrategy : LoadBalancingStrategyBase
     private static uint ComputeHash(string key)
     {
         // FNV-1a 32-bit — safe for distribution, no security-scanner false positives
-        const uint FnvPrime = 16777619u;
-        const uint FnvOffsetBasis = 2166136261u;
+        const uint fnvPrime = 16777619u;
+        const uint fnvOffsetBasis = 2166136261u;
         var bytes = Encoding.UTF8.GetBytes(key);
-        uint hash = FnvOffsetBasis;
+        uint hash = fnvOffsetBasis;
         foreach (var b in bytes)
         {
             hash ^= b;
-            hash *= FnvPrime;
+            hash *= fnvPrime;
         }
         return hash;
     }
@@ -711,14 +709,14 @@ public sealed class ConsistentHashingLoadBalancingStrategy : LoadBalancingStrate
     private static uint ComputeHash(string key)
     {
         // FNV-1a 32-bit — safe for distribution, no security-scanner false positives
-        const uint FnvPrime = 16777619u;
-        const uint FnvOffsetBasis = 2166136261u;
+        const uint fnvPrime = 16777619u;
+        const uint fnvOffsetBasis = 2166136261u;
         var bytes = Encoding.UTF8.GetBytes(key);
-        uint hash = FnvOffsetBasis;
+        uint hash = fnvOffsetBasis;
         foreach (var b in bytes)
         {
             hash ^= b;
-            hash *= FnvPrime;
+            hash *= fnvPrime;
         }
         return hash;
     }
@@ -872,7 +870,7 @@ public sealed class LeastResponseTimeLoadBalancingStrategy : LoadBalancingStrate
 /// </summary>
 public sealed class PowerOfTwoChoicesLoadBalancingStrategy : LoadBalancingStrategyBase
 {
-    private static readonly Random _random = Random.Shared;
+    // Finding: Use Random.Shared directly (static readonly PascalCase)
 
     public override string StrategyId => "lb-power-of-two";
     public override string StrategyName => "Power of Two Choices Load Balancer";
@@ -896,15 +894,13 @@ public sealed class PowerOfTwoChoicesLoadBalancingStrategy : LoadBalancingStrate
         if (healthy.Count == 0) return null;
         if (healthy.Count == 1) return healthy[0];
 
-        LoadBalancerEndpoint choice1, choice2;
-        lock (_random)
+        // Random.Shared is thread-safe — no lock needed
+        var choice1 = healthy[Random.Shared.Next(healthy.Count)];
+        LoadBalancerEndpoint choice2;
+        do
         {
-            choice1 = healthy[_random.Next(healthy.Count)];
-            do
-            {
-                choice2 = healthy[_random.Next(healthy.Count)];
-            } while (choice2 == choice1 && healthy.Count > 1);
-        }
+            choice2 = healthy[Random.Shared.Next(healthy.Count)];
+        } while (choice2 == choice1 && healthy.Count > 1);
 
         return choice1.ActiveConnections <= choice2.ActiveConnections ? choice1 : choice2;
     }

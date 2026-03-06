@@ -573,7 +573,7 @@ public sealed class AdaptiveBulkheadStrategy : ResilienceStrategyBase
 
     private readonly int _minCapacity;
     private readonly int _maxCapacity;
-    private readonly int _baseCapacity;
+    internal int BaseCapacity { get; }
     private readonly TimeSpan _targetLatency;
     private readonly TimeSpan _adaptationInterval;
 
@@ -592,7 +592,7 @@ public sealed class AdaptiveBulkheadStrategy : ResilienceStrategyBase
         if (adaptationInterval <= TimeSpan.Zero) throw new ArgumentOutOfRangeException(nameof(adaptationInterval), "Adaptation interval must be positive.");
         _minCapacity = minCapacity;
         _maxCapacity = maxCapacity;
-        _baseCapacity = baseCapacity;
+        BaseCapacity = baseCapacity;
         _currentCapacity = baseCapacity;
         _targetLatency = targetLatency;
         _adaptationInterval = adaptationInterval;

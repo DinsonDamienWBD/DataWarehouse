@@ -214,8 +214,8 @@ public abstract class ResilienceStrategyBase : StrategyBase, IResilienceStrategy
     // Stored as ticks (0 = never) for atomic read/write via Interlocked
     private long _lastFailureTicks;
     private long _lastSuccessTicks;
-    private DateTimeOffset? _lastFailure => _lastFailureTicks == 0 ? (DateTimeOffset?)null : new DateTimeOffset(_lastFailureTicks, TimeSpan.Zero);
-    private DateTimeOffset? _lastSuccess => _lastSuccessTicks == 0 ? (DateTimeOffset?)null : new DateTimeOffset(_lastSuccessTicks, TimeSpan.Zero);
+    private DateTimeOffset? LastFailure => _lastFailureTicks == 0 ? (DateTimeOffset?)null : new DateTimeOffset(_lastFailureTicks, TimeSpan.Zero);
+    private DateTimeOffset? LastSuccess => _lastSuccessTicks == 0 ? (DateTimeOffset?)null : new DateTimeOffset(_lastSuccessTicks, TimeSpan.Zero);
 
     /// <inheritdoc/>
     public abstract override string StrategyId { get; }
@@ -323,8 +323,8 @@ public abstract class ResilienceStrategyBase : StrategyBase, IResilienceStrategy
             RetryAttempts = Interlocked.Read(ref _retryAttempts),
             CircuitBreakerRejections = Interlocked.Read(ref _circuitBreakerRejections),
             FallbackInvocations = Interlocked.Read(ref _fallbackInvocations),
-            LastFailure = _lastFailure,
-            LastSuccess = _lastSuccess,
+            LastFailure = LastFailure,
+            LastSuccess = LastSuccess,
             AverageExecutionTime = avgTime,
             P99ExecutionTime = p99Time,
             CurrentState = GetCurrentState()

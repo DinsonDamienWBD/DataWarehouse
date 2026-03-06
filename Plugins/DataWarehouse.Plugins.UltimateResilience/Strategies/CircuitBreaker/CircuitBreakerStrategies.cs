@@ -29,7 +29,7 @@ public sealed class StandardCircuitBreakerStrategy : ResilienceStrategyBase
     private CircuitBreakerState _state = CircuitBreakerState.Closed;
     private int _failureCount;
     private int _halfOpenSuccessCount;
-    private DateTimeOffset _lastFailureTime = DateTimeOffset.MinValue;
+    internal DateTimeOffset LastFailureTime { get; set; } = DateTimeOffset.MinValue;
     private DateTimeOffset _openedAt = DateTimeOffset.MinValue;
     private readonly object _stateLock = new();
 
@@ -175,7 +175,7 @@ public sealed class StandardCircuitBreakerStrategy : ResilienceStrategyBase
 
     private void OnFailure()
     {
-        _lastFailureTime = DateTimeOffset.UtcNow;
+        LastFailureTime = DateTimeOffset.UtcNow;
 
         if (_state == CircuitBreakerState.HalfOpen)
         {
@@ -205,7 +205,7 @@ public sealed class StandardCircuitBreakerStrategy : ResilienceStrategyBase
         {
             _state = CircuitBreakerState.Closed;
             _failureCount = 0;
-            _lastFailureTime = DateTimeOffset.MinValue;
+            LastFailureTime = DateTimeOffset.MinValue;
             _openedAt = DateTimeOffset.MinValue;
         }
     }
@@ -743,9 +743,9 @@ public sealed class GradualRecoveryCircuitBreakerStrategy : ResilienceStrategyBa
     private DateTimeOffset _openedAt = DateTimeOffset.MinValue;
     private double _halfOpenPermitRate = 0.0;
     private int _halfOpenSuccesses;
-    private int _halfOpenAttempts;
+    internal int HalfOpenAttempts { get; set; }
     private readonly object _stateLock = new();
-    private static readonly Random _random = Random.Shared;
+    // Finding: Use Random.Shared directly (static readonly PascalCase)
 
     private readonly int _failureThreshold;
     private readonly TimeSpan _openDuration;
@@ -805,7 +805,7 @@ public sealed class GradualRecoveryCircuitBreakerStrategy : ResilienceStrategyBa
                     _state = CircuitBreakerState.HalfOpen;
                     _halfOpenPermitRate = _initialPermitRate;
                     _halfOpenSuccesses = 0;
-                    _halfOpenAttempts = 0;
+                    HalfOpenAttempts = 0;
                 }
                 else
                 {
@@ -823,8 +823,8 @@ public sealed class GradualRecoveryCircuitBreakerStrategy : ResilienceStrategyBa
 
             if (_state == CircuitBreakerState.HalfOpen)
             {
-                _halfOpenAttempts++;
-                if (_random.NextDouble() > _halfOpenPermitRate)
+                HalfOpenAttempts++;
+                if (Random.Shared.NextDouble() > _halfOpenPermitRate)
                 {
                     RecordCircuitBreakerRejection();
                     return new ResilienceResult<T>
@@ -931,7 +931,7 @@ public sealed class GradualRecoveryCircuitBreakerStrategy : ResilienceStrategyBa
             _openedAt = DateTimeOffset.MinValue;
             _halfOpenPermitRate = 0.0;
             _halfOpenSuccesses = 0;
-            _halfOpenAttempts = 0;
+            HalfOpenAttempts = 0;
         }
     }
 }
