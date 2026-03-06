@@ -2799,8 +2799,8 @@ Plans:
 - [x] 099-05-PLAN.md -- UltimateStorage findings 1001-1243
 - [x] 099-06-PLAN.md -- UltimateIntelligence findings 1-187
 - [x] 099-07-PLAN.md -- UltimateIntelligence findings 188-374
-- [ ] 099-08-PLAN.md -- UltimateIntelligence findings 375-562
-- [ ] 099-09-PLAN.md -- UltimateConnector findings 1-180
+- [x] 099-08-PLAN.md -- UltimateIntelligence findings 375-562
+- [x] 099-09-PLAN.md -- UltimateConnector findings 1-180
 - [ ] 099-10-PLAN.md -- UltimateConnector findings 181-360
 - [ ] 099-11-PLAN.md -- UltimateConnector findings 361-542
 
