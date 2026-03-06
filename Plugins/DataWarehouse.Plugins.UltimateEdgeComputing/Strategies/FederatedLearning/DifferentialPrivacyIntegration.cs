@@ -10,7 +10,7 @@ namespace DataWarehouse.Plugins.UltimateEdgeComputing.Strategies.FederatedLearni
 public sealed class DifferentialPrivacyIntegration
 {
     // P2-2680: Random is not thread-safe; use Random.Shared which is thread-safe (per-thread instance under the hood).
-    private static readonly Random _random = Random.Shared;
+    private static readonly Random SharedRandom = Random.Shared;
     private double _remainingBudget;
 
     /// <summary>
@@ -105,8 +105,8 @@ public sealed class DifferentialPrivacyIntegration
     private double SampleGaussian(double mean, double stdDev)
     {
         // Box-Muller transform
-        var u1 = 1.0 - _random.NextDouble(); // Uniform(0,1]
-        var u2 = 1.0 - _random.NextDouble();
+        var u1 = 1.0 - SharedRandom.NextDouble(); // Uniform(0,1]
+        var u2 = 1.0 - SharedRandom.NextDouble();
 
         var randStdNormal = Math.Sqrt(-2.0 * Math.Log(u1)) * Math.Sin(2.0 * Math.PI * u2);
 

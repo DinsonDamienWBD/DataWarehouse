@@ -13,7 +13,7 @@ public enum ResourceCategory
     /// <summary>Memory allocation and management.</summary>
     Memory,
     /// <summary>I/O throttling and scheduling.</summary>
-    IO,
+    Io,
     /// <summary>GPU allocation and compute management.</summary>
     Gpu,
     /// <summary>Network bandwidth management.</summary>
@@ -139,7 +139,7 @@ public sealed record ResourceStrategyCapabilities
     /// <summary>Whether strategy supports memory management.</summary>
     public required bool SupportsMemory { get; init; }
     /// <summary>Whether strategy supports I/O management.</summary>
-    public required bool SupportsIO { get; init; }
+    public required bool SupportsIo { get; init; }
     /// <summary>Whether strategy supports GPU management.</summary>
     public required bool SupportsGpu { get; init; }
     /// <summary>Whether strategy supports network management.</summary>

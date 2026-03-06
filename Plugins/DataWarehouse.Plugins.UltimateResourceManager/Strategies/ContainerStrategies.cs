@@ -21,7 +21,7 @@ public sealed class CgroupV2Strategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Composite;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = true, SupportsMemory = true, SupportsIO = true,
+        SupportsCpu = true, SupportsMemory = true, SupportsIo = true,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = true, SupportsPreemption = true
     };
@@ -113,7 +113,7 @@ public sealed class DockerResourceStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Composite;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = true, SupportsMemory = true, SupportsIO = true,
+        SupportsCpu = true, SupportsMemory = true, SupportsIo = true,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = false
     };
@@ -198,7 +198,7 @@ public sealed class KubernetesResourceStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Composite;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = true, SupportsMemory = true, SupportsIO = false,
+        SupportsCpu = true, SupportsMemory = true, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = true, SupportsPreemption = true
     };
@@ -287,7 +287,7 @@ public sealed class PodmanResourceStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Composite;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = true, SupportsMemory = true, SupportsIO = true,
+        SupportsCpu = true, SupportsMemory = true, SupportsIo = true,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = true, SupportsPreemption = false
     };
@@ -365,7 +365,7 @@ public sealed class WindowsJobObjectStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Composite;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = true, SupportsMemory = true, SupportsIO = false,
+        SupportsCpu = true, SupportsMemory = true, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = true, SupportsPreemption = true
     };
@@ -447,7 +447,7 @@ public sealed class WindowsContainerStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Composite;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = true, SupportsMemory = true, SupportsIO = false,
+        SupportsCpu = true, SupportsMemory = true, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = false
     };
@@ -526,7 +526,7 @@ public sealed class ProcessGroupStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Composite;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = true, SupportsMemory = false, SupportsIO = true,
+        SupportsCpu = true, SupportsMemory = false, SupportsIo = true,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = true
     };
@@ -619,7 +619,7 @@ public sealed class NamespaceIsolationStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Composite;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = false, SupportsIO = false,
+        SupportsCpu = false, SupportsMemory = false, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = true, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = false
     };

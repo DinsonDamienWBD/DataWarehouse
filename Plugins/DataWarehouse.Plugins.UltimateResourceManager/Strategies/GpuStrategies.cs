@@ -16,7 +16,7 @@ public sealed class TimeSlicingGpuStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Gpu;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = false, SupportsIO = false,
+        SupportsCpu = false, SupportsMemory = false, SupportsIo = false,
         SupportsGpu = true, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = true
     };
@@ -98,7 +98,7 @@ public sealed class MigGpuStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Gpu;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = false, SupportsIO = false,
+        SupportsCpu = false, SupportsMemory = false, SupportsIo = false,
         SupportsGpu = true, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = false
     };
@@ -166,7 +166,7 @@ public sealed class MpsGpuStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Gpu;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = false, SupportsIO = false,
+        SupportsCpu = false, SupportsMemory = false, SupportsIo = false,
         SupportsGpu = true, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = false
     };
@@ -221,7 +221,7 @@ public sealed class VgpuStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Gpu;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = false, SupportsIO = false,
+        SupportsCpu = false, SupportsMemory = false, SupportsIo = false,
         SupportsGpu = true, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = true, SupportsPreemption = false
     };

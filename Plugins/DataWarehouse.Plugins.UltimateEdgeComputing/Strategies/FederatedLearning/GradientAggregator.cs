@@ -31,7 +31,7 @@ public sealed class GradientAggregator
         return strategy switch
         {
             AggregationStrategy.FedAvg => AggregateWithFedAvg(updates),
-            AggregationStrategy.FedSGD => AggregateWithFedSGD(updates),
+            AggregationStrategy.FedSgd => AggregateWithFedSgd(updates),
             _ => throw new ArgumentException($"Unknown aggregation strategy: {strategy}")
         };
     }
@@ -83,7 +83,7 @@ public sealed class GradientAggregator
     /// Federated SGD: simple average of per-sample gradients.
     /// g = (1/K) * Σ g_k where K = number of nodes.
     /// </summary>
-    private ModelWeights AggregateWithFedSGD(GradientUpdate[] updates)
+    private ModelWeights AggregateWithFedSgd(GradientUpdate[] updates)
     {
         var numNodes = updates.Length;
         var aggregatedWeights = new Dictionary<string, double[]>();

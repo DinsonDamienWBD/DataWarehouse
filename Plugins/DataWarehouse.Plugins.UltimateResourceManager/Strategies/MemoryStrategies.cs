@@ -14,7 +14,7 @@ public sealed class CgroupMemoryStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Memory;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = true, SupportsIO = false,
+        SupportsCpu = false, SupportsMemory = true, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = true, SupportsPreemption = false
     };
@@ -74,7 +74,7 @@ public sealed class BalloonMemoryStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Memory;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = true, SupportsIO = false,
+        SupportsCpu = false, SupportsMemory = true, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = true
     };
@@ -118,7 +118,7 @@ public sealed class PressureAwareMemoryStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Memory;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = true, SupportsIO = false,
+        SupportsCpu = false, SupportsMemory = true, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = true
     };
@@ -168,7 +168,7 @@ public sealed class HugePagesMemoryStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Memory;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = true, SupportsIO = false,
+        SupportsCpu = false, SupportsMemory = true, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = false
     };

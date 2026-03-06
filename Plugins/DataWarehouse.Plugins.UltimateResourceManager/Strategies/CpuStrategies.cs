@@ -17,7 +17,7 @@ public sealed class FairShareCpuStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Cpu;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = true, SupportsMemory = false, SupportsIO = false,
+        SupportsCpu = true, SupportsMemory = false, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = true, SupportsPreemption = true
     };
@@ -85,7 +85,7 @@ public sealed class PriorityCpuStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Cpu;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = true, SupportsMemory = false, SupportsIO = false,
+        SupportsCpu = true, SupportsMemory = false, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = true
     };
@@ -150,7 +150,7 @@ public sealed class AffinityCpuStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Cpu;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = true, SupportsMemory = false, SupportsIO = false,
+        SupportsCpu = true, SupportsMemory = false, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = false,
         SupportsHierarchicalQuotas = false, SupportsPreemption = false
     };
@@ -223,7 +223,7 @@ public sealed class RealTimeCpuStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Cpu;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = true, SupportsMemory = false, SupportsIO = false,
+        SupportsCpu = true, SupportsMemory = false, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = true
     };
@@ -286,7 +286,7 @@ public sealed class NumaCpuStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Cpu;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = true, SupportsMemory = true, SupportsIO = false,
+        SupportsCpu = true, SupportsMemory = true, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = true, SupportsPreemption = false
     };

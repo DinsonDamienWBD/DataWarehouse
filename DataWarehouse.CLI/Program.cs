@@ -41,7 +41,7 @@ public static class Program
         _history = new CommandHistory();
 
         // Try to get AI provider registry from environment or default
-        _aiRegistry = TryGetAIRegistry();
+        _aiRegistry = TryGetAiRegistry();
 
         // Initialize NLP with AI support if available
         var learningStorePath = GetLearningStorePath();
@@ -76,7 +76,7 @@ public static class Program
         // Check for AI help query
         if (args.Length >= 2 && (args[0] == "ai-help" || args[0] == "ask"))
         {
-            return await HandleAIHelpAsync(string.Join(" ", args.Skip(1)));
+            return await HandleAiHelpAsync(string.Join(" ", args.Skip(1)));
         }
 
         // Check for natural language mode (quoted argument)
@@ -100,7 +100,7 @@ public static class Program
     /// <summary>
     /// Tries to initialize the AI provider registry if configured.
     /// </summary>
-    private static IAiProviderRegistry? TryGetAIRegistry()
+    private static IAiProviderRegistry? TryGetAiRegistry()
     {
         // Check for environment variables that indicate AI is configured
         var openaiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY");
@@ -135,7 +135,7 @@ public static class Program
     /// <summary>
     /// Handles AI-powered help queries.
     /// </summary>
-    private static async Task<int> HandleAIHelpAsync(string query)
+    private static async Task<int> HandleAiHelpAsync(string query)
     {
         var result = await _nlp!.GetAiHelpAsync(query);
 

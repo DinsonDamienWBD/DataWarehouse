@@ -416,7 +416,7 @@ public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, ID
             {
                 ["supportsCpu"] = s.Capabilities.SupportsCpu,
                 ["supportsMemory"] = s.Capabilities.SupportsMemory,
-                ["supportsIO"] = s.Capabilities.SupportsIO,
+                ["supportsIO"] = s.Capabilities.SupportsIo,
                 ["supportsGpu"] = s.Capabilities.SupportsGpu,
                 ["supportsNetwork"] = s.Capabilities.SupportsNetwork,
                 ["supportsQuotas"] = s.Capabilities.SupportsQuotas,

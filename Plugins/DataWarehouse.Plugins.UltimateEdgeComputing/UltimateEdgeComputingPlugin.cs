@@ -1170,9 +1170,9 @@ internal sealed class MultiEdgeOrchestratorImpl : EC.IMultiEdgeOrchestrator
 
         // P2-2923: cap connections to avoid O(n²) for large topologies.
         // For ≤ 64 nodes build full mesh; above that limit to 8 nearest-neighbour ring connections per node.
-        const int FullMeshLimit = 64;
-        const int NeighbourCount = 8;
-        if (nodes.Count <= FullMeshLimit)
+        const int fullMeshLimit = 64;
+        const int neighbourCount = 8;
+        if (nodes.Count <= fullMeshLimit)
         {
             for (int i = 0; i < nodes.Count; i++)
                 for (int j = i + 1; j < nodes.Count; j++)
@@ -1180,8 +1180,8 @@ internal sealed class MultiEdgeOrchestratorImpl : EC.IMultiEdgeOrchestrator
         }
         else
         {
-            // Ring-lattice: connect each node to its next NeighbourCount/2 neighbours on each side.
-            int half = NeighbourCount / 2;
+            // Ring-lattice: connect each node to its next neighbourCount/2 neighbours on each side.
+            int half = neighbourCount / 2;
             for (int i = 0; i < nodes.Count; i++)
                 for (int k = 1; k <= half; k++)
                 {

@@ -56,7 +56,7 @@ public enum AggregationStrategy
     FedAvg,
 
     /// <summary>Federated Stochastic Gradient Descent - simple average.</summary>
-    FedSGD
+    FedSgd
 }
 
 /// <summary>

@@ -212,7 +212,7 @@ public sealed class InteractiveMode
             case "ask":
                 if (parts.Length > 1)
                 {
-                    await HandleAIHelpAsync(string.Join(" ", parts.Skip(1)));
+                    await HandleAiHelpAsync(string.Join(" ", parts.Skip(1)));
                     return true;
                 }
                 AnsiConsole.MarkupLine("[yellow]Usage: ask <your question>[/]");
@@ -257,7 +257,7 @@ public sealed class InteractiveMode
         return false;
     }
 
-    private async Task HandleAIHelpAsync(string query)
+    private async Task HandleAiHelpAsync(string query)
     {
         var result = await _nlp.GetAiHelpAsync(query, _cts.Token);
 

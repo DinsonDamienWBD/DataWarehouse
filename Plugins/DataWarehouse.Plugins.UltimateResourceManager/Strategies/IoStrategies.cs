@@ -14,10 +14,10 @@ public sealed class DeadlineIoStrategy : ResourceStrategyBase
 
     public override string StrategyId => "io-deadline";
     public override string DisplayName => "Deadline I/O Scheduler";
-    public override ResourceCategory Category => ResourceCategory.IO;
+    public override ResourceCategory Category => ResourceCategory.Io;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = false, SupportsIO = true,
+        SupportsCpu = false, SupportsMemory = false, SupportsIo = true,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = true
     };
@@ -83,10 +83,10 @@ public sealed class TokenBucketIoStrategy : ResourceStrategyBase
 
     public override string StrategyId => "io-token-bucket";
     public override string DisplayName => "Token Bucket I/O Throttler";
-    public override ResourceCategory Category => ResourceCategory.IO;
+    public override ResourceCategory Category => ResourceCategory.Io;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = false, SupportsIO = true,
+        SupportsCpu = false, SupportsMemory = false, SupportsIo = true,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = true, SupportsPreemption = false
     };
@@ -139,10 +139,10 @@ public sealed class BandwidthLimitIoStrategy : ResourceStrategyBase
 
     public override string StrategyId => "io-bandwidth-limit";
     public override string DisplayName => "Bandwidth Limit I/O Manager";
-    public override ResourceCategory Category => ResourceCategory.IO;
+    public override ResourceCategory Category => ResourceCategory.Io;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = false, SupportsIO = true,
+        SupportsCpu = false, SupportsMemory = false, SupportsIo = true,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = true, SupportsPreemption = false
     };
@@ -195,10 +195,10 @@ public sealed class PriorityIoStrategy : ResourceStrategyBase
 
     public override string StrategyId => "io-priority";
     public override string DisplayName => "Priority I/O Scheduler";
-    public override ResourceCategory Category => ResourceCategory.IO;
+    public override ResourceCategory Category => ResourceCategory.Io;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = false, SupportsIO = true,
+        SupportsCpu = false, SupportsMemory = false, SupportsIo = true,
         SupportsGpu = false, SupportsNetwork = false, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = true
     };

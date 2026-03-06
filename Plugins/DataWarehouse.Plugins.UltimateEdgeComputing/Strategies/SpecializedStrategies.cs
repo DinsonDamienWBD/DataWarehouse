@@ -1041,29 +1041,29 @@ internal sealed class SmartCityEdgeStrategy : IEdgeComputingStrategy
         int totalDemand = nsTotal + ewTotal;
 
         // Webster-style proportional green allocation
-        const int MinGreen = 10;
-        const int MaxCycle = 120;
-        const int Overhead = 8; // lost time per phase (yellow + all-red)
+        const int minGreen = 10;
+        const int maxCycle = 120;
+        const int overhead = 8; // lost time per phase (yellow + all-red)
 
         int nsGreen, ewGreen;
         if (totalDemand <= 0)
         {
             // Equal split when no vehicles
-            nsGreen = ewGreen = (MaxCycle - 2 * Overhead) / 2;
+            nsGreen = ewGreen = (maxCycle - 2 * overhead) / 2;
         }
         else
         {
-            int availableGreen = MaxCycle - 2 * Overhead;
-            nsGreen = Math.Max(MinGreen, (int)(availableGreen * (double)nsTotal / totalDemand));
-            ewGreen = Math.Max(MinGreen, availableGreen - nsGreen);
+            int availableGreen = maxCycle - 2 * overhead;
+            nsGreen = Math.Max(minGreen, (int)(availableGreen * (double)nsTotal / totalDemand));
+            ewGreen = Math.Max(minGreen, availableGreen - nsGreen);
 
             // Re-cap cycle to [60, 120]
-            int cycle = nsGreen + ewGreen + 2 * Overhead;
-            if (cycle > MaxCycle)
+            int cycle = nsGreen + ewGreen + 2 * overhead;
+            if (cycle > maxCycle)
             {
-                double scale = (double)(MaxCycle - 2 * Overhead) / (nsGreen + ewGreen);
-                nsGreen = Math.Max(MinGreen, (int)(nsGreen * scale));
-                ewGreen = Math.Max(MinGreen, (int)(ewGreen * scale));
+                double scale = (double)(maxCycle - 2 * overhead) / (nsGreen + ewGreen);
+                nsGreen = Math.Max(minGreen, (int)(nsGreen * scale));
+                ewGreen = Math.Max(minGreen, (int)(ewGreen * scale));
             }
         }
 

@@ -232,7 +232,7 @@ public sealed class ConsensusScalingManager : IScalableSubsystem, IDisposable
         if (groupIds.Length == 0) return null;
         if (groupIds.Length == 1) return groupIds[0];
 
-        int bucket = JumpConsistentHash(Fnv1aHash(key), groupIds.Length);
+        int bucket = JumpConsistentHash(Fnv1AHash(key), groupIds.Length);
         return groupIds[bucket];
     }
 
@@ -447,7 +447,7 @@ public sealed class ConsensusScalingManager : IScalableSubsystem, IDisposable
     /// <summary>
     /// FNV-1a 64-bit hash for consistent key routing.
     /// </summary>
-    private static ulong Fnv1aHash(string key)
+    private static ulong Fnv1AHash(string key)
     {
         ulong hash = 14695981039346656037UL;
         foreach (char c in key)

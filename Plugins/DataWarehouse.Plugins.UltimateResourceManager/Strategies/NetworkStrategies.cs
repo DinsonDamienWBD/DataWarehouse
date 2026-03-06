@@ -15,7 +15,7 @@ public sealed class TokenBucketNetworkStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Network;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = false, SupportsIO = false,
+        SupportsCpu = false, SupportsMemory = false, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = true, SupportsQuotas = true,
         SupportsHierarchicalQuotas = true, SupportsPreemption = false
     };
@@ -80,7 +80,7 @@ public sealed class QosNetworkStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Network;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = false, SupportsMemory = false, SupportsIO = false,
+        SupportsCpu = false, SupportsMemory = false, SupportsIo = false,
         SupportsGpu = false, SupportsNetwork = true, SupportsQuotas = true,
         SupportsHierarchicalQuotas = false, SupportsPreemption = true
     };
@@ -149,7 +149,7 @@ public sealed class CompositeResourceStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Composite;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = true, SupportsMemory = true, SupportsIO = true,
+        SupportsCpu = true, SupportsMemory = true, SupportsIo = true,
         SupportsGpu = true, SupportsNetwork = true, SupportsQuotas = true,
         SupportsHierarchicalQuotas = true, SupportsPreemption = true
     };
@@ -232,7 +232,7 @@ public sealed class HierarchicalQuotaStrategy : ResourceStrategyBase
     public override ResourceCategory Category => ResourceCategory.Quota;
     public override ResourceStrategyCapabilities Capabilities => new()
     {
-        SupportsCpu = true, SupportsMemory = true, SupportsIO = true,
+        SupportsCpu = true, SupportsMemory = true, SupportsIo = true,
         SupportsGpu = true, SupportsNetwork = true, SupportsQuotas = true,
         SupportsHierarchicalQuotas = true, SupportsPreemption = false
     };
