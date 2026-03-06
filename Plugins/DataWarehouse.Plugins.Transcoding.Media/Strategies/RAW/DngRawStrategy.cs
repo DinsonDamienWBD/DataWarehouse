@@ -276,12 +276,12 @@ internal sealed class DngRawStrategy : MediaStrategyBase
         if (data.Length < 16)
             throw new InvalidOperationException("Data too small to be a valid DNG file.");
 
-        bool isTiffLE = data[0] == TiffLittleEndian[0] && data[1] == TiffLittleEndian[1] &&
+        bool isTiffLe = data[0] == TiffLittleEndian[0] && data[1] == TiffLittleEndian[1] &&
                         data[2] == TiffLittleEndian[2] && data[3] == TiffLittleEndian[3];
-        bool isTiffBE = data[0] == TiffBigEndian[0] && data[1] == TiffBigEndian[1] &&
+        bool isTiffBe = data[0] == TiffBigEndian[0] && data[1] == TiffBigEndian[1] &&
                         data[2] == TiffBigEndian[2] && data[3] == TiffBigEndian[3];
 
-        if (!isTiffLE && !isTiffBE)
+        if (!isTiffLe && !isTiffBe)
             throw new InvalidOperationException("Invalid DNG file: Missing TIFF header.");
     }
 
@@ -344,16 +344,16 @@ internal sealed class DngRawStrategy : MediaStrategyBase
     {
         if (data.Length < 16) return "1.7.0.0";
 
-        bool isLE = data[0] == 0x49; // 'II' = little-endian, 'MM' = big-endian
-        int ifdOffset = ReadTiffInt32(data, 4, isLE);
+        bool isLe = data[0] == 0x49; // 'II' = little-endian, 'MM' = big-endian
+        int ifdOffset = ReadTiffInt32(data, 4, isLe);
         if (ifdOffset <= 0 || ifdOffset + 2 >= data.Length) return "1.7.0.0";
 
-        int entryCount = ReadTiffUInt16(data, ifdOffset, isLE);
+        int entryCount = ReadTiffUInt16(data, ifdOffset, isLe);
 
         for (int i = 0; i < entryCount && ifdOffset + 2 + (i + 1) * 12 <= data.Length; i++)
         {
             int entryOff = ifdOffset + 2 + i * 12;
-            ushort tag = (ushort)ReadTiffUInt16(data, entryOff, isLE);
+            ushort tag = (ushort)ReadTiffUInt16(data, entryOff, isLe);
 
             if (tag == DngVersionTag && entryOff + 11 < data.Length)
             {
@@ -385,21 +385,21 @@ internal sealed class DngRawStrategy : MediaStrategyBase
     {
         if (data.Length < 16) return false;
 
-        bool isLE = data[0] == 0x49;
-        int ifdOffset = ReadTiffInt32(data, 4, isLE);
+        bool isLe = data[0] == 0x49;
+        int ifdOffset = ReadTiffInt32(data, 4, isLe);
         if (ifdOffset <= 0 || ifdOffset + 2 >= data.Length) return false;
 
-        int entryCount = ReadTiffUInt16(data, ifdOffset, isLE);
+        int entryCount = ReadTiffUInt16(data, ifdOffset, isLe);
 
         for (int i = 0; i < entryCount && ifdOffset + 2 + (i + 1) * 12 <= data.Length; i++)
         {
             int entryOff = ifdOffset + 2 + i * 12;
-            ushort tag = (ushort)ReadTiffUInt16(data, entryOff, isLE);
+            ushort tag = (ushort)ReadTiffUInt16(data, entryOff, isLe);
 
             // PhotometricInterpretation: 34892 = LinearRaw
             if (tag == 0x0106)
             {
-                int value = ReadTiffUInt16(data, entryOff + 8, isLE);
+                int value = ReadTiffUInt16(data, entryOff + 8, isLe);
                 return value == 34892;
             }
         }
@@ -414,21 +414,21 @@ internal sealed class DngRawStrategy : MediaStrategyBase
     {
         if (data.Length < 16) return "Unknown";
 
-        bool isLE = data[0] == 0x49;
-        int ifdOffset = ReadTiffInt32(data, 4, isLE);
+        bool isLe = data[0] == 0x49;
+        int ifdOffset = ReadTiffInt32(data, 4, isLe);
         if (ifdOffset <= 0 || ifdOffset + 2 >= data.Length) return "Unknown";
 
-        int entryCount = ReadTiffUInt16(data, ifdOffset, isLE);
+        int entryCount = ReadTiffUInt16(data, ifdOffset, isLe);
 
         for (int i = 0; i < entryCount && ifdOffset + 2 + (i + 1) * 12 <= data.Length; i++)
         {
             int entryOff = ifdOffset + 2 + i * 12;
-            ushort tag = (ushort)ReadTiffUInt16(data, entryOff, isLE);
+            ushort tag = (ushort)ReadTiffUInt16(data, entryOff, isLe);
 
             if (tag == 0x0110) // Model
             {
-                int count = ReadTiffInt32(data, entryOff + 4, isLE);
-                int valueOffset = ReadTiffInt32(data, entryOff + 8, isLE);
+                int count = ReadTiffInt32(data, entryOff + 4, isLe);
+                int valueOffset = ReadTiffInt32(data, entryOff + 8, isLe);
 
                 if (count <= 4)
                 {

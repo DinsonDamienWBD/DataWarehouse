@@ -108,27 +108,27 @@ public sealed class TranscodePackageExecutor
         var magic = Encoding.UTF8.GetString(magicBytes).TrimEnd('\0');
 
         // Bounds constants to prevent OOM from crafted/corrupt packages
-        const int MaxStringFieldBytes = 64 * 1024;         // 64 KB for encoder name and args
-        const int MaxHashBytes = 256;                       // Hash at most 256 bytes
+        const int maxStringFieldBytes = 64 * 1024;         // 64 KB for encoder name and args
+        const int maxHashBytes = 256;                       // Hash at most 256 bytes
 
         // Read encoder name (length-prefixed)
         var encoderLength = reader.ReadInt32();
-        if (encoderLength < 0 || encoderLength > MaxStringFieldBytes)
-            throw new InvalidDataException($"TranscodePackage: encoderLength {encoderLength} is out of valid range [0, {MaxStringFieldBytes}].");
+        if (encoderLength < 0 || encoderLength > maxStringFieldBytes)
+            throw new InvalidDataException($"TranscodePackage: encoderLength {encoderLength} is out of valid range [0, {maxStringFieldBytes}].");
         var encoderBytes = reader.ReadBytes(encoderLength);
         var encoder = Encoding.UTF8.GetString(encoderBytes);
 
         // Read FFmpeg arguments (length-prefixed)
         var argsLength = reader.ReadInt32();
-        if (argsLength < 0 || argsLength > MaxStringFieldBytes)
-            throw new InvalidDataException($"TranscodePackage: argsLength {argsLength} is out of valid range [0, {MaxStringFieldBytes}].");
+        if (argsLength < 0 || argsLength > maxStringFieldBytes)
+            throw new InvalidDataException($"TranscodePackage: argsLength {argsLength} is out of valid range [0, {maxStringFieldBytes}].");
         var argsBytes = reader.ReadBytes(argsLength);
         var ffmpegArgs = Encoding.UTF8.GetString(argsBytes);
 
         // Read source hash (length-prefixed)
         var hashLength = reader.ReadInt32();
-        if (hashLength < 0 || hashLength > MaxHashBytes)
-            throw new InvalidDataException($"TranscodePackage: hashLength {hashLength} is out of valid range [0, {MaxHashBytes}].");
+        if (hashLength < 0 || hashLength > maxHashBytes)
+            throw new InvalidDataException($"TranscodePackage: hashLength {hashLength} is out of valid range [0, {maxHashBytes}].");
         var sourceHash = reader.ReadBytes(hashLength);
 
         // Read source data length

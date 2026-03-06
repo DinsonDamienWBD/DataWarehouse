@@ -307,9 +307,9 @@ internal sealed class WebPImageStrategy : MediaStrategyBase
     /// <summary>
     /// Writes a RIFF sub-chunk with FourCC identifier and data.
     /// </summary>
-    private static void WriteRiffSubChunk(BinaryWriter writer, string fourCC, byte[] data)
+    private static void WriteRiffSubChunk(BinaryWriter writer, string fourCc, byte[] data)
     {
-        writer.Write(Encoding.ASCII.GetBytes(fourCC));
+        writer.Write(Encoding.ASCII.GetBytes(fourCc));
         writer.Write(data.Length);
         writer.Write(data);
 
@@ -321,11 +321,11 @@ internal sealed class WebPImageStrategy : MediaStrategyBase
     /// <summary>
     /// Extracts a named chunk from a RIFF container.
     /// </summary>
-    private static byte[] ExtractRiffChunk(byte[] data, string fourCC)
+    private static byte[] ExtractRiffChunk(byte[] data, string fourCc)
     {
         if (data.Length < 12) return Array.Empty<byte>();
 
-        var targetBytes = Encoding.ASCII.GetBytes(fourCC);
+        var targetBytes = Encoding.ASCII.GetBytes(fourCc);
         int offset = 12; // Skip RIFF header
 
         while (offset + 8 < data.Length)

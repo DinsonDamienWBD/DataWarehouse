@@ -27,15 +27,15 @@ namespace DataWarehouse.Plugins.Transcoding.Media.Strategies.Video;
 /// </summary>
 internal sealed class GpuAccelerationStrategy : MediaStrategyBase
 {
-    private static readonly BoundedDictionary<int, GpuDeviceInfo> _gpuCache = new BoundedDictionary<int, GpuDeviceInfo>(1000);
+    private static readonly BoundedDictionary<int, GpuDeviceInfo> GpuCache = new BoundedDictionary<int, GpuDeviceInfo>(1000);
     // _lastGpuScan is read/written from background scan and from health check threads (finding 1099).
     // Store as ticks for atomic read/write via Interlocked.
     private long _lastGpuScanTicks = DateTime.MinValue.Ticks;
     private static readonly TimeSpan GpuCacheTtl = TimeSpan.FromMinutes(5);
-    private static readonly SemaphoreSlim _scanLock = new(1, 1);
+    private static readonly SemaphoreSlim ScanLock = new(1, 1);
 
-    // _activeEncoder and _selectedGpuIndex are written under _scanLock but read without it (finding 1099).
-    private volatile HardwareEncoder _activeEncoder = HardwareEncoder.CPU;
+    // _activeEncoder and _selectedGpuIndex are written under ScanLock but read without it (finding 1099).
+    private volatile HardwareEncoder _activeEncoder = HardwareEncoder.Cpu;
     private volatile int _selectedGpuIndex = -1;
     private long _gpuMemoryLimitBytes = 4L * 1024 * 1024 * 1024; // 4GB default
     private long _gpuMemoryAllocated;
@@ -92,32 +92,32 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
     /// </summary>
     public async Task<GpuDetectionResult> DetectGpuHardwareAsync(CancellationToken cancellationToken = default)
     {
-        await _scanLock.WaitAsync(cancellationToken);
+        await ScanLock.WaitAsync(cancellationToken);
         try
         {
-            if (DateTime.UtcNow - new DateTime(Interlocked.Read(ref _lastGpuScanTicks), DateTimeKind.Utc) < GpuCacheTtl && _gpuCache.Count > 0)
+            if (DateTime.UtcNow - new DateTime(Interlocked.Read(ref _lastGpuScanTicks), DateTimeKind.Utc) < GpuCacheTtl && GpuCache.Count > 0)
             {
                 return new GpuDetectionResult
                 {
-                    AvailableGpus = _gpuCache.Values.ToList(),
+                    AvailableGpus = GpuCache.Values.ToList(),
                     ActiveEncoder = _activeEncoder,
                     SelectedGpuIndex = _selectedGpuIndex,
                     IsCached = true
                 };
             }
 
-            _gpuCache.Clear();
+            GpuCache.Clear();
             var gpus = new List<GpuDeviceInfo>();
 
             // Detect NVIDIA GPUs via nvidia-smi
             if (TryDetectNvidiaGpus(out var nvidiaGpus))
             {
                 gpus.AddRange(nvidiaGpus);
-                _activeEncoder = HardwareEncoder.NVENC;
+                _activeEncoder = HardwareEncoder.Nvenc;
             }
 
             // Detect Intel QuickSync via FFmpeg
-            if (_activeEncoder == HardwareEncoder.CPU && TryDetectIntelQsv())
+            if (_activeEncoder == HardwareEncoder.Cpu && TryDetectIntelQsv())
             {
                 gpus.Add(new GpuDeviceInfo
                 {
@@ -134,20 +134,20 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
             }
 
             // Detect AMD AMF
-            if (_activeEncoder == HardwareEncoder.CPU && TryDetectAmdAmf())
+            if (_activeEncoder == HardwareEncoder.Cpu && TryDetectAmdAmf())
             {
                 gpus.Add(new GpuDeviceInfo
                 {
                     Index = gpus.Count,
                     Name = "AMD GPU (AMF)",
-                    Vendor = GpuVendor.AMD,
+                    Vendor = GpuVendor.Amd,
                     TotalMemoryMb = 0,
                     FreeMemoryMb = 0,
                     Utilization = 0,
                     Temperature = 0,
                     SupportedEncoders = new[] { "h264_amf", "hevc_amf", "av1_amf" }
                 });
-                _activeEncoder = HardwareEncoder.AMF;
+                _activeEncoder = HardwareEncoder.Amf;
             }
 
             // Select least-utilized GPU
@@ -157,7 +157,7 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
             }
 
             foreach (var gpu in gpus)
-                _gpuCache[gpu.Index] = gpu;
+                GpuCache[gpu.Index] = gpu;
 
             Interlocked.Exchange(ref _lastGpuScanTicks, DateTime.UtcNow.Ticks);
 
@@ -173,7 +173,7 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
         }
         finally
         {
-            _scanLock.Release();
+            ScanLock.Release();
         }
     }
 
@@ -182,7 +182,7 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
     /// </summary>
     public bool CheckGpuMemory(long requiredBytes)
     {
-        if (_selectedGpuIndex < 0 || !_gpuCache.TryGetValue(_selectedGpuIndex, out var gpu))
+        if (_selectedGpuIndex < 0 || !GpuCache.TryGetValue(_selectedGpuIndex, out var gpu))
             return false;
 
         var availableBytes = gpu.FreeMemoryMb * 1024L * 1024L;
@@ -244,7 +244,7 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
     {
         return _activeEncoder switch
         {
-            HardwareEncoder.NVENC => codec switch
+            HardwareEncoder.Nvenc => codec switch
             {
                 "h264" => $"-c:v h264_nvenc -gpu {_selectedGpuIndex} -preset p4 -tune hq -rc vbr",
                 "h265" or "hevc" => $"-c:v hevc_nvenc -gpu {_selectedGpuIndex} -preset p4 -tune hq -rc vbr",
@@ -258,7 +258,7 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
                 "av1" => "-c:v av1_qsv -preset medium -global_quality 25",
                 _ => $"-c:v {codec}"
             },
-            HardwareEncoder.AMF => codec switch
+            HardwareEncoder.Amf => codec switch
             {
                 "h264" => "-c:v h264_amf -quality balanced -rc vbr_peak",
                 "h265" or "hevc" => "-c:v hevc_amf -quality balanced -rc vbr_peak",
@@ -283,8 +283,8 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
             MemoryUtilization = _gpuMemoryLimitBytes > 0
                 ? (double)_gpuMemoryAllocated / _gpuMemoryLimitBytes
                 : 0,
-            GpuCount = _gpuCache.Count,
-            Gpus = _gpuCache.Values.ToList()
+            GpuCount = GpuCache.Count,
+            Gpus = GpuCache.Values.ToList()
         };
     }
 
@@ -327,7 +327,7 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
                     {
                         Index = index,
                         Name = parts[1],
-                        Vendor = GpuVendor.NVIDIA,
+                        Vendor = GpuVendor.Nvidia,
                         TotalMemoryMb = totalMem,
                         FreeMemoryMb = freeMem,
                         Utilization = util,
@@ -421,7 +421,7 @@ internal sealed class GpuAccelerationStrategy : MediaStrategyBase
         var offsetSeconds = (int)timeOffset.TotalSeconds;
         var hwaccelArgs = _activeEncoder switch
         {
-            HardwareEncoder.NVENC => "-hwaccel cuda",
+            HardwareEncoder.Nvenc => "-hwaccel cuda",
             HardwareEncoder.QuickSync => "-hwaccel qsv",
             _ => ""
         };
@@ -518,7 +518,7 @@ public sealed class GpuHealthStats
     public required List<GpuDeviceInfo> Gpus { get; init; }
 }
 
-public enum HardwareEncoder { CPU, NVENC, QuickSync, AMF }
-public enum GpuVendor { Unknown, NVIDIA, Intel, AMD }
+public enum HardwareEncoder { Cpu, Nvenc, QuickSync, Amf }
+public enum GpuVendor { Unknown, Nvidia, Intel, Amd }
 
 #endregion

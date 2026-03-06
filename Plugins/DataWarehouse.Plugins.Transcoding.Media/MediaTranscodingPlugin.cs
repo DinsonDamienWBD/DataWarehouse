@@ -152,7 +152,7 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
     private string? _imageMagickPath;
     private bool _ffmpegAvailable;
     private bool _imageMagickAvailable;
-    private FfmpegExecutor? _ffmpegExecutor;
+    internal FfmpegExecutor? FfmpegExecutorInstance { get; set; }
 
     /// <summary>
     /// Event raised when transcoding progress updates.
@@ -558,7 +558,7 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
     public static class QualityPresets
     {
         /// <summary>4K UHD quality preset (3840x2160).</summary>
-        public static TranscodingProfile UHD4K => new()
+        public static TranscodingProfile Uhd4K => new()
         {
             ProfileId = "4k",
             Name = "4K UHD",
@@ -579,7 +579,7 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
         };
 
         /// <summary>1080p Full HD quality preset (1920x1080).</summary>
-        public static TranscodingProfile FullHD1080p => new()
+        public static TranscodingProfile FullHd1080P => new()
         {
             ProfileId = "1080p",
             Name = "1080p Full HD",
@@ -600,7 +600,7 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
         };
 
         /// <summary>720p HD quality preset (1280x720).</summary>
-        public static TranscodingProfile HD720p => new()
+        public static TranscodingProfile Hd720P => new()
         {
             ProfileId = "720p",
             Name = "720p HD",
@@ -621,7 +621,7 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
         };
 
         /// <summary>480p SD quality preset (854x480).</summary>
-        public static TranscodingProfile SD480p => new()
+        public static TranscodingProfile Sd480P => new()
         {
             ProfileId = "480p",
             Name = "480p SD",
@@ -674,10 +674,10 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
 
     private void RegisterQualityPresetProfiles()
     {
-        _customProfiles["4k"] = QualityPresets.UHD4K;
-        _customProfiles["1080p"] = QualityPresets.FullHD1080p;
-        _customProfiles["720p"] = QualityPresets.HD720p;
-        _customProfiles["480p"] = QualityPresets.SD480p;
+        _customProfiles["4k"] = QualityPresets.Uhd4K;
+        _customProfiles["1080p"] = QualityPresets.FullHd1080P;
+        _customProfiles["720p"] = QualityPresets.Hd720P;
+        _customProfiles["480p"] = QualityPresets.Sd480P;
         _customProfiles["video-thumbnail"] = QualityPresets.VideoThumbnail;
         _customProfiles["audio-only"] = QualityPresets.AudioOnly;
     }
@@ -726,12 +726,12 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
         var profiles = new List<TranscodingProfile>();
 
         if (sourceHeight >= 2160)
-            profiles.Add(QualityPresets.UHD4K);
+            profiles.Add(QualityPresets.Uhd4K);
         if (sourceHeight >= 1080)
-            profiles.Add(QualityPresets.FullHD1080p);
+            profiles.Add(QualityPresets.FullHd1080P);
         if (sourceHeight >= 720)
-            profiles.Add(QualityPresets.HD720p);
-        profiles.Add(QualityPresets.SD480p);
+            profiles.Add(QualityPresets.Hd720P);
+        profiles.Add(QualityPresets.Sd480P);
 
         foreach (var profile in profiles)
         {
@@ -782,12 +782,12 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
         var profiles = new List<TranscodingProfile>();
 
         if (sourceHeight >= 2160)
-            profiles.Add(QualityPresets.UHD4K);
+            profiles.Add(QualityPresets.Uhd4K);
         if (sourceHeight >= 1080)
-            profiles.Add(QualityPresets.FullHD1080p);
+            profiles.Add(QualityPresets.FullHd1080P);
         if (sourceHeight >= 720)
-            profiles.Add(QualityPresets.HD720p);
-        profiles.Add(QualityPresets.SD480p);
+            profiles.Add(QualityPresets.Hd720P);
+        profiles.Add(QualityPresets.Sd480P);
 
         int id = 1;
         foreach (var profile in profiles)
@@ -839,7 +839,7 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
     /// </summary>
     public string BuildHlsTranscodingCommand(string sourcePath, HlsVariant variant, string outputDir)
     {
-        var profile = _customProfiles.GetValueOrDefault(variant.ProfileId, QualityPresets.HD720p);
+        var profile = _customProfiles.GetValueOrDefault(variant.ProfileId, QualityPresets.Hd720P);
         var playlistPath = Path.Combine(outputDir, $"variant_{variant.ProfileId}.m3u8");
         var segmentPattern = Path.Combine(outputDir, $"segment_{variant.ProfileId}_%03d.ts");
 
@@ -2469,12 +2469,12 @@ public class MediaTranscodingPlugin : MediaTranscodingPluginBase
         {
             try
             {
-                _ffmpegExecutor = new FfmpegExecutor(_ffmpegPath);
+                FfmpegExecutorInstance = new FfmpegExecutor(_ffmpegPath);
             }
             catch (FfmpegNotFoundException)
             {
                 _ffmpegAvailable = false;
-                _ffmpegExecutor = null;
+                FfmpegExecutorInstance = null;
             }
         }
 

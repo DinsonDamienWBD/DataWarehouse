@@ -189,9 +189,9 @@ internal sealed class OnnxInferenceStrategy : MediaStrategyBase
 internal sealed class AiUpscalingStrategy : MediaStrategyBase
 {
     private string _modelPath = "";
-    private int _scaleFactor = 2;
-    private int _tileSize = 512; // Process in tiles to avoid OOM
-    private int _tileOverlap = 32; // Overlap to avoid seam artifacts
+    internal int ScaleFactor { get; set; } = 2;
+    internal int TileSize { get; set; } = 512; // Process in tiles to avoid OOM
+    internal int TileOverlap { get; set; } = 32; // Overlap to avoid seam artifacts
 
     public AiUpscalingStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
@@ -235,9 +235,9 @@ internal sealed class AiUpscalingStrategy : MediaStrategyBase
     public void Configure(string modelPath, int scaleFactor = 2, int tileSize = 512, int tileOverlap = 32)
     {
         _modelPath = modelPath;
-        _scaleFactor = scaleFactor;
-        _tileSize = tileSize;
-        _tileOverlap = tileOverlap;
+        ScaleFactor = scaleFactor;
+        TileSize = tileSize;
+        TileOverlap = tileOverlap;
     }
 
     /// <summary>
@@ -305,7 +305,7 @@ internal sealed class ObjectDetectionStrategy : MediaStrategyBase
     private string _modelPath = "";
     private float _confidenceThreshold = 0.5f;
     private float _iouThreshold = 0.45f;
-    private string[] _classLabels = Array.Empty<string>();
+    internal string[] ClassLabels { get; set; } = Array.Empty<string>();
 
     public ObjectDetectionStrategy() : base(new MediaCapabilities(
         SupportedInputFormats: new HashSet<MediaFormat>
@@ -351,7 +351,7 @@ internal sealed class ObjectDetectionStrategy : MediaStrategyBase
         _modelPath = modelPath;
         _confidenceThreshold = confidenceThreshold;
         _iouThreshold = iouThreshold;
-        _classLabels = classLabels ?? GetCocoClassLabels();
+        ClassLabels = classLabels ?? GetCocoClassLabels();
     }
 
     /// <summary>

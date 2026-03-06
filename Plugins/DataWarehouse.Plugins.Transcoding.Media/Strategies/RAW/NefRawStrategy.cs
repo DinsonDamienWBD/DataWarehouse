@@ -264,12 +264,12 @@ internal sealed class NefRawStrategy : MediaStrategyBase
         if (data.Length < 16)
             throw new InvalidOperationException("Data too small to be a valid NEF file.");
 
-        bool isTiffLE = data[0] == TiffLittleEndian[0] && data[1] == TiffLittleEndian[1] &&
+        bool isTiffLe = data[0] == TiffLittleEndian[0] && data[1] == TiffLittleEndian[1] &&
                         data[2] == TiffLittleEndian[2] && data[3] == TiffLittleEndian[3];
-        bool isTiffBE = data[0] == TiffBigEndian[0] && data[1] == TiffBigEndian[1] &&
+        bool isTiffBe = data[0] == TiffBigEndian[0] && data[1] == TiffBigEndian[1] &&
                         data[2] == TiffBigEndian[2] && data[3] == TiffBigEndian[3];
 
-        if (!isTiffLE && !isTiffBE)
+        if (!isTiffLe && !isTiffBe)
             throw new InvalidOperationException("Invalid NEF file: Missing TIFF header.");
     }
 

@@ -276,7 +276,7 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
         writer.Write(DdpfFourcc);           // dwFlags: FOURCC
 
         // dwFourCC
-        var fourCC = format switch
+        var fourCc = format switch
         {
             "BC1" => "DXT1",
             "BC2" => "DXT3",
@@ -286,7 +286,7 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
             "BC6H" or "BC7" => "DX10",     // Uses DX10 extended header
             _ => "DXT5"
         };
-        writer.Write(Encoding.ASCII.GetBytes(fourCC));
+        writer.Write(Encoding.ASCII.GetBytes(fourCc));
 
         writer.Write(0u);                   // dwRGBBitCount
         writer.Write(0u);                   // dwRBitMask
@@ -328,8 +328,8 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
 
         // LOW-1066: Guard against negative or extreme values that cause integer overflow in mipmap
         // calculations (e.g., width * height * bytesPerPixel). DDS spec limits dimensions to 16384.
-        const int MaxDdsDimension = 65536;
-        if (width <= 0 || height <= 0 || width > MaxDdsDimension || height > MaxDdsDimension)
+        const int maxDdsDimension = 65536;
+        if (width <= 0 || height <= 0 || width > maxDdsDimension || height > maxDdsDimension)
             return (0, 0);
 
         return (width, height);
@@ -352,11 +352,11 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
         if (data.Length < 88) return "Unknown";
 
         // FourCC at offset 84 (4 + 124_header_offset_to_pixelformat + fourcc_offset)
-        int fourCcOffset = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 44 + 4 + 4; // = 84
-        if (fourCcOffset + 4 > data.Length) return "Unknown";
+        int fourCcOff = 4 + 4 + 4 + 4 + 4 + 4 + 4 + 4 + 44 + 4 + 4; // = 84
+        if (fourCcOff + 4 > data.Length) return "Unknown";
 
-        var fourCC = Encoding.ASCII.GetString(data, fourCcOffset, 4);
-        return fourCC switch
+        var fourCc = Encoding.ASCII.GetString(data, fourCcOff, 4);
+        return fourCc switch
         {
             "DXT1" => "BC1/DXT1",
             "DXT3" => "BC2/DXT3",
@@ -364,7 +364,7 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
             "ATI1" => "BC4",
             "ATI2" => "BC5",
             "DX10" => ParseDx10Format(data),
-            _ => fourCC
+            _ => fourCc
         };
     }
 
@@ -409,9 +409,9 @@ internal sealed class DdsTextureStrategy : MediaStrategyBase
     {
         if (data.Length < 88) return false;
 
-        int fourCcOffset = 84;
-        return data[fourCcOffset] == (byte)'D' && data[fourCcOffset + 1] == (byte)'X' &&
-               data[fourCcOffset + 2] == (byte)'1' && data[fourCcOffset + 3] == (byte)'0';
+        int fourCcOff = 84;
+        return data[fourCcOff] == (byte)'D' && data[fourCcOff + 1] == (byte)'X' &&
+               data[fourCcOff + 2] == (byte)'1' && data[fourCcOff + 3] == (byte)'0';
     }
 
     /// <summary>
