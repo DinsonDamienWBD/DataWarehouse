@@ -42,14 +42,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
         private const int ReportSize = 64;
 
         // OnlyKey message types
-        private const byte OKSetSlot = 0x01;
-        private const byte OKGetSlot = 0x02;
-        private const byte OKSign = 0x03;
-        private const byte OKChallenge = 0x10;
-        private const byte OKEncrypt = 0x11;
-        private const byte OKDecrypt = 0x12;
-        private const byte OKPing = 0xF0;
-        private const byte OKAck = 0xF1;
+        private const byte OkSetSlot = 0x01;
+        private const byte OkGetSlot = 0x02;
+        private const byte OkSign = 0x03;
+        private const byte OkChallenge = 0x10;
+        private const byte OkEncrypt = 0x11;
+        private const byte OkDecrypt = 0x12;
+        private const byte OkPing = 0xF0;
+        private const byte OkAck = 0xF1;
 
         private HidDevice? _device;
         private HidStream? _stream;
@@ -164,14 +164,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             {
                 var report = new byte[ReportSize];
                 report[0] = 0x00; // Report ID
-                report[1] = OKPing;
+                report[1] = OkPing;
 
                 _stream!.Write(report);
 
                 var response = new byte[ReportSize];
                 var bytesRead = _stream.Read(response, 0, response.Length);
 
-                return bytesRead > 0 && response[1] == OKAck;
+                return bytesRead > 0 && response[1] == OkAck;
             }
             catch
             {
@@ -269,7 +269,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             // Send challenge to OnlyKey
             var report = new byte[ReportSize];
             report[0] = 0x00; // Report ID
-            report[1] = OKChallenge;
+            report[1] = OkChallenge;
             report[2] = (byte)_config.Profile;
             report[3] = (byte)_config.DefaultSlot;
             Array.Copy(challenge, 0, report, 4, Math.Min(challenge.Length, 32));
@@ -297,15 +297,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
             // P2-3496: Validate totalRead (actual bytes received) before extracting HMAC bytes
             // to avoid out-of-bounds copy. Expected layout: 1-byte status + 20 bytes HMAC-SHA1 = 21 bytes.
-            const int HmacOffset = 1;
-            const int HmacLength = 20;
-            if (totalRead < HmacOffset + HmacLength)
+            const int hmacOffset = 1;
+            const int hmacLength = 20;
+            if (totalRead < hmacOffset + hmacLength)
                 throw new InvalidOperationException(
-                    $"OnlyKey response too short ({totalRead} bytes received); expected at least {HmacOffset + HmacLength}.");
+                    $"OnlyKey response too short ({totalRead} bytes received); expected at least {hmacOffset + hmacLength}.");
 
             // Extract HMAC response (20 bytes for HMAC-SHA1)
-            var hmacResponse = new byte[HmacLength];
-            Array.Copy(response, HmacOffset, hmacResponse, 0, HmacLength);
+            var hmacResponse = new byte[hmacLength];
+            Array.Copy(response, hmacOffset, hmacResponse, 0, hmacLength);
 
             // Extend to 32 bytes using HKDF
             var derivedKey = new byte[32];
@@ -319,7 +319,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
         {
             var report = new byte[ReportSize];
             report[0] = 0x00;
-            report[1] = OKGetSlot;
+            report[1] = OkGetSlot;
             report[2] = (byte)_config.Profile;
             report[3] = (byte)slot;
 
@@ -338,7 +338,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 }
             }
 
-            if (totalRead == 0 || response[1] != OKAck)
+            if (totalRead == 0 || response[1] != OkAck)
             {
                 throw new InvalidOperationException($"Failed to read OnlyKey slot {slot}.");
             }
@@ -360,7 +360,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
             var report = new byte[ReportSize];
             report[0] = 0x00;
-            report[1] = OKSetSlot;
+            report[1] = OkSetSlot;
             report[2] = (byte)_config.Profile;
             report[3] = (byte)slot;
             report[4] = (byte)data.Length;
@@ -382,7 +382,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                 }
             }
 
-            if (totalRead == 0 || response[1] != OKAck)
+            if (totalRead == 0 || response[1] != OkAck)
             {
                 throw new InvalidOperationException($"Failed to write to OnlyKey slot {slot}.");
             }
@@ -482,7 +482,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
 
                 var report = new byte[ReportSize];
                 report[0] = 0x00;
-                report[1] = OKSign;
+                report[1] = OkSign;
                 report[2] = (byte)_config.Profile;
                 report[3] = (byte)slot;
                 Array.Copy(hash, 0, report, 4, 32);

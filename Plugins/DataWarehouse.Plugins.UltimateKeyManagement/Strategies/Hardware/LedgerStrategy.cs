@@ -117,14 +117,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
         {
             var devices = DeviceList.Local.GetHidDevices()
                 .Where(d => d.VendorID == LedgerVendorId &&
-                           LedgerProductIds.Contains(d.ProductID));
+                           LedgerProductIds.Contains(d.ProductID))
+                .ToList();
 
-            if (!devices.Any())
+            if (devices.Count == 0)
             {
                 throw new InvalidOperationException("No Ledger device found.");
             }
 
-            _device = devices.First();
+            _device = devices[0];
 
             try
             {

@@ -481,7 +481,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
 
             var keyIdBytes = ComputeKeyIdHash(keyId);
 
-            var result = await getInfoFunction.CallDeserializingToObjectAsync<KeyInfoOutputDTO>(keyIdBytes);
+            var result = await getInfoFunction.CallDeserializingToObjectAsync<KeyInfoOutputDto>(keyIdBytes);
 
             return new SmartContractKeyInfo
             {
@@ -504,7 +504,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             var getStatusFunction = contract.GetFunction("getApprovalStatus");
 
             var keyIdBytes = ComputeKeyIdHash(keyId);
-            var result = await getStatusFunction.CallDeserializingToObjectAsync<ApprovalStatusOutputDTO>(
+            var result = await getStatusFunction.CallDeserializingToObjectAsync<ApprovalStatusOutputDto>(
                 keyIdBytes, requesterAddress);
 
             return (result.Approved, result.Count);
@@ -800,7 +800,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
     }
 
     [FunctionOutput]
-    public class KeyInfoOutputDTO : IFunctionOutputDTO
+    public class KeyInfoOutputDto : IFunctionOutputDTO
     {
         [Parameter("address", "owner", 1)]
         public string Owner { get; set; } = "";
@@ -822,7 +822,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
     }
 
     [FunctionOutput]
-    public class ApprovalStatusOutputDTO : IFunctionOutputDTO
+    public class ApprovalStatusOutputDto : IFunctionOutputDTO
     {
         [Parameter("bool", "approved", 1)]
         public bool Approved { get; set; }

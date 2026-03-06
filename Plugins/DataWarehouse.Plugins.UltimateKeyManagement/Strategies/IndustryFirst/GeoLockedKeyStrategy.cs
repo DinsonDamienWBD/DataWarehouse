@@ -232,7 +232,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                 {
                     Latitude = geoContext.Latitude,
                     Longitude = geoContext.Longitude,
-                    Source = LocationSource.GPS,
+                    Source = LocationSource.Gps,
                     Timestamp = DateTime.UtcNow
                 };
             }
@@ -882,7 +882,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
     /// </summary>
     public enum LocationSource
     {
-        GPS,
+        Gps,
         IpGeolocation,
         ManualEntry,
         Attestation

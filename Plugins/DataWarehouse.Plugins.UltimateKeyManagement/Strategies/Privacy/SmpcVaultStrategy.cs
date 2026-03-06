@@ -237,7 +237,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
             // Validate protocol vs. party count
             if (_config.Protocol == MpcProtocol.Yao && _config.Parties != 2)
                 throw new ArgumentException("Yao's protocol requires exactly 2 parties.");
-            if (_config.Protocol == MpcProtocol.BGW && _config.Threshold >= (_config.Parties / 2.0))
+            if (_config.Protocol == MpcProtocol.Bgw && _config.Threshold >= (_config.Parties / 2.0))
                 throw new ArgumentException("BGW protocol requires t < n/2 (honest majority).");
 
             // Initialize audit logger
@@ -590,14 +590,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
 
                 // Generate random nonce k for this party
                 var k = GenerateRandomScalar();
-                var R = DomainParams.G.Multiply(k);
+                var rPoint = DomainParams.G.Multiply(k);
 
                 // Compute Lagrange coefficient for this party
                 var lambda = ComputeLagrangeCoefficient(_config.PartyIndex, participatingParties);
 
                 // #3568: Include message hash in partial signature formula.
                 // Correct threshold-ECDSA partial signature: s_i = k_i^{-1} * (m + r * lambda_i * x_i) mod n
-                var r = R.Normalize().AffineXCoord.ToBigInteger().Mod(DomainParams.N);
+                var r = rPoint.Normalize().AffineXCoord.ToBigInteger().Mod(DomainParams.N);
                 var m = new BigInteger(1, messageHash);
                 var kInverse = k.ModInverse(DomainParams.N);
 
@@ -626,7 +626,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                 {
                     KeyId = keyId,
                     PartyIndex = _config.PartyIndex,
-                    R = SerializePoint(R),
+                    R = SerializePoint(rPoint),
                     PartialS = partialS.ToByteArrayUnsigned(),
                     MessageHash = messageHash,
                     CorrelationId = correlationId
@@ -647,11 +647,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                 throw new ArgumentException("No partial signatures provided.");
 
             // Aggregate R values (in practice, use commitment scheme)
-            var R = DeserializePoint(partialSignatures[0].R);
+            var rAgg = DeserializePoint(partialSignatures[0].R);
             for (int i = 1; i < partialSignatures.Length; i++)
             {
-                var Ri = DeserializePoint(partialSignatures[i].R);
-                R = R.Add(Ri);
+                var ri = DeserializePoint(partialSignatures[i].R);
+                rAgg = rAgg.Add(ri);
             }
 
             // Sum all partial signatures
@@ -663,7 +663,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
             }
 
             // Create DER-encoded signature
-            var r = R.Normalize().AffineXCoord.ToBigInteger().Mod(DomainParams.N);
+            var r = rAgg.Normalize().AffineXCoord.ToBigInteger().Mod(DomainParams.N);
             return EncodeSignatureDer(r, s);
         }
 
@@ -757,12 +757,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                 // Parse ephemeral public key
                 // P2-3576: Bound-check ephemeralLen before allocating to prevent a large
                 // wire value from causing a huge heap allocation / OOM attack.
-                const int MaxEphemeralKeyBytes = 256; // 2048-bit EC point upper bound
+                const int maxEphemeralKeyBytes = 256; // 2048-bit EC point upper bound
                 var ephemeralLen = reader.ReadInt32();
-                if (ephemeralLen <= 0 || ephemeralLen > MaxEphemeralKeyBytes)
+                if (ephemeralLen <= 0 || ephemeralLen > maxEphemeralKeyBytes)
                     throw new InvalidOperationException(
                         $"[SmpcVaultStrategy.UnwrapKeyAsync] Invalid ephemeralLen {ephemeralLen}; " +
-                        $"expected 1-{MaxEphemeralKeyBytes} bytes.");
+                        $"expected 1-{maxEphemeralKeyBytes} bytes.");
                 var ephemeralBytes = reader.ReadBytes(ephemeralLen);
                 var ephemeralPublic = DomainParams.Curve.DecodePoint(ephemeralBytes);
 
@@ -1141,11 +1141,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
         /// <summary>Yao's Garbled Circuits (2-party only)</summary>
         Yao,
         /// <summary>Goldreich-Micali-Wigderson protocol (multi-party)</summary>
-        GMW,
+        Gmw,
         /// <summary>SPDZ protocol (preprocessing + online)</summary>
-        SPDZ,
+        Spdz,
         /// <summary>Ben-Or, Goldwasser, Wigderson (honest majority required)</summary>
-        BGW
+        Bgw
     }
 
     /// <summary>
@@ -1156,7 +1156,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
         public int Parties { get; set; } = 3;
         public int Threshold { get; set; } = 2;
         public int PartyIndex { get; set; } = 1;
-        public MpcProtocol Protocol { get; set; } = MpcProtocol.SPDZ;
+        public MpcProtocol Protocol { get; set; } = MpcProtocol.Spdz;
         public string[] PartyEndpoints { get; set; } = Array.Empty<string>();
         public int OperationTimeoutMs { get; set; } = 30000;
         public string? StoragePath { get; set; }
@@ -1365,9 +1365,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
 
             switch (op)
             {
-                case GarbledOperation.AND:
-                case GarbledOperation.OR:
-                case GarbledOperation.XOR:
+                case GarbledOperation.And:
+                case GarbledOperation.Or:
+                case GarbledOperation.Xor:
                     // Single gate for 1-bit operation
                     gates.Add(new GarbledGate
                     {
@@ -1378,15 +1378,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                     });
                     return (gates.ToArray(), new[] { nextWire }, nextWire + 1);
 
-                case GarbledOperation.ADD:
+                case GarbledOperation.Add:
                     // Ripple-carry adder circuit
                     return BuildAdderCircuit(bitsA, bitsB, gates, nextWire);
 
-                case GarbledOperation.MUL:
+                case GarbledOperation.Mul:
                     // Schoolbook multiplication circuit
                     return BuildMultiplierCircuit(bitsA, bitsB, gates, nextWire);
 
-                case GarbledOperation.CMP:
+                case GarbledOperation.Cmp:
                     // Comparison circuit (returns 1 if A > B)
                     return BuildComparisonCircuit(bitsA, bitsB, gates, nextWire);
 
@@ -1418,7 +1418,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                             LeftInput = aWire,
                             RightInput = bWire,
                             Output = nextWire,
-                            Type = GarbledOperation.XOR
+                            Type = GarbledOperation.Xor
                         });
                         outputWires[i] = nextWire++;
 
@@ -1428,7 +1428,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                             LeftInput = aWire,
                             RightInput = bWire,
                             Output = nextWire,
-                            Type = GarbledOperation.AND
+                            Type = GarbledOperation.And
                         });
                         carryWire = nextWire++;
                     }
@@ -1436,50 +1436,50 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                 else
                 {
                     // Full adder
-                    int xorAB = nextWire++;
+                    int xorAb = nextWire++;
                     gates.Add(new GarbledGate
                     {
                         LeftInput = aWire >= 0 ? aWire : bWire,
                         RightInput = aWire >= 0 && bWire >= 0 ? bWire : carryWire,
-                        Output = xorAB,
-                        Type = GarbledOperation.XOR
+                        Output = xorAb,
+                        Type = GarbledOperation.Xor
                     });
 
                     // Sum = XOR(A,B) XOR Carry
                     gates.Add(new GarbledGate
                     {
-                        LeftInput = xorAB,
+                        LeftInput = xorAb,
                         RightInput = carryWire,
                         Output = nextWire,
-                        Type = GarbledOperation.XOR
+                        Type = GarbledOperation.Xor
                     });
                     outputWires[i] = nextWire++;
 
                     // New carry logic
-                    int andAB = nextWire++;
+                    int andAb = nextWire++;
                     gates.Add(new GarbledGate
                     {
-                        LeftInput = aWire >= 0 ? aWire : xorAB,
+                        LeftInput = aWire >= 0 ? aWire : xorAb,
                         RightInput = bWire >= 0 ? bWire : carryWire,
-                        Output = andAB,
-                        Type = GarbledOperation.AND
+                        Output = andAb,
+                        Type = GarbledOperation.And
                     });
 
                     int andXorC = nextWire++;
                     gates.Add(new GarbledGate
                     {
-                        LeftInput = xorAB,
+                        LeftInput = xorAb,
                         RightInput = carryWire,
                         Output = andXorC,
-                        Type = GarbledOperation.AND
+                        Type = GarbledOperation.And
                     });
 
                     gates.Add(new GarbledGate
                     {
-                        LeftInput = andAB,
+                        LeftInput = andAb,
                         RightInput = andXorC,
                         Output = nextWire,
-                        Type = GarbledOperation.OR
+                        Type = GarbledOperation.Or
                     });
                     carryWire = nextWire++;
                 }
@@ -1510,7 +1510,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                         LeftInput = i,
                         RightInput = bitsA + j,
                         Output = nextWire,
-                        Type = GarbledOperation.AND
+                        Type = GarbledOperation.And
                     });
                     partialProducts[j][i + j] = nextWire++;
                 }
@@ -1547,7 +1547,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                                 LeftInput = validWire,
                                 RightInput = carryWire,
                                 Output = nextWire,
-                                Type = GarbledOperation.XOR
+                                Type = GarbledOperation.Xor
                             });
                             nextSum[i] = nextWire++;
 
@@ -1556,7 +1556,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                                 LeftInput = validWire,
                                 RightInput = carryWire,
                                 Output = nextWire,
-                                Type = GarbledOperation.AND
+                                Type = GarbledOperation.And
                             });
                             carryWire = nextWire++;
                         }
@@ -1564,24 +1564,24 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                     else
                     {
                         // Full adder
-                        int xorAB = nextWire++;
+                        int xorAb = nextWire++;
                         gates.Add(new GarbledGate
                         {
                             LeftInput = aWire,
                             RightInput = bWire,
-                            Output = xorAB,
-                            Type = GarbledOperation.XOR
+                            Output = xorAb,
+                            Type = GarbledOperation.Xor
                         });
 
                         if (carryWire == -1)
                         {
-                            nextSum[i] = xorAB;
+                            nextSum[i] = xorAb;
                             gates.Add(new GarbledGate
                             {
                                 LeftInput = aWire,
                                 RightInput = bWire,
                                 Output = nextWire,
-                                Type = GarbledOperation.AND
+                                Type = GarbledOperation.And
                             });
                             carryWire = nextWire++;
                         }
@@ -1589,37 +1589,37 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                         {
                             gates.Add(new GarbledGate
                             {
-                                LeftInput = xorAB,
+                                LeftInput = xorAb,
                                 RightInput = carryWire,
                                 Output = nextWire,
-                                Type = GarbledOperation.XOR
+                                Type = GarbledOperation.Xor
                             });
                             nextSum[i] = nextWire++;
 
-                            int andAB = nextWire++;
+                            int andAb = nextWire++;
                             gates.Add(new GarbledGate
                             {
                                 LeftInput = aWire,
                                 RightInput = bWire,
-                                Output = andAB,
-                                Type = GarbledOperation.AND
+                                Output = andAb,
+                                Type = GarbledOperation.And
                             });
 
                             int andXorC = nextWire++;
                             gates.Add(new GarbledGate
                             {
-                                LeftInput = xorAB,
+                                LeftInput = xorAb,
                                 RightInput = carryWire,
                                 Output = andXorC,
-                                Type = GarbledOperation.AND
+                                Type = GarbledOperation.And
                             });
 
                             gates.Add(new GarbledGate
                             {
-                                LeftInput = andAB,
+                                LeftInput = andAb,
                                 RightInput = andXorC,
                                 Output = nextWire,
-                                Type = GarbledOperation.OR
+                                Type = GarbledOperation.Or
                             });
                             carryWire = nextWire++;
                         }
@@ -1656,7 +1656,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                         LeftInput = bWire,
                         RightInput = bWire, // XOR with self gives 0, then we use AND logic
                         Output = notB,
-                        Type = GarbledOperation.XOR
+                        Type = GarbledOperation.Xor
                     });
 
                     gates.Add(new GarbledGate
@@ -1664,7 +1664,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                         LeftInput = aWire,
                         RightInput = bWire,
                         Output = aGreater,
-                        Type = GarbledOperation.AND // Simplified: A AND NOT B
+                        Type = GarbledOperation.And // Simplified: A AND NOT B
                     });
                 }
                 else if (aWire >= 0)
@@ -1688,7 +1688,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
                         LeftInput = resultWire,
                         RightInput = aGreater,
                         Output = nextWire,
-                        Type = GarbledOperation.OR
+                        Type = GarbledOperation.Or
                     });
                     resultWire = nextWire++;
                 }
@@ -1727,9 +1727,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
         {
             return type switch
             {
-                GarbledOperation.AND => left && right,
-                GarbledOperation.OR => left || right,
-                GarbledOperation.XOR => left ^ right,
+                GarbledOperation.And => left && right,
+                GarbledOperation.Or => left || right,
+                GarbledOperation.Xor => left ^ right,
                 _ => throw new ArgumentException($"Invalid gate type for boolean evaluation: {type}")
             };
         }
@@ -1807,7 +1807,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
         /// <summary>
         /// Gets both labels for Party B's input wires (for OT).
         /// </summary>
-        public (byte[][] labels0, byte[][] labels1) GetInputLabelsForOT()
+        public (byte[][] labels0, byte[][] labels1) GetInputLabelsForOt()
         {
             var labels0 = new byte[_inputBitsB][];
             var labels1 = new byte[_inputBitsB][];
@@ -1939,7 +1939,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
     /// </summary>
     public enum GarbledOperation
     {
-        AND, OR, XOR, ADD, MUL, CMP
+        And, Or, Xor, Add, Mul, Cmp
     }
 
     #endregion
@@ -1964,11 +1964,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
         {
             // Generate random a
             var a = GenerateRandomScalar();
-            var A = OtDomain.G.Multiply(a);
+            var aPoint = OtDomain.G.Multiply(a);
 
             return new OtSenderSetup
             {
-                A = A.GetEncoded(false),
+                A = aPoint.GetEncoded(false),
                 PrivateA = a.ToByteArrayUnsigned()
             };
         }
@@ -1978,25 +1978,25 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
         /// </summary>
         public OtReceiverResponse ReceiverChoose(byte[] senderA, bool choiceBit)
         {
-            var A = OtCurve.Curve.DecodePoint(senderA);
+            var aPoint = OtCurve.Curve.DecodePoint(senderA);
 
             // Generate random b
             var b = GenerateRandomScalar();
-            var B = OtDomain.G.Multiply(b);
+            var bPoint = OtDomain.G.Multiply(b);
 
             // If choice = 1, B = b*G + A, otherwise B = b*G
             if (choiceBit)
             {
-                B = B.Add(A);
+                bPoint = bPoint.Add(aPoint);
             }
 
             // Compute key: K = b * A
-            var K = A.Multiply(b);
-            var key = SHA256.HashData(K.Normalize().AffineXCoord.GetEncoded());
+            var kPoint = aPoint.Multiply(b);
+            var key = SHA256.HashData(kPoint.Normalize().AffineXCoord.GetEncoded());
 
             return new OtReceiverResponse
             {
-                B = B.GetEncoded(false),
+                B = bPoint.GetEncoded(false),
                 ReceiverKey = key
             };
         }
@@ -2007,16 +2007,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
         public OtSenderMessages SenderEncrypt(OtSenderSetup setup, byte[] receiverB, byte[] message0, byte[] message1)
         {
             var a = new BigInteger(1, setup.PrivateA);
-            var A = OtCurve.Curve.DecodePoint(setup.A);
-            var B = OtCurve.Curve.DecodePoint(receiverB);
+            var aPoint = OtCurve.Curve.DecodePoint(setup.A);
+            var bPoint = OtCurve.Curve.DecodePoint(receiverB);
 
             // K0 = a * B (if receiver chose 0, B = b*G, so K0 = a*b*G)
             // K1 = a * (B - A) (if receiver chose 1, B = b*G + A, so B-A = b*G, K1 = a*b*G)
-            var K0 = B.Multiply(a);
-            var K1 = B.Subtract(A).Multiply(a);
+            var k0 = bPoint.Multiply(a);
+            var k1 = bPoint.Subtract(aPoint).Multiply(a);
 
-            var key0 = SHA256.HashData(K0.Normalize().AffineXCoord.GetEncoded());
-            var key1 = SHA256.HashData(K1.Normalize().AffineXCoord.GetEncoded());
+            var key0 = SHA256.HashData(k0.Normalize().AffineXCoord.GetEncoded());
+            var key1 = SHA256.HashData(k1.Normalize().AffineXCoord.GetEncoded());
 
             return new OtSenderMessages
             {
@@ -2072,7 +2072,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
         /// <summary>
         /// Performs batch OT for multiple choice bits (OT extension).
         /// </summary>
-        public async Task<byte[][]> BatchOTAsync(
+        public async Task<byte[][]> BatchOtAsync(
             byte[][] messages0,
             byte[][] messages1,
             bool[] choices,
@@ -2141,7 +2141,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
     /// </summary>
     public sealed class ObliviousTransferN
     {
-        private readonly ObliviousTransfer _baseOT = new();
+        private readonly ObliviousTransfer _baseOt = new();
 
         /// <summary>
         /// Performs 1-out-of-N OT using binary decomposition.
@@ -2189,11 +2189,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
             var receivedMasks = new byte[bits][];
             for (int i = 0; i < bits; i++)
             {
-                var setup = _baseOT.SenderSetup();
-                var response = _baseOT.ReceiverChoose(setup.A, choiceBits[i]);
-                var encrypted = _baseOT.SenderEncrypt(setup, response.B,
+                var setup = _baseOt.SenderSetup();
+                var response = _baseOt.ReceiverChoose(setup.A, choiceBits[i]);
+                var encrypted = _baseOt.SenderEncrypt(setup, response.B,
                     maskedMessages[i][0], maskedMessages[i][1]);
-                receivedMasks[i] = _baseOT.ReceiverDecrypt(response, encrypted, choiceBits[i]);
+                receivedMasks[i] = _baseOt.ReceiverDecrypt(response, encrypted, choiceBits[i]);
             }
 
             // Use received masks to decrypt the chosen message
@@ -3098,13 +3098,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
         {
             // Commitment: R = g^k for random k
             var k = GenerateRandomFieldElement();
-            var R = SmpcCurveParams.Domain.G.Multiply(k);
+            var rCommit = SmpcCurveParams.Domain.G.Multiply(k);
 
             // Challenge: c = H(g, Y, R)
             var challengeInput = new byte[SmpcCurveParams.Domain.G.GetEncoded(true).Length * 3];
             var gBytes = SmpcCurveParams.Domain.G.GetEncoded(true);
             var yBytes = publicY.GetEncoded(true);
-            var rBytes = R.GetEncoded(true);
+            var rBytes = rCommit.GetEncoded(true);
 
             Buffer.BlockCopy(gBytes, 0, challengeInput, 0, gBytes.Length);
             Buffer.BlockCopy(yBytes, 0, challengeInput, gBytes.Length, yBytes.Length);
@@ -3118,7 +3118,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Privacy
 
             return new SchnorrProof
             {
-                Commitment = R,
+                Commitment = rCommit,
                 Challenge = c,
                 Response = s
             };

@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
         // P2-3573: Share a single HttpClient per process to enable connection pooling
         // and proper DNS refresh via SocketsHttpHandler. Creating per-instance clients
         // leads to socket exhaustion under load.
-        private static readonly HttpClient _httpClient = new(new SocketsHttpHandler
+        private static readonly HttpClient HttpClientInstance = new(new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(15),
             PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5)
@@ -131,7 +131,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, "/get-secret-value");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -173,7 +173,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, "/create-secret");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             _currentKeyId = keyId;
@@ -194,7 +194,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, "/encrypt");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -219,7 +219,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, "/decrypt");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -245,7 +245,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
                 var request = CreateRequest(HttpMethod.Post, "/list-items");
                 request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return Array.Empty<string>();
@@ -299,7 +299,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = CreateRequest(HttpMethod.Post, "/delete-item");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -321,7 +321,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
                 var request = CreateRequest(HttpMethod.Post, "/describe-item");
                 request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
@@ -380,7 +380,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             var request = new HttpRequestMessage(HttpMethod.Post, $"{_config.GatewayUrl}/auth");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -393,7 +393,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
             try
             {
                 var request = new HttpRequestMessage(HttpMethod.Get, $"{_config.GatewayUrl}/status");
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -410,7 +410,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
 
         public override void Dispose()
         {
-            // _httpClient is shared (static) — not disposed here to prevent breaking other callers.
+            // HttpClientInstance is shared (static) — not disposed here to prevent breaking other callers.
             base.Dispose();
         }
     }

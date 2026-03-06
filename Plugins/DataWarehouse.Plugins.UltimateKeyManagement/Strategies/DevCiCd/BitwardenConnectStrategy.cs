@@ -177,7 +177,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
-            var secret = JsonSerializer.Deserialize<BitwardenSecret>(json, _jsonOptions);
+            var secret = JsonSerializer.Deserialize<BitwardenSecret>(json, JsonOptions);
 
             if (secret?.Value == null)
             {
@@ -275,7 +275,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                 return Array.Empty<string>();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var result = JsonSerializer.Deserialize<BitwardenSecretsListResponse>(json, _jsonOptions);
+            var result = JsonSerializer.Deserialize<BitwardenSecretsListResponse>(json, JsonOptions);
 
             return result?.Secrets?
                 .Select(s => s.Key)
@@ -332,7 +332,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                 return null;
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var secret = JsonSerializer.Deserialize<BitwardenSecret>(json, _jsonOptions);
+            var secret = JsonSerializer.Deserialize<BitwardenSecret>(json, JsonOptions);
 
             if (secret == null)
                 return null;
@@ -420,7 +420,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                 response.EnsureSuccessStatusCode();
 
                 var json = await response.Content.ReadAsStringAsync(cancellationToken);
-                var tokenResponse = JsonSerializer.Deserialize<BitwardenTokenResponse>(json, _jsonOptions);
+                var tokenResponse = JsonSerializer.Deserialize<BitwardenTokenResponse>(json, JsonOptions);
 
                 if (tokenResponse == null || string.IsNullOrEmpty(tokenResponse.AccessToken))
                 {
@@ -506,7 +506,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                 return null;
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var result = JsonSerializer.Deserialize<BitwardenSecretsListResponse>(json, _jsonOptions);
+            var result = JsonSerializer.Deserialize<BitwardenSecretsListResponse>(json, JsonOptions);
 
             // Populate cache for all returned secrets to amortise future lookups.
             if (result?.Secrets != null)
@@ -548,7 +548,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             if (payload != null)
             {
                 request.Content = new StringContent(
-                    JsonSerializer.Serialize(payload, _jsonOptions),
+                    JsonSerializer.Serialize(payload, JsonOptions),
                     Encoding.UTF8,
                     "application/json");
             }
@@ -556,7 +556,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             return await _httpClient.SendAsync(request, cancellationToken);
         }
 
-        private static readonly JsonSerializerOptions _jsonOptions = new()
+        private static readonly JsonSerializerOptions JsonOptions = new()
         {
             PropertyNameCaseInsensitive = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase

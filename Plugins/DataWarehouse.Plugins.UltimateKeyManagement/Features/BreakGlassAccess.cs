@@ -1011,8 +1011,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
             _policies.Clear();
             _responders.Clear();
             _accessLock.Dispose();
-
-            GC.SuppressFinalize(this);
         }
     }
 

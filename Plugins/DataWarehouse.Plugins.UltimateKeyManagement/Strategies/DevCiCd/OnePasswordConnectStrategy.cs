@@ -218,7 +218,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                 return Array.Empty<string>();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var items = JsonSerializer.Deserialize<List<OpItem>>(json, _jsonOptions);
+            var items = JsonSerializer.Deserialize<List<OpItem>>(json, JsonOptions);
 
             return items?
                 .Where(i => i.Category == _config.ItemCategory)
@@ -318,7 +318,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var vaults = JsonSerializer.Deserialize<List<OpVault>>(json, _jsonOptions);
+            var vaults = JsonSerializer.Deserialize<List<OpVault>>(json, JsonOptions);
 
             var vault = vaults?.FirstOrDefault(v =>
                 string.Equals(v.Name, _config.VaultName, StringComparison.OrdinalIgnoreCase));
@@ -350,7 +350,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             }
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var items = JsonSerializer.Deserialize<List<OpItem>>(json, _jsonOptions);
+            var items = JsonSerializer.Deserialize<List<OpItem>>(json, JsonOptions);
 
             var itemSummary = items?.FirstOrDefault(i =>
                 string.Equals(i.Title, title, StringComparison.OrdinalIgnoreCase));
@@ -367,7 +367,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
                 return itemSummary;
 
             json = await response.Content.ReadAsStringAsync(cancellationToken);
-            return JsonSerializer.Deserialize<OpItem>(json, _jsonOptions);
+            return JsonSerializer.Deserialize<OpItem>(json, JsonOptions);
         }
 
         private async Task<string> CreateItemAsync(string keyId, string keyBase64, ISecurityContext context, CancellationToken cancellationToken = default)
@@ -413,7 +413,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             };
 
             var content = new StringContent(
-                JsonSerializer.Serialize(item, _jsonOptions),
+                JsonSerializer.Serialize(item, JsonOptions),
                 Encoding.UTF8,
                 "application/json");
 
@@ -425,7 +425,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var createdItem = JsonSerializer.Deserialize<OpItem>(json, _jsonOptions);
+            var createdItem = JsonSerializer.Deserialize<OpItem>(json, JsonOptions);
 
             return createdItem?.Id ?? throw new InvalidOperationException("Failed to get created item ID.");
         }
@@ -440,7 +440,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
-            var item = JsonSerializer.Deserialize<OpItem>(json, _jsonOptions);
+            var item = JsonSerializer.Deserialize<OpItem>(json, JsonOptions);
 
             if (item == null)
             {
@@ -500,7 +500,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             }
 
             var content = new StringContent(
-                JsonSerializer.Serialize(item, _jsonOptions),
+                JsonSerializer.Serialize(item, JsonOptions),
                 Encoding.UTF8,
                 "application/json");
 
@@ -512,7 +512,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.DevCiCd
             response.EnsureSuccessStatusCode();
         }
 
-        private static readonly JsonSerializerOptions _jsonOptions = new()
+        private static readonly JsonSerializerOptions JsonOptions = new()
         {
             PropertyNameCaseInsensitive = true,
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,

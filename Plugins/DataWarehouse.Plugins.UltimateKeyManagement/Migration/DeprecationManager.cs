@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
     /// </summary>
     public sealed class DeprecationManager : IDisposable
     {
-        private static readonly Lazy<DeprecationManager> _instance = new(() => new DeprecationManager());
+        private static readonly Lazy<DeprecationManager> LazyInstance = new(() => new DeprecationManager());
         private readonly BoundedDictionary<string, DeprecationInfo> _deprecatedItems = new BoundedDictionary<string, DeprecationInfo>(1000);
         // #3439: ConcurrentBag.Any() is O(n) and has TOCTOU. Use ConcurrentDictionary for O(1) de-dup.
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, DeprecationWarning> _emittedWarnings = new();
@@ -34,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
         /// <summary>
         /// Gets the singleton instance of the DeprecationManager.
         /// </summary>
-        public static DeprecationManager Instance => _instance.Value;
+        public static DeprecationManager Instance => LazyInstance.Value;
 
         /// <summary>
         /// Event raised when a deprecation warning is emitted.
@@ -496,8 +496,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
 
             _disposed = true;
             _deprecatedItems.Clear();
-
-            GC.SuppressFinalize(this);
         }
     }
 

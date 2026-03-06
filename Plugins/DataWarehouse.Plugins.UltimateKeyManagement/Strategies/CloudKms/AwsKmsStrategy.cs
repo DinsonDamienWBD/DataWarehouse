@@ -27,7 +27,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
     public sealed class AwsKmsStrategy : KeyStoreStrategyBase, IEnvelopeKeyStore
     {
         // P2-3450: Shared static HttpClient to prevent socket exhaustion
-        private static readonly HttpClient _httpClient = new(new SocketsHttpHandler
+        private static readonly HttpClient HttpClientInstance = new(new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(15),
             PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5)
@@ -112,7 +112,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             try
             {
                 var request = CreateSignedRequest("DescribeKey", new { KeyId = _config.DefaultKeyId });
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -131,7 +131,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 KeySpec = "AES_256"
             });
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -150,7 +150,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 KeySpec = "SYMMETRIC_DEFAULT"
             });
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -170,7 +170,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 Plaintext = Convert.ToBase64String(dataKey)
             });
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -189,7 +189,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 CiphertextBlob = Convert.ToBase64String(wrappedKey)
             });
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -203,7 +203,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             ValidateSecurityContext(context);
 
             var request = CreateSignedRequest("ListKeys", new { });
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
@@ -239,7 +239,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 PendingWindowInDays = 7 // Minimum is 7 days
             });
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -250,7 +250,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             try
             {
                 var request = CreateSignedRequest("DescribeKey", new { KeyId = keyId });
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
@@ -339,7 +339,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public override void Dispose()
         {
-            // _httpClient is shared (static) — not disposed here to prevent breaking other callers.
+            // HttpClientInstance is shared (static) — not disposed here to prevent breaking other callers.
             base.Dispose();
         }
     }

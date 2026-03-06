@@ -746,7 +746,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 SessionId = Guid.NewGuid().ToString("N"),
                 RemoteNodeId = "simulated-node",
                 EstablishedAt = DateTimeOffset.UtcNow,
-                Protocol = QkdProtocol.BB84
+                Protocol = QkdProtocol.Bb84
             };
         }
 

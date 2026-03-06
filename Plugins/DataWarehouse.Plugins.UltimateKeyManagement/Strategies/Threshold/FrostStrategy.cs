@@ -401,15 +401,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                     var e = GenerateRandomScalar();
 
                     // Compute commitments D_i = d_i * G, E_i = e_i * G
-                    var D = DomainParams.G.Multiply(d);
-                    var E = DomainParams.G.Multiply(e);
+                    var dPoint = DomainParams.G.Multiply(d);
+                    var ePoint = DomainParams.G.Multiply(e);
 
                     var nonce = new FrostNonce
                     {
                         D = d,
                         E = e,
-                        DCommitment = D,
-                        ECommitment = E,
+                        DCommitment = dPoint,
+                        ECommitment = ePoint,
                         Index = keyData.NoncePool.Count + i
                     };
 
@@ -420,8 +420,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                         KeyId = keyId,
                         PartyIndex = _config.PartyIndex,
                         NonceIndex = nonce.Index,
-                        D = D.GetEncoded(false),
-                        E = E.GetEncoded(false)
+                        D = dPoint.GetEncoded(false),
+                        E = ePoint.GetEncoded(false)
                     };
                 }
 
@@ -534,15 +534,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 {
                     if (msg.PartyIndex == _config.PartyIndex) continue;
 
-                    var D = CurveParams.Curve.DecodePoint(msg.D);
-                    var E = CurveParams.Curve.DecodePoint(msg.E);
+                    var dDec = CurveParams.Curve.DecodePoint(msg.D);
+                    var eDec = CurveParams.Curve.DecodePoint(msg.E);
 
                     // Verify commitment
-                    var expectedCommitment = ComputeCommitmentHash(D, E);
+                    var expectedCommitment = ComputeCommitmentHash(dDec, eDec);
                     if (!expectedCommitment.SequenceEqual(msg.Commitment))
                         throw new CryptographicException($"Invalid commitment from party {msg.PartyIndex}");
 
-                    nonceCommitments[msg.PartyIndex] = (D, E);
+                    nonceCommitments[msg.PartyIndex] = (dDec, eDec);
                 }
 
                 // Compute binding factor rho_i for each signer
@@ -552,25 +552,25 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                     state.SignerIndices);
 
                 // Compute group commitment R = sum(D_i + rho_i * E_i)
-                var R = DomainParams.Curve.Infinity;
+                var rCommit = DomainParams.Curve.Infinity;
                 foreach (var idx in state.SignerIndices)
                 {
-                    var (D, E) = nonceCommitments[idx];
+                    var (dNonce, eNonce) = nonceCommitments[idx];
                     var rho = bindingFactors[idx];
-                    R = R.Add(D).Add(E.Multiply(rho));
+                    rCommit = rCommit.Add(dNonce).Add(eNonce.Multiply(rho));
                 }
 
                 // Ensure R has even Y coordinate (BIP-340)
-                var negateNonce = !HasEvenY(R);
+                var negateNonce = !HasEvenY(rCommit);
                 if (negateNonce)
                 {
-                    R = R.Negate();
+                    rCommit = rCommit.Negate();
                 }
 
                 // Compute challenge c = H(R.x || P || m)
-                var Rx = GetXOnlyPubkey(R);
-                var Px = GetXOnlyPubkey(keyData.GroupPublicKey!);
-                var challenge = ComputeChallenge(Rx, Px, state.Message);
+                var rx = GetXOnlyPubkey(rCommit);
+                var px = GetXOnlyPubkey(keyData.GroupPublicKey!);
+                var challenge = ComputeChallenge(rx, px, state.Message);
 
                 // Compute Lagrange coefficient
                 var lambda = ComputeLagrangeCoefficient(_config.PartyIndex, state.SignerIndices);
@@ -592,7 +592,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                     .Add(lambda.Multiply(keyData.SecretShare).Multiply(challenge).Mod(DomainParams.N))
                     .Mod(DomainParams.N);
 
-                state.R = R;
+                state.R = rCommit;
                 state.Challenge = challenge;
                 state.Phase = 2;
 
@@ -603,7 +603,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                     KeyId = keyId,
                     PartyIndex = _config.PartyIndex,
                     Z = z.ToByteArrayUnsigned(),
-                    R = Rx
+                    R = rx
                 };
             }
             finally
@@ -632,10 +632,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                     ?? throw new InvalidOperationException("No active signing session.");
 
                 // Verify all R values match
-                var R = round2Messages[0].R;
+                var rBytes = round2Messages[0].R;
                 foreach (var msg in round2Messages.Skip(1))
                 {
-                    if (!R.SequenceEqual(msg.R))
+                    if (!rBytes.SequenceEqual(msg.R))
                         throw new CryptographicException("R values do not match.");
                 }
 
@@ -648,7 +648,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
                 // Verify the signature before returning
                 var signature = new byte[64];
-                Array.Copy(R, 0, signature, 0, 32);
+                Array.Copy(rBytes, 0, signature, 0, 32);
                 var zBytes = z.ToByteArrayUnsigned();
                 Array.Copy(zBytes, 0, signature, 64 - zBytes.Length, zBytes.Length);
 
@@ -696,21 +696,21 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
             return SHA256.HashData(ms.ToArray());
         }
 
-        private BigInteger ComputeChallenge(byte[] Rx, byte[] Px, byte[] message)
+        private BigInteger ComputeChallenge(byte[] rx, byte[] px, byte[] message)
         {
             using var ms = new MemoryStream(4096);
-            ms.Write(Rx);
-            ms.Write(Px);
+            ms.Write(rx);
+            ms.Write(px);
             ms.Write(message);
             var hash = TaggedHash(TagChallenge, ms.ToArray());
             return new BigInteger(1, hash).Mod(DomainParams.N);
         }
 
-        private byte[] ComputeCommitmentHash(ECPoint D, ECPoint E)
+        private byte[] ComputeCommitmentHash(ECPoint d, ECPoint e)
         {
             using var ms = new MemoryStream(4096);
-            ms.Write(D.GetEncoded(false));
-            ms.Write(E.GetEncoded(false));
+            ms.Write(d.GetEncoded(false));
+            ms.Write(e.GetEncoded(false));
             return SHA256.HashData(ms.ToArray());
         }
 
@@ -726,10 +726,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
             ms.Write(message);
             foreach (var idx in signerIndices.OrderBy(x => x))
             {
-                var (D, E) = commitments[idx];
+                var (dVal, eVal) = commitments[idx];
                 ms.Write(BitConverter.GetBytes(idx));
-                ms.Write(D.GetEncoded(false));
-                ms.Write(E.GetEncoded(false));
+                ms.Write(dVal.GetEncoded(false));
+                ms.Write(eVal.GetEncoded(false));
             }
             var encodedCommitments = ms.ToArray();
 
@@ -748,18 +748,18 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
         private byte[] CreateSchnorrProof(BigInteger secret)
         {
             var k = GenerateRandomScalar();
-            var R = DomainParams.G.Multiply(k);
-            var P = DomainParams.G.Multiply(secret);
+            var rPoint = DomainParams.G.Multiply(k);
+            var pPoint = DomainParams.G.Multiply(secret);
 
             using var ms = new MemoryStream(4096);
-            ms.Write(R.GetEncoded(false));
-            ms.Write(P.GetEncoded(false));
+            ms.Write(rPoint.GetEncoded(false));
+            ms.Write(pPoint.GetEncoded(false));
             var challenge = new BigInteger(1, SHA256.HashData(ms.ToArray())).Mod(DomainParams.N);
 
             var response = k.Add(challenge.Multiply(secret)).Mod(DomainParams.N);
 
             var proof = new byte[97]; // 65 (point) + 32 (scalar)
-            Array.Copy(R.GetEncoded(false), proof, 65);
+            Array.Copy(rPoint.GetEncoded(false), proof, 65);
             var responseBytes = response.ToByteArrayUnsigned();
             Array.Copy(responseBytes, 0, proof, 97 - responseBytes.Length, responseBytes.Length);
 
@@ -770,22 +770,22 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
         {
             if (proof.Length != 97) return false;
 
-            var RBytes = new byte[65];
-            Array.Copy(proof, RBytes, 65);
-            var R = CurveParams.Curve.DecodePoint(RBytes);
+            var rPointBytes = new byte[65];
+            Array.Copy(proof, rPointBytes, 65);
+            var rVerify = CurveParams.Curve.DecodePoint(rPointBytes);
 
             var responseBytes = new byte[32];
             Array.Copy(proof, 65, responseBytes, 0, 32);
             var response = new BigInteger(1, responseBytes);
 
             using var ms = new MemoryStream(4096);
-            ms.Write(RBytes);
+            ms.Write(rPointBytes);
             ms.Write(publicKey.GetEncoded(false));
             var challenge = new BigInteger(1, SHA256.HashData(ms.ToArray())).Mod(DomainParams.N);
 
             // Verify: response * G == R + challenge * P
             var left = DomainParams.G.Multiply(response);
-            var right = R.Add(publicKey.Multiply(challenge));
+            var right = rVerify.Add(publicKey.Multiply(challenge));
 
             return left.Equals(right);
         }
@@ -794,29 +794,29 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
         {
             if (signature.Length != 64 || pubkey.Length != 32) return false;
 
-            var Rx = new byte[32];
+            var rxSig = new byte[32];
             var sBytes = new byte[32];
-            Array.Copy(signature, 0, Rx, 0, 32);
+            Array.Copy(signature, 0, rxSig, 0, 32);
             Array.Copy(signature, 32, sBytes, 0, 32);
 
             var s = new BigInteger(1, sBytes);
             if (s.CompareTo(DomainParams.N) >= 0) return false;
 
-            var e = ComputeChallenge(Rx, pubkey, message);
+            var e = ComputeChallenge(rxSig, pubkey, message);
 
             // Lift x-only pubkey to full point
             var x = new BigInteger(1, pubkey);
-            var P = LiftX(x);
-            if (P == null) return false;
+            var p = LiftX(x);
+            if (p == null) return false;
 
             // R = s*G - e*P
-            var R = DomainParams.G.Multiply(s).Add(P.Negate().Multiply(e));
+            var rSig = DomainParams.G.Multiply(s).Add(p.Negate().Multiply(e));
 
-            if (R.IsInfinity) return false;
-            if (!HasEvenY(R)) return false;
+            if (rSig.IsInfinity) return false;
+            if (!HasEvenY(rSig)) return false;
 
-            var computedRx = GetXOnlyPubkey(R);
-            return Rx.SequenceEqual(computedRx);
+            var computedRx = GetXOnlyPubkey(rSig);
+            return rxSig.SequenceEqual(computedRx);
         }
 
         private ECPoint? LiftX(BigInteger x)

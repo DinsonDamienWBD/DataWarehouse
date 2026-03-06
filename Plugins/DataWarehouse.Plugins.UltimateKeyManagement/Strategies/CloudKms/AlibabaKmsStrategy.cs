@@ -29,7 +29,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         // P2-3450: Share a single HttpClient per process to enable connection pooling
         // and proper DNS refresh via SocketsHttpHandler. Creating per-instance clients
         // leads to socket exhaustion under load.
-        private static readonly HttpClient _httpClient = new(new SocketsHttpHandler
+        private static readonly HttpClient HttpClientInstance = new(new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(15),
             PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5)
@@ -130,7 +130,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 };
 
                 var request = CreateSignedRequest(parameters);
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -151,7 +151,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(parameters);
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -173,7 +173,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(parameters);
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -195,7 +195,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(parameters);
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -215,7 +215,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(parameters);
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -235,7 +235,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(parameters);
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
@@ -274,7 +274,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(parameters);
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -291,7 +291,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 };
 
                 var request = CreateSignedRequest(parameters);
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
@@ -402,7 +402,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public override void Dispose()
         {
-            // _httpClient is shared (static) — not disposed here to prevent breaking other callers.
+            // HttpClientInstance is shared (static) — not disposed here to prevent breaking other callers.
             base.Dispose();
         }
     }

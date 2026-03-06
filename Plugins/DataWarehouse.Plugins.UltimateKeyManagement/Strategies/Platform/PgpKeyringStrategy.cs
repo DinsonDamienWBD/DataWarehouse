@@ -285,7 +285,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
             IAsymmetricCipherKeyPairGenerator keyPairGenerator;
             PgpKeyPair keyPair;
 
-            if (_config.KeyAlgorithm == PgpKeyAlgorithm.RSA)
+            if (_config.KeyAlgorithm == PgpKeyAlgorithm.Rsa)
             {
                 keyPairGenerator = new RsaKeyPairGenerator();
                 keyPairGenerator.Init(new RsaKeyGenerationParameters(
@@ -393,14 +393,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
                 PgpPrivateKey? privateKey = null;
                 PgpPublicKeyEncryptedData? encryptedDataPacket = null;
 
-                foreach (PgpPublicKeyEncryptedData pked in encryptedDataList.GetEncryptedDataObjects())
+                foreach (var encObj in encryptedDataList.GetEncryptedDataObjects().OfType<PgpPublicKeyEncryptedData>())
                 {
-                    var secretKey = _secretKeyRing.GetSecretKey(pked.KeyId);
+                    var secretKey = _secretKeyRing.GetSecretKey(encObj.KeyId);
                     if (secretKey != null)
                     {
                         var passphrase = GetPassphrase();
                         privateKey = secretKey.ExtractPrivateKey(passphrase.ToCharArray());
-                        encryptedDataPacket = pked;
+                        encryptedDataPacket = encObj;
                         break;
                     }
                 }
@@ -582,7 +582,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
         /// <summary>
         /// Key algorithm to use for new key generation.
         /// </summary>
-        public PgpKeyAlgorithm KeyAlgorithm { get; set; } = PgpKeyAlgorithm.RSA;
+        public PgpKeyAlgorithm KeyAlgorithm { get; set; } = PgpKeyAlgorithm.Rsa;
 
         /// <summary>
         /// Key size in bits for new key generation.
@@ -598,7 +598,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
         /// <summary>
         /// RSA algorithm (recommended).
         /// </summary>
-        RSA,
+        Rsa,
 
         /// <summary>
         /// DSA/ElGamal algorithm.

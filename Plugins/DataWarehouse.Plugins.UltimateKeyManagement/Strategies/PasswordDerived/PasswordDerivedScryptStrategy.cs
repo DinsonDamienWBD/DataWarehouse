@@ -283,17 +283,17 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
         {
             return await Task.Run(() =>
             {
-                var N = n ?? _config.N;
-                var R = r ?? _config.R;
-                var P = p ?? _config.P;
+                var costParam = n ?? _config.N;
+                var blockSize = r ?? _config.R;
+                var parallelism = p ?? _config.P;
 
                 // Use BouncyCastle's SCrypt implementation for direct key derivation
                 return SCrypt.Generate(
                     Encoding.UTF8.GetBytes(password),
                     salt,
-                    N,
-                    R,
-                    P,
+                    costParam,
+                    blockSize,
+                    parallelism,
                     outputLength);
             }, cancellationToken);
         }

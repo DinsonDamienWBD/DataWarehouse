@@ -112,8 +112,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
             scanResult.TotalFilesScanned = files.Count;
 
             // P2-3448: Bound parallel file I/O to prevent thread-pool and file-handle exhaustion.
-            const int MaxConcurrency = 32;
-            using var sem = new System.Threading.SemaphoreSlim(MaxConcurrency, MaxConcurrency);
+            const int maxConcurrency = 32;
+            using var sem = new System.Threading.SemaphoreSlim(maxConcurrency, maxConcurrency);
             var tasks = files.Select(async file =>
             {
                 await sem.WaitAsync(cancellationToken).ConfigureAwait(false);
@@ -500,7 +500,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
             _disposed = true;
             _detectedReferences.Clear();
 
-            GC.SuppressFinalize(this);
         }
 
         #endregion

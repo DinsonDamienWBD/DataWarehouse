@@ -41,7 +41,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         private bool _disposed;
 
         // #3533: Share wrapping key so EncryptedShare actually stores ciphertext, not raw share bytes.
-        private static readonly byte[] _shareWrapKey = HKDF.DeriveKey(
+        private static readonly byte[] ShareWrapKey = HKDF.DeriveKey(
             HashAlgorithmName.SHA256,
             SHA256.HashData(Encoding.UTF8.GetBytes(
                 $"SocialRecovery.ShareWrap.v1:{Environment.MachineName}:{Environment.UserName}")),
@@ -972,7 +972,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             RandomNumberGenerator.Fill(nonce);
             var tag = new byte[16];
             var ciphertext = new byte[plainShare.Length];
-            var perGuardian = HKDF.DeriveKey(HashAlgorithmName.SHA256, _shareWrapKey, 32,
+            var perGuardian = HKDF.DeriveKey(HashAlgorithmName.SHA256, ShareWrapKey, 32,
                 salt: Encoding.UTF8.GetBytes("dw-social-per-guardian-v1"),
                 info: Encoding.UTF8.GetBytes(guardianId));
             using var aes = new AesGcm(perGuardian, 16);
@@ -991,7 +991,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             var nonce = wrapped[..12];
             var tag = wrapped[12..28];
             var ciphertext = wrapped[28..];
-            var perGuardian = HKDF.DeriveKey(HashAlgorithmName.SHA256, _shareWrapKey, 32,
+            var perGuardian = HKDF.DeriveKey(HashAlgorithmName.SHA256, ShareWrapKey, 32,
                 salt: Encoding.UTF8.GetBytes("dw-social-per-guardian-v1"),
                 info: Encoding.UTF8.GetBytes(guardianId));
             var plaintext = new byte[ciphertext.Length];

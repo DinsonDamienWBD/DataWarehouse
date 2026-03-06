@@ -27,7 +27,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
     public sealed class IbmKeyProtectStrategy : KeyStoreStrategyBase, IEnvelopeKeyStore
     {
         // P2-3450: Shared static HttpClient to prevent socket exhaustion
-        private static readonly HttpClient _httpClient = new(new SocketsHttpHandler
+        private static readonly HttpClient HttpClientInstance = new(new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(15),
             PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5)
@@ -128,7 +128,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 request.Headers.Add("Authorization", $"Bearer {_accessToken}");
                 request.Headers.Add("Bluemix-Instance", _config.InstanceId);
 
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -164,7 +164,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 unwrapRequest.Content = new StringContent(
                     JsonSerializer.Serialize(unwrapPayload), Encoding.UTF8, "application/json");
 
-                using var unwrapResponse = await _httpClient.SendAsync(unwrapRequest);
+                using var unwrapResponse = await HttpClientInstance.SendAsync(unwrapRequest);
                 unwrapResponse.EnsureSuccessStatusCode();
 
                 var unwrapJson = await unwrapResponse.Content.ReadAsStringAsync();
@@ -185,7 +185,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             wrapRequest.Content = new StringContent(
                 JsonSerializer.Serialize(wrapPayload), Encoding.UTF8, "application/json");
 
-            using var wrapResponse = await _httpClient.SendAsync(wrapRequest);
+            using var wrapResponse = await HttpClientInstance.SendAsync(wrapRequest);
             wrapResponse.EnsureSuccessStatusCode();
 
             var wrapJson = await wrapResponse.Content.ReadAsStringAsync();
@@ -237,7 +237,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
             request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -264,7 +264,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
             request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -289,7 +289,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
             request.Content = new StringContent(JsonSerializer.Serialize(payload), Encoding.UTF8, "application/json");
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -308,7 +308,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Authorization", $"Bearer {_accessToken}");
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
@@ -344,7 +344,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             request.Headers.Add("Authorization", $"Bearer {_accessToken}");
             request.Headers.Add("Bluemix-Instance", _config.InstanceId);
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -361,7 +361,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 request.Headers.Add("Authorization", $"Bearer {_accessToken}");
                 request.Headers.Add("Bluemix-Instance", _config.InstanceId);
 
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
@@ -409,7 +409,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
             tokenRequest.Content = new FormUrlEncodedContent(formData);
 
-            using var response = await _httpClient.SendAsync(tokenRequest, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(tokenRequest, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -440,7 +440,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public override void Dispose()
         {
-            // _httpClient is shared (static) — not disposed here to prevent breaking other callers.
+            // HttpClientInstance is shared (static) — not disposed here to prevent breaking other callers.
             base.Dispose();
         }
     }

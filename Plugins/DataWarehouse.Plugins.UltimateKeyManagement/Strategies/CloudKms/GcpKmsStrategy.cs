@@ -28,7 +28,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
     public sealed class GcpKmsStrategy : KeyStoreStrategyBase, IEnvelopeKeyStore
     {
         // P2-3450: Shared static HttpClient to prevent socket exhaustion
-        private static readonly HttpClient _httpClient = new(new SocketsHttpHandler
+        private static readonly HttpClient HttpClientInstance = new(new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(15),
             PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5)
@@ -134,7 +134,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 await EnsureAuthenticatedAsync(cancellationToken);
                 var keyResourceName = GetKeyResourceName();
                 var request = CreateAuthenticatedRequest(HttpMethod.Get, $"https://cloudkms.googleapis.com/v1/{keyResourceName}");
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -166,7 +166,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                     $"https://cloudkms.googleapis.com/v1/{keyResourceName}:decrypt",
                     new { ciphertext = encryptedKeyBase64.Trim() });
 
-                var decryptResponse = await _httpClient.SendAsync(decryptRequest);
+                var decryptResponse = await HttpClientInstance.SendAsync(decryptRequest);
                 decryptResponse.EnsureSuccessStatusCode();
 
                 var decryptJson = await decryptResponse.Content.ReadAsStringAsync();
@@ -184,7 +184,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 $"https://cloudkms.googleapis.com/v1/{keyResourceName}:encrypt",
                 new { plaintext = newKeyBase64 });
 
-            using var encryptResponse = await _httpClient.SendAsync(encryptRequest);
+            using var encryptResponse = await HttpClientInstance.SendAsync(encryptRequest);
             encryptResponse.EnsureSuccessStatusCode();
 
             var encryptJson = await encryptResponse.Content.ReadAsStringAsync();
@@ -226,7 +226,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                     }
                 });
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -253,7 +253,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                     plaintext = Convert.ToBase64String(dataKey)
                 });
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -279,7 +279,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                     ciphertext = Convert.ToBase64String(wrappedKey)
                 });
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -295,7 +295,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
             var keyRingPath = $"projects/{_config.ProjectId}/locations/{_config.Location}/keyRings/{_config.KeyRing}";
             var request = CreateAuthenticatedRequest(HttpMethod.Get, $"https://cloudkms.googleapis.com/v1/{keyRingPath}/cryptoKeys");
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
@@ -333,7 +333,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
             // Get the primary version
             var getRequest = CreateAuthenticatedRequest(HttpMethod.Get, $"https://cloudkms.googleapis.com/v1/{keyResourceName}");
-            var getResponse = await _httpClient.SendAsync(getRequest, cancellationToken);
+            var getResponse = await HttpClientInstance.SendAsync(getRequest, cancellationToken);
             getResponse.EnsureSuccessStatusCode();
 
             var getJson = await getResponse.Content.ReadAsStringAsync(cancellationToken);
@@ -346,7 +346,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 $"https://cloudkms.googleapis.com/v1/{primaryVersion}:destroy",
                 new { });
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -363,7 +363,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                     : keyId;
 
                 var request = CreateAuthenticatedRequest(HttpMethod.Get, $"https://cloudkms.googleapis.com/v1/{keyResourceName}");
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
@@ -429,7 +429,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 metadataRequest.Headers.Add("Metadata-Flavor", "Google");
                 try
                 {
-                    using var metadataResponse = await _httpClient.SendAsync(metadataRequest, cancellationToken);
+                    using var metadataResponse = await HttpClientInstance.SendAsync(metadataRequest, cancellationToken);
                     if (metadataResponse.IsSuccessStatusCode)
                     {
                         var metadataJson = await metadataResponse.Content.ReadAsStringAsync(cancellationToken);
@@ -505,7 +505,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 new KeyValuePair<string, string>("assertion", jwt)
             });
 
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -529,7 +529,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public override void Dispose()
         {
-            // _httpClient is shared (static) — not disposed here to prevent breaking other callers.
+            // HttpClientInstance is shared (static) — not disposed here to prevent breaking other callers.
             base.Dispose();
         }
     }

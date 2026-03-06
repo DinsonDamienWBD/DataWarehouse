@@ -28,7 +28,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
     public sealed class AzureKeyVaultStrategy : KeyStoreStrategyBase, IEnvelopeKeyStore
     {
         // P2-3450: Shared static HttpClient to prevent socket exhaustion
-        private static readonly HttpClient _httpClient = new(new SocketsHttpHandler
+        private static readonly HttpClient HttpClientInstance = new(new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(15),
             PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5)
@@ -116,7 +116,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             {
                 await EnsureTokenAsync(cancellationToken);
                 var request = CreateRequest(HttpMethod.Get, "/keys?api-version=7.4");
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -129,7 +129,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
         {
             await EnsureTokenAsync();
             var request = CreateRequest(HttpMethod.Get, $"/secrets/{keyId}?api-version=7.4");
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -147,7 +147,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             var request = CreateRequest(HttpMethod.Put, $"/secrets/{keyId}?api-version=7.4");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             _currentKeyId = keyId;
@@ -162,7 +162,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             var request = CreateRequest(HttpMethod.Post, $"/keys/{kekId}/wrapkey?api-version=7.4");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -180,7 +180,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             var request = CreateRequest(HttpMethod.Post, $"/keys/{kekId}/unwrapkey?api-version=7.4");
             request.Content = new StringContent(content, Encoding.UTF8, "application/json");
 
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -195,7 +195,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
             await EnsureTokenAsync(cancellationToken);
             var request = CreateRequest(HttpMethod.Get, "/secrets?api-version=7.4");
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
@@ -226,7 +226,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
             await EnsureTokenAsync(cancellationToken);
             var request = CreateRequest(HttpMethod.Delete, $"/secrets/{keyId}?api-version=7.4");
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -238,7 +238,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             {
                 await EnsureTokenAsync(cancellationToken);
                 var request = CreateRequest(HttpMethod.Get, $"/secrets/{keyId}?api-version=7.4");
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
@@ -301,7 +301,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 ["grant_type"] = "client_credentials"
             });
 
-            using var response = await _httpClient.PostAsync(tokenUrl, content, cancellationToken);
+            using var response = await HttpClientInstance.PostAsync(tokenUrl, content, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
@@ -325,7 +325,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public override void Dispose()
         {
-            // _httpClient is shared (static) — not disposed here to prevent breaking other callers.
+            // HttpClientInstance is shared (static) — not disposed here to prevent breaking other callers.
             _tokenRefreshLock?.Dispose();
             base.Dispose();
         }

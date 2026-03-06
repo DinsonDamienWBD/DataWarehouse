@@ -42,10 +42,7 @@ public sealed class PerObjectConfigMode : IEncryptionConfigMode
     {
         // PerObjectConfig mode has no restrictions
         // Each object can have any valid encryption configuration
-        if (metadata == null)
-        {
-            return (false, "Encryption metadata cannot be null.");
-        }
+        ArgumentNullException.ThrowIfNull(metadata);
 
         if (string.IsNullOrWhiteSpace(metadata.EncryptionPluginId))
         {
@@ -164,10 +161,7 @@ public sealed class FixedConfigMode : IEncryptionConfigMode
         EncryptionMetadata? existingConfig,
         EncryptionPolicy? policy)
     {
-        if (metadata == null)
-        {
-            return (false, "Encryption metadata cannot be null.");
-        }
+        ArgumentNullException.ThrowIfNull(metadata);
 
         if (string.IsNullOrWhiteSpace(metadata.EncryptionPluginId))
         {
@@ -296,10 +290,7 @@ public sealed class PolicyEnforcedConfigMode : IEncryptionConfigMode
         EncryptionMetadata? existingConfig,
         EncryptionPolicy? policy)
     {
-        if (metadata == null)
-        {
-            return (false, "Encryption metadata cannot be null.");
-        }
+        ArgumentNullException.ThrowIfNull(metadata);
 
         if (string.IsNullOrWhiteSpace(metadata.EncryptionPluginId))
         {

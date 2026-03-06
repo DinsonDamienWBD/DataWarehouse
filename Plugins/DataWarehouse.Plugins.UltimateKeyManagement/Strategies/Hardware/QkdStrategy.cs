@@ -35,7 +35,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
         private readonly BoundedDictionary<string, QkdSessionInfo> _sessions = new BoundedDictionary<string, QkdSessionInfo>(1000);
         private readonly SemaphoreSlim _qkdLock = new(1, 1);
         private string _qkdDeviceEndpoint = "";
-        private QkdProtocol _protocol = QkdProtocol.BB84;
+        private QkdProtocol _protocol = QkdProtocol.Bb84;
         private bool _simulationMode = true;
         private double _targetQber = 0.05; // 5% target QBER threshold
         private int _keyBlockSize = 256; // bits per key block
@@ -82,10 +82,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
             {
                 _protocol = protoStr.ToUpperInvariant() switch
                 {
-                    "BB84" => QkdProtocol.BB84,
+                    "BB84" => QkdProtocol.Bb84,
                     "E91" => QkdProtocol.E91,
                     "B92" => QkdProtocol.B92,
-                    _ => QkdProtocol.BB84
+                    _ => QkdProtocol.Bb84
                 };
             }
 
@@ -339,7 +339,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
     public enum QkdProtocol
     {
         /// <summary>Bennett-Brassard 1984 — prepare-and-measure, 4 states, 2 bases</summary>
-        BB84,
+        Bb84,
         /// <summary>Ekert 1991 — entanglement-based, Bell inequality test</summary>
         E91,
         /// <summary>Bennett 1992 — simplified 2-state protocol</summary>

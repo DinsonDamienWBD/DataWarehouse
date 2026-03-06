@@ -545,7 +545,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Container
             var name = secretName;
             if (name.Contains("_v20"))
             {
-                name = name.Substring(0, name.LastIndexOf("_v20"));
+                name = name.Substring(0, name.LastIndexOf("_v20", StringComparison.Ordinal));
             }
 
             if (name.StartsWith(_config.SecretNamePrefix))

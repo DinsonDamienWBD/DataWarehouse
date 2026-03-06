@@ -77,7 +77,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         private bool _disposed;
 
         // #3536: Master wrapping key — derived from machine identity for at-rest encryption of DerivedKey.
-        private static readonly byte[] _cacheWrapKey = HKDF.DeriveKey(
+        private static readonly byte[] CacheWrapKey = HKDF.DeriveKey(
             HashAlgorithmName.SHA256,
             SHA256.HashData(Encoding.UTF8.GetBytes(
                 $"Stellar.CacheWrap.v1:{Environment.MachineName}:{Environment.UserName}")),
@@ -770,7 +770,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             RandomNumberGenerator.Fill(nonce);
             var tag = new byte[16];
             var ct = new byte[plaintext.Length];
-            var pk = HKDF.DeriveKey(HashAlgorithmName.SHA256, _cacheWrapKey, 32,
+            var pk = HKDF.DeriveKey(HashAlgorithmName.SHA256, CacheWrapKey, 32,
                 salt: Encoding.UTF8.GetBytes("dw-stellar-per-key-v1"),
                 info: Encoding.UTF8.GetBytes(keyId));
             using var aes = new AesGcm(pk, 16);
@@ -788,7 +788,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             var wrapped = Convert.FromBase64String(wrappedBase64);
             if (wrapped.Length < 28) throw new InvalidOperationException("Stellar cached key too short.");
             var nonce = wrapped[..12]; var tag = wrapped[12..28]; var ct = wrapped[28..];
-            var pk = HKDF.DeriveKey(HashAlgorithmName.SHA256, _cacheWrapKey, 32,
+            var pk = HKDF.DeriveKey(HashAlgorithmName.SHA256, CacheWrapKey, 32,
                 salt: Encoding.UTF8.GetBytes("dw-stellar-per-key-v1"),
                 info: Encoding.UTF8.GetBytes(keyId));
             var plaintext = new byte[ct.Length];

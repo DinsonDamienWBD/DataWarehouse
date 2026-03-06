@@ -72,7 +72,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         // #3524: Master wrapping key for AES-GCM encryption of key material stored in EncryptedKeyMaterial.
         // In production, this should be stored in a hardware-backed key store. Here it is derived from
         // a machine-specific secret so it survives process restarts without exposing raw key bytes at rest.
-        private static readonly byte[] _wrapMasterKey = System.Security.Cryptography.HKDF.DeriveKey(
+        private static readonly byte[] WrapMasterKey = System.Security.Cryptography.HKDF.DeriveKey(
             System.Security.Cryptography.HashAlgorithmName.SHA256,
             System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(
@@ -150,7 +150,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
 
             switch (_config.Provider)
             {
-                case LlmProvider.OpenAI:
+                case LlmProvider.OpenAi:
                     client.BaseAddress = new Uri(_config.ApiEndpoint ?? "https://api.openai.com/v1/");
                     client.DefaultRequestHeaders.Remove("Authorization");
                     client.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.ApiKey}");
@@ -164,7 +164,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
                     client.DefaultRequestHeaders.Add("anthropic-version", "2024-01-01");
                     break;
 
-                case LlmProvider.AzureOpenAI:
+                case LlmProvider.AzureOpenAi:
                     // #3521: Throw if URL is still the placeholder.
                     var azureEndpoint = _config.ApiEndpoint;
                     if (string.IsNullOrEmpty(azureEndpoint) ||
@@ -393,7 +393,7 @@ Provide your access decision in the following JSON format:
             {
                 return _config.Provider switch
                 {
-                    LlmProvider.OpenAI or LlmProvider.AzureOpenAI =>
+                    LlmProvider.OpenAi or LlmProvider.AzureOpenAi =>
                         await CallOpenAiAsync(systemPrompt, userPrompt, ct),
                     LlmProvider.Anthropic =>
                         await CallAnthropicAsync(systemPrompt, userPrompt, ct),
@@ -578,7 +578,6 @@ Provide your access decision in the following JSON format:
             if (history.Count == 0) return 0.5; // Unknown user
 
             var score = 0.0;
-            var factors = 0;
 
             // Check time-of-day anomaly
             var currentHour = DateTime.UtcNow.Hour;
@@ -592,7 +591,6 @@ Provide your access decision in the following JSON format:
             {
                 score += 0.3;
             }
-            factors++;
 
             // Check access frequency anomaly
             var recentCount = history.Count(h => h.Timestamp > DateTime.UtcNow.AddHours(-1));
@@ -603,7 +601,6 @@ Provide your access decision in the following JSON format:
             {
                 score += 0.4; // Unusually high frequency
             }
-            factors++;
 
             // Check day-of-week anomaly
             var currentDay = DateTime.UtcNow.DayOfWeek;
@@ -617,7 +614,6 @@ Provide your access decision in the following JSON format:
             {
                 score += 0.2;
             }
-            factors++;
 
             // Check denial rate
             var denialRate = history.Count(h => !h.WasApproved) / (double)history.Count;
@@ -625,7 +621,6 @@ Provide your access decision in the following JSON format:
             {
                 score += 0.3;
             }
-            factors++;
 
             return Math.Min(1.0, score);
         }
@@ -952,7 +947,7 @@ Always respond in valid JSON format.";
             // Derive a per-key wrapping key so each key uses a unique sub-key.
             var perKeyWrap = System.Security.Cryptography.HKDF.DeriveKey(
                 System.Security.Cryptography.HashAlgorithmName.SHA256,
-                _wrapMasterKey, 32,
+                WrapMasterKey, 32,
                 salt: System.Text.Encoding.UTF8.GetBytes("dw-ai-per-key-v1"),
                 info: System.Text.Encoding.UTF8.GetBytes(keyId));
 
@@ -983,7 +978,7 @@ Always respond in valid JSON format.";
 
             var perKeyWrap = System.Security.Cryptography.HKDF.DeriveKey(
                 System.Security.Cryptography.HashAlgorithmName.SHA256,
-                _wrapMasterKey, 32,
+                WrapMasterKey, 32,
                 salt: System.Text.Encoding.UTF8.GetBytes("dw-ai-per-key-v1"),
                 info: System.Text.Encoding.UTF8.GetBytes(keyId));
 
@@ -1008,9 +1003,9 @@ Always respond in valid JSON format.";
 
     public enum LlmProvider
     {
-        OpenAI,
+        OpenAi,
         Anthropic,
-        AzureOpenAI,
+        AzureOpenAi,
         LocalLlm
     }
 
@@ -1032,7 +1027,7 @@ Always respond in valid JSON format.";
 
     public class AiCustodianConfig
     {
-        public LlmProvider Provider { get; set; } = LlmProvider.OpenAI;
+        public LlmProvider Provider { get; set; } = LlmProvider.OpenAi;
         public string ApiKey { get; set; } = "";
         public string? ApiEndpoint { get; set; }
         public string? Model { get; set; }

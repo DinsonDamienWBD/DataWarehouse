@@ -202,7 +202,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
                 {
                     if (line.Contains($"{AttributeKeyId} = "))
                     {
-                        var start = line.IndexOf(" = ") + 3;
+                        var start = line.IndexOf(" = ", StringComparison.Ordinal) + 3;
                         if (start > 3)
                         {
                             var keyId = line.Substring(start).Trim();

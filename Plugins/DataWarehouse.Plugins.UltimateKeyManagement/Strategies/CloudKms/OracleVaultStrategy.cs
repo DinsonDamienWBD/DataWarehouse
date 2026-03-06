@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
     public sealed class OracleVaultStrategy : KeyStoreStrategyBase, IEnvelopeKeyStore
     {
         // P2-3450: Shared static HttpClient to prevent socket exhaustion
-        private static readonly HttpClient _httpClient = new(new SocketsHttpHandler
+        private static readonly HttpClient HttpClientInstance = new(new SocketsHttpHandler
         {
             PooledConnectionLifetime = TimeSpan.FromMinutes(15),
             PooledConnectionIdleTimeout = TimeSpan.FromMinutes(5)
@@ -145,7 +145,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             {
                 var url = $"https://kms.{_config.Region}.oraclecloud.com/20180608/keys/{_config.KeyOcid}";
                 var request = CreateSignedRequest(HttpMethod.Get, url, null);
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -179,7 +179,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 };
 
                 var decryptRequest = CreateSignedRequest(HttpMethod.Post, decryptUrl, decryptPayload);
-                using var decryptResponse = await _httpClient.SendAsync(decryptRequest);
+                using var decryptResponse = await HttpClientInstance.SendAsync(decryptRequest);
                 decryptResponse.EnsureSuccessStatusCode();
 
                 var decryptJson = await decryptResponse.Content.ReadAsStringAsync();
@@ -199,7 +199,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var encryptRequest = CreateSignedRequest(HttpMethod.Post, encryptUrl, encryptPayload);
-            using var encryptResponse = await _httpClient.SendAsync(encryptRequest);
+            using var encryptResponse = await HttpClientInstance.SendAsync(encryptRequest);
             encryptResponse.EnsureSuccessStatusCode();
 
             var encryptJson = await encryptResponse.Content.ReadAsStringAsync();
@@ -238,7 +238,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(HttpMethod.Post, url, payload);
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -261,7 +261,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(HttpMethod.Post, url, payload);
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -283,7 +283,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(HttpMethod.Post, url, payload);
-            using var response = await _httpClient.SendAsync(request);
+            using var response = await HttpClientInstance.SendAsync(request);
             response.EnsureSuccessStatusCode();
 
             var json = await response.Content.ReadAsStringAsync();
@@ -298,7 +298,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
             var url = $"https://kms.{_config.Region}.oraclecloud.com/20180608/keys?compartmentId={_config.CompartmentOcid}";
             var request = CreateSignedRequest(HttpMethod.Get, url, null);
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
             if (!response.IsSuccessStatusCode)
                 return Array.Empty<string>();
@@ -336,7 +336,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             };
 
             var request = CreateSignedRequest(HttpMethod.Post, url, payload);
-            using var response = await _httpClient.SendAsync(request, cancellationToken);
+            using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
             response.EnsureSuccessStatusCode();
         }
 
@@ -349,7 +349,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 var keyOcid = string.IsNullOrEmpty(keyId) || keyId == _config.KeyOcid ? _config.KeyOcid : keyId;
                 var url = $"https://kms.{_config.Region}.oraclecloud.com/20180608/keys/{keyOcid}";
                 var request = CreateSignedRequest(HttpMethod.Get, url, null);
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return null;
@@ -461,7 +461,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public override void Dispose()
         {
-            // _httpClient is shared (static) — not disposed here to prevent breaking other callers.
+            // HttpClientInstance is shared (static) — not disposed here to prevent breaking other callers.
             base.Dispose();
         }
     }

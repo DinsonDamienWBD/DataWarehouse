@@ -192,7 +192,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
             {
                 if (line.Contains($"\"svce\"<blob>=\"{prefix}"))
                 {
-                    var start = line.IndexOf($"{prefix}") + prefix.Length;
+                    var start = line.IndexOf(prefix, StringComparison.Ordinal) + prefix.Length;
                     var end = line.IndexOf('"', start);
                     if (start > prefix.Length && end > start)
                     {

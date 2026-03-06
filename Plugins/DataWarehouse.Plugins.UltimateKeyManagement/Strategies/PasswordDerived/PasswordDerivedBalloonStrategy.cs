@@ -310,13 +310,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
         /// </summary>
         private static byte[] BalloonHash(byte[] password, byte[] salt, int sCost, int tCost, int delta, int outputLength)
         {
-            const int HASH_SIZE = 32; // SHA-256 output size
+            const int hashSize = 32; // SHA-256 output size
 
             // Initialize buffer with sCost blocks
             var buffer = new byte[sCost][];
             for (int i = 0; i < sCost; i++)
             {
-                buffer[i] = new byte[HASH_SIZE];
+                buffer[i] = new byte[hashSize];
             }
 
             var counter = 0L;
@@ -364,7 +364,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
             var finalHash = Hash(buffer[sCost - 1]);
 
             // If output needs to be longer than hash size, use HKDF-like expansion
-            if (outputLength <= HASH_SIZE)
+            if (outputLength <= hashSize)
             {
                 var result = new byte[outputLength];
                 Array.Copy(finalHash, result, outputLength);
@@ -415,7 +415,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
         /// </summary>
         private static byte[] ExpandOutput(byte[] seed, int outputLength)
         {
-            const int HASH_SIZE = 32;
+            const int hashSize = 32;
             var result = new byte[outputLength];
             var offset = 0;
             var counter = 0;
@@ -427,10 +427,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.PasswordDerived
                 var counterBytes = BitConverter.GetBytes(counter++);
                 digest.BlockUpdate(counterBytes, 0, counterBytes.Length);
 
-                var block = new byte[HASH_SIZE];
+                var block = new byte[hashSize];
                 digest.DoFinal(block, 0);
 
-                var toCopy = Math.Min(HASH_SIZE, outputLength - offset);
+                var toCopy = Math.Min(hashSize, outputLength - offset);
                 Array.Copy(block, 0, result, offset, toCopy);
                 offset += toCopy;
             }

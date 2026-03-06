@@ -388,14 +388,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 var k = GenerateRandomScalar();
 
                 // Compute R = k*G
-                var R = DomainParams.G.Multiply(k);
+                var rPoint = DomainParams.G.Multiply(k);
 
                 // Compute Lagrange coefficient for this party
                 var lambda = ComputeLagrangeCoefficient(_config.PartyIndex, participatingParties);
 
                 // Compute partial signature: s_i = k + r * lambda_i * x_i (mod n)
                 // where r = R.x mod n, x_i is party's share
-                var r = R.Normalize().AffineXCoord.ToBigInteger().Mod(DomainParams.N);
+                var r = rPoint.Normalize().AffineXCoord.ToBigInteger().Mod(DomainParams.N);
                 // P2-3601: Message hash m MUST be included in the partial signature equation.
                 // Threshold ECDSA partial signature: s_i = k_i + r * m * lambda_i * x_i (mod n)
                 // where m = hash(message), x_i = party share, lambda_i = Lagrange coefficient.
@@ -409,7 +409,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 {
                     KeyId = keyId,
                     PartyIndex = _config.PartyIndex,
-                    R = SerializePoint(R),
+                    R = SerializePoint(rPoint),
                     PartialS = partialS.ToByteArrayUnsigned(),
                     MessageHash = messageHash
                 };
@@ -429,14 +429,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 throw new ArgumentException("No partial signatures provided.");
 
             // Verify all R values match (same nonce commitment)
-            var R = DeserializePoint(partialSignatures[0].R);
+            var rAgg = DeserializePoint(partialSignatures[0].R);
             for (int i = 1; i < partialSignatures.Length; i++)
             {
-                var Ri = DeserializePoint(partialSignatures[i].R);
-                if (!R.Equals(Ri))
+                var ri = DeserializePoint(partialSignatures[i].R);
+                if (!rAgg.Equals(ri))
                 {
                     // In real protocol, aggregate R values from nonce sharing
-                    R = R.Add(Ri);
+                    rAgg = rAgg.Add(ri);
                 }
             }
 
@@ -449,7 +449,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
             }
 
             // Create DER-encoded signature
-            var r = R.Normalize().AffineXCoord.ToBigInteger().Mod(DomainParams.N);
+            var r = rAgg.Normalize().AffineXCoord.ToBigInteger().Mod(DomainParams.N);
             return EncodeSignatureDer(r, s);
         }
 

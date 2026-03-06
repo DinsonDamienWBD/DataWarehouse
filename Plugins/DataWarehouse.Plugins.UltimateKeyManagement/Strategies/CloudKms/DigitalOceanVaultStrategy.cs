@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
     public sealed class DigitalOceanVaultStrategy : KeyStoreStrategyBase
     {
         // P2-3450: Shared static HttpClient to prevent socket exhaustion
-        private static readonly HttpClient _httpClient = CreateHttpClient();
+        private static readonly HttpClient HttpClientInstance = CreateHttpClient();
         private static HttpClient CreateHttpClient()
         {
             var client = new HttpClient(new SocketsHttpHandler
@@ -105,11 +105,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 _config.MasterSecret = Convert.FromBase64String(masterSecretBase64);
 
             // Set authorization header
-            _httpClient.DefaultRequestHeaders.Clear();
-            _httpClient.DefaultRequestHeaders.Remove("Authorization");
-            _httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.ApiToken}");
-            _httpClient.DefaultRequestHeaders.Remove("User-Agent");
-            _httpClient.DefaultRequestHeaders.Add("User-Agent", "DataWarehouse-UltimateKeyManagement/1.0");
+            HttpClientInstance.DefaultRequestHeaders.Clear();
+            HttpClientInstance.DefaultRequestHeaders.Remove("Authorization");
+            HttpClientInstance.DefaultRequestHeaders.Add("Authorization", $"Bearer {_config.ApiToken}");
+            HttpClientInstance.DefaultRequestHeaders.Remove("User-Agent");
+            HttpClientInstance.DefaultRequestHeaders.Add("User-Agent", "DataWarehouse-UltimateKeyManagement/1.0");
 
             // #3434: Derive master secret from configurable secret (NOT the bearer token).
             // Load or generate a stable random salt.
@@ -138,7 +138,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             {
                 // Check account access
                 var request = new HttpRequestMessage(HttpMethod.Get, "https://api.digitalocean.com/v2/account");
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
             catch
@@ -204,7 +204,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
             {
                 // List projects and extract key metadata from tags
                 var request = new HttpRequestMessage(HttpMethod.Get, "https://api.digitalocean.com/v2/projects");
-                using var response = await _httpClient.SendAsync(request, cancellationToken);
+                using var response = await HttpClientInstance.SendAsync(request, cancellationToken);
 
                 if (!response.IsSuccessStatusCode)
                     return Array.Empty<string>();
@@ -436,7 +436,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
 
         public override void Dispose()
         {
-            // _httpClient is shared (static) — not disposed here to prevent breaking other callers.
+            // HttpClientInstance is shared (static) — not disposed here to prevent breaking other callers.
             CryptographicOperations.ZeroMemory(_masterSecret);
             CryptographicOperations.ZeroMemory(_masterSalt);
             foreach (var key in _keyCache.Values)

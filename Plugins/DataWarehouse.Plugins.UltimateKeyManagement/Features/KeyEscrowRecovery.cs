@@ -892,7 +892,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
             _escrowedKeys.Clear();
             _escrowLock.Dispose();
 
-            GC.SuppressFinalize(this);
         }
     }
 
@@ -905,7 +904,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
     {
         Email,
         Webhook,
-        SMS,
+        Sms,
         PushNotification,
         MessageBus
     }

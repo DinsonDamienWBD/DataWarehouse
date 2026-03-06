@@ -598,7 +598,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
             _masterKeys.Clear();
             _derivationLock.Dispose();
 
-            GC.SuppressFinalize(this);
         }
     }
 

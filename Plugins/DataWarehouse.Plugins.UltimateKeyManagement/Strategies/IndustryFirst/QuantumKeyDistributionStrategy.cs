@@ -610,10 +610,6 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             // Privacy amplification using Toeplitz matrix universal hash
             // Reduces key to remove any information leaked during error correction
 
-            var compressionRatio = 1.0 - qber - 0.1; // Conservative estimate
-            var outputBits = (int)(bits.Length * 8 * compressionRatio);
-            outputBits = Math.Min(outputBits, targetSizeBits);
-
             // Generate Toeplitz matrix hash seed
             var seed = new byte[32];
             RandomNumberGenerator.Fill(seed);
@@ -630,7 +626,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         private void StartChannelMonitoring()
         {
             _channelMonitorTimer = new Timer(
-                async _ => { try { await MonitorChannelHealth(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } },
+                _ => { Task.Run(async () => { try { await MonitorChannelHealth(); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Timer callback failed: {ex.Message}"); } }); },
                 null,
                 TimeSpan.FromSeconds(10),
                 TimeSpan.FromSeconds(_config.ChannelMonitorIntervalSeconds));
@@ -807,7 +803,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
 
         // #3530: Master wrapping key for AES-GCM encryption of QKD key material at rest.
         // Derived from machine identity — in production, store in hardware-backed key store.
-        private static readonly byte[] _persistWrapKey = HKDF.DeriveKey(
+        private static readonly byte[] PersistWrapKey = HKDF.DeriveKey(
             HashAlgorithmName.SHA256,
             SHA256.HashData(Encoding.UTF8.GetBytes(
                 $"QKD.PersistWrap.v1:{Environment.MachineName}:{Environment.UserName}")),
@@ -849,7 +845,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             RandomNumberGenerator.Fill(nonce);
             var tag = new byte[16];
             var ciphertext = new byte[plaintext.Length];
-            var perKeyWrap = HKDF.DeriveKey(HashAlgorithmName.SHA256, _persistWrapKey, 32,
+            var perKeyWrap = HKDF.DeriveKey(HashAlgorithmName.SHA256, PersistWrapKey, 32,
                 salt: Encoding.UTF8.GetBytes("dw-qkd-per-key-v1"),
                 info: Encoding.UTF8.GetBytes(keyId));
             using var aes = new AesGcm(perKeyWrap, 16);
@@ -869,7 +865,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             var nonce = wrapped[..12];
             var tag = wrapped[12..28];
             var ciphertext = wrapped[28..];
-            var perKeyWrap = HKDF.DeriveKey(HashAlgorithmName.SHA256, _persistWrapKey, 32,
+            var perKeyWrap = HKDF.DeriveKey(HashAlgorithmName.SHA256, PersistWrapKey, 32,
                 salt: Encoding.UTF8.GetBytes("dw-qkd-per-key-v1"),
                 info: Encoding.UTF8.GetBytes(keyId));
             var plaintext = new byte[ciphertext.Length];

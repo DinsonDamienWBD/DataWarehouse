@@ -81,7 +81,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hsm
 
             // Initialize auto-rotation timer
             _rotationTimer = new Timer(
-                async _ => await CheckAndRotateAsync(CancellationToken.None),
+                _ => { Task.Run(async () => { try { await CheckAndRotateAsync(CancellationToken.None); } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Rotation timer callback failed: {ex.Message}"); } }); },
                 null,
                 _rotationInterval,
                 _rotationInterval);
