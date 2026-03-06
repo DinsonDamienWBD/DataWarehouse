@@ -1139,7 +1139,7 @@ public sealed class StatisticalValidationStrategy : DataQualityStrategyBase
                 Median = sorted[sorted.Count / 2],
                 Q1 = q1,
                 Q3 = q3,
-                IQR = iqr
+                Iqr = iqr
             };
         }
     }
@@ -1183,8 +1183,8 @@ public sealed class StatisticalValidationStrategy : DataQualityStrategyBase
             }
 
             // IQR outlier detection
-            var lowerBound = stats.Q1 - 1.5 * stats.IQR;
-            var upperBound = stats.Q3 + 1.5 * stats.IQR;
+            var lowerBound = stats.Q1 - 1.5 * stats.Iqr;
+            var upperBound = stats.Q3 + 1.5 * stats.Iqr;
             if (numValue < lowerBound || numValue > upperBound)
             {
                 issues.Add(new DataQualityIssue
@@ -1199,7 +1199,7 @@ public sealed class StatisticalValidationStrategy : DataQualityStrategyBase
                     {
                         ["q1"] = stats.Q1,
                         ["q3"] = stats.Q3,
-                        ["iqr"] = stats.IQR
+                        ["iqr"] = stats.Iqr
                     }
                 });
             }
@@ -1239,7 +1239,7 @@ public sealed class FieldStatistics
     public double Median { get; init; }
     public double Q1 { get; init; }
     public double Q3 { get; init; }
-    public double IQR { get; init; }
+    public double Iqr { get; init; }
 }
 
 #endregion

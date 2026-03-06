@@ -3,16 +3,16 @@ using System.Text;
 namespace DataWarehouse.Plugins.UltimateSDKPorts.Strategies.JavaScriptBindings;
 
 /// <summary>JavaScript Node.js native addon binding strategy.</summary>
-public sealed class NodeNativeAddonStrategy : SDKPortStrategyBase
+public sealed class NodeNativeAddonStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "NodeNativeAddon",
         Description = "Node.js native addon bindings using N-API for high-performance native integration",
-        Category = SDKPortCategory.JavaScriptBinding,
+        Category = SdkPortCategory.JavaScriptBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.JavaScript, LanguageTarget.TypeScript],
-            SupportedTransports: [TransportType.FFI],
+            SupportedTransports: [TransportType.Ffi],
             SupportsAsync: true, SupportsStreaming: true, SupportsCallbacks: true,
             SupportsBidirectional: false, SupportsAutoCodegen: true, SupportsTypeGeneration: true,
             MaxConcurrentCalls: 5000),
@@ -52,13 +52,13 @@ public sealed class NodeNativeAddonStrategy : SDKPortStrategyBase
 }
 
 /// <summary>JavaScript WebSocket binding strategy.</summary>
-public sealed class JavaScriptWebSocketStrategy : SDKPortStrategyBase
+public sealed class JavaScriptWebSocketStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "JavaScriptWebSocket",
         Description = "JavaScript bindings using WebSocket for real-time bidirectional communication",
-        Category = SDKPortCategory.JavaScriptBinding,
+        Category = SdkPortCategory.JavaScriptBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.JavaScript, LanguageTarget.TypeScript],
             SupportedTransports: [TransportType.WebSocket],
@@ -99,16 +99,16 @@ public sealed class JavaScriptWebSocketStrategy : SDKPortStrategyBase
 }
 
 /// <summary>JavaScript gRPC-Web binding strategy.</summary>
-public sealed class JavaScriptGrpcWebStrategy : SDKPortStrategyBase
+public sealed class JavaScriptGrpcWebStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "JavaScriptGrpcWeb",
         Description = "JavaScript bindings using gRPC-Web for browser-compatible gRPC",
-        Category = SDKPortCategory.JavaScriptBinding,
+        Category = SdkPortCategory.JavaScriptBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.JavaScript, LanguageTarget.TypeScript],
-            SupportedTransports: [TransportType.GRPC],
+            SupportedTransports: [TransportType.Grpc],
             SupportsAsync: true, SupportsStreaming: true, SupportsCallbacks: false,
             SupportsBidirectional: false, SupportsAutoCodegen: true, SupportsTypeGeneration: true,
             MaxConcurrentCalls: 10000),
@@ -146,16 +146,16 @@ public sealed class JavaScriptGrpcWebStrategy : SDKPortStrategyBase
 }
 
 /// <summary>JavaScript REST/fetch binding strategy.</summary>
-public sealed class JavaScriptFetchStrategy : SDKPortStrategyBase
+public sealed class JavaScriptFetchStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "JavaScriptFetch",
         Description = "JavaScript bindings using fetch API for REST communication",
-        Category = SDKPortCategory.JavaScriptBinding,
+        Category = SdkPortCategory.JavaScriptBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.JavaScript, LanguageTarget.TypeScript],
-            SupportedTransports: [TransportType.REST],
+            SupportedTransports: [TransportType.Rest],
             SupportsAsync: true, SupportsStreaming: false, SupportsCallbacks: false,
             SupportsBidirectional: false, SupportsAutoCodegen: true, SupportsTypeGeneration: true),
         Tags = ["javascript", "fetch", "rest"]

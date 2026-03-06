@@ -528,7 +528,7 @@ public sealed class IoTTriggerStrategy : ServerlessStrategyBase
 /// 119.2.9: GraphQL subscription trigger for real-time updates
 /// with WebSocket support and subscription filtering.
 /// </summary>
-public sealed class GraphQLSubscriptionTriggerStrategy : ServerlessStrategyBase
+public sealed class GraphQlSubscriptionTriggerStrategy : ServerlessStrategyBase
 {
     public override string StrategyId => "trigger-graphql-subscription";
     public override string DisplayName => "GraphQL Subscription Trigger";
@@ -548,10 +548,10 @@ public sealed class GraphQLSubscriptionTriggerStrategy : ServerlessStrategyBase
     public override string[] Tags => new[] { "graphql", "subscription", "websocket", "realtime", "trigger" };
 
     /// <summary>Creates a subscription trigger.</summary>
-    public Task<GraphQLTriggerResult> CreateTriggerAsync(GraphQLTriggerConfig config, CancellationToken ct = default)
+    public Task<GraphQlTriggerResult> CreateTriggerAsync(GraphQlTriggerConfig config, CancellationToken ct = default)
     {
         RecordOperation("CreateTrigger");
-        return Task.FromResult(new GraphQLTriggerResult
+        return Task.FromResult(new GraphQlTriggerResult
         {
             Success = true,
             TriggerId = config.TriggerId,
@@ -684,8 +684,8 @@ public sealed record WebhookResult { public bool Success { get; init; } public s
 public sealed record IoTTriggerConfig { public required string TriggerId { get; init; } public required string FunctionId { get; init; } public required string TopicFilter { get; init; } }
 public sealed record IoTTriggerResult { public bool Success { get; init; } public string? TriggerId { get; init; } public string? TopicFilter { get; init; } }
 
-public sealed record GraphQLTriggerConfig { public required string TriggerId { get; init; } public required string FunctionId { get; init; } public required string SubscriptionName { get; init; } }
-public sealed record GraphQLTriggerResult { public bool Success { get; init; } public string? TriggerId { get; init; } public string? SubscriptionName { get; init; } }
+public sealed record GraphQlTriggerConfig { public required string TriggerId { get; init; } public required string FunctionId { get; init; } public required string SubscriptionName { get; init; } }
+public sealed record GraphQlTriggerResult { public bool Success { get; init; } public string? TriggerId { get; init; } public string? SubscriptionName { get; init; } }
 
 public sealed record EventBusTriggerConfig { public required string TriggerId { get; init; } public required string FunctionId { get; init; } public required string RuleName { get; init; } public Dictionary<string, object> EventPattern { get; init; } = new(); }
 public sealed record EventBusTriggerResult { public bool Success { get; init; } public string? TriggerId { get; init; } public string? RuleName { get; init; } public Dictionary<string, object> EventPattern { get; init; } = new(); }

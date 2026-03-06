@@ -3,16 +3,16 @@ using System.Text;
 namespace DataWarehouse.Plugins.UltimateSDKPorts.Strategies.PythonBindings;
 
 /// <summary>Python ctypes FFI binding strategy.</summary>
-public sealed class PythonCtypesStrategy : SDKPortStrategyBase
+public sealed class PythonCtypesStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "PythonCtypes",
         Description = "Python bindings using ctypes for direct C library calls",
-        Category = SDKPortCategory.PythonBinding,
+        Category = SdkPortCategory.PythonBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Python],
-            SupportedTransports: [TransportType.FFI, TransportType.SharedMemory],
+            SupportedTransports: [TransportType.Ffi, TransportType.SharedMemory],
             SupportsAsync: false, SupportsStreaming: false, SupportsCallbacks: true,
             SupportsBidirectional: false, SupportsAutoCodegen: true, SupportsTypeGeneration: true),
         Tags = ["python", "ctypes", "ffi"]
@@ -59,16 +59,16 @@ public sealed class PythonCtypesStrategy : SDKPortStrategyBase
 }
 
 /// <summary>Python pybind11 binding strategy.</summary>
-public sealed class PythonPybind11Strategy : SDKPortStrategyBase
+public sealed class PythonPybind11Strategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "PythonPybind11",
         Description = "Python bindings using pybind11 for C++ interop with automatic type conversion",
-        Category = SDKPortCategory.PythonBinding,
+        Category = SdkPortCategory.PythonBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Python],
-            SupportedTransports: [TransportType.FFI],
+            SupportedTransports: [TransportType.Ffi],
             SupportsAsync: true, SupportsStreaming: true, SupportsCallbacks: true,
             SupportsBidirectional: true, SupportsAutoCodegen: true, SupportsTypeGeneration: true,
             MaxConcurrentCalls: 5000),
@@ -100,16 +100,16 @@ public sealed class PythonPybind11Strategy : SDKPortStrategyBase
 }
 
 /// <summary>Python gRPC binding strategy.</summary>
-public sealed class PythonGrpcStrategy : SDKPortStrategyBase
+public sealed class PythonGrpcStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "PythonGrpc",
         Description = "Python bindings using gRPC for high-performance RPC",
-        Category = SDKPortCategory.PythonBinding,
+        Category = SdkPortCategory.PythonBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Python],
-            SupportedTransports: [TransportType.GRPC],
+            SupportedTransports: [TransportType.Grpc],
             SupportsAsync: true, SupportsStreaming: true, SupportsCallbacks: false,
             SupportsBidirectional: true, SupportsAutoCodegen: true, SupportsTypeGeneration: true,
             MaxConcurrentCalls: 10000),
@@ -146,16 +146,16 @@ public sealed class PythonGrpcStrategy : SDKPortStrategyBase
 }
 
 /// <summary>Python asyncio binding strategy.</summary>
-public sealed class PythonAsyncioStrategy : SDKPortStrategyBase
+public sealed class PythonAsyncioStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "PythonAsyncio",
         Description = "Python bindings with native asyncio support",
-        Category = SDKPortCategory.PythonBinding,
+        Category = SdkPortCategory.PythonBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Python],
-            SupportedTransports: [TransportType.REST, TransportType.WebSocket],
+            SupportedTransports: [TransportType.Rest, TransportType.WebSocket],
             SupportsAsync: true, SupportsStreaming: true, SupportsCallbacks: true,
             SupportsBidirectional: true, SupportsAutoCodegen: true, SupportsTypeGeneration: true),
         Tags = ["python", "asyncio", "async"]

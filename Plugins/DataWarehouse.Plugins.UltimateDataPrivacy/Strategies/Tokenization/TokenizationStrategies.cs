@@ -30,7 +30,7 @@ public sealed class FormatPreservingTokenizationStrategy : DataPrivacyStrategyBa
     public override string[] Tags => ["tokenization", "format-preserving", "fpe"];
 }
 
-public sealed class PCICompliantTokenizationStrategy : DataPrivacyStrategyBase
+public sealed class PciCompliantTokenizationStrategy : DataPrivacyStrategyBase
 {
     public override string StrategyId => "pci-compliant-tokenization";
     public override string DisplayName => "PCI-Compliant Tokenization";

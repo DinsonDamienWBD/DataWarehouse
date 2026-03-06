@@ -3,13 +3,13 @@ using DataWarehouse.SDK.Utilities;
 namespace DataWarehouse.Plugins.UltimateSDKPorts;
 
 /// <summary>SDK port transport type.</summary>
-public enum TransportType { FFI, GRPC, REST, WebSocket, MessageQueue, SharedMemory, Unix, Named }
+public enum TransportType { Ffi, Grpc, Rest, WebSocket, MessageQueue, SharedMemory, Unix, Named }
 
 /// <summary>SDK language target.</summary>
 public enum LanguageTarget { Python, JavaScript, TypeScript, Go, Rust, Java, Ruby, CSharp, Swift, Kotlin, Cpp, C }
 
 /// <summary>SDK port capabilities.</summary>
-public sealed record SDKPortCapabilities(
+public sealed record SdkPortCapabilities(
     LanguageTarget[] SupportedLanguages,
     TransportType[] SupportedTransports,
     bool SupportsAsync,
@@ -21,17 +21,17 @@ public sealed record SDKPortCapabilities(
     int MaxConcurrentCalls = 1000);
 
 /// <summary>SDK port characteristics.</summary>
-public sealed record SDKPortCharacteristics
+public sealed record SdkPortCharacteristics
 {
     public required string StrategyName { get; init; }
     public required string Description { get; init; }
-    public required SDKPortCategory Category { get; init; }
-    public required SDKPortCapabilities Capabilities { get; init; }
+    public required SdkPortCategory Category { get; init; }
+    public required SdkPortCapabilities Capabilities { get; init; }
     public string[] Tags { get; init; } = Array.Empty<string>();
 }
 
 /// <summary>SDK port category.</summary>
-public enum SDKPortCategory
+public enum SdkPortCategory
 {
     PythonBinding,
     JavaScriptBinding,
@@ -51,7 +51,7 @@ public sealed class BindingRequest
     public required string MethodName { get; init; }
     public Dictionary<string, object> Parameters { get; init; } = new();
     public LanguageTarget SourceLanguage { get; init; }
-    public TransportType Transport { get; init; } = TransportType.GRPC;
+    public TransportType Transport { get; init; } = TransportType.Grpc;
     public TimeSpan? Timeout { get; init; }
     public Dictionary<string, string> Metadata { get; init; } = new();
 }
@@ -74,7 +74,7 @@ public sealed class BindingResponse
 }
 
 /// <summary>SDK method registration.</summary>
-public sealed class SDKMethod
+public sealed class SdkMethod
 {
     public required string MethodName { get; init; }
     public required string[] ParameterTypes { get; init; }
@@ -94,15 +94,15 @@ public sealed class TypeMapping
 }
 
 /// <summary>Base class for SDK port strategies.</summary>
-public abstract class SDKPortStrategyBase
+public abstract class SdkPortStrategyBase
 {
-    protected readonly BoundedDictionary<string, SDKMethod> _registeredMethods = new BoundedDictionary<string, SDKMethod>(1000);
+    protected readonly BoundedDictionary<string, SdkMethod> _registeredMethods = new BoundedDictionary<string, SdkMethod>(1000);
     protected readonly BoundedDictionary<string, TypeMapping> _typeMappings = new BoundedDictionary<string, TypeMapping>(1000);
 
-    public abstract SDKPortCharacteristics Characteristics { get; }
+    public abstract SdkPortCharacteristics Characteristics { get; }
     public string StrategyId => Characteristics.StrategyName.Replace(" ", "");
 
-    public virtual void RegisterMethod(SDKMethod method) => _registeredMethods[method.MethodName] = method;
+    public virtual void RegisterMethod(SdkMethod method) => _registeredMethods[method.MethodName] = method;
     public virtual void RegisterTypeMapping(TypeMapping mapping) => _typeMappings[mapping.SourceType] = mapping;
 
     public abstract Task<BindingResponse> InvokeAsync(BindingRequest request, CancellationToken ct = default);

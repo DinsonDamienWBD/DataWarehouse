@@ -412,7 +412,7 @@ public sealed class PiiDetectionStrategy : DataPrivacyStrategyBase
     {
         ["email"] = new[] { new PiiPattern(@"[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}", 0.95, PiiType.Email) },
         ["phone"] = new[] { new PiiPattern(@"\+?\d{1,3}[-.\s]?\(?\d{1,4}\)?[-.\s]?\d{3,4}[-.\s]?\d{4}", 0.85, PiiType.Phone) },
-        ["ssn"] = new[] { new PiiPattern(@"\d{3}-\d{2}-\d{4}", 0.90, PiiType.SSN) },
+        ["ssn"] = new[] { new PiiPattern(@"\d{3}-\d{2}-\d{4}", 0.90, PiiType.Ssn) },
         ["credit_card"] = new[] { new PiiPattern(@"\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}", 0.88, PiiType.CreditCard) },
         ["ip_address"] = new[] { new PiiPattern(@"\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}", 0.75, PiiType.IpAddress) },
         ["name"] = new[] { new PiiPattern(@"^[A-Z][a-z]+ [A-Z][a-z]+$", 0.60, PiiType.PersonName) }
@@ -692,7 +692,7 @@ public sealed record PiiPattern(string Pattern, double BaseConfidence, PiiType P
 
 public enum PiiType
 {
-    Email, Phone, SSN, CreditCard, IpAddress, PersonName,
+    Email, Phone, Ssn, CreditCard, IpAddress, PersonName,
     Address, DateOfBirth, Passport, DriversLicense, BankAccount
 }
 

@@ -120,8 +120,8 @@ public sealed class OnnxStrategy : DataFormatStrategyBase
         try
         {
             // Guard: refuse unbounded allocation from untrusted stream length (finding 2233).
-            const long MaxOnnxSchemaBytes = 256L * 1024 * 1024; // 256 MB
-            if (stream.Length > MaxOnnxSchemaBytes)
+            const long maxOnnxSchemaBytes = 256L * 1024 * 1024; // 256 MB
+            if (stream.Length > maxOnnxSchemaBytes)
                 return null;
             var buffer = new byte[stream.Length];
             await stream.ReadExactlyAsync(buffer, 0, buffer.Length, ct);

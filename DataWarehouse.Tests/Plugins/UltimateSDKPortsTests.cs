@@ -10,7 +10,7 @@ public class UltimateSdkPortsTests
     [Fact]
     public void Plugin_HasCorrectIdentity()
     {
-        using var plugin = new UltimateSDKPortsPlugin();
+        using var plugin = new UltimateSdkPortsPlugin();
 
         Assert.Equal("com.datawarehouse.sdkports.ultimate", plugin.Id);
         Assert.Equal("Ultimate SDK Ports", plugin.Name);
@@ -21,7 +21,7 @@ public class UltimateSdkPortsTests
     [Fact]
     public void Registry_AutoDiscoversStrategies()
     {
-        using var plugin = new UltimateSDKPortsPlugin();
+        using var plugin = new UltimateSdkPortsPlugin();
 
         var strategies = plugin.Registry.GetAll().ToList();
         Assert.NotEmpty(strategies);
@@ -31,7 +31,7 @@ public class UltimateSdkPortsTests
     [Fact]
     public void SemanticDescription_ContainsSDK()
     {
-        using var plugin = new UltimateSDKPortsPlugin();
+        using var plugin = new UltimateSdkPortsPlugin();
 
         Assert.Contains("sdk", plugin.SemanticDescription, StringComparison.OrdinalIgnoreCase);
         Assert.Contains("python", plugin.SemanticDescription, StringComparison.OrdinalIgnoreCase);
@@ -40,7 +40,7 @@ public class UltimateSdkPortsTests
     [Fact]
     public void SemanticTags_ContainsExpectedLanguages()
     {
-        using var plugin = new UltimateSDKPortsPlugin();
+        using var plugin = new UltimateSdkPortsPlugin();
 
         Assert.Contains("python", plugin.SemanticTags);
         Assert.Contains("go", plugin.SemanticTags);
@@ -51,7 +51,7 @@ public class UltimateSdkPortsTests
     [Fact]
     public void PlatformDomain_IsSDKPorts()
     {
-        using var plugin = new UltimateSDKPortsPlugin();
+        using var plugin = new UltimateSdkPortsPlugin();
 
         Assert.Equal("SDKPorts", plugin.PlatformDomain);
     }

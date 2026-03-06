@@ -195,7 +195,7 @@ public sealed class NumericProfile
     public double Kurtosis { get; init; }
     public double Q1 { get; init; }
     public double Q3 { get; init; }
-    public double IQR { get; init; }
+    public double Iqr { get; init; }
     public double Sum { get; init; }
     public int ZeroCount { get; init; }
     public int NegativeCount { get; init; }
@@ -587,7 +587,7 @@ public sealed class ColumnProfilingStrategy : DataQualityStrategyBase
             Variance = variance,
             Q1 = sorted[q1Index],
             Q3 = sorted[q3Index],
-            IQR = sorted[q3Index] - sorted[q1Index],
+            Iqr = sorted[q3Index] - sorted[q1Index],
             Sum = numericValues.Sum(),
             ZeroCount = numericValues.Count(v => v == 0),
             NegativeCount = numericValues.Count(v => v < 0),
@@ -759,11 +759,11 @@ public sealed class ColumnProfilingStrategy : DataQualityStrategyBase
         var n = pairs.Count;
         var sumX = pairs.Sum(p => p.First);
         var sumY = pairs.Sum(p => p.Second);
-        var sumXY = pairs.Sum(p => p.First * p.Second);
+        var sumXy = pairs.Sum(p => p.First * p.Second);
         var sumX2 = pairs.Sum(p => p.First * p.First);
         var sumY2 = pairs.Sum(p => p.Second * p.Second);
 
-        var numerator = n * sumXY - sumX * sumY;
+        var numerator = n * sumXy - sumX * sumY;
         var denominator = Math.Sqrt((n * sumX2 - sumX * sumX) * (n * sumY2 - sumY * sumY));
 
         return denominator == 0 ? 0 : numerator / denominator;

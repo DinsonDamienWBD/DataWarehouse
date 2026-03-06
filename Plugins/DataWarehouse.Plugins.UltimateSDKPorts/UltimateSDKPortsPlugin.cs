@@ -28,15 +28,15 @@ namespace DataWarehouse.Plugins.UltimateSDKPorts;
 /// - Type mapping and conversion
 /// - Multiple transport support (FFI, gRPC, REST, WebSocket)
 /// </summary>
-public sealed class UltimateSDKPortsPlugin : PlatformPluginBase, IDisposable
+public sealed class UltimateSdkPortsPlugin : PlatformPluginBase, IDisposable
 {
-    // NOTE(65.4-07, 65.5-05): SDKPortStrategyBase does not implement IStrategy, so base-class
+    // NOTE(65.4-07, 65.5-05): SdkPortStrategyBase does not implement IStrategy, so base-class
     // RegisterPlatformStrategy(IStrategy) cannot be called directly. The _registry is retained
-    // as the typed lookup layer. Dual-registration will become possible when SDKPortStrategyBase extends StrategyBase.
-    private readonly SDKPortStrategyRegistry _registry = new();
-    private readonly BoundedDictionary<string, SDKMethod> _globalMethods = new BoundedDictionary<string, SDKMethod>(1000);
+    // as the typed lookup layer. Dual-registration will become possible when SdkPortStrategyBase extends StrategyBase.
+    private readonly SdkPortStrategyRegistry _registry = new();
+    private readonly BoundedDictionary<string, SdkMethod> _globalMethods = new BoundedDictionary<string, SdkMethod>(1000);
     private readonly BoundedDictionary<string, TypeMapping> _globalTypeMappings = new BoundedDictionary<string, TypeMapping>(1000);
-    private SDKPortStrategyBase? _activeStrategy;
+    private SdkPortStrategyBase? _activeStrategy;
     private CancellationTokenSource? _cts;
     private bool _disposed;
 
@@ -71,10 +71,10 @@ public sealed class UltimateSDKPortsPlugin : PlatformPluginBase, IDisposable
     };
 
     /// <summary>Gets the SDK port strategy registry (typed lookup thin wrapper).</summary>
-    public SDKPortStrategyRegistry Registry => _registry;
+    public SdkPortStrategyRegistry Registry => _registry;
 
     /// <summary>Initializes a new instance of the Ultimate SDK Ports plugin.</summary>
-    public UltimateSDKPortsPlugin()
+    public UltimateSdkPortsPlugin()
     {
         DiscoverAndRegisterStrategies();
         RegisterDefaultTypeMappings();
@@ -233,7 +233,7 @@ public sealed class UltimateSDKPortsPlugin : PlatformPluginBase, IDisposable
     #region Public API
 
     public IReadOnlyCollection<string> GetRegisteredStrategies() => _registry.RegisteredStrategies.ToList();
-    public SDKPortStrategyBase? GetStrategy(string name) => _registry.Get(name);
+    public SdkPortStrategyBase? GetStrategy(string name) => _registry.Get(name);
 
     public void SetActiveStrategy(string strategyName)
     {
@@ -241,7 +241,7 @@ public sealed class UltimateSDKPortsPlugin : PlatformPluginBase, IDisposable
             ?? throw new ArgumentException($"Strategy '{strategyName}' not found");
     }
 
-    public void RegisterMethod(SDKMethod method)
+    public void RegisterMethod(SdkMethod method)
     {
         _globalMethods[method.MethodName] = method;
         foreach (var strategy in _registry.GetAll())
@@ -318,7 +318,7 @@ public sealed class UltimateSDKPortsPlugin : PlatformPluginBase, IDisposable
         try
         {
             var methodName = payload.GetValueOrDefault("methodName")?.ToString() ?? throw new ArgumentException("Method name required");
-            var method = new SDKMethod
+            var method = new SdkMethod
             {
                 MethodName = methodName,
                 ParameterTypes = (payload.GetValueOrDefault("parameterTypes") as string[]) ?? Array.Empty<string>(),

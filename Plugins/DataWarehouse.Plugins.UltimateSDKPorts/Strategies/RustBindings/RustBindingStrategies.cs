@@ -3,16 +3,16 @@ using System.Text;
 namespace DataWarehouse.Plugins.UltimateSDKPorts.Strategies.RustBindings;
 
 /// <summary>Rust FFI binding strategy.</summary>
-public sealed class RustFfiStrategy : SDKPortStrategyBase
+public sealed class RustFfiStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "RustFfi",
         Description = "Rust bindings using FFI for direct C library integration with safety wrappers",
-        Category = SDKPortCategory.RustBinding,
+        Category = SdkPortCategory.RustBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Rust],
-            SupportedTransports: [TransportType.FFI],
+            SupportedTransports: [TransportType.Ffi],
             SupportsAsync: false, SupportsStreaming: false, SupportsCallbacks: true,
             SupportsBidirectional: false, SupportsAutoCodegen: true, SupportsTypeGeneration: true),
         Tags = ["rust", "ffi", "unsafe"]
@@ -54,16 +54,16 @@ public sealed class RustFfiStrategy : SDKPortStrategyBase
 }
 
 /// <summary>Rust Tokio async binding strategy.</summary>
-public sealed class RustTokioStrategy : SDKPortStrategyBase
+public sealed class RustTokioStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "RustTokio",
         Description = "Rust bindings using Tokio for async/await operations",
-        Category = SDKPortCategory.RustBinding,
+        Category = SdkPortCategory.RustBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Rust],
-            SupportedTransports: [TransportType.GRPC, TransportType.REST],
+            SupportedTransports: [TransportType.Grpc, TransportType.Rest],
             SupportsAsync: true, SupportsStreaming: true, SupportsCallbacks: true,
             SupportsBidirectional: true, SupportsAutoCodegen: true, SupportsTypeGeneration: true,
             MaxConcurrentCalls: 10000),
@@ -106,16 +106,16 @@ public sealed class RustTokioStrategy : SDKPortStrategyBase
 }
 
 /// <summary>Rust Tonic gRPC binding strategy.</summary>
-public sealed class RustTonicStrategy : SDKPortStrategyBase
+public sealed class RustTonicStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "RustTonic",
         Description = "Rust bindings using Tonic for gRPC communication",
-        Category = SDKPortCategory.RustBinding,
+        Category = SdkPortCategory.RustBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Rust],
-            SupportedTransports: [TransportType.GRPC],
+            SupportedTransports: [TransportType.Grpc],
             SupportsAsync: true, SupportsStreaming: true, SupportsCallbacks: false,
             SupportsBidirectional: true, SupportsAutoCodegen: true, SupportsTypeGeneration: true,
             MaxConcurrentCalls: 50000),
@@ -154,16 +154,16 @@ public sealed class RustTonicStrategy : SDKPortStrategyBase
 }
 
 /// <summary>Rust WebAssembly binding strategy.</summary>
-public sealed class RustWasmStrategy : SDKPortStrategyBase
+public sealed class RustWasmStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "RustWasm",
         Description = "Rust bindings compiled to WebAssembly for browser/edge deployment",
-        Category = SDKPortCategory.RustBinding,
+        Category = SdkPortCategory.RustBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Rust, LanguageTarget.JavaScript],
-            SupportedTransports: [TransportType.FFI],
+            SupportedTransports: [TransportType.Ffi],
             SupportsAsync: true, SupportsStreaming: false, SupportsCallbacks: true,
             SupportsBidirectional: false, SupportsAutoCodegen: true, SupportsTypeGeneration: true),
         Tags = ["rust", "wasm", "webassembly"]

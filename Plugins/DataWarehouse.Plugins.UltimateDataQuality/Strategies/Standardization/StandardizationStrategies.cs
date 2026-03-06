@@ -48,7 +48,7 @@ public sealed class StandardizationResult
 public sealed class StandardizedValue
 {
     public object? OriginalValue { get; init; }
-    public object? StandardizedValue_ { get; init; }
+    public object? Result { get; init; }
     public required string StandardType { get; init; }
 }
 
@@ -209,7 +209,7 @@ public sealed class FormatStandardizationStrategy : DataQualityStrategyBase
                     standardizedFields[fieldName] = new StandardizedValue
                     {
                         OriginalValue = value,
-                        StandardizedValue_ = standardized,
+                        Result = standardized,
                         StandardType = format.Type.ToString()
                     };
                     newFields[fieldName] = standardized;
@@ -643,7 +643,7 @@ public sealed class CodeStandardizationStrategy : DataQualityStrategyBase
                     standardizedFields[fieldName] = new StandardizedValue
                     {
                         OriginalValue = original,
-                        StandardizedValue_ = standardized,
+                        Result = standardized,
                         StandardType = $"Code:{codeType}"
                     };
                     newFields[fieldName] = standardized;

@@ -32,7 +32,7 @@ public sealed class UltimateDataFormatPlugin : FormatPluginBase, IDisposable
     private readonly BoundedDictionary<string, IDataFormatStrategy> _registry = new BoundedDictionary<string, IDataFormatStrategy>(1000);
     private readonly BoundedDictionary<string, long> _usageStats = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<DomainFamily, List<string>> _domainIndex = new BoundedDictionary<DomainFamily, List<string>>(1000);
-    private bool _disposed;
+    private volatile bool _disposed;
 
     // Configuration
     private volatile bool _auditEnabled = true;
@@ -139,11 +139,12 @@ public sealed class UltimateDataFormatPlugin : FormatPluginBase, IDisposable
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-
-                // Skip strategies that fail to instantiate
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                // Log strategy instantiation failures for diagnostics (finding 54)
+                System.Diagnostics.Trace.TraceWarning(
+                    "[UltimateDataFormat] Strategy instantiation failed for {0}: {1}",
+                    type.FullName, ex.Message);
             }
         }
     }
@@ -225,11 +226,12 @@ public sealed class UltimateDataFormatPlugin : FormatPluginBase, IDisposable
                     return strategy;
                 }
             }
-            catch
+            catch (Exception ex)
             {
-
-                // Continue to next strategy
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                // Log per-strategy detection failures for diagnostics (finding 55)
+                System.Diagnostics.Trace.TraceWarning(
+                    "[UltimateDataFormat] DetectFormat failed for strategy: {0}",
+                    ex.Message);
             }
         }
 

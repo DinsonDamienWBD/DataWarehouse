@@ -512,13 +512,13 @@ public sealed class FuzzyMatchDuplicateStrategy : DataQualityStrategyBase
         if (recordList.Count < 2) return 1.0;
 
         // Cap pairwise comparisons to avoid O(n²) on large groups.
-        const int MaxComparisons = 500;
+        const int maxComparisons = 500;
         double totalSimilarity = 0;
         int comparisons = 0;
 
-        for (int i = 0; i < recordList.Count - 1 && comparisons < MaxComparisons; i++)
+        for (int i = 0; i < recordList.Count - 1 && comparisons < maxComparisons; i++)
         {
-            for (int j = i + 1; j < recordList.Count && comparisons < MaxComparisons; j++)
+            for (int j = i + 1; j < recordList.Count && comparisons < maxComparisons; j++)
             {
                 totalSimilarity += CalculateSimilarity(recordList[i], recordList[j], config);
                 comparisons++;

@@ -1,6 +1,6 @@
 namespace DataWarehouse.Plugins.UltimateDataPrivacy.Strategies.PrivacyCompliance;
 
-public sealed class GDPRRightToErasureStrategy : DataPrivacyStrategyBase
+public sealed class GdprRightToErasureStrategy : DataPrivacyStrategyBase
 {
     public override string StrategyId => "gdpr-right-to-erasure";
     public override string DisplayName => "GDPR Right to Erasure";
@@ -10,7 +10,7 @@ public sealed class GDPRRightToErasureStrategy : DataPrivacyStrategyBase
     public override string[] Tags => ["privacy-compliance", "gdpr", "erasure"];
 }
 
-public sealed class GDPRRightToAccessStrategy : DataPrivacyStrategyBase
+public sealed class GdprRightToAccessStrategy : DataPrivacyStrategyBase
 {
     public override string StrategyId => "gdpr-right-to-access";
     public override string DisplayName => "GDPR Right to Access";
@@ -20,7 +20,7 @@ public sealed class GDPRRightToAccessStrategy : DataPrivacyStrategyBase
     public override string[] Tags => ["privacy-compliance", "gdpr", "access"];
 }
 
-public sealed class GDPRDataPortabilityStrategy : DataPrivacyStrategyBase
+public sealed class GdprDataPortabilityStrategy : DataPrivacyStrategyBase
 {
     public override string StrategyId => "gdpr-data-portability";
     public override string DisplayName => "GDPR Data Portability";
@@ -30,7 +30,7 @@ public sealed class GDPRDataPortabilityStrategy : DataPrivacyStrategyBase
     public override string[] Tags => ["privacy-compliance", "gdpr", "portability"];
 }
 
-public sealed class CCPAOptOutStrategy : DataPrivacyStrategyBase
+public sealed class CcpaOptOutStrategy : DataPrivacyStrategyBase
 {
     public override string StrategyId => "ccpa-opt-out";
     public override string DisplayName => "CCPA Opt-Out";

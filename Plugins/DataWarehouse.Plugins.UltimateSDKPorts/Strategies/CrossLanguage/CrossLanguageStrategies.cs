@@ -3,17 +3,17 @@ using System.Text;
 namespace DataWarehouse.Plugins.UltimateSDKPorts.Strategies.CrossLanguage;
 
 /// <summary>Universal gRPC binding strategy for all languages.</summary>
-public sealed class UniversalGrpcStrategy : SDKPortStrategyBase
+public sealed class UniversalGrpcStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "UniversalGrpc",
         Description = "Universal gRPC bindings supporting all major languages through protobuf",
-        Category = SDKPortCategory.CrossLanguage,
+        Category = SdkPortCategory.CrossLanguage,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Python, LanguageTarget.JavaScript, LanguageTarget.TypeScript,
                                 LanguageTarget.Go, LanguageTarget.Rust, LanguageTarget.Java, LanguageTarget.CSharp],
-            SupportedTransports: [TransportType.GRPC],
+            SupportedTransports: [TransportType.Grpc],
             SupportsAsync: true, SupportsStreaming: true, SupportsCallbacks: false,
             SupportsBidirectional: true, SupportsAutoCodegen: true, SupportsTypeGeneration: true,
             MaxConcurrentCalls: 100000),
@@ -64,18 +64,18 @@ public sealed class UniversalGrpcStrategy : SDKPortStrategyBase
 }
 
 /// <summary>OpenAPI/REST binding strategy for all languages.</summary>
-public sealed class OpenApiStrategy : SDKPortStrategyBase
+public sealed class OpenApiStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "OpenApi",
         Description = "OpenAPI 3.0 bindings with auto-generated clients for all languages",
-        Category = SDKPortCategory.CrossLanguage,
+        Category = SdkPortCategory.CrossLanguage,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Python, LanguageTarget.JavaScript, LanguageTarget.TypeScript,
                                 LanguageTarget.Go, LanguageTarget.Rust, LanguageTarget.Java, LanguageTarget.Ruby,
                                 LanguageTarget.CSharp, LanguageTarget.Swift, LanguageTarget.Kotlin],
-            SupportedTransports: [TransportType.REST],
+            SupportedTransports: [TransportType.Rest],
             SupportsAsync: true, SupportsStreaming: false, SupportsCallbacks: false,
             SupportsBidirectional: false, SupportsAutoCodegen: true, SupportsTypeGeneration: true),
         Tags = ["openapi", "rest", "swagger", "cross-language"]
@@ -115,17 +115,17 @@ public sealed class OpenApiStrategy : SDKPortStrategyBase
 }
 
 /// <summary>JSON-RPC binding strategy for all languages.</summary>
-public sealed class JsonRpcStrategy : SDKPortStrategyBase
+public sealed class JsonRpcStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "JsonRpc",
         Description = "JSON-RPC 2.0 bindings for language-agnostic RPC",
-        Category = SDKPortCategory.CrossLanguage,
+        Category = SdkPortCategory.CrossLanguage,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Python, LanguageTarget.JavaScript, LanguageTarget.TypeScript,
                                 LanguageTarget.Go, LanguageTarget.Rust, LanguageTarget.Java, LanguageTarget.Ruby],
-            SupportedTransports: [TransportType.REST, TransportType.WebSocket],
+            SupportedTransports: [TransportType.Rest, TransportType.WebSocket],
             SupportsAsync: true, SupportsStreaming: false, SupportsCallbacks: true,
             SupportsBidirectional: true, SupportsAutoCodegen: true, SupportsTypeGeneration: true),
         Tags = ["jsonrpc", "rpc", "cross-language"]
@@ -158,13 +158,13 @@ public sealed class JsonRpcStrategy : SDKPortStrategyBase
 }
 
 /// <summary>MessagePack binary serialization binding strategy.</summary>
-public sealed class MessagePackStrategy : SDKPortStrategyBase
+public sealed class MessagePackStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "MessagePack",
         Description = "MessagePack binary serialization for efficient cross-language communication",
-        Category = SDKPortCategory.CrossLanguage,
+        Category = SdkPortCategory.CrossLanguage,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Python, LanguageTarget.JavaScript, LanguageTarget.Go,
                                 LanguageTarget.Rust, LanguageTarget.Java, LanguageTarget.CSharp],
@@ -183,17 +183,17 @@ public sealed class MessagePackStrategy : SDKPortStrategyBase
 }
 
 /// <summary>Apache Thrift binding strategy.</summary>
-public sealed class ThriftStrategy : SDKPortStrategyBase
+public sealed class ThriftStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "Thrift",
         Description = "Apache Thrift bindings for cross-language service definitions",
-        Category = SDKPortCategory.CrossLanguage,
+        Category = SdkPortCategory.CrossLanguage,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Python, LanguageTarget.JavaScript, LanguageTarget.Go,
                                 LanguageTarget.Rust, LanguageTarget.Java, LanguageTarget.CSharp, LanguageTarget.Cpp],
-            SupportedTransports: [TransportType.GRPC, TransportType.REST],
+            SupportedTransports: [TransportType.Grpc, TransportType.Rest],
             SupportsAsync: true, SupportsStreaming: false, SupportsCallbacks: false,
             SupportsBidirectional: false, SupportsAutoCodegen: true, SupportsTypeGeneration: true),
         Tags = ["thrift", "apache", "cross-language"]
@@ -230,16 +230,16 @@ public sealed class ThriftStrategy : SDKPortStrategyBase
 }
 
 /// <summary>Cap'n Proto binding strategy.</summary>
-public sealed class CapnProtoStrategy : SDKPortStrategyBase
+public sealed class CapnProtoStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "CapnProto",
         Description = "Cap'n Proto bindings for zero-copy serialization",
-        Category = SDKPortCategory.CrossLanguage,
+        Category = SdkPortCategory.CrossLanguage,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Rust, LanguageTarget.Go, LanguageTarget.Cpp, LanguageTarget.Python],
-            SupportedTransports: [TransportType.FFI, TransportType.MessageQueue],
+            SupportedTransports: [TransportType.Ffi, TransportType.MessageQueue],
             SupportsAsync: true, SupportsStreaming: true, SupportsCallbacks: false,
             SupportsBidirectional: true, SupportsAutoCodegen: true, SupportsTypeGeneration: true,
             MaxConcurrentCalls: 100000),

@@ -146,8 +146,8 @@ public sealed class OrcStrategy : DataFormatStrategyBase
         {
             // ECOS-05: Fixed — Read actual schema from ORC footer
             // Guard: refuse unbounded allocation from untrusted stream length (finding 2233).
-            const long MaxOrcSchemaBytes = 256L * 1024 * 1024; // 256 MB
-            if (stream.Length > MaxOrcSchemaBytes)
+            const long maxOrcSchemaBytes = 256L * 1024 * 1024; // 256 MB
+            if (stream.Length > maxOrcSchemaBytes)
                 return null;
             stream.Position = 0;
             var fileBytes = new byte[stream.Length];

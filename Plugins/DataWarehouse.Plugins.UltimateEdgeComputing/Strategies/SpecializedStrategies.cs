@@ -1068,9 +1068,9 @@ internal sealed class SmartCityEdgeStrategy : IEdgeComputingStrategy
         }
 
         // Estimated delay reduction vs. fixed-time 50/50 split (Akçelik approximation proxy)
-        double baseDelay = totalDemand > 0 ? 60.0 * totalDemand / (nsGreen + ewGreen + 2 * Overhead) : 0;
+        double baseDelay = totalDemand > 0 ? 60.0 * totalDemand / (nsGreen + ewGreen + 2 * overhead) : 0;
         double optimisedDelay = totalDemand > 0
-            ? 60.0 * (nsTotal / (double)(nsGreen + Overhead) + ewTotal / (double)(ewGreen + Overhead))
+            ? 60.0 * (nsTotal / (double)(nsGreen + overhead) + ewTotal / (double)(ewGreen + overhead))
             : 0;
         double delayReduction = Math.Max(0, baseDelay - optimisedDelay);
 

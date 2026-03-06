@@ -45,7 +45,7 @@ public enum CommunicationProtocol
     /// <summary>WebSocket.</summary>
     WebSocket,
     /// <summary>GraphQL.</summary>
-    GraphQL
+    GraphQl
 }
 
 /// <summary>

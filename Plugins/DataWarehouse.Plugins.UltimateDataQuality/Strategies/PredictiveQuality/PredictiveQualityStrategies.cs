@@ -691,25 +691,25 @@ internal sealed class QualityTrendAnalyzerStrategy : DataQualityStrategyBase
         int n = snapshot.Count;
 
         // Convert timestamps to sequential indices (0, 1, 2, ...)
-        double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+        double sumX = 0, sumY = 0, sumXy = 0, sumX2 = 0;
         for (int i = 0; i < n; i++)
         {
             double x = i;
             double y = snapshot[i].Value;
             sumX += x;
             sumY += y;
-            sumXY += x * y;
+            sumXy += x * y;
             sumX2 += x * x;
         }
 
-        // Least squares: slope = (n*sumXY - sumX*sumY) / (n*sumX2 - sumX*sumX)
+        // Least squares: slope = (n*sumXy - sumX*sumY) / (n*sumX2 - sumX*sumX)
         double denominator = n * sumX2 - sumX * sumX;
         double slope = 0;
         double intercept = 0;
 
         if (Math.Abs(denominator) > 1e-15)
         {
-            slope = (n * sumXY - sumX * sumY) / denominator;
+            slope = (n * sumXy - sumX * sumY) / denominator;
             intercept = (sumY - slope * sumX) / n;
         }
         else

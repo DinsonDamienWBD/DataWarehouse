@@ -125,9 +125,9 @@ public sealed class SafeTensorsStrategy : DataFormatStrategyBase
             long headerLength = BitConverter.ToInt64(lengthBytes, 0);
 
             // Guard: header length must fit in int and be reasonable (finding 2232).
-            const long MaxHeaderBytes = 64 * 1024 * 1024; // 64 MB — generous upper bound for header JSON
-            if (headerLength < 0 || headerLength > MaxHeaderBytes)
-                return DataFormatResult.Fail($"SafeTensors header length {headerLength} is out of valid range [0, {MaxHeaderBytes}]");
+            const long maxHeaderBytes = 64 * 1024 * 1024; // 64 MB — generous upper bound for header JSON
+            if (headerLength < 0 || headerLength > maxHeaderBytes)
+                return DataFormatResult.Fail($"SafeTensors header length {headerLength} is out of valid range [0, {maxHeaderBytes}]");
 
             // Read header JSON
             var headerBytes = new byte[(int)headerLength];
@@ -164,9 +164,9 @@ public sealed class SafeTensorsStrategy : DataFormatStrategyBase
                 long tensorSize = endOffset - startOffset;
 
                 // Guard: individual tensor size must fit in int (finding 2232).
-                const long MaxTensorBytes = 2L * 1024 * 1024 * 1024 - 1; // just under 2 GB
-                if (tensorSize < 0 || tensorSize > MaxTensorBytes)
-                    return DataFormatResult.Fail($"Tensor '{tensorName}' size {tensorSize} is out of valid range [0, {MaxTensorBytes}]");
+                const long maxTensorBytes = 2L * 1024 * 1024 * 1024 - 1; // just under 2 GB
+                if (tensorSize < 0 || tensorSize > maxTensorBytes)
+                    return DataFormatResult.Fail($"Tensor '{tensorName}' size {tensorSize} is out of valid range [0, {maxTensorBytes}]");
 
                 // Read tensor data
                 var tensorData = new byte[(int)tensorSize];

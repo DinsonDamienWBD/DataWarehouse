@@ -88,7 +88,7 @@ public class PluginSmokeTests : IDisposable
 
         // === Platform Plugins ===
         new object[] { "UltimateMicroservices", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateMicroservices.UltimateMicroservicesPlugin()), "microservices" },
-        new object[] { "UltimateSDKPorts", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateSDKPorts.UltimateSDKPortsPlugin()), "sdk" },
+        new object[] { "UltimateSDKPorts", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateSDKPorts.UltimateSdkPortsPlugin()), "sdk" },
         new object[] { "UltimateDocGen", new Func<PluginBase>(() => new DataWarehouse.Plugins.UltimateDocGen.UltimateDocGenPlugin()), "docgen" },
         // AppPlatform consolidated into UltimateCompute (Phase 65.5-11)
         new object[] { "PluginMarketplace", new Func<PluginBase>(() => new DataWarehouse.Plugins.PluginMarketplace.PluginMarketplacePlugin()), "marketplace" },

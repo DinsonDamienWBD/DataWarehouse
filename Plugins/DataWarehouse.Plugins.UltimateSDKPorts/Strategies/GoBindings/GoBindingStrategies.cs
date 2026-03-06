@@ -3,16 +3,16 @@ using System.Text;
 namespace DataWarehouse.Plugins.UltimateSDKPorts.Strategies.GoBindings;
 
 /// <summary>Go CGO binding strategy.</summary>
-public sealed class GoCgoStrategy : SDKPortStrategyBase
+public sealed class GoCgoStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "GoCgo",
         Description = "Go bindings using CGO for direct C library integration",
-        Category = SDKPortCategory.GoBinding,
+        Category = SdkPortCategory.GoBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Go],
-            SupportedTransports: [TransportType.FFI],
+            SupportedTransports: [TransportType.Ffi],
             SupportsAsync: false, SupportsStreaming: false, SupportsCallbacks: true,
             SupportsBidirectional: false, SupportsAutoCodegen: true, SupportsTypeGeneration: true),
         Tags = ["go", "cgo", "ffi"]
@@ -45,16 +45,16 @@ public sealed class GoCgoStrategy : SDKPortStrategyBase
 }
 
 /// <summary>Go gRPC binding strategy.</summary>
-public sealed class GoGrpcStrategy : SDKPortStrategyBase
+public sealed class GoGrpcStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "GoGrpc",
         Description = "Go bindings using gRPC for high-performance RPC with protobuf",
-        Category = SDKPortCategory.GoBinding,
+        Category = SdkPortCategory.GoBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Go],
-            SupportedTransports: [TransportType.GRPC],
+            SupportedTransports: [TransportType.Grpc],
             SupportsAsync: true, SupportsStreaming: true, SupportsCallbacks: false,
             SupportsBidirectional: true, SupportsAutoCodegen: true, SupportsTypeGeneration: true,
             MaxConcurrentCalls: 10000),
@@ -100,16 +100,16 @@ public sealed class GoGrpcStrategy : SDKPortStrategyBase
 }
 
 /// <summary>Go HTTP client binding strategy.</summary>
-public sealed class GoHttpClientStrategy : SDKPortStrategyBase
+public sealed class GoHttpClientStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "GoHttpClient",
         Description = "Go bindings using net/http for REST API communication",
-        Category = SDKPortCategory.GoBinding,
+        Category = SdkPortCategory.GoBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Go],
-            SupportedTransports: [TransportType.REST],
+            SupportedTransports: [TransportType.Rest],
             SupportsAsync: true, SupportsStreaming: false, SupportsCallbacks: false,
             SupportsBidirectional: false, SupportsAutoCodegen: true, SupportsTypeGeneration: true),
         Tags = ["go", "http", "rest"]
@@ -150,13 +150,13 @@ public sealed class GoHttpClientStrategy : SDKPortStrategyBase
 }
 
 /// <summary>Go channel-based async binding strategy.</summary>
-public sealed class GoChannelStrategy : SDKPortStrategyBase
+public sealed class GoChannelStrategy : SdkPortStrategyBase
 {
-    public override SDKPortCharacteristics Characteristics { get; } = new()
+    public override SdkPortCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "GoChannel",
         Description = "Go bindings using channels for async message passing",
-        Category = SDKPortCategory.GoBinding,
+        Category = SdkPortCategory.GoBinding,
         Capabilities = new(
             SupportedLanguages: [LanguageTarget.Go],
             SupportedTransports: [TransportType.MessageQueue],

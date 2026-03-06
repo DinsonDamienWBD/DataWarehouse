@@ -70,7 +70,7 @@ public sealed class GlobalDifferentialPrivacyStrategy : DataPrivacyStrategyBase
     public override string[] Tags => ["differential-privacy", "global", "centralized"];
 }
 
-public sealed class ApproximateDPStrategy : DataPrivacyStrategyBase
+public sealed class ApproximateDpStrategy : DataPrivacyStrategyBase
 {
     public override string StrategyId => "approximate-dp";
     public override string DisplayName => "Approximate Differential Privacy";

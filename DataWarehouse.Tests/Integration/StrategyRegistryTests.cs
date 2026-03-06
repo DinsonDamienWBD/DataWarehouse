@@ -78,7 +78,7 @@ public class StrategyRegistryTests
         "ObservabilityConnectionStrategyBase",
         "LineageStrategyBase",
         "DataQualityStrategyBase",
-        "SDKPortStrategyBase",
+        "SdkPortStrategyBase",
         "ProtocolStrategyBase",
         "DashboardConnectionStrategyBase",
         "AIProviderStrategyBase",

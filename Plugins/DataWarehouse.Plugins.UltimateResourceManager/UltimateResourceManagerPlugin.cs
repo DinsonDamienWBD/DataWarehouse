@@ -132,7 +132,7 @@ public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, ID
         response.Metadata["PreemptionEnabled"] = _preemptionEnabled.ToString();
         response.Metadata["CpuStrategies"] = GetStrategiesByCategory(ResourceCategory.Cpu).Count.ToString();
         response.Metadata["MemoryStrategies"] = GetStrategiesByCategory(ResourceCategory.Memory).Count.ToString();
-        response.Metadata["IoStrategies"] = GetStrategiesByCategory(ResourceCategory.IO).Count.ToString();
+        response.Metadata["IoStrategies"] = GetStrategiesByCategory(ResourceCategory.Io).Count.ToString();
         response.Metadata["GpuStrategies"] = GetStrategiesByCategory(ResourceCategory.Gpu).Count.ToString();
 
         return response;
@@ -163,7 +163,7 @@ public sealed class UltimateResourceManagerPlugin : InfrastructurePluginBase, ID
         metadata["TotalStrategies"] = _registry.Count;
         metadata["CpuStrategies"] = GetStrategiesByCategory(ResourceCategory.Cpu).Count;
         metadata["MemoryStrategies"] = GetStrategiesByCategory(ResourceCategory.Memory).Count;
-        metadata["IoStrategies"] = GetStrategiesByCategory(ResourceCategory.IO).Count;
+        metadata["IoStrategies"] = GetStrategiesByCategory(ResourceCategory.Io).Count;
         metadata["GpuStrategies"] = GetStrategiesByCategory(ResourceCategory.Gpu).Count;
         metadata["ActiveAllocations"] = _activeAllocations.Count;
         metadata["TotalAllocations"] = Interlocked.Read(ref _totalAllocations);
