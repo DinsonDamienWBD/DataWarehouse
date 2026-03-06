@@ -431,8 +431,12 @@ public static class TamperProofManifestExtensions
 
             return null;
         }
-        catch
+        catch (Exception ex)
         {
+            // #3444: Log deserialization failures so corrupt metadata is distinguishable
+            // from absent metadata in diagnostics.
+            System.Diagnostics.Trace.TraceWarning(
+                $"[TamperProofManifestExtensions] DeserializeEncryptionMetadata failed: {ex.Message}");
             return null;
         }
     }

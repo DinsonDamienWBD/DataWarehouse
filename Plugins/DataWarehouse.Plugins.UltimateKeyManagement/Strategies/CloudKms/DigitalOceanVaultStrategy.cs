@@ -293,8 +293,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                     }
                 };
             }
-            catch
+            catch (Exception ex)
             {
+                // #3430: Log metadata retrieval failures.
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[DigitalOceanVaultStrategy] GetKeyMetadataAsync failed for key '{keyId}': {ex.Message}");
                 return null;
             }
         }
@@ -313,8 +316,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.CloudKms
                 var json = await File.ReadAllTextAsync(path);
                 return JsonSerializer.Deserialize<Dictionary<string, string>>(json);
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[DigitalOceanVaultStrategy] GetProjectMetadataAsync failed: {ex.Message}");
                 return null;
             }
         }

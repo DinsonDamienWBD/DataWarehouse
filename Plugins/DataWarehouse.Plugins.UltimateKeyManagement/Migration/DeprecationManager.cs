@@ -306,9 +306,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Migration
             // Emit to configured outputs
             if (_options.EmitToConsole)
             {
-                Console.ForegroundColor = ConsoleColor.Yellow;
-                System.Diagnostics.Debug.WriteLine($"[DEPRECATION WARNING] {warning.Message}");
-                Console.ResetColor();
+                // #3439: Avoid Console.ForegroundColor — it is not thread-safe and concurrent
+                // mutations corrupt terminal state. Use Trace output instead.
+                System.Diagnostics.Trace.TraceWarning($"[DEPRECATION WARNING] {warning.Message}");
             }
 
             if (_options.EmitToTrace)

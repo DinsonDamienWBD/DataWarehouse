@@ -390,10 +390,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 var gammaI = GenerateRandomScalar();
 
                 // Compute R_i = k_i * G (nonce commitment)
-                var Ri = DomainParams.G.Multiply(ki);
+                var ri = DomainParams.G.Multiply(ki);
 
                 // Compute Gamma_i = gamma_i * G
-                var GammaI = DomainParams.G.Multiply(gammaI);
+                var gammaIPoint = DomainParams.G.Multiply(gammaI);
 
                 // Encrypt k_i * gamma_i with Paillier for MtA protocol
                 var kiGammaI = ki.Multiply(gammaI).Mod(DomainParams.N);
@@ -416,10 +416,10 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 {
                     KeyId = keyId,
                     PartyIndex = _config.PartyIndex,
-                    Ri = Ri.GetEncoded(false),
-                    GammaI = GammaI.GetEncoded(false),
+                    Ri = ri.GetEncoded(false),
+                    GammaI = gammaIPoint.GetEncoded(false),
                     EncryptedKiGammaI = encryptedKiGammaI.ToByteArrayUnsigned(),
-                    Commitment = ComputeCommitment(Ri, GammaI)
+                    Commitment = ComputeCommitment(ri, gammaIPoint)
                 };
             }
             finally
@@ -457,9 +457,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                     m => CurveParams.Curve.DecodePoint(m.GammaI));
 
                 // Compute aggregated R (will be refined in round 3)
-                var R = DomainParams.G.Multiply(state.Ki);
-                foreach (var ri in state.OtherRi.Values)
-                    R = R.Add(ri);
+                var r = DomainParams.G.Multiply(state.Ki);
+                foreach (var otherRi in state.OtherRi.Values)
+                    r = r.Add(otherRi);
 
                 // MtA protocol: compute alpha_ij and beta_ij for each pair
                 // alpha_ij = k_i * x_j (mod n) - requires MtA
@@ -477,7 +477,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
                 }
 
                 state.SigmaI = sigmaI;
-                state.R = R;
+                state.R = r;
                 state.Phase = 2;
 
                 await PersistKeysToStorage();

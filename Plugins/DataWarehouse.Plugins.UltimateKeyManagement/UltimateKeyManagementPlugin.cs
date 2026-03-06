@@ -341,8 +341,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    // #3558: Log assembly scanning failures so missing strategies are diagnosable.
+                    System.Diagnostics.Trace.TraceWarning(
+                        $"[UltimateKeyManagementPlugin] DiscoverAndRegisterStrategiesAsync: " +
+                        $"assembly.GetTypes() failed for '{assembly.GetName().Name}': {ex.Message}");
                     continue;
                 }
             }
@@ -603,9 +607,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
 
                 await MessageBus.PublishAsync(eventType, message);
             }
-            catch
+            catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                // #3559: Log message bus failures — security audit events (rotation, startup,
+                // shutdown) can be lost silently without this.
+                System.Diagnostics.Trace.TraceError(
+                    $"[UltimateKeyManagementPlugin] PublishEventAsync failed for '{eventType}': {ex.Message}");
             }
         }
 

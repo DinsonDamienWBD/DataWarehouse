@@ -46,7 +46,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
         private bool _disposed;
 
         // #3540: Master wrapping key for encrypting DecryptedKey at rest.
-        private static readonly byte[] _vdfWrapKey = System.Security.Cryptography.HKDF.DeriveKey(
+        private static readonly byte[] VdfWrapKey = System.Security.Cryptography.HKDF.DeriveKey(
             System.Security.Cryptography.HashAlgorithmName.SHA256,
             System.Security.Cryptography.SHA256.HashData(
                 System.Text.Encoding.UTF8.GetBytes(
@@ -871,7 +871,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             var tag = new byte[16];
             var ct = new byte[plaintext.Length];
             var pk = System.Security.Cryptography.HKDF.DeriveKey(
-                System.Security.Cryptography.HashAlgorithmName.SHA256, _vdfWrapKey, 32,
+                System.Security.Cryptography.HashAlgorithmName.SHA256, VdfWrapKey, 32,
                 salt: System.Text.Encoding.UTF8.GetBytes("dw-vdf-per-key-v1"),
                 info: System.Text.Encoding.UTF8.GetBytes(keyId));
             using var aes = new System.Security.Cryptography.AesGcm(pk, 16);
@@ -889,7 +889,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.IndustryFirst
             if (wrapped.Length < 28) throw new InvalidOperationException("VDF wrapped key too short.");
             var nonce = wrapped[..12]; var tag = wrapped[12..28]; var ct = wrapped[28..];
             var pk = System.Security.Cryptography.HKDF.DeriveKey(
-                System.Security.Cryptography.HashAlgorithmName.SHA256, _vdfWrapKey, 32,
+                System.Security.Cryptography.HashAlgorithmName.SHA256, VdfWrapKey, 32,
                 salt: System.Text.Encoding.UTF8.GetBytes("dw-vdf-per-key-v1"),
                 info: System.Text.Encoding.UTF8.GetBytes(keyId));
             var plaintext = new byte[ct.Length];

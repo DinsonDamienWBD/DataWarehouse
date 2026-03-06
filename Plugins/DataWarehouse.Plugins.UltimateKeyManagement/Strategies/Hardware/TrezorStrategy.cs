@@ -800,11 +800,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-
-                // Ignore errors
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                // #3507: Log key loading failures — silent swallow loses all derived keys.
+                System.Diagnostics.Trace.TraceError(
+                    $"[TrezorStrategy] LoadDerivedKeys failed: {ex.Message}");
             }
         }
 

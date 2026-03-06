@@ -674,7 +674,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
             _rotationHistory.Clear();
             _rotationLock.Dispose();
 
-            GC.SuppressFinalize(this);
+            // #3602: Removed GC.SuppressFinalize — class has no finalizer/destructor.
         }
     }
 

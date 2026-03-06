@@ -499,8 +499,8 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
         /// </summary>
         private byte[] ExpandMessageXmd(byte[] message, byte[] dst, int lenInBytes)
         {
-            var b_in_bytes = 32; // SHA-256 output length
-            var ell = (lenInBytes + b_in_bytes - 1) / b_in_bytes;
+            var bInBytes = 32; // SHA-256 output length
+            var ell = (lenInBytes + bInBytes - 1) / bInBytes;
 
             if (ell > 255)
                 throw new ArgumentException("Requested length too large.");
@@ -526,15 +526,15 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Threshold
 
             var output = new byte[lenInBytes];
             var bi = SHA256.HashData(ConcatBytes(b0, new byte[] { 1 }, dstPrime));
-            Array.Copy(bi, 0, output, 0, Math.Min(b_in_bytes, lenInBytes));
+            Array.Copy(bi, 0, output, 0, Math.Min(bInBytes, lenInBytes));
 
             for (int i = 2; i <= ell; i++)
             {
                 var xorInput = XorBytes(b0, bi);
                 bi = SHA256.HashData(ConcatBytes(xorInput, new byte[] { (byte)i }, dstPrime));
 
-                var offset = (i - 1) * b_in_bytes;
-                var toCopy = Math.Min(b_in_bytes, lenInBytes - offset);
+                var offset = (i - 1) * bInBytes;
+                var toCopy = Math.Min(bInBytes, lenInBytes - offset);
                 if (toCopy > 0)
                 {
                     Array.Copy(bi, 0, output, offset, toCopy);

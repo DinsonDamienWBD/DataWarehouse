@@ -980,11 +980,12 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Features
 
                 await _messageBus.PublishAsync(eventType, message);
             }
-            catch
+            catch (Exception ex)
             {
-
-                // Best-effort event publishing
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                // #3420: Log audit event publishing failures — compliance systems
+                // must detect when break-glass audit events are lost.
+                System.Diagnostics.Trace.TraceError(
+                    $"[BreakGlassAccess] PublishEventAsync failed for event '{eventType}': {ex.Message}");
             }
         }
 

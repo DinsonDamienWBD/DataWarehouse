@@ -107,8 +107,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
                 using var response = await _httpClient.SendAsync(request, cancellationToken);
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                // #3595: Log health check failures so "vault down" is distinguishable from "key not found".
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[VaultKeyStoreStrategy] HealthCheckAsync failed: {ex.Message}");
                 return false;
             }
         }
@@ -260,8 +263,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
                     }
                 };
             }
-            catch
+            catch (Exception ex)
             {
+                // #3595: Log metadata failures so "key not found" is distinguishable from "vault error".
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[VaultKeyStoreStrategy] GetKeyMetadataAsync failed for key '{keyId}': {ex.Message}");
                 return null;
             }
         }
@@ -274,8 +280,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.SecretsManageme
                 using var response = await _httpClient.SendAsync(request);
                 return response.IsSuccessStatusCode;
             }
-            catch
+            catch (Exception ex)
             {
+                // #3595: Log health check failures.
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[VaultKeyStoreStrategy] IsHealthyAsync failed: {ex.Message}");
                 return false;
             }
         }

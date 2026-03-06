@@ -238,8 +238,13 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement
                         }
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
+                    // #3430: Log key enumeration failures — silent fallback hides config errors
+                    // that could trigger unintended rotation of the current key.
+                    System.Diagnostics.Trace.TraceError(
+                        $"[KeyRotationScheduler] DetermineKeysToRotateAsync failed to enumerate keys: {ex.Message}. " +
+                        "Falling back to rotating current key only.");
                     var currentKeyId = await strategy.GetCurrentKeyIdAsync();
                     keysToRotate.Add(currentKeyId);
                 }

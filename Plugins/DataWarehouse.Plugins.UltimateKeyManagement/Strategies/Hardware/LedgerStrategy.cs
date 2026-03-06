@@ -722,9 +722,11 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Hardware
                     }
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                // Ignore errors
+                // #3479: Log key loading failures — silent swallow hides data loss at startup.
+                System.Diagnostics.Trace.TraceError(
+                    $"[LedgerStrategy] LoadDerivedKeys failed: {ex.Message}");
             }
         }
 

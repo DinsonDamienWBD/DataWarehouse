@@ -26,9 +26,9 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
     public sealed class WindowsCredManagerStrategy : KeyStoreStrategyBase
     {
         private const string CredentialPrefix = "DataWarehouse.KeyStore";
-        private const int CRED_TYPE_GENERIC = 1;
-        private const int CRED_PERSIST_LOCAL_MACHINE = 2;
-        private const int CRED_PERSIST_ENTERPRISE = 3;
+        private const int CredTypeGeneric = 1;
+        private const int CredPersistLocalMachine = 2;
+        private const int CredPersistEnterprise = 3;
 
         private WindowsCredManagerConfig _config = new();
         private string? _currentKeyId;
@@ -185,7 +185,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
                     for (int i = 0; i < count; i++)
                     {
                         var credPtr = Marshal.ReadIntPtr(credentials, i * IntPtr.Size);
-                        var cred = Marshal.PtrToStructure<CREDENTIAL>(credPtr);
+                        var cred = Marshal.PtrToStructure<Credential>(credPtr);
                         if (cred.TargetName != null && cred.TargetName.StartsWith(prefix))
                         {
                             var keyId = cred.TargetName.Substring(prefix.Length);
@@ -291,16 +291,16 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
 
         private void WriteCredential(string targetName, byte[] credentialBlob, string comment)
         {
-            var credential = new CREDENTIAL
+            var credential = new Credential
             {
                 Flags = 0,
-                Type = CRED_TYPE_GENERIC,
+                Type = CredTypeGeneric,
                 TargetName = targetName,
                 Comment = comment,
                 CredentialBlobSize = (uint)credentialBlob.Length,
                 Persist = (uint)(_config.PersistenceLevel == CredentialPersistence.Enterprise
-                    ? CRED_PERSIST_ENTERPRISE
-                    : CRED_PERSIST_LOCAL_MACHINE),
+                    ? CredPersistEnterprise
+                    : CredPersistLocalMachine),
                 UserName = Environment.UserName
             };
 
@@ -327,14 +327,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
         {
             credentialBlob = null;
 
-            if (!CredReadW(targetName, CRED_TYPE_GENERIC, 0, out var credentialPtr))
+            if (!CredReadW(targetName, CredTypeGeneric, 0, out var credentialPtr))
             {
                 return false;
             }
 
             try
             {
-                var credential = Marshal.PtrToStructure<CREDENTIAL>(credentialPtr);
+                var credential = Marshal.PtrToStructure<Credential>(credentialPtr);
                 if (credential.CredentialBlobSize > 0 && credential.CredentialBlob != IntPtr.Zero)
                 {
                     credentialBlob = new byte[credential.CredentialBlobSize];
@@ -353,14 +353,14 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
         {
             lastWritten = DateTime.MinValue;
 
-            if (!CredReadW(targetName, CRED_TYPE_GENERIC, 0, out var credentialPtr))
+            if (!CredReadW(targetName, CredTypeGeneric, 0, out var credentialPtr))
             {
                 return false;
             }
 
             try
             {
-                var credential = Marshal.PtrToStructure<CREDENTIAL>(credentialPtr);
+                var credential = Marshal.PtrToStructure<Credential>(credentialPtr);
                 lastWritten = DateTime.FromFileTimeUtc(credential.LastWritten);
                 return true;
             }
@@ -372,7 +372,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
 
         private void DeleteCredential(string targetName)
         {
-            if (!CredDeleteW(targetName, CRED_TYPE_GENERIC, 0))
+            if (!CredDeleteW(targetName, CredTypeGeneric, 0))
             {
                 var error = Marshal.GetLastWin32Error();
                 // Ignore "not found" errors (error 1168)
@@ -385,7 +385,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
         }
 
         [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-        private struct CREDENTIAL
+        private struct Credential
         {
             public uint Flags;
             public uint Type;
@@ -406,7 +406,7 @@ namespace DataWarehouse.Plugins.UltimateKeyManagement.Strategies.Platform
         }
 
         [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
-        private static extern bool CredWriteW(ref CREDENTIAL credential, uint flags);
+        private static extern bool CredWriteW(ref Credential credential, uint flags);
 
         [DllImport("advapi32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
         private static extern bool CredReadW(string targetName, uint type, uint reservedFlag, out IntPtr credential);
