@@ -124,7 +124,7 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
         var stringToSign = $"{algorithm}\n{amzDate}\n{credentialScope}\n{GetSha256Hash(canonicalRequest)}";
 
         var signingKey = GetSignatureKey(_secretAccessKey, dateStamp, _region, "xray");
-        var signature = ToHexString(HmacSHA256(signingKey, stringToSign));
+        var signature = ToHexString(HmacSha256(signingKey, stringToSign));
 
         var authorization = $"{algorithm} Credential={_accessKeyId}/{credentialScope}, SignedHeaders={signedHeaders}, Signature={signature}";
 
@@ -138,13 +138,13 @@ public sealed class XRayStrategy : ObservabilityStrategyBase
     }
 
     private static string GetSha256Hash(string text) => Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(text))).ToLowerInvariant();
-    private static byte[] HmacSHA256(byte[] key, string data) { using var hmac = new HMACSHA256(key); return hmac.ComputeHash(Encoding.UTF8.GetBytes(data)); }
+    private static byte[] HmacSha256(byte[] key, string data) { using var hmac = new HMACSHA256(key); return hmac.ComputeHash(Encoding.UTF8.GetBytes(data)); }
     private static byte[] GetSignatureKey(string key, string dateStamp, string regionName, string serviceName)
     {
-        var kDate = HmacSHA256(Encoding.UTF8.GetBytes("AWS4" + key), dateStamp);
-        var kRegion = HmacSHA256(kDate, regionName);
-        var kService = HmacSHA256(kRegion, serviceName);
-        return HmacSHA256(kService, "aws4_request");
+        var kDate = HmacSha256(Encoding.UTF8.GetBytes("AWS4" + key), dateStamp);
+        var kRegion = HmacSha256(kDate, regionName);
+        var kService = HmacSha256(kRegion, serviceName);
+        return HmacSha256(kService, "aws4_request");
     }
     private static string ToHexString(byte[] bytes) => Convert.ToHexString(bytes).ToLowerInvariant();
 

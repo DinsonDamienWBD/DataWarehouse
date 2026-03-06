@@ -17,6 +17,9 @@ public sealed class DynatraceStrategy : ObservabilityStrategyBase
     private string _apiToken = "";
     private string _entityId = "";
 
+    /// <summary>Gets the configured Dynatrace entity ID.</summary>
+    internal string EntityId => _entityId;
+
     public override string StrategyId => "dynatrace";
     public override string Name => "Dynatrace";
 

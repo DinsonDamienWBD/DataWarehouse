@@ -23,6 +23,9 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
     private string _username = "";
     private string _password = "";
     private string _apiKey = "";
+
+    /// <summary>Gets the configured Elasticsearch API key.</summary>
+    internal string ApiKey => _apiKey;
     private readonly ConcurrentQueue<Dictionary<string, object>> _logsBatch = new();
     private readonly System.Timers.Timer _flushTimer;
     private readonly SemaphoreSlim _flushLock = new(1, 1);
@@ -546,12 +549,13 @@ public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
         {
             _flushTimer?.Stop();
             _flushTimer?.Dispose();
-            // Flush pending logs with a bounded wait; use GetAwaiter to avoid deadlock.
+            // Flush pending logs with a bounded wait. Use Task.Run to avoid deadlock
+            // in SynchronizationContext environments (WPF, ASP.NET classic).
             if (_flushLock.Wait(TimeSpan.FromSeconds(1)))
             {
                 try
                 {
-                    FlushLogsAsync(CancellationToken.None).GetAwaiter().GetResult();
+                    Task.Run(() => FlushLogsAsync(CancellationToken.None)).Wait(TimeSpan.FromSeconds(4));
                 }
                 catch { /* Best-effort flush on dispose */ }
                 finally

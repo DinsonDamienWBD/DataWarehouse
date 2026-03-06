@@ -163,20 +163,20 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
 
         // CloudWatch Logs: max 10,000 events AND max 1MB (1,048,576 bytes) per request.
         // LOW-4649: Chunk by count first, then further split batches that exceed the byte limit.
-        const int MaxEventsPerBatch = 10000;
-        const int MaxBytesPerBatch = 1_048_576;
+        const int maxEventsPerBatch = 10000;
+        const int maxBytesPerBatch = 1_048_576;
         // Each event has a 26-byte overhead in the CloudWatch protocol.
-        const int PerEventOverhead = 26;
+        const int perEventOverhead = 26;
 
-        foreach (var countBatch in logEvents.Chunk(MaxEventsPerBatch))
+        foreach (var countBatch in logEvents.Chunk(maxEventsPerBatch))
         {
             var sizeBatch = new List<Dictionary<string, object>>();
             int batchBytes = 0;
 
             foreach (var evt in countBatch)
             {
-                var msgBytes = Encoding.UTF8.GetByteCount(evt["message"]?.ToString() ?? "") + PerEventOverhead;
-                if (sizeBatch.Count > 0 && batchBytes + msgBytes > MaxBytesPerBatch)
+                var msgBytes = Encoding.UTF8.GetByteCount(evt["message"]?.ToString() ?? "") + perEventOverhead;
+                if (sizeBatch.Count > 0 && batchBytes + msgBytes > maxBytesPerBatch)
                 {
                     await PutLogEventsAsync(sizeBatch, cancellationToken);
                     sizeBatch = new List<Dictionary<string, object>>();
@@ -295,7 +295,7 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
         var stringToSign = $"{algorithm}\n{amzDate}\n{credentialScope}\n{GetHash(canonicalRequest)}";
 
         var signingKey = GetSignatureKey(_secretAccessKey, dateStamp, _region, service);
-        var signature = ToHexString(HmacSHA256(signingKey, stringToSign));
+        var signature = ToHexString(HmacSha256(signingKey, stringToSign));
 
         var authorizationHeader = $"{algorithm} Credential={_accessKeyId}/{credentialScope}, SignedHeaders={signedHeaders}, Signature={signature}";
 
@@ -314,7 +314,7 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
         return ToHexString(bytes);
     }
 
-    private static byte[] HmacSHA256(byte[] key, string data)
+    private static byte[] HmacSha256(byte[] key, string data)
     {
         using var hmac = new HMACSHA256(key);
         return hmac.ComputeHash(Encoding.UTF8.GetBytes(data));
@@ -322,10 +322,10 @@ public sealed class CloudWatchStrategy : ObservabilityStrategyBase
 
     private static byte[] GetSignatureKey(string key, string dateStamp, string regionName, string serviceName)
     {
-        var kDate = HmacSHA256(Encoding.UTF8.GetBytes("AWS4" + key), dateStamp);
-        var kRegion = HmacSHA256(kDate, regionName);
-        var kService = HmacSHA256(kRegion, serviceName);
-        return HmacSHA256(kService, "aws4_request");
+        var kDate = HmacSha256(Encoding.UTF8.GetBytes("AWS4" + key), dateStamp);
+        var kRegion = HmacSha256(kDate, regionName);
+        var kService = HmacSha256(kRegion, serviceName);
+        return HmacSha256(kService, "aws4_request");
     }
 
     private static string ToHexString(byte[] bytes)

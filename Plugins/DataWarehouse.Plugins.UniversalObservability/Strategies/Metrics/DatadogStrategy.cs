@@ -86,7 +86,7 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
 
             series.Add(new
             {
-                metric = metric.Name.Replace("-", "_"),
+                metric = SanitizeMetricName(metric.Name),
                 type = metricType,
                 points = new[] { new[] { metric.Timestamp.ToUnixTimeSeconds(), metric.Value } },
                 tags = tags.ToArray(),
@@ -204,6 +204,19 @@ public sealed class DatadogStrategy : ObservabilityStrategyBase
         AddApiKey(req);
         using var response = await _httpClient.SendAsync(req, cancellationToken);
         response.EnsureSuccessStatusCode();
+    }
+
+    /// <summary>Sanitizes a metric name to conform to Datadog naming requirements.</summary>
+    private static string SanitizeMetricName(string name)
+    {
+        // Datadog metric names must be alphanumeric plus underscores and dots.
+        // Replace hyphens, spaces, slashes, and other invalid chars with underscores.
+        var sb = new StringBuilder(name.Length);
+        foreach (var c in name)
+        {
+            sb.Append(char.IsLetterOrDigit(c) || c == '.' || c == '_' ? c : '_');
+        }
+        return sb.ToString();
     }
 
     private static ulong ConvertToNumericId(string id)

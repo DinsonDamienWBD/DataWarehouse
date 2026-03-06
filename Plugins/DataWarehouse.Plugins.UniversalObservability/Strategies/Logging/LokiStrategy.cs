@@ -90,8 +90,8 @@ public sealed class LokiStrategy : ObservabilityStrategyBase
             var labelKey = FormatLabels(labels);
             // Loki timestamps are Unix nanoseconds (int64). Compute from Ticks for sub-millisecond precision.
             // 1 Tick = 100 ns, Unix epoch offset = 621355968000000000 ticks.
-            const long UnixEpochTicks = 621355968000000000L;
-            var timestamp = (entry.Timestamp.UtcTicks - UnixEpochTicks) * 100L; // ticks→ns
+            const long unixEpochTicks = 621355968000000000L;
+            var timestamp = (entry.Timestamp.UtcTicks - unixEpochTicks) * 100L; // ticks→ns
             var logLine = FormatLogLine(entry);
 
             if (!streams.ContainsKey(labelKey))
@@ -128,9 +128,9 @@ public sealed class LokiStrategy : ObservabilityStrategyBase
         int limit = 1000, CancellationToken ct = default)
     {
         // Loki uses Unix nanoseconds for start/end parameters.
-        const long UnixEpochTicks = 621355968000000000L;
-        var startNs = (start.UtcTicks - UnixEpochTicks) * 100L;
-        var endNs = (end.UtcTicks - UnixEpochTicks) * 100L;
+        const long unixEpochTicks = 621355968000000000L;
+        var startNs = (start.UtcTicks - unixEpochTicks) * 100L;
+        var endNs = (end.UtcTicks - unixEpochTicks) * 100L;
         var queryParams = $"query={Uri.EscapeDataString(query)}" +
                          $"&start={startNs}" +
                          $"&end={endNs}" +

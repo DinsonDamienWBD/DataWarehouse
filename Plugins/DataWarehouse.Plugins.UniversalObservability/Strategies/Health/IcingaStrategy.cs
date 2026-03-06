@@ -21,6 +21,9 @@ public sealed class IcingaStrategy : ObservabilityStrategyBase
     private string _apiUrl = "https://localhost:5665";
     private string _username = "root";
     private string _password = "";
+
+    /// <summary>Gets whether credentials have been configured (true if password is non-empty).</summary>
+    internal bool Password => !string.IsNullOrEmpty(_password);
     private bool _verifySsl = true;
 
     /// <inheritdoc/>

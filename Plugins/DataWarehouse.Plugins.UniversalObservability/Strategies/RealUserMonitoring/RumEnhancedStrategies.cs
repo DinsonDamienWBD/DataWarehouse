@@ -18,6 +18,9 @@ public sealed class SessionTrackingService
     private readonly TimeSpan _sessionTimeout;
     private readonly int _maxSessionsPerUser;
 
+    /// <summary>Gets the maximum number of concurrent sessions allowed per user.</summary>
+    internal int MaxSessionsPerUser => _maxSessionsPerUser;
+
     public SessionTrackingService(TimeSpan? sessionTimeout = null, int maxSessionsPerUser = 10)
     {
         _sessionTimeout = sessionTimeout ?? TimeSpan.FromMinutes(30);
