@@ -56,7 +56,8 @@ public sealed class TempoConnectionStrategy : ObservabilityConnectionStrategyBas
     public override async Task PushTracesAsync(IConnectionHandle handle, IReadOnlyList<Dictionary<string, object>> traces, CancellationToken ct = default)
     {
         var httpClient = handle.GetConnection<HttpClient>();
-        var json = JsonSerializer.Serialize(new { batches = traces });
+        // Finding 449: Use correct OTLP format (resourceSpans, not batches).
+        var json = JsonSerializer.Serialize(new { resourceSpans = traces });
         var content = new StringContent(json, Encoding.UTF8, "application/json");
         using var response = await httpClient.PostAsync("/v1/traces", content, ct);
         response.EnsureSuccessStatusCode();

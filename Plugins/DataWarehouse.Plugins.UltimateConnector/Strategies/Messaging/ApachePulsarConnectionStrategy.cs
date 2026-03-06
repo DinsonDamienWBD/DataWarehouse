@@ -147,6 +147,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Messaging
 
         private static void WriteVarint(System.IO.Stream s, long value) { while (value > 127) { s.WriteByte((byte)((value & 0x7F) | 0x80)); value >>= 7; } s.WriteByte((byte)value); }
         private static void WriteString(System.IO.Stream s, string value) { var bytes = Encoding.UTF8.GetBytes(value); WriteVarint(s, bytes.Length); s.Write(bytes, 0, bytes.Length); }
-        private static byte[] ExtractPulsarMessagePayload(byte[] frame) { var payloadStart = Math.Min(20, frame.Length - 1); return frame[payloadStart..]; }
+        private static byte[] ExtractPulsarMessagePayload(byte[] frame)
+        {
+            // Pulsar binary protocol frame parsing requires the official Apache.Pulsar.Client library.
+            // The previous Math.Min(20, ...) approach silently returned garbage body bytes.
+            throw new NotSupportedException(
+                "Pulsar binary frame parsing requires the Apache.Pulsar.Client NuGet package. " +
+                "This raw TCP subscriber cannot reliably extract message payload without the full Pulsar codec.");
+        }
     }
 }
