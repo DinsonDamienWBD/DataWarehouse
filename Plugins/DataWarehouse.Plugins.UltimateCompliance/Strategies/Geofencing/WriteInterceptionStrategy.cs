@@ -577,8 +577,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                         ? certList.ToList() : new List<string>()
                 };
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[WriteInterceptionStrategy] Failed to parse storage node from config: {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }
@@ -600,8 +602,10 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
                         ? certList.ToList() : new List<string>()
                 };
             }
-            catch
+            catch (Exception ex)
             {
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[WriteInterceptionStrategy] Failed to parse write policy from config: {ex.GetType().Name}: {ex.Message}");
                 return null;
             }
         }

@@ -95,11 +95,11 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
     // ==================================================================================
 
     /// <inheritdoc/>
-    public override Task InitializeAsync(
+    public override async Task InitializeAsync(
         Dictionary<string, object> configuration,
         CancellationToken cancellationToken = default)
     {
-        base.InitializeAsync(configuration, cancellationToken);
+        await base.InitializeAsync(configuration, cancellationToken).ConfigureAwait(false);
 
         if (Configuration.TryGetValue("DefaultJurisdiction", out var djObj) && djObj is string dj && dj.Length > 0)
         {
@@ -122,8 +122,6 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
                 _backendJurisdictionMap[kvp.Key] = kvp.Value?.ToString() ?? _defaultJurisdiction;
             }
         }
-
-        return Task.CompletedTask;
     }
 
     /// <summary>

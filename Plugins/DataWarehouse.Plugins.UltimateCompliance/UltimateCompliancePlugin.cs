@@ -285,7 +285,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance
                         ? Enum.TryParse<ComplianceAlertSeverity>(ss, true, out var ps) ? ps : ComplianceAlertSeverity.Warning
                         : ComplianceAlertSeverity.Warning,
                     Framework = msg.Payload.TryGetValue("framework", out var f) ? f as string : null,
-                    Source = msg.Source ?? _pluginId,
+                    Source = msg.Source ?? PluginId,
                     CreatedAtUtc = DateTime.UtcNow
                 };
 
@@ -308,7 +308,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance
         /// <summary>
         /// Gets the plugin identifier for service wiring.
         /// </summary>
-        private string _pluginId => Id;
+        private string PluginId => Id;
 
         /// <summary>
         /// Called when Intelligence becomes available - register compliance capabilities.
@@ -350,22 +350,22 @@ namespace DataWarehouse.Plugins.UltimateCompliance
                 }, ct);
 
                 // Subscribe to PII detection requests
-                SubscribeToPIIDetectionRequests();
+                SubscribeToPiiDetectionRequests();
             }
         }
 
         /// <summary>
         /// Subscribes to PII detection requests from Intelligence.
         /// </summary>
-        private void SubscribeToPIIDetectionRequests()
+        private void SubscribeToPiiDetectionRequests()
         {
             if (MessageBus == null) return;
 
-            MessageBus.Subscribe(IntelligenceTopics.RequestPiiDetection, async msg =>
+            var subscription = MessageBus.Subscribe(IntelligenceTopics.RequestPiiDetection, async msg =>
             {
                 if (msg.Payload.TryGetValue("text", out var textObj) && textObj is string text)
                 {
-                    var detection = DetectPII(text);
+                    var detection = DetectPii(text);
 
                     await MessageBus.PublishAsync(IntelligenceTopics.RequestPiiDetectionResponse, new PluginMessage
                     {
@@ -387,29 +387,46 @@ namespace DataWarehouse.Plugins.UltimateCompliance
                     });
                 }
             });
+            _subscriptions.Add(subscription);
         }
 
         /// <summary>
-        /// Detects PII in text using pattern matching.
+        /// Cached PII detection regex patterns (compiled once, reused per call).
         /// </summary>
-        private (bool ContainsPii, List<(string Type, double Confidence, int StartIndex, int EndIndex)> Items)
-            DetectPII(string text)
+        private static readonly Dictionary<string, System.Text.RegularExpressions.Regex> PiiPatterns = new()
+        {
+            ["EMAIL"] = new System.Text.RegularExpressions.Regex(
+                @"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
+                System.Text.RegularExpressions.RegexOptions.Compiled | System.Text.RegularExpressions.RegexOptions.IgnoreCase,
+                TimeSpan.FromSeconds(5)),
+            ["SSN"] = new System.Text.RegularExpressions.Regex(
+                @"\b\d{3}-\d{2}-\d{4}\b",
+                System.Text.RegularExpressions.RegexOptions.Compiled,
+                TimeSpan.FromSeconds(5)),
+            ["PHONE"] = new System.Text.RegularExpressions.Regex(
+                @"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",
+                System.Text.RegularExpressions.RegexOptions.Compiled,
+                TimeSpan.FromSeconds(5)),
+            ["CREDIT_CARD"] = new System.Text.RegularExpressions.Regex(
+                @"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b",
+                System.Text.RegularExpressions.RegexOptions.Compiled,
+                TimeSpan.FromSeconds(5)),
+            ["IP_ADDRESS"] = new System.Text.RegularExpressions.Regex(
+                @"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b",
+                System.Text.RegularExpressions.RegexOptions.Compiled,
+                TimeSpan.FromSeconds(5))
+        };
+
+        /// <summary>
+        /// Detects PII in text using cached compiled regex patterns.
+        /// </summary>
+        private static (bool ContainsPii, List<(string Type, double Confidence, int StartIndex, int EndIndex)> Items)
+            DetectPii(string text)
         {
             var items = new List<(string Type, double Confidence, int StartIndex, int EndIndex)>();
 
-            // Simple regex-based PII detection patterns
-            var patterns = new Dictionary<string, string>
+            foreach (var (piiType, regex) in PiiPatterns)
             {
-                ["EMAIL"] = @"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b",
-                ["SSN"] = @"\b\d{3}-\d{2}-\d{4}\b",
-                ["PHONE"] = @"\b\d{3}[-.]?\d{3}[-.]?\d{4}\b",
-                ["CREDIT_CARD"] = @"\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b",
-                ["IP_ADDRESS"] = @"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b"
-            };
-
-            foreach (var (piiType, pattern) in patterns)
-            {
-                var regex = new System.Text.RegularExpressions.Regex(pattern, System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 var matches = regex.Matches(text);
                 foreach (System.Text.RegularExpressions.Match match in matches)
                 {
@@ -453,11 +470,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance
                         // Dual-registration will become possible when compliance strategies extend StrategyBase.
                     }
                 }
-                catch
+                catch (Exception ex)
                 {
-
-                    // Skip strategies that fail to initialize
-                    System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                    // Log discovery failures so missing strategies are diagnosable
+                    System.Diagnostics.Trace.TraceWarning(
+                        $"[UltimateCompliancePlugin] Failed to discover/register strategy type '{type.FullName}': {ex.GetType().Name}: {ex.Message}");
                 }
             }
         }
