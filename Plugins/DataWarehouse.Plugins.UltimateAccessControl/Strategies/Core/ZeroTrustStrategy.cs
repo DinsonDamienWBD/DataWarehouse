@@ -38,6 +38,11 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
         private int _maxFailedAttempts = 5;
         private TimeSpan _sessionTimeout = TimeSpan.FromMinutes(30);
         private TimeSpan _lockoutDuration = TimeSpan.FromMinutes(15);
+
+        /// <summary>
+        /// Gets the configured lockout duration for failed authentication attempts.
+        /// </summary>
+        internal TimeSpan LockoutDuration => _lockoutDuration;
         private string? _trustBrokerEndpoint;
         private string? _policyEngineEndpoint;
         private int _devicePostureCheckIntervalMs = 60000; // 1 minute default

@@ -50,18 +50,19 @@ protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext co
             var requestData = context.ResourceAttributes.TryGetValue("RequestData", out var rd) ? rd?.ToString() : "";
 
             // OWASP-aligned SQL injection patterns (hex encoding, EXEC, CAST, comment injection, HAVING, BENCHMARK)
+            // Regex timeout of 100ms prevents ReDoS via crafted input with catastrophic backtracking
             var hasSqlInjection = Regex.IsMatch(requestData ?? "",
                 @"(\b(SELECT|INSERT|UPDATE|DELETE|DROP|UNION|EXEC|EXECUTE|CAST|CONVERT|DECLARE|HAVING|BENCHMARK|SLEEP|WAITFOR|xp_)\b" +
                 @"|--|;|'|/\*|\*/|0x[0-9a-fA-F]+\b" +
                 @"|\bOR\s+\d+=\d+\b|\bAND\s+\d+=\d+\b" +
-                @"|CHAR\s*\(|CONCAT\s*\(|INFORMATION_SCHEMA)", RegexOptions.IgnoreCase);
+                @"|CHAR\s*\(|CONCAT\s*\(|INFORMATION_SCHEMA)", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
 
             // OWASP-aligned XSS patterns (encoded variants, event handlers, data URIs, expression, SVG)
             var hasXss = Regex.IsMatch(requestData ?? "",
                 @"(<script|javascript:|onerror\s*=|onload\s*=|onclick\s*=|onmouseover\s*=" +
                 @"|<iframe|<embed|<object|<svg|<img[^>]+onerror" +
                 @"|data\s*:\s*text/html|expression\s*\(" +
-                @"|%3[Cc]script|&#x3[Cc]|&#60)", RegexOptions.IgnoreCase);
+                @"|%3[Cc]script|&#x3[Cc]|&#60)", RegexOptions.IgnoreCase, TimeSpan.FromMilliseconds(100));
 
             return Task.FromResult(new AccessDecision
             {

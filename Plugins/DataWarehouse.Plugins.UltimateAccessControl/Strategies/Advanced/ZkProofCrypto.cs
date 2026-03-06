@@ -276,9 +276,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Advanced
                 throw new ArgumentException("Data cannot be null or empty", nameof(data));
 
             // Sanity bound: a valid proof cannot exceed 64 KB
-            const int MaxProofBytes = 65536;
-            if (data.Length > MaxProofBytes)
-                throw new ArgumentException($"Proof data too large ({data.Length} bytes); maximum is {MaxProofBytes} bytes.", nameof(data));
+            const int maxProofBytes = 65536;
+            if (data.Length > maxProofBytes)
+                throw new ArgumentException($"Proof data too large ({data.Length} bytes); maximum is {maxProofBytes} bytes.", nameof(data));
 
             using var ms = new MemoryStream(data);
             using var reader = new BinaryReader(ms);

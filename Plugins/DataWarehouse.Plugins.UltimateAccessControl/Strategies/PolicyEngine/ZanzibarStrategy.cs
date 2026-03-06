@@ -104,14 +104,14 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
         /// <summary>
         /// Adds a relationship tuple.
         /// </summary>
-        public void WriteTuple(string user, string relation, string object_)
+        public void WriteTuple(string user, string relation, string @object)
         {
-            var key = $"{user}#{relation}@{object_}";
+            var key = $"{user}#{relation}@{@object}";
             var tuple = new RelationshipTuple
             {
                 User = user,
                 Relation = relation,
-                Object = object_,
+                Object = @object,
                 CreatedAt = DateTime.UtcNow
             };
 
@@ -121,21 +121,21 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
         /// <summary>
         /// Removes a relationship tuple.
         /// </summary>
-        public void DeleteTuple(string user, string relation, string object_)
+        public void DeleteTuple(string user, string relation, string @object)
         {
-            var key = $"{user}#{relation}@{object_}";
+            var key = $"{user}#{relation}@{@object}";
             _tuples.TryRemove(key, out _);
         }
 
         /// <summary>
         /// Checks if a relationship exists (with transitive resolution).
         /// </summary>
-        private bool Check(string user, string relation, string object_, HashSet<string>? visited = null)
+        private bool Check(string user, string relation, string @object, HashSet<string>? visited = null)
         {
             visited ??= new HashSet<string>();
 
             // Prevent infinite loops
-            var checkKey = $"{user}#{relation}@{object_}";
+            var checkKey = $"{user}#{relation}@{@object}";
             if (visited.Contains(checkKey))
                 return false;
             visited.Add(checkKey);
@@ -157,13 +157,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
             // Check if any of those groups have the relation to the object
             foreach (var group in userGroups)
             {
-                if (Check(group, relation, object_, visited))
+                if (Check(group, relation, @object, visited))
                     return true;
             }
 
             // Check for parent relationships (e.g., folder permissions)
             var parentTuples = _tuples.Values
-                .Where(t => t.Object == object_ && t.Relation == "parent")
+                .Where(t => t.Object == @object && t.Relation == "parent")
                 .Select(t => t.User)
                 .ToList();
 
@@ -179,12 +179,12 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
         /// <summary>
         /// Expands a relationship to find all subjects.
         /// </summary>
-        public List<string> Expand(string relation, string object_)
+        public List<string> Expand(string relation, string @object)
         {
             var subjects = new HashSet<string>();
 
             // Find all direct relationships
-            foreach (var tuple in _tuples.Values.Where(t => t.Relation == relation && t.Object == object_))
+            foreach (var tuple in _tuples.Values.Where(t => t.Relation == relation && t.Object == @object))
             {
                 subjects.Add(tuple.User);
 
@@ -219,19 +219,19 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
             IncrementCounter("zanzibar.evaluate");
             var user = context.SubjectId;
             var relation = context.Action; // Map action to relation (e.g., "read" -> "viewer")
-            var object_ = context.ResourceId;
+            var @object = context.ResourceId;
 
             if (_useLocalEvaluation || string.IsNullOrWhiteSpace(_zanzibarEndpoint))
             {
                 // Local evaluation
-                var hasRelationship = Check(user, relation, object_);
+                var hasRelationship = Check(user, relation, @object);
 
                 if (hasRelationship)
                 {
                     return new AccessDecision
                     {
                         IsGranted = true,
-                        Reason = $"Zanzibar relationship exists: {user}#{relation}@{object_}",
+                        Reason = $"Zanzibar relationship exists: {user}#{relation}@{@object}",
                         ApplicablePolicies = new[] { "Zanzibar.RelationshipExists" },
                         Metadata = new Dictionary<string, object>
                         {
@@ -245,7 +245,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
                     return new AccessDecision
                     {
                         IsGranted = false,
-                        Reason = $"No Zanzibar relationship: {user}#{relation}@{object_}",
+                        Reason = $"No Zanzibar relationship: {user}#{relation}@{@object}",
                         ApplicablePolicies = new[] { "Zanzibar.NoRelationship" },
                         Metadata = new Dictionary<string, object>
                         {
@@ -265,7 +265,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
                         {
                             user,
                             relation,
-                            @object = object_
+                            @object = @object
                         }
                     };
 

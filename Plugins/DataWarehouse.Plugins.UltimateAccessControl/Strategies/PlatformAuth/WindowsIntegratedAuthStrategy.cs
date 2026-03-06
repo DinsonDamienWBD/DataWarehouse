@@ -52,6 +52,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PlatformAuth
 protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken)
         {
             IncrementCounter("windows.integrated.auth.evaluate");
+            _logger.LogError("WindowsIntegratedAuth: no SSPI implementation available — rejecting access for {SubjectId}", context.SubjectId);
             throw new NotSupportedException(
                 "Requires SSPI/Negotiate P/Invoke (secur32.dll) for real Kerberos/NTLM token acquisition and validation " +
                 "via the Windows Security Support Provider Interface. Use System.Security.Principal.WindowsIdentity or " +

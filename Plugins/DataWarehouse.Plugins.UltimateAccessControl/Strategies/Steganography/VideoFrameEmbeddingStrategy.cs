@@ -39,6 +39,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         private int _blockSize = 8;
         private double _motionVectorThreshold = 0.5;
         private bool _useSceneChangeDetection = true;
+        /// <summary>Gets whether scene change detection is enabled for embedding.</summary>
+        internal bool UseSceneChangeDetection => _useSceneChangeDetection;
 
         /// <inheritdoc/>
         public override string StrategyId => "video-frame-embedding";

@@ -323,19 +323,19 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
             return "Discovery";
         }
 
-        private double CalculateCrossDomainRiskScore(CorrelatedThreatEvent event_obj, CrossDomainThreatProfile profile)
+        private double CalculateCrossDomainRiskScore(CorrelatedThreatEvent eventObj, CrossDomainThreatProfile profile)
         {
-            if (event_obj.Signals.Count == 0)
+            if (eventObj.Signals.Count == 0)
                 return 0.0;
 
             // Base score from signals
-            var baseScore = event_obj.Signals.Average(s => s.Severity);
+            var baseScore = eventObj.Signals.Average(s => s.Severity);
 
             // Correlation multiplier (multiple domains = higher risk)
-            var correlationMultiplier = 1.0 + (event_obj.CorrelatedDomains.Count - 1) * 0.3;
+            var correlationMultiplier = 1.0 + (eventObj.CorrelatedDomains.Count - 1) * 0.3;
 
             // Attack chain multiplier
-            var attackChainMultiplier = event_obj.AttackChainStage switch
+            var attackChainMultiplier = eventObj.AttackChainStage switch
             {
                 "Initial Access" => 1.1,
                 "Privilege Escalation" => 1.3,
@@ -350,18 +350,18 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
         }
 
         private async Task<ThreatInvestigation> InitiateAutomatedInvestigationAsync(
-            CorrelatedThreatEvent event_obj,
+            CorrelatedThreatEvent eventObj,
             CrossDomainThreatProfile profile,
             CancellationToken cancellationToken)
         {
             var investigation = new ThreatInvestigation
             {
                 Id = Guid.NewGuid().ToString("N"),
-                SubjectId = event_obj.SubjectId,
+                SubjectId = eventObj.SubjectId,
                 InitiatedAt = DateTime.UtcNow,
-                TriggeringEventId = event_obj.Id,
+                TriggeringEventId = eventObj.Id,
                 Status = InvestigationStatus.InProgress,
-                Priority = event_obj.Signals.Max(s => s.Severity) >= 70 ? "High" : "Medium"
+                Priority = eventObj.Signals.Max(s => s.Severity) >= 70 ? "High" : "Medium"
             };
 
             // Automated investigation steps
@@ -375,7 +375,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
             return investigation;
         }
 
-        private void UpdateProfile(CrossDomainThreatProfile profile, CorrelatedThreatEvent event_obj)
+        private void UpdateProfile(CrossDomainThreatProfile profile, CorrelatedThreatEvent eventObj)
         {
             profile.TotalEvents++;
             profile.LastSeen = DateTime.UtcNow;
@@ -386,7 +386,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ThreatDetection
                 profile.AccessTimestamps.RemoveAt(0);
             }
 
-            foreach (var signal in event_obj.Signals)
+            foreach (var signal in eventObj.Signals)
             {
                 profile.ObservedSignalTypes.Add(signal.SignalType);
             }

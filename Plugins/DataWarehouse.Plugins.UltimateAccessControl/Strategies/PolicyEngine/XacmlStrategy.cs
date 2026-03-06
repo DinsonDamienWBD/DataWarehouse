@@ -287,7 +287,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
                 "string-contains" => attrStr.Contains(matchStr),
                 "string-starts-with" => attrStr.StartsWith(matchStr),
                 "string-ends-with" => attrStr.EndsWith(matchStr),
-                "string-regexp-match" => System.Text.RegularExpressions.Regex.IsMatch(attrStr, matchStr),
+                "string-regexp-match" => System.Text.RegularExpressions.Regex.IsMatch(attrStr, matchStr, System.Text.RegularExpressions.RegexOptions.None, TimeSpan.FromMilliseconds(100)),
                 "integer-equal" => int.TryParse(attrStr, out var a) && int.TryParse(matchStr, out var b) && a == b,
                 "integer-greater-than" => int.TryParse(attrStr, out var ga) && int.TryParse(matchStr, out var gb) && ga > gb,
                 "integer-less-than" => int.TryParse(attrStr, out var la) && int.TryParse(matchStr, out var lb) && la < lb,
