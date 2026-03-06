@@ -130,7 +130,7 @@ public sealed class PoolMetadataCodec
             return null;
         }
 
-        var payloadLength = ReadInt32LE(data.Slice(LengthOffset, 4));
+        var payloadLength = ReadInt32Le(data.Slice(LengthOffset, 4));
         var payload = data.Slice(PayloadOffset, payloadLength);
         var json = Encoding.UTF8.GetString(payload);
 
@@ -158,14 +158,14 @@ public sealed class PoolMetadataCodec
         }
 
         // Check magic number
-        var magic = ReadUInt32LE(data.Slice(MagicOffset, 4));
+        var magic = ReadUInt32Le(data.Slice(MagicOffset, 4));
         if (magic != MagicNumber)
         {
             return false;
         }
 
         // Read payload length
-        var payloadLength = ReadInt32LE(data.Slice(LengthOffset, 4));
+        var payloadLength = ReadInt32Le(data.Slice(LengthOffset, 4));
         if (payloadLength <= 0 || payloadLength > MaxPayloadSize || PayloadOffset + payloadLength > data.Length)
         {
             return false;
@@ -180,13 +180,13 @@ public sealed class PoolMetadataCodec
         return storedChecksum.SequenceEqual(computedHash);
     }
 
-    private static uint ReadUInt32LE(ReadOnlySpan<byte> data)
+    private static uint ReadUInt32Le(ReadOnlySpan<byte> data)
     {
         var value = BitConverter.ToUInt32(data);
         return BitConverter.IsLittleEndian ? value : ReverseEndianness(value);
     }
 
-    private static int ReadInt32LE(ReadOnlySpan<byte> data)
+    private static int ReadInt32Le(ReadOnlySpan<byte> data)
     {
         var value = BitConverter.ToInt32(data);
         return BitConverter.IsLittleEndian ? value : (int)ReverseEndianness((uint)value);

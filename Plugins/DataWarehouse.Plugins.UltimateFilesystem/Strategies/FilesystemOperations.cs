@@ -1200,10 +1200,10 @@ public sealed class ExFatOperations : FilesystemOperationsBase
 /// F2FS (Flash-Friendly File System) operations with multi-head logging,
 /// node/sit/nat areas, cold/warm/hot data separation, and inline inode data.
 /// </summary>
-public sealed class F2fsOperations : FilesystemOperationsBase
+public sealed class F2FsOperations : FilesystemOperationsBase
 {
     /// <summary>F2FS magic number.</summary>
-    private const uint F2fsMagic = 0xF2F52010;
+    private const uint F2FsMagic = 0xF2F52010;
 
     /// <inheritdoc/>
     protected override string FilesystemType => "F2FS";
@@ -1222,7 +1222,7 @@ public sealed class F2fsOperations : FilesystemOperationsBase
         var span = superblock.AsSpan();
 
         // magic (offset 0)
-        BitConverter.TryWriteBytes(span[0..4], F2fsMagic);
+        BitConverter.TryWriteBytes(span[0..4], F2FsMagic);
         // major_ver (offset 4)
         BitConverter.TryWriteBytes(span[4..6], (ushort)1);
         // minor_ver (offset 6)

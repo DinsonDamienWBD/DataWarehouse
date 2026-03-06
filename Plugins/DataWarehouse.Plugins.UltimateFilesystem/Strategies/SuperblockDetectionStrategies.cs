@@ -225,27 +225,27 @@ internal static class SuperblockReader
     }
 
     /// <summary>Reads a 16-bit unsigned integer in little-endian from a byte array.</summary>
-    public static ushort ReadUInt16LE(byte[] data, int offset) =>
+    public static ushort ReadUInt16Le(byte[] data, int offset) =>
         BinaryPrimitives.ReadUInt16LittleEndian(data.AsSpan(offset));
 
     /// <summary>Reads a 32-bit unsigned integer in little-endian from a byte array.</summary>
-    public static uint ReadUInt32LE(byte[] data, int offset) =>
+    public static uint ReadUInt32Le(byte[] data, int offset) =>
         BinaryPrimitives.ReadUInt32LittleEndian(data.AsSpan(offset));
 
     /// <summary>Reads a 64-bit unsigned integer in little-endian from a byte array.</summary>
-    public static ulong ReadUInt64LE(byte[] data, int offset) =>
+    public static ulong ReadUInt64Le(byte[] data, int offset) =>
         BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan(offset));
 
     /// <summary>Reads a 32-bit unsigned integer in big-endian from a byte array.</summary>
-    public static uint ReadUInt32BE(byte[] data, int offset) =>
+    public static uint ReadUInt32Be(byte[] data, int offset) =>
         BinaryPrimitives.ReadUInt32BigEndian(data.AsSpan(offset));
 
     /// <summary>Reads a 64-bit unsigned integer in big-endian from a byte array.</summary>
-    public static ulong ReadUInt64BE(byte[] data, int offset) =>
+    public static ulong ReadUInt64Be(byte[] data, int offset) =>
         BinaryPrimitives.ReadUInt64BigEndian(data.AsSpan(offset));
 
     /// <summary>Reads a 16-bit unsigned integer in big-endian from a byte array.</summary>
-    public static ushort ReadUInt16BE(byte[] data, int offset) =>
+    public static ushort ReadUInt16Be(byte[] data, int offset) =>
         BinaryPrimitives.ReadUInt16BigEndian(data.AsSpan(offset));
 
     /// <summary>Reads a null-terminated ASCII string from a byte array.</summary>
@@ -390,28 +390,28 @@ public sealed class Ext4SuperblockStrategy : FilesystemStrategyBase
     private FilesystemMetadata? ParseSuperblock(byte[] sb, string path)
     {
         // Validate magic number at offset 0x38 (56 decimal) relative to superblock start
-        var magic = SuperblockReader.ReadUInt16LE(sb, 0x38);
+        var magic = SuperblockReader.ReadUInt16Le(sb, 0x38);
         if (magic != Ext4Magic)
             return null;
 
         // Parse superblock fields
-        var inodesCount = SuperblockReader.ReadUInt32LE(sb, 0x00);
-        var blocksCountLo = SuperblockReader.ReadUInt32LE(sb, 0x04);
-        var reservedBlocksLo = SuperblockReader.ReadUInt32LE(sb, 0x08);
-        var freeBlocksLo = SuperblockReader.ReadUInt32LE(sb, 0x0C);
-        var freeInodes = SuperblockReader.ReadUInt32LE(sb, 0x10);
-        var logBlockSize = SuperblockReader.ReadUInt32LE(sb, 0x18);
-        var blocksPerGroup = SuperblockReader.ReadUInt32LE(sb, 0x20);
-        var inodesPerGroup = SuperblockReader.ReadUInt32LE(sb, 0x28);
-        var mtime = SuperblockReader.ReadUInt32LE(sb, 0x2C);
-        var wtime = SuperblockReader.ReadUInt32LE(sb, 0x30);
-        var mntCount = SuperblockReader.ReadUInt16LE(sb, 0x34);
-        var maxMntCount = SuperblockReader.ReadUInt16LE(sb, 0x36);
-        var state = SuperblockReader.ReadUInt16LE(sb, 0x3A);
-        var inodeSize = SuperblockReader.ReadUInt16LE(sb, 0x58);
-        var featureCompat = SuperblockReader.ReadUInt32LE(sb, 0x5C);
-        var featureIncompat = SuperblockReader.ReadUInt32LE(sb, 0x60);
-        var featureRoCompat = SuperblockReader.ReadUInt32LE(sb, 0x64);
+        var inodesCount = SuperblockReader.ReadUInt32Le(sb, 0x00);
+        var blocksCountLo = SuperblockReader.ReadUInt32Le(sb, 0x04);
+        var reservedBlocksLo = SuperblockReader.ReadUInt32Le(sb, 0x08);
+        var freeBlocksLo = SuperblockReader.ReadUInt32Le(sb, 0x0C);
+        var freeInodes = SuperblockReader.ReadUInt32Le(sb, 0x10);
+        var logBlockSize = SuperblockReader.ReadUInt32Le(sb, 0x18);
+        var blocksPerGroup = SuperblockReader.ReadUInt32Le(sb, 0x20);
+        var inodesPerGroup = SuperblockReader.ReadUInt32Le(sb, 0x28);
+        var mtime = SuperblockReader.ReadUInt32Le(sb, 0x2C);
+        var wtime = SuperblockReader.ReadUInt32Le(sb, 0x30);
+        var mntCount = SuperblockReader.ReadUInt16Le(sb, 0x34);
+        var maxMntCount = SuperblockReader.ReadUInt16Le(sb, 0x36);
+        var state = SuperblockReader.ReadUInt16Le(sb, 0x3A);
+        var inodeSize = SuperblockReader.ReadUInt16Le(sb, 0x58);
+        var featureCompat = SuperblockReader.ReadUInt32Le(sb, 0x5C);
+        var featureIncompat = SuperblockReader.ReadUInt32Le(sb, 0x60);
+        var featureRoCompat = SuperblockReader.ReadUInt32Le(sb, 0x64);
         var uuid = SuperblockReader.ReadUuid(sb, 0x68);
         var volumeName = SuperblockReader.ReadString(sb, 0x78, 16);
 
@@ -422,8 +422,8 @@ public sealed class Ext4SuperblockStrategy : FilesystemStrategyBase
         bool is64Bit = (featureIncompat & Incompat64Bit) != 0;
         if (is64Bit && sb.Length >= 0x15C)
         {
-            var blocksCountHi = SuperblockReader.ReadUInt32LE(sb, 0x150);
-            var freeBlocksHi = SuperblockReader.ReadUInt32LE(sb, 0x158);
+            var blocksCountHi = SuperblockReader.ReadUInt32Le(sb, 0x150);
+            var freeBlocksHi = SuperblockReader.ReadUInt32Le(sb, 0x158);
             totalBlocks |= (long)blocksCountHi << 32;
             freeBlocks |= (long)freeBlocksHi << 32;
         }
@@ -664,8 +664,8 @@ public sealed class BtrfsSuperblockStrategy : FilesystemStrategyBase
     private const ulong IncompatSkinnyMetadata = 1UL << 8;
     private const ulong IncompatNoHoles = 1UL << 9;
     private const ulong IncompatMetadataUuid = 1UL << 10;
-    private const ulong IncompatRaid1c3 = 1UL << 11;
-    private const ulong IncompatRaid1c4 = 1UL << 12;
+    private const ulong IncompatRaid1C3 = 1UL << 11;
+    private const ulong IncompatRaid1C4 = 1UL << 12;
     private const ulong IncompatZoned = 1UL << 13;
     private const ulong IncompatExtentTreeV2 = 1UL << 14;
 
@@ -718,17 +718,17 @@ public sealed class BtrfsSuperblockStrategy : FilesystemStrategyBase
 
         // Parse fields
         var fsid = SuperblockReader.ReadUuid(sb, 0x20);
-        var generation = SuperblockReader.ReadUInt64LE(sb, 0x48);
-        var totalBytes = (long)SuperblockReader.ReadUInt64LE(sb, 0x70);
-        var bytesUsed = (long)SuperblockReader.ReadUInt64LE(sb, 0x78);
-        var numDevices = SuperblockReader.ReadUInt64LE(sb, 0x88);
-        var sectorSize = SuperblockReader.ReadUInt32LE(sb, 0x90);
-        var nodeSize = SuperblockReader.ReadUInt32LE(sb, 0x94);
-        var stripeSize = SuperblockReader.ReadUInt32LE(sb, 0x9C);
-        var compatFlags = SuperblockReader.ReadUInt64LE(sb, 0xAC);
-        var compatRoFlags = SuperblockReader.ReadUInt64LE(sb, 0xB4);
-        var incompatFlags = SuperblockReader.ReadUInt64LE(sb, 0xBC);
-        var csumType = SuperblockReader.ReadUInt16LE(sb, 0xC4);
+        var generation = SuperblockReader.ReadUInt64Le(sb, 0x48);
+        var totalBytes = (long)SuperblockReader.ReadUInt64Le(sb, 0x70);
+        var bytesUsed = (long)SuperblockReader.ReadUInt64Le(sb, 0x78);
+        var numDevices = SuperblockReader.ReadUInt64Le(sb, 0x88);
+        var sectorSize = SuperblockReader.ReadUInt32Le(sb, 0x90);
+        var nodeSize = SuperblockReader.ReadUInt32Le(sb, 0x94);
+        var stripeSize = SuperblockReader.ReadUInt32Le(sb, 0x9C);
+        var compatFlags = SuperblockReader.ReadUInt64Le(sb, 0xAC);
+        var compatRoFlags = SuperblockReader.ReadUInt64Le(sb, 0xB4);
+        var incompatFlags = SuperblockReader.ReadUInt64Le(sb, 0xBC);
+        var csumType = SuperblockReader.ReadUInt16Le(sb, 0xC4);
 
         // Label at offset 0x12B (256 bytes)
         var label = sb.Length >= 0x12B + 256 ? SuperblockReader.ReadString(sb, 0x12B, 256) : "";
@@ -746,8 +746,8 @@ public sealed class BtrfsSuperblockStrategy : FilesystemStrategyBase
         if ((incompatFlags & IncompatSkinnyMetadata) != 0) features.Add("skinny_metadata");
         if ((incompatFlags & IncompatNoHoles) != 0) features.Add("no_holes");
         if ((incompatFlags & IncompatMetadataUuid) != 0) features.Add("metadata_uuid");
-        if ((incompatFlags & IncompatRaid1c3) != 0) features.Add("raid1c3");
-        if ((incompatFlags & IncompatRaid1c4) != 0) features.Add("raid1c4");
+        if ((incompatFlags & IncompatRaid1C3) != 0) features.Add("raid1c3");
+        if ((incompatFlags & IncompatRaid1C4) != 0) features.Add("raid1c4");
         if ((incompatFlags & IncompatZoned) != 0) features.Add("zoned");
         if ((incompatFlags & IncompatExtentTreeV2) != 0) features.Add("extent_tree_v2");
 
@@ -981,38 +981,38 @@ public sealed class XfsSuperblockStrategy : FilesystemStrategyBase
         if (sb.Length < 256) return null;
 
         // Validate magic at offset 0 (big-endian)
-        var magic = SuperblockReader.ReadUInt32BE(sb, 0x00);
+        var magic = SuperblockReader.ReadUInt32Be(sb, 0x00);
         if (magic != XfsMagic)
             return null;
 
         // Parse fields (all big-endian for XFS)
-        var blockSize = (int)SuperblockReader.ReadUInt32BE(sb, 0x04);
-        var totalBlocks = (long)SuperblockReader.ReadUInt64BE(sb, 0x08);
-        var rtBlocks = (long)SuperblockReader.ReadUInt64BE(sb, 0x10);
+        var blockSize = (int)SuperblockReader.ReadUInt32Be(sb, 0x04);
+        var totalBlocks = (long)SuperblockReader.ReadUInt64Be(sb, 0x08);
+        var rtBlocks = (long)SuperblockReader.ReadUInt64Be(sb, 0x10);
         var uuid = SuperblockReader.ReadUuid(sb, 0x20);
-        var agBlocks = SuperblockReader.ReadUInt32BE(sb, 0x50);
-        var agCount = SuperblockReader.ReadUInt32BE(sb, 0x54);
-        var logBlocks = SuperblockReader.ReadUInt32BE(sb, 0x5C);
-        var versionNum = SuperblockReader.ReadUInt16BE(sb, 0x60);
-        var sectSize = SuperblockReader.ReadUInt16BE(sb, 0x62);
-        var inodeSize = SuperblockReader.ReadUInt16BE(sb, 0x64);
+        var agBlocks = SuperblockReader.ReadUInt32Be(sb, 0x50);
+        var agCount = SuperblockReader.ReadUInt32Be(sb, 0x54);
+        var logBlocks = SuperblockReader.ReadUInt32Be(sb, 0x5C);
+        var versionNum = SuperblockReader.ReadUInt16Be(sb, 0x60);
+        var sectSize = SuperblockReader.ReadUInt16Be(sb, 0x62);
+        var inodeSize = SuperblockReader.ReadUInt16Be(sb, 0x64);
         var fname = SuperblockReader.ReadString(sb, 0x68, 12);
-        var allocatedInodes = (long)SuperblockReader.ReadUInt64BE(sb, 0x78);
-        var freeInodes = (long)SuperblockReader.ReadUInt64BE(sb, 0x80);
-        var freeDataBlocks = (long)SuperblockReader.ReadUInt64BE(sb, 0x88);
+        var allocatedInodes = (long)SuperblockReader.ReadUInt64Be(sb, 0x78);
+        var freeInodes = (long)SuperblockReader.ReadUInt64Be(sb, 0x80);
+        var freeDataBlocks = (long)SuperblockReader.ReadUInt64Be(sb, 0x88);
 
         // features2 at 0xA0
         uint features2 = 0;
         if (sb.Length >= 0xA4)
-            features2 = SuperblockReader.ReadUInt32BE(sb, 0xA0);
+            features2 = SuperblockReader.ReadUInt32Be(sb, 0xA0);
 
         // V5 features at 0xD0+
         uint featCompat = 0, featRoCompat = 0, featIncompat = 0;
         if (sb.Length >= 0xE0)
         {
-            featCompat = SuperblockReader.ReadUInt32BE(sb, 0xD0);
-            featRoCompat = SuperblockReader.ReadUInt32BE(sb, 0xD4);
-            featIncompat = SuperblockReader.ReadUInt32BE(sb, 0xD8);
+            featCompat = SuperblockReader.ReadUInt32Be(sb, 0xD0);
+            featRoCompat = SuperblockReader.ReadUInt32Be(sb, 0xD4);
+            featIncompat = SuperblockReader.ReadUInt32Be(sb, 0xD8);
         }
 
         // Parse feature flags
@@ -1185,9 +1185,9 @@ public sealed class XfsSuperblockStrategy : FilesystemStrategyBase
 public sealed class ZfsSuperblockStrategy : FilesystemStrategyBase
 {
     // ZFS uberblock magic (little-endian)
-    private const ulong UberblockMagicLE = 0x00BAB10C;
+    private const ulong UberblockMagicLe = 0x00BAB10C;
     // ZFS uberblock magic (big-endian)
-    private const ulong UberblockMagicBE = 0x0CB1BA00;
+    private const ulong UberblockMagicBe = 0x0CB1BA00;
     // Label 0 starts at offset 0, uberblock array at 0x20000 within label
     private const int Label0Offset = 0;
     private const int NvlistOffset = 0x4000; // 16KB into label (after 8KB blank + 8KB boot block)
@@ -1244,33 +1244,33 @@ public sealed class ZfsSuperblockStrategy : FilesystemStrategyBase
             int ubOffset = UberblockOffset + (i * UberblockSize);
             if (ubOffset + UberblockSize > label.Length) break;
 
-            var magicVal = SuperblockReader.ReadUInt64LE(label, ubOffset);
-            bool isLE = magicVal == UberblockMagicLE;
-            bool isBE = false;
+            var magicVal = SuperblockReader.ReadUInt64Le(label, ubOffset);
+            bool isLe = magicVal == UberblockMagicLe;
+            bool isBe = false;
 
-            if (!isLE)
+            if (!isLe)
             {
                 // Check big-endian
-                var magicBE = SuperblockReader.ReadUInt64BE(label, ubOffset);
-                isBE = magicBE == UberblockMagicLE;
+                var magicBe = SuperblockReader.ReadUInt64Be(label, ubOffset);
+                isBe = magicBe == UberblockMagicLe;
             }
 
-            if (!isLE && !isBE) continue;
+            if (!isLe && !isBe) continue;
 
             long txg;
             ulong timestamp, version;
 
-            if (isLE)
+            if (isLe)
             {
-                version = SuperblockReader.ReadUInt64LE(label, ubOffset + 0x08);
-                txg = (long)SuperblockReader.ReadUInt64LE(label, ubOffset + 0x10);
-                timestamp = SuperblockReader.ReadUInt64LE(label, ubOffset + 0x20);
+                version = SuperblockReader.ReadUInt64Le(label, ubOffset + 0x08);
+                txg = (long)SuperblockReader.ReadUInt64Le(label, ubOffset + 0x10);
+                timestamp = SuperblockReader.ReadUInt64Le(label, ubOffset + 0x20);
             }
             else
             {
-                version = SuperblockReader.ReadUInt64BE(label, ubOffset + 0x08);
-                txg = (long)SuperblockReader.ReadUInt64BE(label, ubOffset + 0x10);
-                timestamp = SuperblockReader.ReadUInt64BE(label, ubOffset + 0x20);
+                version = SuperblockReader.ReadUInt64Be(label, ubOffset + 0x08);
+                txg = (long)SuperblockReader.ReadUInt64Be(label, ubOffset + 0x10);
+                timestamp = SuperblockReader.ReadUInt64Be(label, ubOffset + 0x20);
             }
 
             if (txg > bestTxg)
@@ -1499,8 +1499,8 @@ public sealed class ZfsSuperblockStrategy : FilesystemStrategyBase
 public sealed class ApfsSuperblockStrategy : FilesystemStrategyBase
 {
     // APFS container magic "NXSB"
-    private const uint NxsbMagicLE = 0x4253584E; // "NXSB" in little-endian (bytes: N X S B)
-    private const uint NxsbMagicBE = 0x4E585342; // "NXSB" in big-endian
+    private const uint NxsbMagicLe = 0x4253584E; // "NXSB" in little-endian (bytes: N X S B)
+    private const uint NxsbMagicBe = 0x4E585342; // "NXSB" in big-endian
     private const int SuperblockOffset = 0; // Container superblock at block 0
     private const int SuperblockSize = 4096; // Minimum APFS block size
 
@@ -1554,11 +1554,11 @@ public sealed class ApfsSuperblockStrategy : FilesystemStrategyBase
         if (sb.Length < 0xC0) return null;
 
         // Validate magic at offset 0x20
-        var magic = SuperblockReader.ReadUInt32LE(sb, 0x20);
-        if (magic != NxsbMagicLE && magic != NxsbMagicBE)
+        var magic = SuperblockReader.ReadUInt32Le(sb, 0x20);
+        if (magic != NxsbMagicLe && magic != NxsbMagicBe)
             return null;
 
-        bool isLE = magic == NxsbMagicLE;
+        bool isLe = magic == NxsbMagicLe;
 
         // Parse fields
         uint blockSize;
@@ -1567,25 +1567,25 @@ public sealed class ApfsSuperblockStrategy : FilesystemStrategyBase
         Guid uuid;
         uint maxFileSystems;
 
-        if (isLE)
+        if (isLe)
         {
-            blockSize = SuperblockReader.ReadUInt32LE(sb, 0x24);
-            blockCount = (long)SuperblockReader.ReadUInt64LE(sb, 0x28);
-            features = SuperblockReader.ReadUInt64LE(sb, 0x30);
-            roCompatFeatures = SuperblockReader.ReadUInt64LE(sb, 0x38);
-            incompatFeatures = SuperblockReader.ReadUInt64LE(sb, 0x40);
+            blockSize = SuperblockReader.ReadUInt32Le(sb, 0x24);
+            blockCount = (long)SuperblockReader.ReadUInt64Le(sb, 0x28);
+            features = SuperblockReader.ReadUInt64Le(sb, 0x30);
+            roCompatFeatures = SuperblockReader.ReadUInt64Le(sb, 0x38);
+            incompatFeatures = SuperblockReader.ReadUInt64Le(sb, 0x40);
             uuid = SuperblockReader.ReadUuid(sb, 0x48);
-            maxFileSystems = sb.Length >= 0xB8 ? SuperblockReader.ReadUInt32LE(sb, 0xB4) : 0;
+            maxFileSystems = sb.Length >= 0xB8 ? SuperblockReader.ReadUInt32Le(sb, 0xB4) : 0;
         }
         else
         {
-            blockSize = SuperblockReader.ReadUInt32BE(sb, 0x24);
-            blockCount = (long)SuperblockReader.ReadUInt64BE(sb, 0x28);
-            features = SuperblockReader.ReadUInt64BE(sb, 0x30);
-            roCompatFeatures = SuperblockReader.ReadUInt64BE(sb, 0x38);
-            incompatFeatures = SuperblockReader.ReadUInt64BE(sb, 0x40);
+            blockSize = SuperblockReader.ReadUInt32Be(sb, 0x24);
+            blockCount = (long)SuperblockReader.ReadUInt64Be(sb, 0x28);
+            features = SuperblockReader.ReadUInt64Be(sb, 0x30);
+            roCompatFeatures = SuperblockReader.ReadUInt64Be(sb, 0x38);
+            incompatFeatures = SuperblockReader.ReadUInt64Be(sb, 0x40);
             uuid = SuperblockReader.ReadUuid(sb, 0x48);
-            maxFileSystems = sb.Length >= 0xB8 ? SuperblockReader.ReadUInt32BE(sb, 0xB4) : 0;
+            maxFileSystems = sb.Length >= 0xB8 ? SuperblockReader.ReadUInt32Be(sb, 0xB4) : 0;
         }
 
         // Validate block size
@@ -1862,10 +1862,10 @@ public sealed class RefsSuperblockStrategy : FilesystemStrategyBase
         if (!isRefs) return null;
 
         // Parse VBR fields
-        var bytesPerSector = SuperblockReader.ReadUInt16LE(vbr, 0x0B);
+        var bytesPerSector = SuperblockReader.ReadUInt16Le(vbr, 0x0B);
         var sectorsPerCluster = vbr[0x0D];
-        var totalSectors = (long)SuperblockReader.ReadUInt64LE(vbr, 0x28);
-        var serialNumber = SuperblockReader.ReadUInt32LE(vbr, 0x50);
+        var totalSectors = (long)SuperblockReader.ReadUInt64Le(vbr, 0x28);
+        var serialNumber = SuperblockReader.ReadUInt32Le(vbr, 0x50);
 
         int clusterSize = bytesPerSector * sectorsPerCluster;
         if (clusterSize == 0) clusterSize = 64 * 1024;

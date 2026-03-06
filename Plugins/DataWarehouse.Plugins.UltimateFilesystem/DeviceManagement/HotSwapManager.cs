@@ -84,7 +84,7 @@ public sealed class HotSwapManager : IAsyncDisposable
 {
     private readonly PhysicalDeviceManager _deviceManager;
     private readonly DevicePoolManager _poolManager;
-    private readonly DeviceJournal _journal;
+    internal DeviceJournal Journal { get; }
     private readonly HotSwapConfig _config;
     private readonly ILogger _logger;
 
@@ -140,7 +140,7 @@ public sealed class HotSwapManager : IAsyncDisposable
     {
         _deviceManager = deviceManager ?? throw new ArgumentNullException(nameof(deviceManager));
         _poolManager = poolManager ?? throw new ArgumentNullException(nameof(poolManager));
-        _journal = journal ?? throw new ArgumentNullException(nameof(journal));
+        Journal = journal ?? throw new ArgumentNullException(nameof(journal));
         _config = config ?? new HotSwapConfig();
         _logger = logger ?? NullLogger.Instance;
     }

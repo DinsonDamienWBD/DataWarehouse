@@ -609,7 +609,7 @@ public sealed class DistributedHaFilesystemManager
     private readonly BoundedDictionary<string, DataPlacement> _placements = new BoundedDictionary<string, DataPlacement>(1000);
     private string? _leaderId;
     private long _currentTerm;
-    private string? _votedForInCurrentTerm;
+    internal string? VotedForInCurrentTerm { get; private set; }
     private readonly object _electionLock = new();
     private readonly object _nodeLock = new(); // Protects node state mutations (IsHealthy, UsedBytes, LastHeartbeat)
 
@@ -659,12 +659,12 @@ public sealed class DistributedHaFilesystemManager
             if (candidateTerm > _currentTerm)
             {
                 _currentTerm = candidateTerm;
-                _votedForInCurrentTerm = null; // Reset vote for new term
+                VotedForInCurrentTerm = null; // Reset vote for new term
             }
             else
             {
                 _currentTerm++;
-                _votedForInCurrentTerm = null;
+                VotedForInCurrentTerm = null;
             }
 
             // Snapshot healthy nodes under _nodeLock to avoid race with UpdateHeartbeat (finding 3017).
@@ -703,7 +703,7 @@ public sealed class DistributedHaFilesystemManager
                 }
             }
 
-            _votedForInCurrentTerm = candidateId;
+            VotedForInCurrentTerm = candidateId;
 
             if (votes >= majority)
             {

@@ -264,7 +264,7 @@ public sealed class FailurePredictionEngine
     }
 
     // LOW-2988: static Dictionary for O(1) risk-level lookup instead of allocating array + IndexOf per call.
-    private static readonly System.Collections.Frozen.FrozenDictionary<string, int> _riskOrder =
+    private static readonly System.Collections.Frozen.FrozenDictionary<string, int> RiskOrder =
         new Dictionary<string, int>(StringComparer.Ordinal)
         {
             ["None"] = 0, ["Low"] = 1, ["Medium"] = 2, ["High"] = 3, ["Critical"] = 4
@@ -272,8 +272,8 @@ public sealed class FailurePredictionEngine
 
     private static string HigherRisk(string current, string candidate)
     {
-        int currentIdx = _riskOrder.GetValueOrDefault(current, 0);
-        int candidateIdx = _riskOrder.GetValueOrDefault(candidate, 0);
+        int currentIdx = RiskOrder.GetValueOrDefault(current, 0);
+        int candidateIdx = RiskOrder.GetValueOrDefault(candidate, 0);
         return candidateIdx > currentIdx ? candidate : current;
     }
 }
