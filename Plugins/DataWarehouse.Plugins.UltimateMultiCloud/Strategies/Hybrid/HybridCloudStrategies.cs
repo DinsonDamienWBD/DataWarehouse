@@ -575,7 +575,7 @@ public sealed class SyncResult
     public TimeSpan Duration { get; init; }
 }
 
-public enum ConnectionType { VPN, DirectConnect, ExpressRoute, CloudInterconnect, PrivateLink }
+public enum ConnectionType { Vpn, DirectConnect, ExpressRoute, CloudInterconnect, PrivateLink }
 
 public enum TunnelStatus { Establishing, Active, Degraded, Down }
 

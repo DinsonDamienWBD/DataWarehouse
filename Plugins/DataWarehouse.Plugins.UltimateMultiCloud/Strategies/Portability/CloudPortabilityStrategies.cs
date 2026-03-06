@@ -551,7 +551,7 @@ public sealed class IaCPortabilityStrategy : MultiCloudStrategyBase
             case IaCFormat.CloudFormation:
                 ParseCloudFormationResources(content, resources, warnings);
                 break;
-            case IaCFormat.ARM:
+            case IaCFormat.Arm:
                 ParseArmResources(content, resources, warnings);
                 break;
             case IaCFormat.Pulumi:
@@ -1080,7 +1080,7 @@ public sealed class ApiResult
     public object? Response { get; init; }
 }
 
-public enum IaCFormat { Terraform, CloudFormation, ARM, Bicep, Pulumi, CDK }
+public enum IaCFormat { Terraform, CloudFormation, Arm, Bicep, Pulumi, Cdk }
 
 public sealed class IaCTemplate
 {
@@ -1108,7 +1108,7 @@ public sealed class ValidationResult
     public string[]? Warnings { get; init; }
 }
 
-public enum DatabaseType { PostgreSQL, MySQL, SQLServer, Oracle, MongoDB, DynamoDB, CosmosDB, Spanner }
+public enum DatabaseType { PostgreSql, MySql, SqlServer, Oracle, MongoDb, DynamoDb, CosmosDb, Spanner }
 
 public sealed class DatabaseMapping
 {

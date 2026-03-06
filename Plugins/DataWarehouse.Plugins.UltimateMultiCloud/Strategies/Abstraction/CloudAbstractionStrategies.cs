@@ -128,7 +128,7 @@ public sealed class AwsCloudAdapterStrategy : MultiCloudStrategyBase
         return new CloudProviderAdapter
         {
             ProviderId = "aws",
-            ProviderType = CloudProviderType.AWS,
+            ProviderType = CloudProviderType.Aws,
             Region = region,
             Storage = new AwsStorageAbstraction(),
             Compute = new AwsComputeAbstraction(),
@@ -207,7 +207,7 @@ public sealed class GcpCloudAdapterStrategy : MultiCloudStrategyBase
         return new CloudProviderAdapter
         {
             ProviderId = "gcp",
-            ProviderType = CloudProviderType.GCP,
+            ProviderType = CloudProviderType.Gcp,
             Region = "global",
             Storage = new GcpStorageAbstraction(),
             Compute = new GcpComputeAbstraction()

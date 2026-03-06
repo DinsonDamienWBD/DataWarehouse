@@ -320,7 +320,7 @@ public sealed class UltimateMultiCloudPlugin : InfrastructurePluginBase, IDispos
         {
             ProviderId = message.Payload.TryGetValue("providerId", out var id) && id is string i ? i : throw new ArgumentException("Missing providerId"),
             Name = message.Payload.TryGetValue("name", out var n) && n is string name ? name : "Unknown",
-            Type = message.Payload.TryGetValue("type", out var t) && t is string type ? Enum.Parse<CloudProviderType>(type, true) : CloudProviderType.AWS,
+            Type = message.Payload.TryGetValue("type", out var t) && t is string type ? Enum.Parse<CloudProviderType>(type, true) : CloudProviderType.Aws,
             Regions = message.Payload.TryGetValue("regions", out var r) && r is IEnumerable<string> regions ? regions.ToList() : new List<string>(),
             Priority = message.Payload.TryGetValue("priority", out var p) && int.TryParse(p?.ToString(), out var pv) ? pv : 100,
             CostMultiplier = message.Payload.TryGetValue("costMultiplier", out var c) && double.TryParse(c?.ToString(), out var cv) ? cv : 1.0
@@ -724,12 +724,12 @@ public sealed class UltimateMultiCloudPlugin : InfrastructurePluginBase, IDispos
 /// </summary>
 public enum CloudProviderType
 {
-    AWS,
+    Aws,
     Azure,
-    GCP,
+    Gcp,
     Alibaba,
     Oracle,
-    IBM,
+    Ibm,
     DigitalOcean,
     Backblaze,
     Wasabi,
