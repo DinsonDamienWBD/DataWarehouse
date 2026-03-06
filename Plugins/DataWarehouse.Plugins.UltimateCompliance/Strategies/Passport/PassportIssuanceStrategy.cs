@@ -269,7 +269,7 @@ public sealed class PassportIssuanceStrategy : ComplianceStrategyBase
     {
         // Serialize passport content WITHOUT DigitalSignature for signing
         var signable = passport with { DigitalSignature = null };
-        var json = JsonSerializer.Serialize(signable, _serializerOptions);
+        var json = JsonSerializer.Serialize(signable, SerializerOptions);
         var data = Encoding.UTF8.GetBytes(json);
 
         using var hmac = new HMACSHA256(_signingKey!);
@@ -371,7 +371,7 @@ public sealed class PassportIssuanceStrategy : ComplianceStrategyBase
         return earliest;
     }
 
-    private static readonly JsonSerializerOptions _serializerOptions = new()
+    private static readonly JsonSerializerOptions SerializerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = false

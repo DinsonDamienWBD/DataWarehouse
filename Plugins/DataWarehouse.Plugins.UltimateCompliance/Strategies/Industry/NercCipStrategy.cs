@@ -21,9 +21,9 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Industry
             var violations = new List<ComplianceViolation>();
             var recommendations = new List<string>();
 
-            bool isBES = context.Attributes.TryGetValue("IsBulkElectricSystem", out var besObj) && besObj is true;
+            bool isBes = context.Attributes.TryGetValue("IsBulkElectricSystem", out var besObj) && besObj is true;
 
-            if (!isBES)
+            if (!isBes)
             {
                 return Task.FromResult(new ComplianceResult
                 {

@@ -654,7 +654,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
     public enum ClassificationSource
     {
         ContentAnalysis,
-        SourceIP,
+        SourceIp,
         Metadata,
         UserAccount,
         StorageLocation,

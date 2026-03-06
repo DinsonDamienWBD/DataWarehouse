@@ -38,7 +38,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
 
             // Check 2: Verify post-quantum key encapsulation
             if (!context.Attributes.TryGetValue("KeyEncapsulation", out var kem) ||
-                !IsPostQuantumKEM(kem?.ToString()))
+                !IsPostQuantumKem(kem?.ToString()))
             {
                 violations.Add(new ComplianceViolation
                 {
@@ -128,23 +128,23 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Innovation
         }
 
         // Static readonly arrays avoid per-call heap allocations (finding 1458)
-        private static readonly string[] _pqSignatures = { "Dilithium", "CRYSTALS-Dilithium", "Falcon", "SPHINCS+", "SPHINCS" };
-        private static readonly string[] _pqKEMs = { "Kyber", "CRYSTALS-Kyber", "NTRU", "SABER" };
+        private static readonly string[] PqSignatures = { "Dilithium", "CRYSTALS-Dilithium", "Falcon", "SPHINCS+", "SPHINCS" };
+        private static readonly string[] PqKeMs = { "Kyber", "CRYSTALS-Kyber", "NTRU", "SABER" };
 
         private static bool IsPostQuantumSignature(string? algorithm)
         {
             if (string.IsNullOrEmpty(algorithm))
                 return false;
 
-            return _pqSignatures.Any(a => algorithm.Contains(a, StringComparison.OrdinalIgnoreCase));
+            return PqSignatures.Any(a => algorithm.Contains(a, StringComparison.OrdinalIgnoreCase));
         }
 
-        private static bool IsPostQuantumKEM(string? algorithm)
+        private static bool IsPostQuantumKem(string? algorithm)
         {
             if (string.IsNullOrEmpty(algorithm))
                 return false;
 
-            return _pqKEMs.Any(a => algorithm.Contains(a, StringComparison.OrdinalIgnoreCase));
+            return PqKeMs.Any(a => algorithm.Contains(a, StringComparison.OrdinalIgnoreCase));
         }
 
         private static bool IsQuantumResistantHash(string? algorithm)

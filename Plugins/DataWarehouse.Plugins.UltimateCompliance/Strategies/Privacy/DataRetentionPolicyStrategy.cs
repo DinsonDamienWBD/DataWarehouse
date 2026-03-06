@@ -38,7 +38,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         private readonly BoundedDictionary<string, RetentionSchedule> _schedules = new BoundedDictionary<string, RetentionSchedule>(1000);
         private readonly ConcurrentBag<RetentionAuditEntry> _auditLog = new();
 
-        private TimeSpan _defaultRetention = TimeSpan.FromDays(365 * 3); // 3 years default
+        internal TimeSpan DefaultRetention { get; private set; } = TimeSpan.FromDays(365 * 3); // 3 years default
         private bool _autoScheduleDeletion = true;
         private int _warningDaysBeforeExpiry = 30;
 
@@ -55,7 +55,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default)
         {
             if (configuration.TryGetValue("DefaultRetentionDays", out var retObj) && retObj is int days)
-                _defaultRetention = TimeSpan.FromDays(days);
+                DefaultRetention = TimeSpan.FromDays(days);
 
             if (configuration.TryGetValue("AutoScheduleDeletion", out var autoObj) && autoObj is bool auto)
                 _autoScheduleDeletion = auto;

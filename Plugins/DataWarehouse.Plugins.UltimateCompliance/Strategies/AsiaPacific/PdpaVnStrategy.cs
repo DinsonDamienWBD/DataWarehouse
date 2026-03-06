@@ -53,7 +53,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.AsiaPacific
             {
                 violations.Add(new ComplianceViolation
                 {
-                    Code = "PDPA-VN-026",
+                    Code = "PDPA-VN-027",
                     Description = "Data localization requirement not met",
                     Severity = ViolationSeverity.Critical,
                     Remediation = "Store copy of personal data in Vietnam for specified categories (Decree 13 Art. 26)",

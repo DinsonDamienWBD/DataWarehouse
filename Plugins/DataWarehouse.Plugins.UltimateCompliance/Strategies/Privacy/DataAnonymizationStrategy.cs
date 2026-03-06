@@ -399,7 +399,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 
             var scale = rule.NoiseScale ?? 1.0;
             var noise = GenerateLaplaceNoise(scale);
-            return Math.Round(numValue + noise, 2).ToString();
+            return Math.Round(numValue + noise, 2).ToString(System.Globalization.CultureInfo.InvariantCulture);
         }
 
         private string GenerateSyntheticValue(string value, FieldAnonymizationRule rule)
@@ -651,7 +651,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
         None,
         KAnonymity,
         LDiversity,
-        TCloseness,
+        Closeness,
         DifferentialPrivacy,
         SafeHarbor
     }

@@ -37,7 +37,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         private readonly BoundedDictionary<string, List<string>> _dataResidencyRequirements = new BoundedDictionary<string, List<string>>(1000);
 
         // Regulatory zone mappings
-        private static readonly Dictionary<string, HashSet<string>> _regulatoryZones = new()
+        private static readonly Dictionary<string, HashSet<string>> RegulatoryZones = new()
         {
             ["EU"] = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -150,7 +150,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
         /// </summary>
         public bool IsInRegulatoryZone(string countryCode, string zoneName)
         {
-            if (_regulatoryZones.TryGetValue(zoneName, out var countries))
+            if (RegulatoryZones.TryGetValue(zoneName, out var countries))
             {
                 return countries.Contains(countryCode);
             }
@@ -345,11 +345,11 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Geofencing
             }
 
             // Check if SCCs or adequate safeguards are required
-            bool sourceInEU = IsInRegulatoryZone(source, "EU");
-            bool destinationInEU = IsInRegulatoryZone(destination, "EU");
+            bool sourceInEu = IsInRegulatoryZone(source, "EU");
+            bool destinationInEu = IsInRegulatoryZone(destination, "EU");
             bool destinationAdequate = IsInRegulatoryZone(destination, "GDPR-ADEQUATE");
 
-            if (sourceInEU && !destinationInEU && !destinationAdequate)
+            if (sourceInEu && !destinationInEu && !destinationAdequate)
             {
                 if (!policy.HasAdequacyDecision && !policy.HasStandardContractualClauses)
                 {

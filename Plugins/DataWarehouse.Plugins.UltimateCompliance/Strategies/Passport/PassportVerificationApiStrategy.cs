@@ -421,7 +421,7 @@ public sealed class PassportVerificationApiStrategy : ComplianceStrategyBase
         // Recompute HMAC-SHA256 using the same JSON serializer options as PassportIssuanceStrategy.SignPassport
         // (camelCase, no indentation, DigitalSignature nulled out) to ensure byte-for-byte match
         var signable = passport with { DigitalSignature = null };
-        var json = JsonSerializer.Serialize(signable, _signerOptions);
+        var json = JsonSerializer.Serialize(signable, SignerOptions);
         byte[] computed;
         using (var hmac = new HMACSHA256(_signingKey))
         {
@@ -432,7 +432,7 @@ public sealed class PassportVerificationApiStrategy : ComplianceStrategyBase
     }
 
     // Serializer options must exactly match PassportIssuanceStrategy._serializerOptions
-    private static readonly JsonSerializerOptions _signerOptions = new()
+    private static readonly JsonSerializerOptions SignerOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         WriteIndented = false

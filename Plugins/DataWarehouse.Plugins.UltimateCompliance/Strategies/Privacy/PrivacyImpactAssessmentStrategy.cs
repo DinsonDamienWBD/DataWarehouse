@@ -38,7 +38,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
 
         private double _highRiskThreshold = 15.0;
         private double _consultationThreshold = 20.0;
-        private bool _autoTriggerDpia = true;
+        internal bool AutoTriggerDpia { get; private set; } = true;
 
         /// <inheritdoc/>
         public override string StrategyId => "privacy-impact-assessment";
@@ -59,7 +59,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Privacy
                 _consultationThreshold = ct;
 
             if (configuration.TryGetValue("AutoTriggerDpia", out var atObj) && atObj is bool at)
-                _autoTriggerDpia = at;
+                AutoTriggerDpia = at;
 
             InitializeDefaultTemplates();
             InitializeDefaultRiskCategories();

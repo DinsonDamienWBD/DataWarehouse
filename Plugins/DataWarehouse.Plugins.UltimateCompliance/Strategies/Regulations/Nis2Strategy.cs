@@ -80,7 +80,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
 
         // NIS2 Annex I sectors are "essential entities" (higher tier, stricter supervision)
         // NIS2 Annex II sectors are "important entities" (lower tier, lighter requirements)
-        private static readonly HashSet<string> _essentialSectors = new(StringComparer.OrdinalIgnoreCase)
+        private static readonly HashSet<string> EssentialSectors = new(StringComparer.OrdinalIgnoreCase)
         {
             "energy", "transport", "banking", "financial-market", "health", "drinking-water",
             "wastewater", "digital-infrastructure", "ict-service-management", "public-administration", "space"
@@ -96,7 +96,7 @@ namespace DataWarehouse.Plugins.UltimateCompliance.Strategies.Regulations
 
             // NIS2: essential entities (Annex I) face stricter requirements and proactive supervision
             // Important entities (Annex II) have lighter obligations — opposite of what was previously coded
-            var isEssential = _essentialSectors.Contains(sector);
+            var isEssential = EssentialSectors.Contains(sector);
             var entityType = isEssential ? "Essential Entity (Annex I)" : "Important Entity (Annex II)";
             recommendations.Add($"NIS2 applies to {sector} sector as {entityType} - ensure full compliance with all Article 21 measures");
 
