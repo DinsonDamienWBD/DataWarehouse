@@ -2795,10 +2795,10 @@ Plans:
 - [x] 099-01-PLAN.md -- UltimateStorage findings 1-250
 - [x] 099-02-PLAN.md -- UltimateStorage findings 251-500
 - [x] 099-03-PLAN.md -- UltimateStorage findings 501-750
-- [ ] 099-04-PLAN.md -- UltimateStorage findings 751-1000
-- [ ] 099-05-PLAN.md -- UltimateStorage findings 1001-1243
-- [ ] 099-06-PLAN.md -- UltimateIntelligence findings 1-187
-- [ ] 099-07-PLAN.md -- UltimateIntelligence findings 188-374
+- [x] 099-04-PLAN.md -- UltimateStorage findings 751-1000
+- [x] 099-05-PLAN.md -- UltimateStorage findings 1001-1243
+- [x] 099-06-PLAN.md -- UltimateIntelligence findings 1-187
+- [x] 099-07-PLAN.md -- UltimateIntelligence findings 188-374
 - [ ] 099-08-PLAN.md -- UltimateIntelligence findings 375-562
 - [ ] 099-09-PLAN.md -- UltimateConnector findings 1-180
 - [ ] 099-10-PLAN.md -- UltimateConnector findings 181-360
