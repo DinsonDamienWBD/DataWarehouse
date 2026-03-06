@@ -86,7 +86,7 @@ public sealed class BackendGreenScoreRegistry
     /// <param name="renewablePct">Percentage of energy from renewable sources (0-100).</param>
     /// <param name="pue">Power Usage Effectiveness ratio (1.0 = ideal).</param>
     /// <param name="wue">Optional Water Usage Effectiveness in liters/kWh.</param>
-    /// <param name="carbonIntensity">Optional current carbon intensity (gCO2e/kWh). Defaults to 475 (global average).</param>
+    /// <param name="carbonIntensity">Optional current carbon intensity (gCo2E/kWh). Defaults to 475 (global average).</param>
     public void RegisterBackend(string backendId, string region, double renewablePct, double pue, double? wue, double carbonIntensity = 475.0)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(backendId);
@@ -115,7 +115,7 @@ public sealed class BackendGreenScoreRegistry
     /// Re-computes green scores with the new intensity value.
     /// </summary>
     /// <param name="region">Region identifier to update.</param>
-    /// <param name="intensity">New carbon intensity in gCO2e/kWh.</param>
+    /// <param name="intensity">New carbon intensity in gCo2E/kWh.</param>
     public void UpdateCarbonIntensity(string region, double intensity)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(region);

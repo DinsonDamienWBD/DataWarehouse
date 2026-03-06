@@ -176,7 +176,7 @@ public sealed class PowerSourceSwitchingStrategy : SustainabilityStrategyBase
 }
 
 /// <summary>Power source type.</summary>
-public enum PowerSourceType { Grid, Battery, Solar, Wind, Generator, Fuel_Cell }
+public enum PowerSourceType { Grid, Battery, Solar, Wind, Generator, FuelCell }
 
 /// <summary>Power source information.</summary>
 public sealed class PowerSource

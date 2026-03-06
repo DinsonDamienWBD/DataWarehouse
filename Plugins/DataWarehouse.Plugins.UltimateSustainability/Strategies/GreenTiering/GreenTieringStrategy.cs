@@ -64,7 +64,7 @@ public sealed record GreenMigrationBatch
     public required double TargetGreenScore { get; init; }
 
     /// <summary>
-    /// Estimated carbon cost of performing the migration itself (gCO2e).
+    /// Estimated carbon cost of performing the migration itself (gCo2E).
     /// Transferring data consumes energy, which has a carbon cost.
     /// </summary>
     public required double EstimatedCarbonCostGrams { get; init; }
@@ -115,7 +115,7 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
     // Energy cost of network transfer: ~0.0000006 kWh per MB (approximate for modern data centers)
     private const double NetworkEnergyKwhPerByte = 0.0000006 / (1024.0 * 1024.0);
 
-    // Default carbon intensity for migration energy estimation (gCO2e/kWh)
+    // Default carbon intensity for migration energy estimation (gCo2E/kWh)
     private const double DefaultMigrationCarbonIntensity = 400.0;
 
     private const string PluginId = "com.datawarehouse.sustainability.ultimate";
@@ -368,7 +368,7 @@ public sealed class GreenTieringStrategy : SustainabilityStrategyBase
                         Payload = new Dictionary<string, object>
                         {
                             ["tenantId"] = tenantId,
-                            ["estimatedCarbonGramsCO2e"] = migrationCarbonGrams,
+                            ["estimatedCarbonGramsCo2E"] = migrationCarbonGrams,
                             ["operationType"] = "green-tiering-migration"
                         },
                         Description = $"Check if tenant {tenantId} has sufficient carbon budget for green tiering migration"

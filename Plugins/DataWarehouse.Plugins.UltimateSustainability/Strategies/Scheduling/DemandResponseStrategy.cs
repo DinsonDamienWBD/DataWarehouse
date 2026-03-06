@@ -7,7 +7,7 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.Scheduling;
 public sealed class DemandResponseStrategy : SustainabilityStrategyBase
 {
     private DemandResponseEvent? _activeEvent;
-    private readonly List<DemandResponseEvent> _eventHistory = new();
+    internal List<DemandResponseEvent> EventHistory { get; } = new();
     private Timer? _checkTimer;
     private readonly object _lock = new();
 
@@ -68,7 +68,7 @@ public sealed class DemandResponseStrategy : SustainabilityStrategyBase
         {
             if (_activeEvent != null)
             {
-                _eventHistory.Add(_activeEvent);
+                EventHistory.Add(_activeEvent);
                 _activeEvent = null;
             }
         }

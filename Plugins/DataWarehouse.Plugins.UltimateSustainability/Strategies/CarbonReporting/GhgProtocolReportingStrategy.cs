@@ -72,12 +72,12 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
 {
     private const string PluginId = "com.datawarehouse.sustainability.ultimate";
 
-    // Emission factors (kgCO2e per unit) based on published data
-    private const double CloudStorageEmissionFactorKgCO2ePerGbMonth = 0.023;  // AWS S3 average
-    private const double DataTransferEmissionFactorKgCO2ePerGb = 0.06;       // Cross-region transfer
-    private const double DownstreamComputeEmissionFactorKgCO2ePerGbRead = 0.01; // End-user compute
+    // Emission factors (kgCo2E per unit) based on published data
+    private const double CloudStorageEmissionFactorKgCo2EPerGbMonth = 0.023;  // AWS S3 average
+    private const double DataTransferEmissionFactorKgCo2EPerGb = 0.06;       // Cross-region transfer
+    private const double DownstreamComputeEmissionFactorKgCo2EPerGbRead = 0.01; // End-user compute
 
-    // Default carbon intensity when no real-time grid data is available (gCO2e/kWh)
+    // Default carbon intensity when no real-time grid data is available (gCo2E/kWh)
     private const double DefaultCarbonIntensityGco2EPerKwh = 400.0;
 
     // In-memory storage for energy measurements received via message bus
@@ -275,7 +275,7 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
 
             // Calculate months in the reporting period
             var periodMonths = Math.Max(1, (to - from).TotalDays / 30.0);
-            var emissionsKg = totalStorageGb * periodMonths * CloudStorageEmissionFactorKgCO2ePerGbMonth;
+            var emissionsKg = totalStorageGb * periodMonths * CloudStorageEmissionFactorKgCo2EPerGbMonth;
             var emissionsGrams = emissionsKg * 1000.0;
 
             if (emissionsGrams > 0)
@@ -309,7 +309,7 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
                 totalTransferGb = transferMeasurements.Sum(m => m.EnergyWh) * 100.0; // rough approximation
             }
 
-            var emissionsKg = totalTransferGb * DataTransferEmissionFactorKgCO2ePerGb;
+            var emissionsKg = totalTransferGb * DataTransferEmissionFactorKgCo2EPerGb;
             var emissionsGrams = emissionsKg * 1000.0;
 
             if (emissionsGrams > 0)
@@ -346,7 +346,7 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
                 totalReadGb = readMeasurements.Sum(m => m.EnergyWh) * 50.0;
             }
 
-            var emissionsKg = totalReadGb * DownstreamComputeEmissionFactorKgCO2ePerGbRead;
+            var emissionsKg = totalReadGb * DownstreamComputeEmissionFactorKgCo2EPerGbRead;
             var emissionsGrams = emissionsKg * 1000.0;
 
             if (emissionsGrams > 0)
@@ -434,10 +434,10 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
     /// Updates the carbon intensity for a specific region.
     /// </summary>
     /// <param name="region">Region identifier.</param>
-    /// <param name="intensityGCO2ePerKwh">Carbon intensity in gCO2e/kWh.</param>
-    public void UpdateRegionCarbonIntensity(string region, double intensityGCO2ePerKwh)
+    /// <param name="intensityGco2EPerKwh">Carbon intensity in gCo2E/kWh.</param>
+    public void UpdateRegionCarbonIntensity(string region, double intensityGco2EPerKwh)
     {
-        _regionCarbonIntensity[region] = intensityGCO2ePerKwh;
+        _regionCarbonIntensity[region] = intensityGco2EPerKwh;
     }
 
     /// <summary>
@@ -548,9 +548,9 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
                "WattTime/ElectricityMaps APIs multiplied by measured or estimated energy consumption. " +
                "Energy sources prioritized: RAPL hardware counters > powercap sysfs > cloud provider API > TDP estimation. " +
                "Scope 3: Activity-based emission factors applied to data volumes. " +
-               "Category 1 (vendor-hosted storage): 0.023 kgCO2e/GB/month. " +
-               "Category 4 (data transfer): 0.06 kgCO2e/GB. " +
-               "Category 11 (downstream compute): 0.01 kgCO2e/GB read. " +
+               "Category 1 (vendor-hosted storage): 0.023 kgCo2E/GB/month. " +
+               "Category 4 (data transfer): 0.06 kgCo2E/GB. " +
+               "Category 11 (downstream compute): 0.01 kgCo2E/GB read. " +
                "All Scope 3 entries classified as Estimated data quality per GHG Protocol guidance.";
     }
 
@@ -600,7 +600,7 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
             {
                 var payload = message.Payload;
                 var region = ExtractString(payload, "region");
-                var intensity = ExtractDouble(payload, "carbonIntensityGCO2ePerKwh");
+                var intensity = ExtractDouble(payload, "carbonIntensityGco2EPerKwh");
 
                 if (!string.IsNullOrWhiteSpace(region) && intensity > 0)
                 {
@@ -708,6 +708,6 @@ public sealed record EnergyMeasurementRecord
     /// <summary>Size of data involved in bytes, if applicable.</summary>
     public long DataSizeBytes { get; init; }
 
-    /// <summary>Carbon intensity at time of measurement (gCO2e/kWh).</summary>
+    /// <summary>Carbon intensity at time of measurement (gCo2E/kWh).</summary>
     public double CarbonIntensity { get; init; }
 }

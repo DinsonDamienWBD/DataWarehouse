@@ -22,7 +22,7 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
     private volatile bool _dirty;
     private volatile bool _disposed;
 
-    private static readonly JsonSerializerOptions s_jsonOptions = new()
+    private static readonly JsonSerializerOptions SJsonOptions = new()
     {
         WriteIndented = true,
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -79,9 +79,9 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
     /// Returns false if the operation would exceed the hard limit.
     /// </summary>
     /// <param name="tenantId">The tenant identifier.</param>
-    /// <param name="carbonGramsCO2e">Carbon grams to record.</param>
+    /// <param name="carbonGramsCo2E">Carbon grams to record.</param>
     /// <returns>True if recorded successfully; false if hard limit would be exceeded.</returns>
-    public Task<bool> RecordUsageAsync(string tenantId, double carbonGramsCO2e)
+    public Task<bool> RecordUsageAsync(string tenantId, double carbonGramsCo2E)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
 
@@ -94,7 +94,7 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
         lock (entry.Lock)
         {
             var usagePercent = entry.BudgetGramsCo2E > 0
-                ? ((entry.UsedGramsCo2E + carbonGramsCO2e) / entry.BudgetGramsCo2E) * 100.0
+                ? ((entry.UsedGramsCo2E + carbonGramsCo2E) / entry.BudgetGramsCo2E) * 100.0
                 : 0;
 
             if (usagePercent > entry.HardLimitPercent)
@@ -102,7 +102,7 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
                 return Task.FromResult(false);
             }
 
-            entry.UsedGramsCo2E += carbonGramsCO2e;
+            entry.UsedGramsCo2E += carbonGramsCo2E;
         }
 
         MarkDirty();
@@ -164,7 +164,7 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
         try
         {
             var json = await File.ReadAllTextAsync(_filePath, ct).ConfigureAwait(false);
-            var entries = JsonSerializer.Deserialize<Dictionary<string, StoredBudgetEntry>>(json, s_jsonOptions);
+            var entries = JsonSerializer.Deserialize<Dictionary<string, StoredBudgetEntry>>(json, SJsonOptions);
 
             if (entries != null)
             {
@@ -204,7 +204,7 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
                 }
             }
 
-            var json = JsonSerializer.Serialize(storedEntries, s_jsonOptions);
+            var json = JsonSerializer.Serialize(storedEntries, SJsonOptions);
             var tempPath = _filePath + ".tmp";
             await File.WriteAllTextAsync(tempPath, json, ct).ConfigureAwait(false);
             File.Move(tempPath, _filePath, overwrite: true);

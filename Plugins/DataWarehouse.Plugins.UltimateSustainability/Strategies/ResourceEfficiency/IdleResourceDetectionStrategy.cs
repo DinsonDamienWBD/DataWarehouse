@@ -177,7 +177,7 @@ public sealed class IdleResourceDetectionStrategy : SustainabilityStrategyBase
 }
 
 /// <summary>Resource type.</summary>
-public enum ResourceType { VM, Container, Database, LoadBalancer, Storage, Network, Service }
+public enum ResourceType { Vm, Container, Database, LoadBalancer, Storage, Network, Service }
 
 /// <summary>Resource tracker.</summary>
 public sealed class ResourceTracker

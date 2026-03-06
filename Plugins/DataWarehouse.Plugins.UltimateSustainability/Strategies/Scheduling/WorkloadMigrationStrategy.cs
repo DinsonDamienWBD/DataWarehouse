@@ -26,7 +26,7 @@ public sealed class WorkloadMigrationStrategy : SustainabilityStrategyBase
     /// <inheritdoc/>
     public override string[] Tags => new[] { "migration", "workload", "carbon", "renewable", "multi-region", "follow-the-sun" };
 
-    /// <summary>Carbon intensity differential to trigger migration (gCO2e/kWh).</summary>
+    /// <summary>Carbon intensity differential to trigger migration (gCo2E/kWh).</summary>
     public double MigrationThreshold { get; set; } = 100;
     /// <summary>Minimum time between migrations per workload (hours).</summary>
     public int MinMigrationIntervalHours { get; set; } = 4;

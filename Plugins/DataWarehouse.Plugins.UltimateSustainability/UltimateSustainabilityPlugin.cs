@@ -34,7 +34,7 @@ public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
     // _registry provides category-based lookup only and is always updated atomically with _strategies.
     private readonly SustainabilityStrategyRegistry _registry = new();
     private readonly BoundedDictionary<string, ISustainabilityStrategy> _strategies = new BoundedDictionary<string, ISustainabilityStrategy>(1000);
-    private ISustainabilityStrategy? _activeStrategy;
+    internal ISustainabilityStrategy? ActiveStrategy { get; private set; }
     // Cached capabilities list; invalidated whenever a new strategy is registered.
     private volatile IReadOnlyList<RegisteredCapability>? _cachedCapabilities;
 
@@ -96,7 +96,7 @@ public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
     {
         if (!_strategies.TryGetValue(strategyId, out var strategy))
             throw new ArgumentException($"Unknown strategy: {strategyId}");
-        _activeStrategy = strategy;
+        ActiveStrategy = strategy;
     }
 
     /// <summary>

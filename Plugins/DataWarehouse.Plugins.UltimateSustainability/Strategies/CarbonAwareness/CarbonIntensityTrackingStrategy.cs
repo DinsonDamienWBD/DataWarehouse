@@ -6,7 +6,7 @@ namespace DataWarehouse.Plugins.UltimateSustainability.Strategies.CarbonAwarenes
 
 /// <summary>
 /// Tracks carbon intensity of the electrical grid in real-time.
-/// Monitors grid carbon emissions (gCO2e/kWh) and provides historical data
+/// Monitors grid carbon emissions (gCo2E/kWh) and provides historical data
 /// for carbon-aware workload scheduling decisions.
 /// </summary>
 public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
@@ -36,7 +36,7 @@ public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
 
     /// <inheritdoc/>
     public override string SemanticDescription =>
-        "Tracks real-time carbon intensity of the electrical grid (gCO2e/kWh). " +
+        "Tracks real-time carbon intensity of the electrical grid (gCo2E/kWh). " +
         "Monitors grid emissions, maintains historical data, and identifies low-carbon windows " +
         "for optimal workload scheduling. Integrates with grid carbon APIs.";
 
@@ -44,7 +44,7 @@ public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
     public override string[] Tags => new[] { "carbon", "intensity", "grid", "monitoring", "real-time" };
 
     /// <summary>
-    /// Gets the current carbon intensity in gCO2e/kWh.
+    /// Gets the current carbon intensity in gCo2E/kWh.
     /// </summary>
     public double CurrentIntensity
     {
@@ -107,12 +107,12 @@ public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
     /// <summary>
     /// Records a carbon intensity reading.
     /// </summary>
-    public void RecordIntensity(double intensityGCO2ePerKwh, DateTimeOffset? timestamp = null)
+    public void RecordIntensity(double intensityGco2EPerKwh, DateTimeOffset? timestamp = null)
     {
         var dataPoint = new CarbonIntensityDataPoint
         {
             Timestamp = timestamp ?? DateTimeOffset.UtcNow,
-            Intensity = intensityGCO2ePerKwh,
+            Intensity = intensityGco2EPerKwh,
             Region = Region
         };
 
@@ -139,14 +139,14 @@ public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
 
         lock (_lock)
         {
-            _currentIntensity = intensityGCO2ePerKwh;
+            _currentIntensity = intensityGco2EPerKwh;
             if (hasData) _24HourAverage = newAverage;
         }
 
-        RecordSample(0, intensityGCO2ePerKwh);
+        RecordSample(0, intensityGco2EPerKwh);
 
         // Generate recommendations based on current intensity
-        UpdateRecommendations(intensityGCO2ePerKwh);
+        UpdateRecommendations(intensityGco2EPerKwh);
     }
 
     /// <summary>
@@ -164,7 +164,7 @@ public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
     /// <summary>
     /// Finds the next low-carbon window within the specified lookahead period.
     /// </summary>
-    public LowCarbonWindow? FindNextLowCarbonWindow(TimeSpan lookahead, double thresholdGCO2ePerKwh)
+    public LowCarbonWindow? FindNextLowCarbonWindow(TimeSpan lookahead, double thresholdGco2EPerKwh)
     {
         // Use historical patterns to predict low-carbon windows
         var history = GetHistory(TimeSpan.FromDays(7));
@@ -177,7 +177,7 @@ public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
             .OrderBy(x => x.Average)
             .ToList();
 
-        var lowCarbonHour = hourlyAverages.FirstOrDefault(x => x.Average < thresholdGCO2ePerKwh);
+        var lowCarbonHour = hourlyAverages.FirstOrDefault(x => x.Average < thresholdGco2EPerKwh);
         if (lowCarbonHour == null) return null;
 
         var now = DateTimeOffset.UtcNow;
@@ -279,7 +279,7 @@ public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
 
     private static double GetEstimatedIntensity(string region)
     {
-        // Regional average carbon intensities (gCO2e/kWh)
+        // Regional average carbon intensities (gCo2E/kWh)
         return region switch
         {
             "US-WECC" => 350,      // Western US
@@ -327,7 +327,7 @@ public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
                 RecommendationId = $"{StrategyId}-defer-load",
                 Type = "DeferLoad",
                 Priority = 8,
-                Description = $"Carbon intensity is {currentIntensity:F0} gCO2e/kWh, 20% above average. Consider deferring non-urgent workloads.",
+                Description = $"Carbon intensity is {currentIntensity:F0} gCo2E/kWh, 20% above average. Consider deferring non-urgent workloads.",
                 EstimatedCarbonReductionGrams = (currentIntensity - _24HourAverage) * 0.5,
                 CanAutoApply = true,
                 Action = "defer",
@@ -346,7 +346,7 @@ public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
                 RecommendationId = $"{StrategyId}-run-now",
                 Type = "RunNow",
                 Priority = 7,
-                Description = $"Carbon intensity is low ({currentIntensity:F0} gCO2e/kWh). Optimal time for batch processing.",
+                Description = $"Carbon intensity is low ({currentIntensity:F0} gCo2E/kWh). Optimal time for batch processing.",
                 EstimatedCarbonReductionGrams = (_24HourAverage - currentIntensity) * 0.5,
                 CanAutoApply = false,
                 Action = "schedule-now"
@@ -366,7 +366,7 @@ public sealed record CarbonIntensityDataPoint
     public required DateTimeOffset Timestamp { get; init; }
 
     /// <summary>
-    /// Carbon intensity in gCO2e/kWh.
+    /// Carbon intensity in gCo2E/kWh.
     /// </summary>
     public required double Intensity { get; init; }
 

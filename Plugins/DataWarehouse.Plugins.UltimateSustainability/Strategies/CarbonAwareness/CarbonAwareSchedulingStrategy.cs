@@ -46,7 +46,7 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
     public TimeSpan MaxDelay { get; set; } = TimeSpan.FromHours(24);
 
     /// <summary>
-    /// Carbon intensity threshold below which workloads should run (gCO2e/kWh).
+    /// Carbon intensity threshold below which workloads should run (gCo2E/kWh).
     /// </summary>
     public double CarbonThreshold { get; set; } = 200;
 
@@ -276,7 +276,7 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
                 // Provider failed — log and fall through to time-of-day estimation.
                 System.Diagnostics.Trace.TraceWarning(
                     "[CarbonAwareSchedulingStrategy] Carbon intensity provider threw: {0}. " +
-                    "Falling back to time-of-day estimate (350 ± 20% gCO2e/kWh).", ex.Message);
+                    "Falling back to time-of-day estimate (350 ± 20% gCo2E/kWh).", ex.Message);
             }
         }
         else
@@ -284,7 +284,7 @@ public sealed class CarbonAwareSchedulingStrategy : SustainabilityStrategyBase
             // P2-4406: No provider configured — log so callers understand estimation is in use.
             System.Diagnostics.Trace.TraceInformation(
                 "[CarbonAwareSchedulingStrategy] No carbon intensity provider configured. " +
-                "Using time-of-day heuristic estimate (350 ± 20% gCO2e/kWh). " +
+                "Using time-of-day heuristic estimate (350 ± 20% gCo2E/kWh). " +
                 "Set CarbonIntensityProvider for real-time data.");
         }
 

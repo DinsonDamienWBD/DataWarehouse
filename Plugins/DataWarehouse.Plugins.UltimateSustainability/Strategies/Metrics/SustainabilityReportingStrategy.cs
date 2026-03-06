@@ -52,13 +52,13 @@ public sealed class SustainabilityReportingStrategy : SustainabilityStrategyBase
             TotalEnergyConsumedWh = totalEnergyWh,
             TotalEnergyConsumedKwh = totalEnergyWh / 1000.0,
             TotalEmissionsGrams = totalEmissionsGrams,
-            TotalEmissionsKgCO2e = totalEmissionsGrams / 1000.0,
-            TotalEmissionsTonsCO2e = totalEmissionsGrams / 1_000_000.0,
+            TotalEmissionsKgCo2E = totalEmissionsGrams / 1000.0,
+            TotalEmissionsTonsCo2E = totalEmissionsGrams / 1_000_000.0,
 
             EnergySavedWh = energySavedWh,
             EnergySavedKwh = energySavedWh / 1000.0,
             CarbonAvoidedGrams = carbonAvoidedGrams,
-            CarbonAvoidedKgCO2e = carbonAvoidedGrams / 1000.0,
+            CarbonAvoidedKgCo2E = carbonAvoidedGrams / 1000.0,
             CostSavingsUsd = costSavingsUsd,
 
             EfficiencyRatio = totalEnergyWh > 0 ? energySavedWh / totalEnergyWh * 100 : 0,
@@ -106,9 +106,9 @@ public sealed class SustainabilityReportingStrategy : SustainabilityStrategyBase
         var sb = new StringBuilder();
         sb.AppendLine("Metric,Value,Unit");
         sb.AppendLine($"Total Energy,{report.TotalEnergyConsumedKwh:F2},kWh");
-        sb.AppendLine($"Total Emissions,{report.TotalEmissionsKgCO2e:F2},kgCO2e");
+        sb.AppendLine($"Total Emissions,{report.TotalEmissionsKgCo2E:F2},kgCo2E");
         sb.AppendLine($"Energy Saved,{report.EnergySavedKwh:F2},kWh");
-        sb.AppendLine($"Carbon Avoided,{report.CarbonAvoidedKgCO2e:F2},kgCO2e");
+        sb.AppendLine($"Carbon Avoided,{report.CarbonAvoidedKgCo2E:F2},kgCo2E");
         sb.AppendLine($"Cost Savings,{report.CostSavingsUsd:F2},USD");
         return sb.ToString();
     }
@@ -126,8 +126,8 @@ public sealed class SustainabilityReportingStrategy : SustainabilityStrategyBase
         sb.AppendLine($"- Energy Saved: {report.EnergySavedKwh:F2} kWh ({report.EfficiencyRatio:F1}% efficiency)");
         sb.AppendLine();
         sb.AppendLine("## Carbon Metrics");
-        sb.AppendLine($"- Total Emissions: {report.TotalEmissionsKgCO2e:F2} kgCO2e");
-        sb.AppendLine($"- Carbon Avoided: {report.CarbonAvoidedKgCO2e:F2} kgCO2e");
+        sb.AppendLine($"- Total Emissions: {report.TotalEmissionsKgCo2E:F2} kgCo2E");
+        sb.AppendLine($"- Carbon Avoided: {report.CarbonAvoidedKgCo2E:F2} kgCo2E");
         sb.AppendLine($"- Carbon Reduction: {report.CarbonReductionPercent:F1}%");
         sb.AppendLine();
         sb.AppendLine("## Financial Impact");
@@ -155,13 +155,13 @@ public sealed record SustainabilityReport
     public required double TotalEnergyConsumedWh { get; init; }
     public required double TotalEnergyConsumedKwh { get; init; }
     public required double TotalEmissionsGrams { get; init; }
-    public required double TotalEmissionsKgCO2e { get; init; }
-    public required double TotalEmissionsTonsCO2e { get; init; }
+    public required double TotalEmissionsKgCo2E { get; init; }
+    public required double TotalEmissionsTonsCo2E { get; init; }
 
     public required double EnergySavedWh { get; init; }
     public required double EnergySavedKwh { get; init; }
     public required double CarbonAvoidedGrams { get; init; }
-    public required double CarbonAvoidedKgCO2e { get; init; }
+    public required double CarbonAvoidedKgCo2E { get; init; }
     public required double CostSavingsUsd { get; init; }
 
     public required double EfficiencyRatio { get; init; }

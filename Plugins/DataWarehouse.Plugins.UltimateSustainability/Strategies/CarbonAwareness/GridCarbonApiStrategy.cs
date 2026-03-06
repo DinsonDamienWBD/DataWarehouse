@@ -50,7 +50,7 @@ public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
         /// <summary>Electricity Maps API for global data.</summary>
         ElectricityMaps,
         /// <summary>UK Carbon Intensity API.</summary>
-        CarbonIntensityUK,
+        CarbonIntensityUk,
         /// <summary>Green Software Foundation Carbon Aware SDK.</summary>
         CarbonAwareSdk
     }
@@ -129,7 +129,7 @@ public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
         {
             ApiProvider.WattTime => await FetchWattTimeDataAsync(ct),
             ApiProvider.ElectricityMaps => await FetchElectricityMapsDataAsync(ct),
-            ApiProvider.CarbonIntensityUK => await FetchCarbonIntensityUKDataAsync(ct),
+            ApiProvider.CarbonIntensityUk => await FetchCarbonIntensityUkDataAsync(ct),
             ApiProvider.CarbonAwareSdk => await FetchCarbonAwareSdkDataAsync(ct),
             _ => GetFallbackData()
         };
@@ -153,7 +153,7 @@ public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
         {
             ApiProvider.WattTime => await FetchWattTimeForecastAsync(hours, ct),
             ApiProvider.ElectricityMaps => await FetchElectricityMapsForecastAsync(hours, ct),
-            ApiProvider.CarbonIntensityUK => await FetchCarbonIntensityUKForecastAsync(hours, ct),
+            ApiProvider.CarbonIntensityUk => await FetchCarbonIntensityUkForecastAsync(hours, ct),
             _ => GenerateFallbackForecast(hours)
         };
     }
@@ -281,7 +281,7 @@ public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
         }
     }
 
-    private async Task<GridCarbonData> FetchCarbonIntensityUKDataAsync(CancellationToken ct)
+    private async Task<GridCarbonData> FetchCarbonIntensityUkDataAsync(CancellationToken ct)
     {
         if (_httpClient == null)
             return GetFallbackData();
@@ -302,7 +302,7 @@ public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
                 Timestamp = DateTimeOffset.UtcNow,
                 CarbonIntensity = data.GetProperty("intensity").GetProperty("actual").GetDouble(),
                 Region = "GB",
-                Provider = "CarbonIntensityUK",
+                Provider = "CarbonIntensityUk",
                 Confidence = 0.95
             };
         }
@@ -451,7 +451,7 @@ public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
         }
     }
 
-    private async Task<IReadOnlyList<GridCarbonForecast>> FetchCarbonIntensityUKForecastAsync(int hours, CancellationToken ct)
+    private async Task<IReadOnlyList<GridCarbonForecast>> FetchCarbonIntensityUkForecastAsync(int hours, CancellationToken ct)
     {
         if (_httpClient == null)
             return GenerateFallbackForecast(hours);
@@ -546,7 +546,7 @@ public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
                 RecommendationId = $"{StrategyId}-high-carbon-alert",
                 Type = "HighCarbonAlert",
                 Priority = 9,
-                Description = $"Grid carbon intensity is very high ({data.CarbonIntensity:F0} gCO2e/kWh). Defer discretionary workloads.",
+                Description = $"Grid carbon intensity is very high ({data.CarbonIntensity:F0} gCo2E/kWh). Defer discretionary workloads.",
                 EstimatedCarbonReductionGrams = data.CarbonIntensity * 0.5,
                 CanAutoApply = true,
                 Action = "defer-workloads"
@@ -560,7 +560,7 @@ public sealed class GridCarbonApiStrategy : SustainabilityStrategyBase
                 RecommendationId = $"{StrategyId}-low-carbon-opportunity",
                 Type = "LowCarbonOpportunity",
                 Priority = 8,
-                Description = $"Grid carbon intensity is low ({data.CarbonIntensity:F0} gCO2e/kWh). Schedule intensive workloads now.",
+                Description = $"Grid carbon intensity is low ({data.CarbonIntensity:F0} gCo2E/kWh). Schedule intensive workloads now.",
                 EstimatedCarbonReductionGrams = (400 - data.CarbonIntensity) * 0.5,
                 CanAutoApply = false,
                 Action = "accelerate-workloads"
@@ -577,7 +577,7 @@ public sealed record GridCarbonData
     /// <summary>Timestamp of the data.</summary>
     public required DateTimeOffset Timestamp { get; init; }
 
-    /// <summary>Carbon intensity in gCO2e/kWh.</summary>
+    /// <summary>Carbon intensity in gCo2E/kWh.</summary>
     public required double CarbonIntensity { get; init; }
 
     /// <summary>Region/zone.</summary>
@@ -604,7 +604,7 @@ public sealed record GridCarbonForecast
     /// <summary>Forecast timestamp.</summary>
     public required DateTimeOffset Timestamp { get; init; }
 
-    /// <summary>Predicted carbon intensity in gCO2e/kWh.</summary>
+    /// <summary>Predicted carbon intensity in gCo2E/kWh.</summary>
     public required double CarbonIntensity { get; init; }
 
     /// <summary>Confidence in the forecast (0-1).</summary>

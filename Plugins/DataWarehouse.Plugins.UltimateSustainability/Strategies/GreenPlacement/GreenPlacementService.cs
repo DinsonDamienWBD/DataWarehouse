@@ -379,7 +379,7 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
                 SourcePluginId = PluginId,
                 Source = "GreenPlacementService",
                 Description = $"Green placement: selected {decision.PreferredBackendId} (score: {decision.GreenScore.Score:F1}, " +
-                              $"carbon: {decision.EstimatedCarbonGramsCo2E:F4} gCO2e)",
+                              $"carbon: {decision.EstimatedCarbonGramsCo2E:F4} gCo2E)",
                 Payload = new Dictionary<string, object>
                 {
                     ["preferredBackendId"] = decision.PreferredBackendId,
@@ -413,7 +413,7 @@ public sealed class GreenPlacementService : SustainabilityStrategyBase, IGreenPl
         var parts = new List<string>
         {
             $"Renewable: {score.RenewablePercentage:F0}%",
-            $"Carbon intensity: {gridData.CarbonIntensityGco2EPerKwh:F0} gCO2e/kWh",
+            $"Carbon intensity: {gridData.CarbonIntensityGco2EPerKwh:F0} gCo2E/kWh",
             $"PUE: {score.PowerUsageEffectiveness:F2}"
         };
 

@@ -89,7 +89,7 @@ public sealed class ElectricityMapsApiStrategy : SustainabilityStrategyBase
     /// <inheritdoc/>
     public override string SemanticDescription =>
         "Real-time grid carbon intensity from Electricity Maps API. " +
-        "Provides carbon intensity (gCO2eq/kWh) and power breakdown (renewable vs fossil percentages) " +
+        "Provides carbon intensity (gCo2Eq/kWh) and power breakdown (renewable vs fossil percentages) " +
         "for global electricity grid zones with automatic cloud-region-to-zone mapping.";
 
     /// <inheritdoc/>
@@ -363,9 +363,9 @@ public sealed class ElectricityMapsApiStrategy : SustainabilityStrategyBase
     /// Lower intensity implies higher renewable share.
     /// Scale: 0 gCO2/kWh -> 100% renewable, >= 900 gCO2/kWh -> 0%.
     /// </summary>
-    private static double EstimateRenewableFromIntensity(double intensityGCO2ePerKwh)
+    private static double EstimateRenewableFromIntensity(double intensityGco2EPerKwh)
     {
-        var pct = Math.Max(0, Math.Min(100, (1 - intensityGCO2ePerKwh / 900.0) * 100));
+        var pct = Math.Max(0, Math.Min(100, (1 - intensityGco2EPerKwh / 900.0) * 100));
         return Math.Round(pct, 1);
     }
 

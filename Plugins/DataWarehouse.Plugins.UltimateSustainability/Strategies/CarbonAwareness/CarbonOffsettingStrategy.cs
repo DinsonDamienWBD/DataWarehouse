@@ -49,7 +49,7 @@ public sealed class CarbonOffsettingStrategy : SustainabilityStrategyBase
     public Func<IReadOnlyList<OffsetProjectType>, double, IReadOnlyList<OffsetProjectRecommendation>>? ProjectCatalogProvider { get; set; }
 
     /// <summary>
-    /// Gets total emissions tracked (gCO2e).
+    /// Gets total emissions tracked (gCo2E).
     /// </summary>
     public double TotalEmissionsGrams
     {
@@ -57,7 +57,7 @@ public sealed class CarbonOffsettingStrategy : SustainabilityStrategyBase
     }
 
     /// <summary>
-    /// Gets total offsets purchased (gCO2e).
+    /// Gets total offsets purchased (gCo2E).
     /// </summary>
     public double TotalOffsetsGrams
     {

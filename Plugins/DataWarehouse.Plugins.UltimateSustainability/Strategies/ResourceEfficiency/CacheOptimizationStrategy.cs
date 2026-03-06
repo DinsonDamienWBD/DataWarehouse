@@ -165,7 +165,7 @@ public sealed class CacheOptimizationStrategy : SustainabilityStrategyBase
 }
 
 /// <summary>Cache type.</summary>
-public enum CacheType { Memory, Redis, Memcached, Disk, CDN }
+public enum CacheType { Memory, Redis, Memcached, Disk, Cdn }
 
 /// <summary>Cache instance information.</summary>
 public sealed class CacheInstance

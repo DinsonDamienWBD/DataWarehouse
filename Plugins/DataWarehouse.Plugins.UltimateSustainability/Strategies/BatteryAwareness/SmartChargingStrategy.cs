@@ -32,7 +32,7 @@ public sealed class SmartChargingStrategy : SustainabilityStrategyBase
     public int MinimumChargeLevel { get; set; } = 20;
     /// <summary>Enable carbon-aware charging.</summary>
     public bool CarbonAwareCharging { get; set; } = true;
-    /// <summary>Carbon intensity threshold for fast charging (gCO2e/kWh).</summary>
+    /// <summary>Carbon intensity threshold for fast charging (gCo2E/kWh).</summary>
     public double LowCarbonThreshold { get; set; } = 200;
 
     /// <summary>Sets the carbon intensity provider.</summary>
@@ -57,14 +57,14 @@ public sealed class SmartChargingStrategy : SustainabilityStrategyBase
                 return new ChargingAction
                 {
                     Action = ChargingActionType.FastCharge,
-                    Reason = $"Low carbon intensity ({carbonIntensity:F0} gCO2e/kWh)",
+                    Reason = $"Low carbon intensity ({carbonIntensity:F0} gCo2E/kWh)",
                     CarbonIntensity = carbonIntensity
                 };
             else
                 return new ChargingAction
                 {
                     Action = ChargingActionType.SlowCharge,
-                    Reason = $"High carbon intensity ({carbonIntensity:F0} gCO2e/kWh), trickle charging",
+                    Reason = $"High carbon intensity ({carbonIntensity:F0} gCo2E/kWh), trickle charging",
                     CarbonIntensity = carbonIntensity
                 };
         }

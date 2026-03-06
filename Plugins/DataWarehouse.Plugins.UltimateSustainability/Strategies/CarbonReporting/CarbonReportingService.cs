@@ -303,7 +303,7 @@ public sealed class CarbonReportingService : SustainabilityStrategyBase, ICarbon
             {
                 var payload = message.Payload;
                 var region = payload.TryGetValue("region", out var r) ? r?.ToString() : null;
-                var intensity = ExtractDouble(payload, "carbonIntensityGCO2ePerKwh");
+                var intensity = ExtractDouble(payload, "carbonIntensityGco2EPerKwh");
                 var renewable = ExtractDouble(payload, "renewablePercentage");
 
                 if (!string.IsNullOrWhiteSpace(region))

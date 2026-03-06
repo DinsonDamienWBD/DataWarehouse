@@ -30,7 +30,7 @@ public sealed record MigrationRecord
     public required long SizeBytes { get; init; }
 
     /// <summary>
-    /// Carbon emissions avoided by moving to the greener backend (gCO2e).
+    /// Carbon emissions avoided by moving to the greener backend (gCo2E).
     /// Accounts for the ongoing storage carbon difference over estimated lifetime.
     /// </summary>
     public required double CarbonSavedGrams { get; init; }
@@ -131,7 +131,7 @@ public sealed class ColdDataCarbonMigrationStrategy : SustainabilityStrategyBase
     }
 
     /// <summary>
-    /// Gets the total carbon saved across all migrations (gCO2e).
+    /// Gets the total carbon saved across all migrations (gCo2E).
     /// </summary>
     public double TotalCarbonSavedGrams
     {
@@ -453,7 +453,7 @@ public sealed class ColdDataCarbonMigrationStrategy : SustainabilityStrategyBase
     private static (double carbonSavedGrams, double energySavedWh) CalculateCarbonSavings(
         long sizeBytes, double sourceGreenScore, double targetGreenScore)
     {
-        // Carbon intensity factor: gCO2e per kWh (global average ~400)
+        // Carbon intensity factor: gCo2E per kWh (global average ~400)
         const double baseCarbonIntensity = 400.0;
 
         // Convert green score to effective carbon intensity
@@ -467,7 +467,7 @@ public sealed class ColdDataCarbonMigrationStrategy : SustainabilityStrategyBase
         // Annual storage energy per byte (kWh)
         var annualEnergyKwh = StorageEnergyKwhPerByteYear * sizeBytes;
 
-        // Carbon saved per year (gCO2e)
+        // Carbon saved per year (gCo2E)
         var annualCarbonSaved = annualEnergyKwh * (sourceEffectiveIntensity - targetEffectiveIntensity);
 
         // Project over estimated lifetime
@@ -689,7 +689,7 @@ public sealed record BatchExecutionResult
     /// <summary>Number of failed migration attempts.</summary>
     public required int FailedMigrations { get; init; }
 
-    /// <summary>Total carbon saved across successful migrations (gCO2e).</summary>
+    /// <summary>Total carbon saved across successful migrations (gCo2E).</summary>
     public required double TotalCarbonSavedGrams { get; init; }
 
     /// <summary>Total energy saved across successful migrations (Wh).</summary>
@@ -719,7 +719,7 @@ public sealed record MigrationStatistics
     /// <summary>Total data migrated in bytes.</summary>
     public required long TotalDataMigratedBytes { get; init; }
 
-    /// <summary>Total carbon saved in gCO2e.</summary>
+    /// <summary>Total carbon saved in gCo2E.</summary>
     public required double TotalCarbonSavedGrams { get; init; }
 
     /// <summary>Current retry queue size.</summary>
@@ -728,7 +728,7 @@ public sealed record MigrationStatistics
     /// <summary>Current history buffer size.</summary>
     public required int HistorySize { get; init; }
 
-    /// <summary>Estimated annual carbon savings based on lifetime projection (gCO2e).</summary>
+    /// <summary>Estimated annual carbon savings based on lifetime projection (gCo2E).</summary>
     public required double EstimatedAnnualCarbonSavingsGrams { get; init; }
 
     /// <summary>Total data migrated in human-readable format.</summary>

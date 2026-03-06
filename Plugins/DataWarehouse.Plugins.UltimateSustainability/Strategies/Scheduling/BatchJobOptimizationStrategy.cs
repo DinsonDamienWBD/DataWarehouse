@@ -27,7 +27,7 @@ public sealed class BatchJobOptimizationStrategy : SustainabilityStrategyBase
     /// <inheritdoc/>
     public override string[] Tags => new[] { "batch", "scheduling", "jobs", "carbon", "cost", "optimization" };
 
-    /// <summary>Carbon intensity threshold for immediate execution (gCO2e/kWh).</summary>
+    /// <summary>Carbon intensity threshold for immediate execution (gCo2E/kWh).</summary>
     public double LowCarbonThreshold { get; set; } = 150;
     /// <summary>Maximum delay for batch jobs (hours).</summary>
     public int MaxDelayHours { get; set; } = 24;

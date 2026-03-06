@@ -549,11 +549,11 @@ public class CarbonAwareLifecycleTests : IDisposable
         var now = DateTimeOffset.UtcNow;
         var emissions = strategy.GetEmissionsByOperationType(now.AddHours(-1), now);
 
-        Assert.Equal(10.0, emissions.ReadGramsCO2e);
-        Assert.Equal(25.0, emissions.WriteGramsCO2e);
-        Assert.Equal(5.0, emissions.DeleteGramsCO2e);
-        Assert.Equal(2.0, emissions.ListGramsCO2e);
-        Assert.Equal(42.0, emissions.TotalGramsCO2e);
+        Assert.Equal(10.0, emissions.ReadGramsCo2E);
+        Assert.Equal(25.0, emissions.WriteGramsCo2E);
+        Assert.Equal(5.0, emissions.DeleteGramsCo2E);
+        Assert.Equal(2.0, emissions.ListGramsCo2E);
+        Assert.Equal(42.0, emissions.TotalGramsCo2E);
 
         await strategy.DisposeAsync();
     }

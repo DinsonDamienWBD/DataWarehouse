@@ -28,7 +28,7 @@ public sealed class CarbonFootprintCalculationStrategy : SustainabilityStrategyB
     /// <inheritdoc/>
     public override string[] Tags => new[] { "carbon", "footprint", "emissions", "scope2", "scope3", "ghg" };
 
-    /// <summary>Default carbon intensity (gCO2e/kWh).</summary>
+    /// <summary>Default carbon intensity (gCo2E/kWh).</summary>
     public double DefaultCarbonIntensity { get; set; } = 400;
 
     /// <summary>Scope 3 multiplier for embodied emissions.</summary>
@@ -103,8 +103,8 @@ public sealed class CarbonFootprintCalculationStrategy : SustainabilityStrategyB
                 TotalScope2Grams = _totalScope2Grams,
                 TotalScope3Grams = _totalScope3Grams,
                 TotalEmissionsGrams = _totalScope2Grams + _totalScope3Grams,
-                TotalKgCO2e = (_totalScope2Grams + _totalScope3Grams) / 1000.0,
-                TotalTonsCO2e = (_totalScope2Grams + _totalScope3Grams) / 1_000_000.0
+                TotalKgCo2E = (_totalScope2Grams + _totalScope3Grams) / 1000.0,
+                TotalTonsCo2E = (_totalScope2Grams + _totalScope3Grams) / 1_000_000.0
             };
         }
     }
@@ -137,6 +137,6 @@ public sealed record EmissionsSummary
     public required double TotalScope2Grams { get; init; }
     public required double TotalScope3Grams { get; init; }
     public required double TotalEmissionsGrams { get; init; }
-    public required double TotalKgCO2e { get; init; }
-    public required double TotalTonsCO2e { get; init; }
+    public required double TotalKgCo2E { get; init; }
+    public required double TotalTonsCo2E { get; init; }
 }

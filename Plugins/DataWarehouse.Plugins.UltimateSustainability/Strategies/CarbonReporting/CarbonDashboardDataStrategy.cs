@@ -16,7 +16,7 @@ public sealed record TimeSeriesPoint
     /// <summary>Metric value at this timestamp.</summary>
     public required double Value { get; init; }
 
-    /// <summary>Unit of the value (e.g., "gCO2e/kWh", "%", "gCO2e").</summary>
+    /// <summary>Unit of the value (e.g., "gCo2E/kWh", "%", "gCo2E").</summary>
     public required string Unit { get; init; }
 }
 
@@ -26,19 +26,19 @@ public sealed record TimeSeriesPoint
 public sealed record EmissionsByOperationType
 {
     /// <summary>Emissions from read operations in grams CO2e.</summary>
-    public double ReadGramsCO2e { get; init; }
+    public double ReadGramsCo2E { get; init; }
 
     /// <summary>Emissions from write operations in grams CO2e.</summary>
-    public double WriteGramsCO2e { get; init; }
+    public double WriteGramsCo2E { get; init; }
 
     /// <summary>Emissions from delete operations in grams CO2e.</summary>
-    public double DeleteGramsCO2e { get; init; }
+    public double DeleteGramsCo2E { get; init; }
 
     /// <summary>Emissions from list operations in grams CO2e.</summary>
-    public double ListGramsCO2e { get; init; }
+    public double ListGramsCo2E { get; init; }
 
     /// <summary>Total emissions across all operation types in grams CO2e.</summary>
-    public double TotalGramsCO2e => ReadGramsCO2e + WriteGramsCO2e + DeleteGramsCO2e + ListGramsCO2e;
+    public double TotalGramsCo2E => ReadGramsCo2E + WriteGramsCo2E + DeleteGramsCo2E + ListGramsCo2E;
 }
 
 /// <summary>
@@ -78,7 +78,7 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
 {
     private const string PluginId = "com.datawarehouse.sustainability.ultimate";
 
-    // Default carbon intensity for emission calculations (gCO2e/kWh)
+    // Default carbon intensity for emission calculations (gCo2E/kWh)
     private const double DefaultCarbonIntensity = 400.0;
 
     // Maximum data retention (default 7 days)
@@ -177,7 +177,7 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
         ArgumentException.ThrowIfNullOrWhiteSpace(region);
 
         var key = $"carbon-intensity:{region}";
-        return AggregateTimeSeries(key, period, granularity, "gCO2e/kWh");
+        return AggregateTimeSeries(key, period, granularity, "gCo2E/kWh");
     }
 
     /// <summary>
@@ -228,10 +228,10 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
         // since we accumulate in real-time without per-operation timestamps in the accumulator)
         return new EmissionsByOperationType
         {
-            ReadGramsCO2e = _emissionsByOpType.GetValueOrDefault("read", 0),
-            WriteGramsCO2e = _emissionsByOpType.GetValueOrDefault("write", 0),
-            DeleteGramsCO2e = _emissionsByOpType.GetValueOrDefault("delete", 0),
-            ListGramsCO2e = _emissionsByOpType.GetValueOrDefault("list", 0)
+            ReadGramsCo2E = _emissionsByOpType.GetValueOrDefault("read", 0),
+            WriteGramsCo2E = _emissionsByOpType.GetValueOrDefault("write", 0),
+            DeleteGramsCo2E = _emissionsByOpType.GetValueOrDefault("delete", 0),
+            ListGramsCo2E = _emissionsByOpType.GetValueOrDefault("list", 0)
         };
     }
 
@@ -262,10 +262,10 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
     /// <summary>
     /// Records a carbon intensity data point for a region.
     /// </summary>
-    public void RecordCarbonIntensity(string region, double intensityGCO2ePerKwh)
+    public void RecordCarbonIntensity(string region, double intensityGco2EPerKwh)
     {
         var key = $"carbon-intensity:{region}";
-        AddTimeSeriesPoint(key, intensityGCO2ePerKwh, "gCO2e/kWh");
+        AddTimeSeriesPoint(key, intensityGco2EPerKwh, "gCo2E/kWh");
     }
 
     /// <summary>
@@ -293,20 +293,20 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
     /// <summary>
     /// Records emissions for a specific operation type.
     /// </summary>
-    public void RecordOperationEmission(string operationType, double emissionsGramsCO2e)
+    public void RecordOperationEmission(string operationType, double emissionsGramsCo2E)
     {
         var normalizedType = NormalizeOperationType(operationType);
-        _emissionsByOpType.AddOrUpdate(normalizedType, emissionsGramsCO2e,
-            (_, existing) => existing + emissionsGramsCO2e);
+        _emissionsByOpType.AddOrUpdate(normalizedType, emissionsGramsCo2E,
+            (_, existing) => existing + emissionsGramsCo2E);
     }
 
     /// <summary>
     /// Records emissions attributed to a specific tenant.
     /// </summary>
-    public void RecordTenantEmission(string tenantId, double emissionsGramsCO2e, double energyWh)
+    public void RecordTenantEmission(string tenantId, double emissionsGramsCo2E, double energyWh)
     {
         var accumulator = _tenantEmissions.GetOrAdd(tenantId, _ => new TenantAccumulator(tenantId));
-        accumulator.Add(emissionsGramsCO2e, energyWh);
+        accumulator.Add(emissionsGramsCo2E, energyWh);
     }
 
     #endregion

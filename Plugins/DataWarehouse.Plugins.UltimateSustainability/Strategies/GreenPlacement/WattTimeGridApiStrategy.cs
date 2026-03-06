@@ -21,7 +21,7 @@ public sealed class WattTimeGridApiStrategy : SustainabilityStrategyBase
     private const string DefaultApiEndpoint = "https://api.watttime.org/v3";
     private const int DefaultCacheTtlSeconds = 300; // 5 minutes
     private const int MaxRetries = 3;
-    private const double MoerToGCO2ePerKwhFactor = 453.592 / 1000.0; // lbs CO2/MWh -> gCO2e/kWh
+    private const double MoerToGco2EPerKwhFactor = 453.592 / 1000.0; // lbs CO2/MWh -> gCo2E/kWh
 
     private readonly HttpClient _httpClient;
     private readonly BoundedDictionary<string, (GridCarbonData Data, DateTimeOffset Expiry)> _cache = new BoundedDictionary<string, (GridCarbonData Data, DateTimeOffset Expiry)>(1000);
@@ -295,7 +295,7 @@ public sealed class WattTimeGridApiStrategy : SustainabilityStrategyBase
 
                 var latestPoint = signalResponse.Data[0];
                 var moer = latestPoint.Value;
-                var carbonIntensity = moer * MoerToGCO2ePerKwhFactor;
+                var carbonIntensity = moer * MoerToGco2EPerKwhFactor;
 
                 return new GridCarbonData
                 {
@@ -352,7 +352,7 @@ public sealed class WattTimeGridApiStrategy : SustainabilityStrategyBase
 
                 // Average over forecast data points
                 var avgMoer = forecastResponse.Data.Average(d => d.Value);
-                var carbonIntensity = avgMoer * MoerToGCO2ePerKwhFactor;
+                var carbonIntensity = avgMoer * MoerToGco2EPerKwhFactor;
 
                 return new GridCarbonData
                 {
@@ -362,7 +362,7 @@ public sealed class WattTimeGridApiStrategy : SustainabilityStrategyBase
                     RenewablePercentage = EstimateRenewableFromMoer(avgMoer),
                     Source = GridDataSource.WattTime,
                     ForecastHours = 24,
-                    MarginalIntensity = forecastResponse.Data[0].Value * MoerToGCO2ePerKwhFactor,
+                    MarginalIntensity = forecastResponse.Data[0].Value * MoerToGco2EPerKwhFactor,
                     AverageIntensity = carbonIntensity
                 };
             }

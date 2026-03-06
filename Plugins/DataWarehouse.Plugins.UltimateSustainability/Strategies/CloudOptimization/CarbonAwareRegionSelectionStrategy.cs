@@ -129,7 +129,7 @@ public sealed class CarbonAwareRegionSelectionStrategy : SustainabilityStrategyB
             CarbonIntensity = scored.First().SnapshotCarbon,
             LatencyMs = selected.LatencyMs,
             CostMultiplier = selected.CostMultiplier,
-            CarbonSavedGCO2ePerKwh = carbonSaved,
+            CarbonSavedGco2EPerKwh = carbonSaved,
             AlternativeRegions = scored.Skip(1).Take(3).Select(x => x.Region.RegionId).ToList()
         };
     }
@@ -215,7 +215,7 @@ public sealed class CarbonAwareRegionSelectionStrategy : SustainabilityStrategyB
             RecommendationId = $"{StrategyId}-greenest",
             Type = "GreenestRegion",
             Priority = 5,
-            Description = $"Greenest region: {greenest.Name} ({greenest.ci:F0} gCO2e/kWh)",
+            Description = $"Greenest region: {greenest.Name} ({greenest.ci:F0} gCo2E/kWh)",
             CanAutoApply = false
         });
     }
@@ -243,6 +243,6 @@ public sealed record RegionSelectionResult
     public double CarbonIntensity { get; init; }
     public int LatencyMs { get; init; }
     public double CostMultiplier { get; init; }
-    public double CarbonSavedGCO2ePerKwh { get; init; }
+    public double CarbonSavedGco2EPerKwh { get; init; }
     public List<string>? AlternativeRegions { get; init; }
 }

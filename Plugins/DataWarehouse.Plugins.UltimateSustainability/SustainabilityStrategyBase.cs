@@ -159,7 +159,7 @@ public sealed class SustainabilityStatistics
     public double PeakPowerWatts { get; set; }
 
     /// <summary>
-    /// Current carbon intensity (gCO2e/kWh).
+    /// Current carbon intensity (gCo2E/kWh).
     /// </summary>
     public double CurrentCarbonIntensity { get; set; }
 
@@ -200,7 +200,7 @@ public sealed record EnergyReading
     public double EnergyWh { get; init; }
 
     /// <summary>
-    /// Current carbon intensity of the grid (gCO2e/kWh).
+    /// Current carbon intensity of the grid (gCo2E/kWh).
     /// </summary>
     public double CarbonIntensity { get; init; }
 
@@ -236,7 +236,7 @@ public sealed record CarbonEmission
     public double EnergyConsumedWh { get; init; }
 
     /// <summary>
-    /// Carbon intensity used for calculation (gCO2e/kWh).
+    /// Carbon intensity used for calculation (gCo2E/kWh).
     /// </summary>
     public double CarbonIntensity { get; init; }
 

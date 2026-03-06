@@ -46,7 +46,7 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
     public int MaxDelayMs { get; set; } = 2000;
 
     /// <summary>
-    /// Default carbon grid intensity (gCO2e/kWh) used to convert energy to carbon
+    /// Default carbon grid intensity (gCo2E/kWh) used to convert energy to carbon
     /// when no real-time intensity data is available from the bus.
     /// </summary>
     public double DefaultCarbonIntensityGco2EPerKwh { get; set; } = 400.0;
@@ -175,7 +175,7 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
     }
 
     /// <inheritdoc/>
-    public async Task SetBudgetAsync(string tenantId, double budgetGramsCO2e, CarbonBudgetPeriod period, CancellationToken ct = default)
+    public async Task SetBudgetAsync(string tenantId, double budgetGramsCo2E, CarbonBudgetPeriod period, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
 
@@ -195,7 +195,7 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
         {
             TenantId = tenantId,
             BudgetPeriod = period,
-            BudgetGramsCo2E = budgetGramsCO2e,
+            BudgetGramsCo2E = budgetGramsCo2E,
             UsedGramsCo2E = usedGrams,
             ThrottleThresholdPercent = DefaultThrottleThresholdPercent,
             HardLimitPercent = DefaultHardLimitPercent,
@@ -209,7 +209,7 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
     }
 
     /// <inheritdoc/>
-    public async Task<bool> CanProceedAsync(string tenantId, double estimatedCarbonGramsCO2e, CancellationToken ct = default)
+    public async Task<bool> CanProceedAsync(string tenantId, double estimatedCarbonGramsCo2E, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
 
@@ -218,7 +218,7 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
             return true; // No budget = unlimited
 
         // Check if estimated usage would exceed hard limit
-        var projectedUsage = budget.UsedGramsCo2E + estimatedCarbonGramsCO2e;
+        var projectedUsage = budget.UsedGramsCo2E + estimatedCarbonGramsCo2E;
         var projectedPercent = budget.BudgetGramsCo2E > 0
             ? (projectedUsage / budget.BudgetGramsCo2E) * 100.0
             : 0;
@@ -227,12 +227,12 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
     }
 
     /// <inheritdoc/>
-    public async Task RecordUsageAsync(string tenantId, double carbonGramsCO2e, string operationType, CancellationToken ct = default)
+    public async Task RecordUsageAsync(string tenantId, double carbonGramsCo2E, string operationType, CancellationToken ct = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(tenantId);
 
         // Record to store (atomic)
-        var recorded = await _store.RecordUsageAsync(tenantId, carbonGramsCO2e).ConfigureAwait(false);
+        var recorded = await _store.RecordUsageAsync(tenantId, carbonGramsCo2E).ConfigureAwait(false);
         if (!recorded)
         {
             // Budget exhausted -- publish exhaustion event
@@ -257,9 +257,9 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
         {
             ["tenantId"] = tenantId,
             ["operationType"] = operationType,
-            ["carbonGramsCO2e"] = carbonGramsCO2e,
+            ["carbonGramsCo2E"] = carbonGramsCo2E,
             ["totalUsedGramsCo2E"] = budget.UsedGramsCo2E,
-            ["remainingGramsCO2e"] = budget.RemainingGramsCo2E,
+            ["remainingGramsCo2E"] = budget.RemainingGramsCo2E,
             ["usagePercent"] = usagePercent,
             ["timestamp"] = DateTimeOffset.UtcNow
         });
@@ -357,7 +357,7 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
 
     /// <summary>
     /// Subscribes to energy measurement events on the message bus.
-    /// When an energy measurement is received, converts Wh to gCO2e
+    /// When an energy measurement is received, converts Wh to gCo2E
     /// using current grid intensity and records it against the tenant's budget.
     /// </summary>
     private void SubscribeToEnergyEvents()
@@ -393,7 +393,7 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
                         TimeSpan.FromSeconds(2)).ConfigureAwait(false);
 
                     if (response.Success && response.Payload is IDictionary<string, object> intensityData &&
-                        intensityData.TryGetValue("carbonIntensityGCO2ePerKwh", out var ci) &&
+                        intensityData.TryGetValue("carbonIntensityGco2EPerKwh", out var ci) &&
                         ci is double ciValue && ciValue > 0)
                     {
                         carbonIntensity = ciValue;
@@ -406,7 +406,7 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
                     System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
                 }
 
-                // Convert Wh to gCO2e: gCO2e = Wh * (gCO2e/kWh) / 1000
+                // Convert Wh to gCo2E: gCo2E = Wh * (gCo2E/kWh) / 1000
                 var carbonGrams = energyWh * carbonIntensity / 1000.0;
 
                 await RecordUsageAsync(tenantId, carbonGrams, operationType).ConfigureAwait(false);
@@ -525,9 +525,9 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
         PublishMessage(topic, new Dictionary<string, object>
         {
             ["tenantId"] = tenantId,
-            ["budgetGramsCO2e"] = budget.BudgetGramsCo2E,
-            ["usedGramsCO2e"] = budget.UsedGramsCo2E,
-            ["remainingGramsCO2e"] = budget.RemainingGramsCo2E,
+            ["budgetGramsCo2E"] = budget.BudgetGramsCo2E,
+            ["usedGramsCo2E"] = budget.UsedGramsCo2E,
+            ["remainingGramsCo2E"] = budget.RemainingGramsCo2E,
             ["budgetPeriod"] = budget.BudgetPeriod.ToString(),
             ["periodStart"] = budget.PeriodStart,
             ["periodEnd"] = budget.PeriodEnd,
