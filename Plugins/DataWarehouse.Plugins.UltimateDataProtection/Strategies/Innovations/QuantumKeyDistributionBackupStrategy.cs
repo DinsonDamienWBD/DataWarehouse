@@ -1228,7 +1228,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         public enum QkdProtocol
         {
             /// <summary>BB84 protocol.</summary>
-            BB84,
+            Bb84,
 
             /// <summary>E91 protocol (entanglement-based).</summary>
             E91,
