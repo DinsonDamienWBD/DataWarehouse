@@ -171,7 +171,7 @@ public sealed class MeilisearchStorageStrategy : DatabaseStorageStrategyBase
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
     {
         // Paginate using Offset + Limit to avoid silently truncating beyond 1000 docs.
-        const int PageSize = 1000;
+        const int pageSize = 1000;
         int offset = 0;
 
         while (true)
@@ -183,7 +183,7 @@ public sealed class MeilisearchStorageStrategy : DatabaseStorageStrategyBase
             // exact ordinal prefix match to eliminate false positives from typo-tolerance.
             var searchParams = new SearchQuery
             {
-                Limit = PageSize,
+                Limit = pageSize,
                 Offset = offset,
                 AttributesToRetrieve = new[] { "key", "size", "contentType", "etag", "metadata", "createdAt", "modifiedAt" },
                 AttributesToSearchOn = new[] { "key" },
@@ -219,10 +219,10 @@ public sealed class MeilisearchStorageStrategy : DatabaseStorageStrategyBase
                 };
             }
 
-            if (result.Hits.Count < PageSize)
+            if (result.Hits.Count < pageSize)
                 yield break;
 
-            offset += PageSize;
+            offset += pageSize;
         }
     }
 

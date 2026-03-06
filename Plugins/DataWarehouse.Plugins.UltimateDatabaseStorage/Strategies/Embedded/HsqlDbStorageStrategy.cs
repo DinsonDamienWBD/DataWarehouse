@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateDatabaseStorage.Strategies.Embedded;
 public sealed class HsqlDbStorageStrategy : DatabaseStorageStrategyBase
 {
     private DbConnection? _connection;
-    private string _databasePath = "mem:datawarehouse";
+    internal string DatabasePath { get; private set; } = "mem:datawarehouse";
     private string _tableName = "storage";
     private readonly object _lock = new();
 
@@ -54,7 +54,7 @@ public sealed class HsqlDbStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
-        _databasePath = GetConfiguration("DatabasePath", "mem:datawarehouse");
+        DatabasePath = GetConfiguration("DatabasePath", "mem:datawarehouse");
         _tableName = GetConfiguration("TableName", "storage");
 
         await Task.CompletedTask;

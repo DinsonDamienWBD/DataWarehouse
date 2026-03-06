@@ -198,7 +198,7 @@ public sealed class OpenSearchStorageStrategy : DatabaseStorageStrategyBase
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
     {
         // Use From/Size pagination to avoid the 10 000-hit limit.
-        const int PageSize = 1000;
+        const int pageSize = 1000;
         int from = 0;
 
         while (true)
@@ -212,7 +212,7 @@ public sealed class OpenSearchStorageStrategy : DatabaseStorageStrategyBase
                     ? q.MatchAll()
                     : q.Prefix(p => p.Field(f => f.Key).Value(prefix)))
                 .From(localFrom)
-                .Size(PageSize)
+                .Size(pageSize)
                 .Sort(so => so.Ascending(f => f.Key))
                 .Source(src => src.Excludes(e => e.Field(f => f.Data))), ct);
 
@@ -242,10 +242,10 @@ public sealed class OpenSearchStorageStrategy : DatabaseStorageStrategyBase
                 };
             }
 
-            if (searchResponse.Hits.Count < PageSize)
+            if (searchResponse.Hits.Count < pageSize)
                 yield break;
 
-            from += PageSize;
+            from += pageSize;
         }
     }
 

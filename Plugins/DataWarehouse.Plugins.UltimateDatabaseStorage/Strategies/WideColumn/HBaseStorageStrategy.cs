@@ -174,7 +174,7 @@ public sealed class HBaseStorageStrategy : DatabaseStorageStrategyBase
             throw new FileNotFoundException($"Object not found: {key}");
         }
 
-        return Convert.FromBase64String(cell.value);
+        return Convert.FromBase64String(cell.Value);
     }
 
     protected override async Task<long> DeleteCoreAsync(string key, CancellationToken ct)
@@ -227,7 +227,7 @@ public sealed class HBaseStorageStrategy : DatabaseStorageStrategyBase
 
                 foreach (var row in batch.Row)
                 {
-                    var key = Encoding.UTF8.GetString(Convert.FromBase64String(row.key));
+                    var key = Encoding.UTF8.GetString(Convert.FromBase64String(row.Key));
 
                     if (!string.IsNullOrEmpty(prefix) && !key.StartsWith(prefix, StringComparison.Ordinal))
                     {
@@ -235,8 +235,8 @@ public sealed class HBaseStorageStrategy : DatabaseStorageStrategyBase
                     }
 
                     var cells = row.Cell?.ToDictionary(
-                        c => Encoding.UTF8.GetString(Convert.FromBase64String(c.column)),
-                        c => c.value) ?? new Dictionary<string, string>();
+                        c => Encoding.UTF8.GetString(Convert.FromBase64String(c.Column)),
+                        c => c.Value) ?? new Dictionary<string, string>();
 
                     long size = 0;
                     if (cells.TryGetValue($"{_columnFamily}:size", out var sizeB64))
@@ -297,8 +297,8 @@ public sealed class HBaseStorageStrategy : DatabaseStorageStrategyBase
         }
 
         var cells = row.Cell?.ToDictionary(
-            c => Encoding.UTF8.GetString(Convert.FromBase64String(c.column)),
-            c => c.value) ?? new Dictionary<string, string>();
+            c => Encoding.UTF8.GetString(Convert.FromBase64String(c.Column)),
+            c => c.Value) ?? new Dictionary<string, string>();
 
         long size = 0;
         if (cells.TryGetValue($"{_columnFamily}:size", out var sizeB64))
@@ -365,14 +365,14 @@ public sealed class HBaseStorageStrategy : DatabaseStorageStrategyBase
 
     private sealed class HBaseRow
     {
-        public string key { get; set; } = "";
+        public string Key { get; set; } = "";
         public HBaseCell[]? Cell { get; set; }
     }
 
     private sealed class HBaseCell
     {
-        public string column { get; set; } = "";
-        public long timestamp { get; set; }
-        public string value { get; set; } = "";
+        public string Column { get; set; } = "";
+        public long Timestamp { get; set; }
+        public string Value { get; set; } = "";
     }
 }

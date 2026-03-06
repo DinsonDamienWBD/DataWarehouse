@@ -188,7 +188,7 @@ public sealed class TypesenseStorageStrategy : DatabaseStorageStrategyBase
     protected override async IAsyncEnumerable<StorageObjectMetadata> ListCoreAsync(string? prefix, [EnumeratorCancellation] CancellationToken ct)
     {
         // Paginate using page + per_page to avoid the 250-hit limit.
-        const int PageSize = 250;
+        const int pageSize = 250;
         int page = 1;
 
         // P2-2839: Use filter_by for structural prefix filtering instead of keyword search
@@ -203,7 +203,7 @@ public sealed class TypesenseStorageStrategy : DatabaseStorageStrategyBase
             ct.ThrowIfCancellationRequested();
 
             var response = await _httpClient!.GetAsync(
-                $"/collections/{_collectionName}/documents/search?q=*&query_by=key&per_page={PageSize}&page={page}&exclude_fields=data{filterBy}", ct);
+                $"/collections/{_collectionName}/documents/search?q=*&query_by=key&per_page={pageSize}&page={page}&exclude_fields=data{filterBy}", ct);
 
             if (!response.IsSuccessStatusCode)
                 yield break;
@@ -240,7 +240,7 @@ public sealed class TypesenseStorageStrategy : DatabaseStorageStrategyBase
                 };
             }
 
-            if (hitCount < PageSize)
+            if (hitCount < pageSize)
                 yield break;
 
             page++;

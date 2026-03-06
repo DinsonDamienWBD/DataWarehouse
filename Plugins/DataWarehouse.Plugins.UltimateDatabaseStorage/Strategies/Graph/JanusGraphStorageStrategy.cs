@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateDatabaseStorage.Strategies.Graph;
 public sealed class JanusGraphStorageStrategy : DatabaseStorageStrategyBase
 {
     private GremlinClient? _client;
-    private GraphTraversalSource? _g;
+    internal GraphTraversalSource? TraversalSource { get; private set; }
     private string _vertexLabel = "StorageObject";
 
     public override string StrategyId => "janusgraph";
@@ -80,7 +80,7 @@ public sealed class JanusGraphStorageStrategy : DatabaseStorageStrategyBase
                 ReconnectionBaseDelay = TimeSpan.FromSeconds(1)
             });
 
-        _g = AnonymousTraversalSource.Traversal()
+        TraversalSource = AnonymousTraversalSource.Traversal()
             .With(new DriverRemoteConnection(_client));
 
         await EnsureSchemaCoreAsync(ct);
@@ -97,7 +97,7 @@ public sealed class JanusGraphStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task DisconnectCoreAsync(CancellationToken ct)
     {
-        _g = null;
+        TraversalSource = null;
         if (_client != null)
         {
             _client.Dispose();
@@ -331,7 +331,7 @@ public sealed class JanusGraphStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async ValueTask DisposeAsyncCore()
     {
-        _g = null;
+        TraversalSource = null;
         _client?.Dispose();
         await base.DisposeAsyncCore();
     }

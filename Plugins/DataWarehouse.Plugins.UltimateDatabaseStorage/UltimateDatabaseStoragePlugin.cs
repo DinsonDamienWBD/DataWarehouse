@@ -521,11 +521,10 @@ public sealed class UltimateDatabaseStoragePlugin : DataWarehouse.SDK.Contracts.
             {
                 await strategy.DisposeAsync();
             }
-            catch
+            catch (Exception ex)
             {
-
-                // Ignore disposal errors
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                System.Diagnostics.Trace.TraceWarning(
+                    $"[UltimateDatabaseStorage] Strategy disposal error: {ex.Message}");
             }
         }
 

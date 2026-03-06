@@ -351,7 +351,7 @@ public sealed class MongoDbStorageStrategy : DatabaseStorageStrategyBase
     }
 
     // P2-2832: Dangerous MongoDB aggregation operators that can exfiltrate/overwrite data.
-    private static readonly HashSet<string> _blockedOperators = new(StringComparer.OrdinalIgnoreCase)
+    private static readonly HashSet<string> BlockedOperators = new(StringComparer.OrdinalIgnoreCase)
     {
         "$out", "$merge", "$lookup", "$unionWith", "$graphLookup", "$function", "$accumulator"
     };
@@ -364,7 +364,7 @@ public sealed class MongoDbStorageStrategy : DatabaseStorageStrategyBase
         var pipeline = BsonDocument.Parse(query);
         foreach (var element in pipeline.Elements)
         {
-            if (_blockedOperators.Contains(element.Name))
+            if (BlockedOperators.Contains(element.Name))
                 throw new InvalidOperationException(
                     $"MongoDB aggregation operator '{element.Name}' is blocked for security reasons.");
         }

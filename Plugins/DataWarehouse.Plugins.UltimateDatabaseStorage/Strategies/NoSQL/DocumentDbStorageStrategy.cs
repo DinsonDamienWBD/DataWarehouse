@@ -375,7 +375,7 @@ public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
 
     private sealed class CosmosTransaction : IDatabaseTransaction
     {
-        private readonly Container _container;
+        internal Container TransactionContainer { get; }
         private readonly TransactionalBatch _batch;
         private bool _disposed;
         private bool _committed;
@@ -385,7 +385,7 @@ public sealed class DocumentDbStorageStrategy : DatabaseStorageStrategyBase
 
         public CosmosTransaction(Container container)
         {
-            _container = container;
+            TransactionContainer = container;
             _batch = container.CreateTransactionalBatch(new PartitionKey("default"));
         }
 

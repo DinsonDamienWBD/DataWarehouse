@@ -170,12 +170,12 @@ public static class GraphVisualizationExport
     /// <param name="edges">Graph edges.</param>
     /// <param name="options">Export options.</param>
     /// <returns>GraphML XML string.</returns>
-    public static string ExportToGraphML(
+    public static string ExportToGraphMl(
         IEnumerable<GraphVisualizationNode> nodes,
         IEnumerable<GraphVisualizationEdge> edges,
-        GraphMLExportOptions? options = null)
+        GraphMlExportOptions? options = null)
     {
-        options ??= new GraphMLExportOptions();
+        options ??= new GraphMlExportOptions();
 
         var settings = new XmlWriterSettings
         {
@@ -190,15 +190,15 @@ public static class GraphVisualizationExport
         writer.WriteStartElement("graphml", "http://graphml.graphdrawing.org/xmlns");
 
         // Define attribute keys
-        WriteGraphMLKey(writer, "label", "node", "string");
-        WriteGraphMLKey(writer, "size", "node", "double");
-        WriteGraphMLKey(writer, "color", "node", "string");
-        WriteGraphMLKey(writer, "group", "node", "string");
-        WriteGraphMLKey(writer, "x", "node", "double");
-        WriteGraphMLKey(writer, "y", "node", "double");
-        WriteGraphMLKey(writer, "weight", "edge", "double");
-        WriteGraphMLKey(writer, "edgeLabel", "edge", "string");
-        WriteGraphMLKey(writer, "edgeColor", "edge", "string");
+        WriteGraphMlKey(writer, "label", "node", "string");
+        WriteGraphMlKey(writer, "size", "node", "double");
+        WriteGraphMlKey(writer, "color", "node", "string");
+        WriteGraphMlKey(writer, "group", "node", "string");
+        WriteGraphMlKey(writer, "x", "node", "double");
+        WriteGraphMlKey(writer, "y", "node", "double");
+        WriteGraphMlKey(writer, "weight", "edge", "double");
+        WriteGraphMlKey(writer, "edgeLabel", "edge", "string");
+        WriteGraphMlKey(writer, "edgeColor", "edge", "string");
 
         // Start graph
         writer.WriteStartElement("graph");
@@ -212,17 +212,17 @@ public static class GraphVisualizationExport
             writer.WriteAttributeString("id", node.Id);
 
             if (node.Label != null)
-                WriteGraphMLData(writer, "label", node.Label);
+                WriteGraphMlData(writer, "label", node.Label);
             if (node.Size.HasValue)
-                WriteGraphMLData(writer, "size", node.Size.Value.ToString(CultureInfo.InvariantCulture));
+                WriteGraphMlData(writer, "size", node.Size.Value.ToString(CultureInfo.InvariantCulture));
             if (node.Color != null)
-                WriteGraphMLData(writer, "color", node.Color);
+                WriteGraphMlData(writer, "color", node.Color);
             if (node.Group != null)
-                WriteGraphMLData(writer, "group", node.Group);
+                WriteGraphMlData(writer, "group", node.Group);
             if (node.X.HasValue)
-                WriteGraphMLData(writer, "x", node.X.Value.ToString(CultureInfo.InvariantCulture));
+                WriteGraphMlData(writer, "x", node.X.Value.ToString(CultureInfo.InvariantCulture));
             if (node.Y.HasValue)
-                WriteGraphMLData(writer, "y", node.Y.Value.ToString(CultureInfo.InvariantCulture));
+                WriteGraphMlData(writer, "y", node.Y.Value.ToString(CultureInfo.InvariantCulture));
 
             writer.WriteEndElement(); // node
         }
@@ -237,11 +237,11 @@ public static class GraphVisualizationExport
             writer.WriteAttributeString("target", edge.TargetId);
 
             if (edge.Weight.HasValue)
-                WriteGraphMLData(writer, "weight", edge.Weight.Value.ToString(CultureInfo.InvariantCulture));
+                WriteGraphMlData(writer, "weight", edge.Weight.Value.ToString(CultureInfo.InvariantCulture));
             if (edge.Label != null)
-                WriteGraphMLData(writer, "edgeLabel", edge.Label);
+                WriteGraphMlData(writer, "edgeLabel", edge.Label);
             if (edge.Color != null)
-                WriteGraphMLData(writer, "edgeColor", edge.Color);
+                WriteGraphMlData(writer, "edgeColor", edge.Color);
 
             writer.WriteEndElement(); // edge
         }
@@ -253,7 +253,7 @@ public static class GraphVisualizationExport
         return sb.ToString();
     }
 
-    private static void WriteGraphMLKey(XmlWriter writer, string id, string @for, string type)
+    private static void WriteGraphMlKey(XmlWriter writer, string id, string @for, string type)
     {
         writer.WriteStartElement("key");
         writer.WriteAttributeString("id", id);
@@ -263,7 +263,7 @@ public static class GraphVisualizationExport
         writer.WriteEndElement();
     }
 
-    private static void WriteGraphMLData(XmlWriter writer, string key, string value)
+    private static void WriteGraphMlData(XmlWriter writer, string key, string value)
     {
         writer.WriteStartElement("data");
         writer.WriteAttributeString("key", key);
@@ -780,7 +780,7 @@ public sealed class CytoscapeExportOptions
 /// <summary>
 /// GraphML export options.
 /// </summary>
-public sealed class GraphMLExportOptions
+public sealed class GraphMlExportOptions
 {
     /// <summary>Gets or sets the graph ID.</summary>
     public string GraphId { get; set; } = "G";

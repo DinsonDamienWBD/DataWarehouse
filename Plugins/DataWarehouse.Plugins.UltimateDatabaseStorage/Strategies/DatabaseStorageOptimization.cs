@@ -96,14 +96,14 @@ public sealed class DatabaseIndexManager
         IndexType.BTree => 8192L * fieldCount,
         IndexType.Hash => 4096L * fieldCount,
         IndexType.FullText => 32768L * fieldCount,
-        IndexType.GiST => 16384L * fieldCount,
+        IndexType.GiSt => 16384L * fieldCount,
         IndexType.Spatial => 16384L * fieldCount,
         _ => 8192L * fieldCount
     };
 }
 
 /// <summary>Index types.</summary>
-public enum IndexType { BTree, Hash, FullText, GiST, Spatial, Bitmap, Bloom }
+public enum IndexType { BTree, Hash, FullText, GiSt, Spatial, Bitmap, Bloom }
 
 /// <summary>Index status.</summary>
 public enum IndexStatus { Active, Building, Invalid, Disabled }

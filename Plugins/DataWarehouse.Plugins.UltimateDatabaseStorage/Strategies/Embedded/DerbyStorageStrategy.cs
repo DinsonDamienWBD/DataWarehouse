@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateDatabaseStorage.Strategies.Embedded;
 public sealed class DerbyStorageStrategy : DatabaseStorageStrategyBase
 {
     private DbConnection? _connection;
-    private string _databasePath = "memory:datawarehouse";
+    internal string DatabasePath { get; private set; } = "memory:datawarehouse";
     private string _tableName = "STORAGE";
     private readonly object _lock = new();
 
@@ -54,7 +54,7 @@ public sealed class DerbyStorageStrategy : DatabaseStorageStrategyBase
 
     protected override async Task InitializeCoreAsync(CancellationToken ct)
     {
-        _databasePath = GetConfiguration("DatabasePath", "memory:datawarehouse");
+        DatabasePath = GetConfiguration("DatabasePath", "memory:datawarehouse");
         _tableName = GetConfiguration("TableName", "STORAGE").ToUpperInvariant();
 
         await Task.CompletedTask;

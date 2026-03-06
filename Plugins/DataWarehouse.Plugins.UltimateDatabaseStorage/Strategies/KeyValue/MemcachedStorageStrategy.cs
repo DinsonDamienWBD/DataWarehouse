@@ -33,7 +33,7 @@ public sealed class MemcachedStorageStrategy : DatabaseStorageStrategyBase
     // lazily. Multi-process deployments still round-trip Memcached under the lock.
     private HashSet<string>? _cachedIndex;
     private DateTime _cacheValidUntil = DateTime.MinValue;
-    private static readonly TimeSpan _cacheValidFor = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan CacheValidFor = TimeSpan.FromSeconds(5);
 
     public override string StrategyId => "memcached";
     public override string Name => "Memcached Storage";
@@ -289,7 +289,7 @@ public sealed class MemcachedStorageStrategy : DatabaseStorageStrategyBase
                     ? JsonSerializer.Deserialize<HashSet<string>>(indexResult.Value, JsonOptions) ?? new HashSet<string>()
                     : new HashSet<string>();
                 _cachedIndex = keys;
-                _cacheValidUntil = DateTime.UtcNow.Add(_cacheValidFor);
+                _cacheValidUntil = DateTime.UtcNow.Add(CacheValidFor);
             }
 
             if (keys.Add(key))
@@ -320,7 +320,7 @@ public sealed class MemcachedStorageStrategy : DatabaseStorageStrategyBase
                 if (!indexResult.Success || string.IsNullOrEmpty(indexResult.Value)) return;
                 keys = JsonSerializer.Deserialize<HashSet<string>>(indexResult.Value, JsonOptions) ?? new HashSet<string>();
                 _cachedIndex = keys;
-                _cacheValidUntil = DateTime.UtcNow.Add(_cacheValidFor);
+                _cacheValidUntil = DateTime.UtcNow.Add(CacheValidFor);
             }
 
             if (keys.Remove(key))

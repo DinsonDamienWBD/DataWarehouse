@@ -201,7 +201,7 @@ public sealed class ElasticsearchStorageStrategy : DatabaseStorageStrategyBase
         // Use From/Size pagination to avoid silently truncating large indexes.
         // PageSize is intentionally bounded; callers enumerate the full result via the
         // async stream rather than a single capped query.
-        const int PageSize = 1000;
+        const int pageSize = 1000;
         int from = 0;
 
         while (true)
@@ -215,7 +215,7 @@ public sealed class ElasticsearchStorageStrategy : DatabaseStorageStrategyBase
                 searchResponse = await _client!.SearchAsync<StorageDocument>(s => s
                     .Indices(_indexName)
                     .From(localFrom)
-                    .Size(PageSize)
+                    .Size(pageSize)
                     .Sort(so => so.Field(f => f.Key, d => d.Order(Elastic.Clients.Elasticsearch.SortOrder.Asc))), ct);
             }
             else
@@ -224,7 +224,7 @@ public sealed class ElasticsearchStorageStrategy : DatabaseStorageStrategyBase
                     .Indices(_indexName)
                     .Query(q => q.Prefix(p => p.Field(f => f.Key).Value(prefix)))
                     .From(localFrom)
-                    .Size(PageSize)
+                    .Size(pageSize)
                     .Sort(so => so.Field(f => f.Key, d => d.Order(Elastic.Clients.Elasticsearch.SortOrder.Asc))), ct);
             }
 
@@ -255,10 +255,10 @@ public sealed class ElasticsearchStorageStrategy : DatabaseStorageStrategyBase
             }
 
             // If we got fewer results than the page size, there are no more pages.
-            if (searchResponse.Hits.Count < PageSize)
+            if (searchResponse.Hits.Count < pageSize)
                 yield break;
 
-            from += PageSize;
+            from += pageSize;
         }
     }
 

@@ -328,8 +328,8 @@ public sealed class RocksDbStorageStrategy : DatabaseStorageStrategyBase
     private sealed class RocksDbTransaction : IDatabaseTransaction
     {
         private readonly RocksDb _db;
-        private readonly ColumnFamilyHandle _dataHandle;
-        private readonly ColumnFamilyHandle _metadataHandle;
+        internal ColumnFamilyHandle DataHandle { get; }
+        internal ColumnFamilyHandle MetadataHandle { get; }
         private readonly WriteBatch _batch;
         private bool _disposed;
         private bool _committed;
@@ -340,8 +340,8 @@ public sealed class RocksDbStorageStrategy : DatabaseStorageStrategyBase
         public RocksDbTransaction(RocksDb db, ColumnFamilyHandle dataHandle, ColumnFamilyHandle metadataHandle)
         {
             _db = db;
-            _dataHandle = dataHandle;
-            _metadataHandle = metadataHandle;
+            DataHandle = dataHandle;
+            MetadataHandle = metadataHandle;
             _batch = new WriteBatch();
         }
 

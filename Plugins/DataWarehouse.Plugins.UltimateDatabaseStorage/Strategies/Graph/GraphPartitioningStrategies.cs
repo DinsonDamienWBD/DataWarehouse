@@ -95,7 +95,7 @@ public sealed class HashPartitioningStrategy : GraphPartitioningStrategyBase
         {
             HashPartitionAlgorithm.Murmur3 => MurmurHash3(vertexId),
             HashPartitionAlgorithm.Xxhash => XxHash32(vertexId),
-            HashPartitionAlgorithm.Fnv1a => Fnv1aHash(vertexId),
+            HashPartitionAlgorithm.Fnv1A => Fnv1AHash(vertexId),
             HashPartitionAlgorithm.Sha256 => Sha256Hash(vertexId),
             _ => MurmurHash3(vertexId)
         };
@@ -241,7 +241,7 @@ public sealed class HashPartitioningStrategy : GraphPartitioningStrategyBase
         return acc;
     }
 
-    private static uint Fnv1aHash(string key)
+    private static uint Fnv1AHash(string key)
     {
         const uint fnvPrime = 16777619;
         const uint offsetBasis = 2166136261;
@@ -272,7 +272,7 @@ public enum HashPartitionAlgorithm
     /// <summary>xxHash32 - extremely fast.</summary>
     Xxhash,
     /// <summary>FNV-1a - simple and fast.</summary>
-    Fnv1a,
+    Fnv1A,
     /// <summary>SHA-256 truncated - cryptographic quality.</summary>
     Sha256
 }

@@ -22,7 +22,7 @@ public sealed class MySqlStorageStrategy : DatabaseStorageStrategyBase
 {
     private string _connectionString = string.Empty;
     private string _tableName = "data_warehouse_storage";
-    private string _databaseName = "datawarehouse";
+    internal string DatabaseName { get; private set; } = "datawarehouse";
     private bool _useJson = true;
     private int _maxPoolSize = 100;
     private int _minPoolSize = 5;
@@ -53,7 +53,7 @@ public sealed class MySqlStorageStrategy : DatabaseStorageStrategyBase
         // P2-2833: Validate table/database names against safe identifier pattern to prevent
         // SQL injection via backtick escaping (backtick itself in name would break quoting).
         _tableName = ValidateSqlIdentifier(GetConfiguration("TableName", "data_warehouse_storage"), "TableName");
-        _databaseName = ValidateSqlIdentifier(GetConfiguration("DatabaseName", "datawarehouse"), "DatabaseName");
+        DatabaseName = ValidateSqlIdentifier(GetConfiguration("DatabaseName", "datawarehouse"), "DatabaseName");
         _useJson = GetConfiguration("UseJson", true);
         _maxPoolSize = GetConfiguration("MaxPoolSize", 100);
         _minPoolSize = GetConfiguration("MinPoolSize", 5);

@@ -345,7 +345,7 @@ public sealed class RedisStorageStrategy : DatabaseStorageStrategyBase
 
     private sealed class RedisTransaction : IDatabaseTransaction
     {
-        private readonly IDatabase _database;
+        internal IDatabase Database { get; }
         private readonly ITransaction _transaction;
         private bool _disposed;
 
@@ -354,7 +354,7 @@ public sealed class RedisStorageStrategy : DatabaseStorageStrategyBase
 
         public RedisTransaction(IDatabase database)
         {
-            _database = database;
+            Database = database;
             _transaction = database.CreateTransaction();
         }
 
