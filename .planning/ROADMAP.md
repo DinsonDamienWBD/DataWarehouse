@@ -3142,7 +3142,7 @@ Plans:
 | 97 | 1 | Hardening: SDK Part 2 (1,250 findings) | 3/5 | In progress | - |
 | 98 | 1 | Hardening: Core Infrastructure (750 findings) | 0/TBD | Not started | - |
 | 99 | 1 | Hardening: Large Plugins A (2,347 findings) | 0/TBD | Not started | - |
-| 100 | 1 | Hardening: Large Plugins B (1,725 findings) | 0/TBD | Not started | - |
+| 100 | 1/10 | In Progress|  | Not started | - |
 | 101 | 1 | Hardening: Medium+Small+Companions (3,557 findings) | 0/TBD | Not started | - |
 | 102 | 1 | Full Audit: Coyote + dotCover | 0/TBD | Not started | - |
 | 103 | 1 | Profile: dotTrace + dotMemory | 0/TBD | Not started | - |
