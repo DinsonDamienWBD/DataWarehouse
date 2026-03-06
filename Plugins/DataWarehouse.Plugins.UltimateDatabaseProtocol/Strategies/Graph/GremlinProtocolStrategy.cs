@@ -552,7 +552,7 @@ public sealed class GremlinProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class NeptuneGremlinProtocolStrategy : DatabaseProtocolStrategyBase
 {
     private ClientWebSocket? _webSocket;
-    private string _region = "us-east-1";
+    internal string Region { get; private set; } = "us-east-1";
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
@@ -588,7 +588,7 @@ public sealed class NeptuneGremlinProtocolStrategy : DatabaseProtocolStrategyBas
             SupportsQueryCancellation = true,
             SupportedAuthMethods =
             [
-                AuthenticationMethod.IAM
+                AuthenticationMethod.Iam
             ]
         }
     };
@@ -604,7 +604,7 @@ public sealed class NeptuneGremlinProtocolStrategy : DatabaseProtocolStrategyBas
             {
                 if (parts[i + 1] == "neptune")
                 {
-                    _region = parts[i];
+                    Region = parts[i];
                     break;
                 }
             }

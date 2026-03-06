@@ -126,7 +126,7 @@ public class UltimateDatabaseProtocolTests
     {
         var families = Enum.GetValues<ProtocolFamily>();
         families.Should().Contain(ProtocolFamily.Relational);
-        families.Should().Contain(ProtocolFamily.NoSQL);
+        families.Should().Contain(ProtocolFamily.NoSql);
         families.Should().Contain(ProtocolFamily.Graph);
         families.Should().Contain(ProtocolFamily.TimeSeries);
         families.Should().Contain(ProtocolFamily.Search);

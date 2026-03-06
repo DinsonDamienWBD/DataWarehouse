@@ -15,7 +15,7 @@ public sealed class AdoNetProviderStrategy : DatabaseProtocolStrategyBase
     private DbTransaction? _currentTransaction;
     private readonly Dictionary<string, DbTransaction> _transactions = new();
     private string _providerName = "";
-    private string _serverVersion = "";
+    internal string ServerVersion { get; private set; } = "";
 
     /// <inheritdoc/>
     public override string StrategyId => "adonet-provider";
@@ -76,7 +76,7 @@ public sealed class AdoNetProviderStrategy : DatabaseProtocolStrategyBase
         _connection.ConnectionString = BuildConnectionString(parameters);
 
         await _connection.OpenAsync(ct);
-        _serverVersion = _connection.ServerVersion;
+        ServerVersion = _connection.ServerVersion;
     }
 
     private string BuildConnectionString(ConnectionParameters parameters)

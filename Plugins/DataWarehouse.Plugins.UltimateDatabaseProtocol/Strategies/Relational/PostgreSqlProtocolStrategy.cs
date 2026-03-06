@@ -72,8 +72,8 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
     private char _transactionStatus;
 
     // ECOS-01: Fixed - negotiated protocol version tracking
-    private int _negotiatedMinorVersion;
-    private readonly List<string> _unrecognizedParameters = new();
+    internal int NegotiatedMinorVersion { get; private set; }
+    internal List<string> UnrecognizedParameters { get; } = new();
 
     /// <inheritdoc/>
     public override string StrategyId => "postgresql-v3";
@@ -106,7 +106,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
             SupportedAuthMethods =
             [
                 AuthenticationMethod.ClearText,
-                AuthenticationMethod.MD5,
+                AuthenticationMethod.Md5,
                 AuthenticationMethod.ScramSha256,
                 AuthenticationMethod.Certificate,
                 AuthenticationMethod.Kerberos
@@ -134,8 +134,8 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
     {
         // PostgreSQL requires an SSL request before upgrading
         var buffer = new byte[8];
-        WriteInt32BE(buffer.AsSpan(0, 4), 8); // Length
-        WriteInt32BE(buffer.AsSpan(4, 4), SslRequestCode);
+        WriteInt32Be(buffer.AsSpan(0, 4), 8); // Length
+        WriteInt32Be(buffer.AsSpan(4, 4), SslRequestCode);
         await SendAsync(buffer, ct);
 
         // Read response (single byte: 'S' for SSL, 'N' for no SSL)
@@ -180,10 +180,10 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var buffer = new byte[messageSize];
         var offset = 0;
 
-        WriteInt32BE(buffer.AsSpan(offset, 4), messageSize);
+        WriteInt32Be(buffer.AsSpan(offset, 4), messageSize);
         offset += 4;
 
-        WriteInt32BE(buffer.AsSpan(offset, 4), ProtocolVersionNumber);
+        WriteInt32Be(buffer.AsSpan(offset, 4), ProtocolVersionNumber);
         offset += 4;
 
         foreach (var kvp in startupParams)
@@ -245,22 +245,22 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
     private void HandleNegotiateProtocolVersion(byte[] payload)
     {
         // Format: Int32 newest minor version supported, Int32 count of unrecognized params, then N null-terminated strings
-        var newestMinor = ReadInt32BE(payload.AsSpan(0, 4));
-        _negotiatedMinorVersion = newestMinor;
+        var newestMinor = ReadInt32Be(payload.AsSpan(0, 4));
+        NegotiatedMinorVersion = newestMinor;
 
-        var paramCount = ReadInt32BE(payload.AsSpan(4, 4));
+        var paramCount = ReadInt32Be(payload.AsSpan(4, 4));
         var offset = 8;
         for (int i = 0; i < paramCount && offset < payload.Length; i++)
         {
             var paramName = ReadNullTerminatedString(payload.AsSpan(offset), out var bytesRead);
             offset += bytesRead;
-            _unrecognizedParameters.Add(paramName);
+            UnrecognizedParameters.Add(paramName);
         }
     }
 
     private async Task HandleAuthenticationAsync(byte[] payload, ConnectionParameters parameters, CancellationToken ct)
     {
-        var authType = ReadInt32BE(payload.AsSpan(0, 4));
+        var authType = ReadInt32Be(payload.AsSpan(0, 4));
 
         switch (authType)
         {
@@ -324,7 +324,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var buffer = new byte[1 + messageLength];
 
         buffer[0] = PasswordMessage;
-        WriteInt32BE(buffer.AsSpan(1, 4), messageLength);
+        WriteInt32Be(buffer.AsSpan(1, 4), messageLength);
         passwordBytes.CopyTo(buffer.AsSpan(5));
         buffer[^1] = 0;
 
@@ -359,13 +359,13 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var offset = 0;
 
         buffer[offset++] = SaslInitialResponse;
-        WriteInt32BE(buffer.AsSpan(offset, 4), totalLength);
+        WriteInt32Be(buffer.AsSpan(offset, 4), totalLength);
         offset += 4;
 
         mechanismBytes.CopyTo(buffer.AsSpan(offset));
         offset += mechanismBytes.Length;
 
-        WriteInt32BE(buffer.AsSpan(offset, 4), messageBytes.Length);
+        WriteInt32Be(buffer.AsSpan(offset, 4), messageBytes.Length);
         offset += 4;
 
         messageBytes.CopyTo(buffer.AsSpan(offset));
@@ -374,7 +374,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
 
         // Read AuthenticationSASLContinue
         var (msgType, payload) = await ReadMessageAsync(ct);
-        if (msgType != Authentication || ReadInt32BE(payload.AsSpan(0, 4)) != 11)
+        if (msgType != Authentication || ReadInt32Be(payload.AsSpan(0, 4)) != 11)
         {
             throw new InvalidOperationException("Expected SASL continue message");
         }
@@ -414,14 +414,14 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var responseLength = 4 + finalMessageBytes.Length;
         var responseBuffer = new byte[1 + responseLength];
         responseBuffer[0] = SaslResponse;
-        WriteInt32BE(responseBuffer.AsSpan(1, 4), responseLength);
+        WriteInt32Be(responseBuffer.AsSpan(1, 4), responseLength);
         finalMessageBytes.CopyTo(responseBuffer.AsSpan(5));
 
         await SendAsync(responseBuffer, ct);
 
         // Read AuthenticationSASLFinal
         (msgType, payload) = await ReadMessageAsync(ct);
-        if (msgType != Authentication || ReadInt32BE(payload.AsSpan(0, 4)) != 12)
+        if (msgType != Authentication || ReadInt32Be(payload.AsSpan(0, 4)) != 12)
         {
             throw new InvalidOperationException("Expected SASL final message");
         }
@@ -480,8 +480,8 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
 
     private void HandleBackendKeyData(byte[] payload)
     {
-        _backendProcessId = ReadInt32BE(payload.AsSpan(0, 4));
-        _backendSecretKey = ReadInt32BE(payload.AsSpan(4, 4));
+        _backendProcessId = ReadInt32Be(payload.AsSpan(0, 4));
+        _backendSecretKey = ReadInt32Be(payload.AsSpan(4, 4));
     }
 
     private void HandleReadyForQuery(byte[] payload)
@@ -511,7 +511,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var buffer = new byte[1 + messageLength];
 
         buffer[0] = Query;
-        WriteInt32BE(buffer.AsSpan(1, 4), messageLength);
+        WriteInt32Be(buffer.AsSpan(1, 4), messageLength);
         queryBytes.CopyTo(buffer.AsSpan(5));
         buffer[^1] = 0;
 
@@ -702,7 +702,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var offset = 0;
 
         buffer[offset++] = Parse;
-        WriteInt32BE(buffer.AsSpan(offset, 4), messageLength);
+        WriteInt32Be(buffer.AsSpan(offset, 4), messageLength);
         offset += 4;
 
         nameBytes.CopyTo(buffer.AsSpan(offset));
@@ -714,7 +714,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         buffer[offset++] = 0;
 
         // No parameter types (let server infer)
-        WriteInt16BE(buffer.AsSpan(offset, 2), 0);
+        WriteInt16Be(buffer.AsSpan(offset, 2), 0);
 
         await SendAsync(buffer, ct);
     }
@@ -729,7 +729,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var offset = 0;
 
         buffer[offset++] = Parse;
-        WriteInt32BE(buffer.AsSpan(offset, 4), messageLength);
+        WriteInt32Be(buffer.AsSpan(offset, 4), messageLength);
         offset += 4;
 
         nameBytes.CopyTo(buffer.AsSpan(offset));
@@ -740,12 +740,12 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         offset += queryBytes.Length;
         buffer[offset++] = 0;
 
-        WriteInt16BE(buffer.AsSpan(offset, 2), (short)parameterOids.Length);
+        WriteInt16Be(buffer.AsSpan(offset, 2), (short)parameterOids.Length);
         offset += 2;
 
         foreach (var oid in parameterOids)
         {
-            WriteInt32BE(buffer.AsSpan(offset, 4), oid);
+            WriteInt32Be(buffer.AsSpan(offset, 4), oid);
             offset += 4;
         }
 
@@ -792,7 +792,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var offset = 0;
 
         buffer[offset++] = Bind;
-        WriteInt32BE(buffer.AsSpan(offset, 4), messageLength);
+        WriteInt32Be(buffer.AsSpan(offset, 4), messageLength);
         offset += 4;
 
         portalBytes.CopyTo(buffer.AsSpan(offset));
@@ -804,28 +804,28 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         buffer[offset++] = 0;
 
         // Parameter format codes (all text)
-        WriteInt16BE(buffer.AsSpan(offset, 2), (short)parameters.Length);
+        WriteInt16Be(buffer.AsSpan(offset, 2), (short)parameters.Length);
         offset += 2;
         for (int i = 0; i < parameters.Length; i++)
         {
-            WriteInt16BE(buffer.AsSpan(offset, 2), 0); // Text format
+            WriteInt16Be(buffer.AsSpan(offset, 2), 0); // Text format
             offset += 2;
         }
 
         // Parameter values
-        WriteInt16BE(buffer.AsSpan(offset, 2), (short)parameters.Length);
+        WriteInt16Be(buffer.AsSpan(offset, 2), (short)parameters.Length);
         offset += 2;
 
         foreach (var data in paramData)
         {
             if (data == null)
             {
-                WriteInt32BE(buffer.AsSpan(offset, 4), -1); // NULL
+                WriteInt32Be(buffer.AsSpan(offset, 4), -1); // NULL
                 offset += 4;
             }
             else
             {
-                WriteInt32BE(buffer.AsSpan(offset, 4), data.Length);
+                WriteInt32Be(buffer.AsSpan(offset, 4), data.Length);
                 offset += 4;
                 data.CopyTo(buffer.AsSpan(offset));
                 offset += data.Length;
@@ -833,9 +833,9 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         }
 
         // Result format codes (all text)
-        WriteInt16BE(buffer.AsSpan(offset, 2), 1);
+        WriteInt16Be(buffer.AsSpan(offset, 2), 1);
         offset += 2;
-        WriteInt16BE(buffer.AsSpan(offset, 2), 0); // Text format
+        WriteInt16Be(buffer.AsSpan(offset, 2), 0); // Text format
 
         await SendAsync(buffer, ct);
     }
@@ -847,7 +847,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var buffer = new byte[1 + messageLength];
 
         buffer[0] = Describe;
-        WriteInt32BE(buffer.AsSpan(1, 4), messageLength);
+        WriteInt32Be(buffer.AsSpan(1, 4), messageLength);
         buffer[5] = (byte)type;
         nameBytes.CopyTo(buffer.AsSpan(6));
         buffer[^1] = 0;
@@ -862,10 +862,10 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var buffer = new byte[1 + messageLength];
 
         buffer[0] = Execute;
-        WriteInt32BE(buffer.AsSpan(1, 4), messageLength);
+        WriteInt32Be(buffer.AsSpan(1, 4), messageLength);
         nameBytes.CopyTo(buffer.AsSpan(5));
         buffer[5 + nameBytes.Length] = 0;
-        WriteInt32BE(buffer.AsSpan(6 + nameBytes.Length, 4), maxRows);
+        WriteInt32Be(buffer.AsSpan(6 + nameBytes.Length, 4), maxRows);
 
         await SendAsync(buffer, ct);
     }
@@ -874,7 +874,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
     {
         var buffer = new byte[5];
         buffer[0] = Sync;
-        WriteInt32BE(buffer.AsSpan(1, 4), 4);
+        WriteInt32Be(buffer.AsSpan(1, 4), 4);
         await SendAsync(buffer, ct);
     }
 
@@ -892,7 +892,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var buffer = new byte[1 + messageLength];
 
         buffer[0] = Close;
-        WriteInt32BE(buffer.AsSpan(1, 4), messageLength);
+        WriteInt32Be(buffer.AsSpan(1, 4), messageLength);
         buffer[5] = (byte)type;
         nameBytes.CopyTo(buffer.AsSpan(6));
         buffer[6 + nameBytes.Length] = 0;
@@ -910,7 +910,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
     {
         var buffer = new byte[5];
         buffer[0] = Flush;
-        WriteInt32BE(buffer.AsSpan(1, 4), 4);
+        WriteInt32Be(buffer.AsSpan(1, 4), 4);
         await SendAsync(buffer, ct);
     }
 
@@ -931,10 +931,10 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
 
         await using var stream = cancelClient.GetStream();
         var buffer = new byte[16];
-        WriteInt32BE(buffer.AsSpan(0, 4), 16);           // Length
-        WriteInt32BE(buffer.AsSpan(4, 4), CancelRequestCode); // Cancel request code
-        WriteInt32BE(buffer.AsSpan(8, 4), _backendProcessId);  // Process ID
-        WriteInt32BE(buffer.AsSpan(12, 4), _backendSecretKey); // Secret key
+        WriteInt32Be(buffer.AsSpan(0, 4), 16);           // Length
+        WriteInt32Be(buffer.AsSpan(4, 4), CancelRequestCode); // Cancel request code
+        WriteInt32Be(buffer.AsSpan(8, 4), _backendProcessId);  // Process ID
+        WriteInt32Be(buffer.AsSpan(12, 4), _backendSecretKey); // Secret key
 
         await stream.WriteAsync(buffer, ct);
         await stream.FlushAsync(ct);
@@ -959,7 +959,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var messageLength = 4 + queryBytes.Length + 1;
         var buffer = new byte[1 + messageLength];
         buffer[0] = Query;
-        WriteInt32BE(buffer.AsSpan(1, 4), messageLength);
+        WriteInt32Be(buffer.AsSpan(1, 4), messageLength);
         queryBytes.CopyTo(buffer.AsSpan(5));
         buffer[^1] = 0;
         await SendAsync(buffer, ct);
@@ -985,7 +985,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
             var copyDataLength = 4 + chunk.Length;
             var copyDataBuffer = new byte[1 + copyDataLength];
             copyDataBuffer[0] = CopyData;
-            WriteInt32BE(copyDataBuffer.AsSpan(1, 4), copyDataLength);
+            WriteInt32Be(copyDataBuffer.AsSpan(1, 4), copyDataLength);
             chunk.CopyTo(copyDataBuffer.AsSpan(5));
             await SendAsync(copyDataBuffer, ct);
         }
@@ -993,7 +993,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         // Send CopyDone
         var doneBuffer = new byte[5];
         doneBuffer[0] = CopyDone;
-        WriteInt32BE(doneBuffer.AsSpan(1, 4), 4);
+        WriteInt32Be(doneBuffer.AsSpan(1, 4), 4);
         await SendAsync(doneBuffer, ct);
 
         // Wait for CommandComplete + ReadyForQuery
@@ -1030,7 +1030,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var messageLength = 4 + queryBytes.Length + 1;
         var buffer = new byte[1 + messageLength];
         buffer[0] = Query;
-        WriteInt32BE(buffer.AsSpan(1, 4), messageLength);
+        WriteInt32Be(buffer.AsSpan(1, 4), messageLength);
         queryBytes.CopyTo(buffer.AsSpan(5));
         buffer[^1] = 0;
         await SendAsync(buffer, ct);
@@ -1076,7 +1076,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         var messageLength = 4 + msgBytes.Length + 1;
         var buffer = new byte[1 + messageLength];
         buffer[0] = CopyFail;
-        WriteInt32BE(buffer.AsSpan(1, 4), messageLength);
+        WriteInt32Be(buffer.AsSpan(1, 4), messageLength);
         msgBytes.CopyTo(buffer.AsSpan(5));
         buffer[^1] = 0;
         await SendAsync(buffer, ct);
@@ -1126,7 +1126,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
     private void HandleNotificationResponse(byte[] payload)
     {
         // Format: Int32 processId, String channelName, String payload
-        var processId = ReadInt32BE(payload.AsSpan(0, 4));
+        var processId = ReadInt32Be(payload.AsSpan(0, 4));
         var channel = ReadNullTerminatedString(payload.AsSpan(4), out var bytesRead);
         var notifPayload = ReadNullTerminatedString(payload.AsSpan(4 + bytesRead), out _);
 
@@ -1160,7 +1160,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
     {
         var buffer = new byte[5];
         buffer[0] = Terminate;
-        WriteInt32BE(buffer.AsSpan(1, 4), 4);
+        WriteInt32Be(buffer.AsSpan(1, 4), 4);
         await SendAsync(buffer, ct);
     }
 
@@ -1170,7 +1170,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         // Use empty query for ping
         var buffer = new byte[6];
         buffer[0] = Query;
-        WriteInt32BE(buffer.AsSpan(1, 4), 5);
+        WriteInt32Be(buffer.AsSpan(1, 4), 5);
         buffer[5] = 0;
 
         await SendAsync(buffer, ct);
@@ -1196,7 +1196,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
         // Read message header (type + length)
         var header = await ReceiveExactAsync(5, ct);
         var messageType = header[0];
-        var length = ReadInt32BE(header.AsSpan(1, 4)) - 4; // Length includes itself
+        var length = ReadInt32Be(header.AsSpan(1, 4)) - 4; // Length includes itself
 
         // Read payload
         var payload = length > 0 ? await ReceiveExactAsync(length, ct) : [];
@@ -1207,7 +1207,7 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
     private List<ColumnMetadata> ParseRowDescription(byte[] payload)
     {
         var columns = new List<ColumnMetadata>();
-        var fieldCount = ReadInt16BE(payload.AsSpan(0, 2));
+        var fieldCount = ReadInt16Be(payload.AsSpan(0, 2));
         var offset = 2;
 
         for (int i = 0; i < fieldCount; i++)
@@ -1215,22 +1215,22 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
             var name = ReadNullTerminatedString(payload.AsSpan(offset), out var bytesRead);
             offset += bytesRead;
 
-            var tableOid = ReadInt32BE(payload.AsSpan(offset, 4));
+            var tableOid = ReadInt32Be(payload.AsSpan(offset, 4));
             offset += 4;
 
-            var columnAttr = ReadInt16BE(payload.AsSpan(offset, 2));
+            var columnAttr = ReadInt16Be(payload.AsSpan(offset, 2));
             offset += 2;
 
-            var typeOid = ReadInt32BE(payload.AsSpan(offset, 4));
+            var typeOid = ReadInt32Be(payload.AsSpan(offset, 4));
             offset += 4;
 
-            var typeSize = ReadInt16BE(payload.AsSpan(offset, 2));
+            var typeSize = ReadInt16Be(payload.AsSpan(offset, 2));
             offset += 2;
 
-            var typeMod = ReadInt32BE(payload.AsSpan(offset, 4));
+            var typeMod = ReadInt32Be(payload.AsSpan(offset, 4));
             offset += 4;
 
-            var formatCode = ReadInt16BE(payload.AsSpan(offset, 2));
+            var formatCode = ReadInt16Be(payload.AsSpan(offset, 2));
             offset += 2;
 
             columns.Add(new ColumnMetadata
@@ -1249,12 +1249,12 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
     private Dictionary<string, object?> ParseDataRow(byte[] payload, List<ColumnMetadata> columns)
     {
         var row = new Dictionary<string, object?>();
-        var fieldCount = ReadInt16BE(payload.AsSpan(0, 2));
+        var fieldCount = ReadInt16Be(payload.AsSpan(0, 2));
         var offset = 2;
 
         for (int i = 0; i < fieldCount && i < columns.Count; i++)
         {
-            var length = ReadInt32BE(payload.AsSpan(offset, 4));
+            var length = ReadInt32Be(payload.AsSpan(offset, 4));
             offset += 4;
 
             if (length == -1)

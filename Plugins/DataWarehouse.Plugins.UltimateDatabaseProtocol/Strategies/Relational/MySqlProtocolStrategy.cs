@@ -113,9 +113,9 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
     private const byte TypeGeometry = 0xff;
 
     // Server state
-    private uint _serverCapabilities;
-    private string _serverVersion = "";
-    private uint _connectionId;
+    internal uint ServerCapabilities { get; private set; }
+    internal string ServerVersion { get; private set; } = "";
+    internal uint ConnectionId { get; private set; }
     private string _authPluginName = "";
     private byte[] _authPluginData = [];
     private int _sequenceId; // Accessed via Interlocked (finding 2730)
@@ -151,7 +151,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
             SupportedAuthMethods =
             [
                 AuthenticationMethod.ClearText,
-                AuthenticationMethod.SHA256,
+                AuthenticationMethod.Sha256,
                 AuthenticationMethod.Certificate
             ]
         }
@@ -169,8 +169,8 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
             CapabilityFlags.PluginAuthLenencClientData);
 
         var packet = new byte[32];
-        WriteInt32LE(packet.AsSpan(0, 4), (int)clientFlags);
-        WriteInt32LE(packet.AsSpan(4, 4), MaxPacketSize);
+        WriteInt32Le(packet.AsSpan(0, 4), (int)clientFlags);
+        WriteInt32Le(packet.AsSpan(4, 4), MaxPacketSize);
         packet[8] = 33; // utf8_general_ci
 
         await SendPacketAsync(packet, ct);
@@ -190,11 +190,11 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         }
 
         // Server version (null-terminated)
-        _serverVersion = ReadNullTerminatedString(packet.AsSpan(offset), out var bytesRead);
+        ServerVersion = ReadNullTerminatedString(packet.AsSpan(offset), out var bytesRead);
         offset += bytesRead;
 
         // Connection ID
-        _connectionId = (uint)ReadInt32LE(packet.AsSpan(offset, 4));
+        ConnectionId = (uint)ReadInt32Le(packet.AsSpan(offset, 4));
         offset += 4;
 
         // Auth plugin data part 1 (8 bytes)
@@ -205,7 +205,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         offset++;
 
         // Capability flags (lower 2 bytes)
-        var capsLower = (ushort)ReadInt16LE(packet.AsSpan(offset, 2));
+        var capsLower = (ushort)ReadInt16Le(packet.AsSpan(offset, 2));
         offset += 2;
 
         if (offset < packet.Length)
@@ -214,14 +214,14 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
             var charset = packet[offset++];
 
             // Status flags
-            var statusFlags = ReadInt16LE(packet.AsSpan(offset, 2));
+            var statusFlags = ReadInt16Le(packet.AsSpan(offset, 2));
             offset += 2;
 
             // Capability flags (upper 2 bytes)
-            var capsUpper = (ushort)ReadInt16LE(packet.AsSpan(offset, 2));
+            var capsUpper = (ushort)ReadInt16Le(packet.AsSpan(offset, 2));
             offset += 2;
 
-            _serverCapabilities = (uint)(capsLower | (capsUpper << 16));
+            ServerCapabilities = (uint)(capsLower | (capsUpper << 16));
 
             // Auth plugin data length
             var authDataLength = packet[offset++];
@@ -230,7 +230,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
             offset += 10;
 
             // Auth plugin data part 2
-            if ((_serverCapabilities & (uint)CapabilityFlags.SecureConnection) != 0)
+            if ((ServerCapabilities & (uint)CapabilityFlags.SecureConnection) != 0)
             {
                 var len2 = Math.Max(13, authDataLength - 8);
                 var authData2 = packet[offset..(offset + len2 - 1)]; // Exclude trailing null
@@ -239,14 +239,14 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
             }
 
             // Auth plugin name
-            if ((_serverCapabilities & (uint)CapabilityFlags.PluginAuth) != 0)
+            if ((ServerCapabilities & (uint)CapabilityFlags.PluginAuth) != 0)
             {
                 _authPluginName = ReadNullTerminatedString(packet.AsSpan(offset), out _);
             }
         }
         else
         {
-            _serverCapabilities = capsLower;
+            ServerCapabilities = capsLower;
             _authPluginData = authData1;
         }
     }
@@ -296,11 +296,11 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         var offset = 0;
 
         // Client flags
-        WriteInt32LE(packet.AsSpan(offset, 4), (int)clientFlags);
+        WriteInt32Le(packet.AsSpan(offset, 4), (int)clientFlags);
         offset += 4;
 
         // Max packet size
-        WriteInt32LE(packet.AsSpan(offset, 4), MaxPacketSize);
+        WriteInt32Le(packet.AsSpan(offset, 4), MaxPacketSize);
         offset += 4;
 
         // Character set (utf8mb4)
@@ -361,7 +361,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
                     return;
 
                 case 0xff: // ERR packet
-                    var errorCode = ReadInt16LE(packet.AsSpan(1, 2));
+                    var errorCode = ReadInt16Le(packet.AsSpan(1, 2));
                     var errorMessage = Encoding.UTF8.GetString(packet[3..]);
                     throw new InvalidOperationException($"Authentication error {errorCode}: {errorMessage}");
 
@@ -506,7 +506,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
 
         if (header == 0xff) // ERR
         {
-            var errorCode = ReadInt16LE(packet.AsSpan(1, 2));
+            var errorCode = ReadInt16Le(packet.AsSpan(1, 2));
             var errorMessage = Encoding.UTF8.GetString(packet[9..]); // Skip SQL state marker and state
             return new QueryResult
             {
@@ -546,7 +546,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         }
 
         // Read EOF packet (if not using DEPRECATE_EOF capability)
-        if ((_serverCapabilities & (uint)CapabilityFlags.DeprecateEof) == 0)
+        if ((ServerCapabilities & (uint)CapabilityFlags.DeprecateEof) == 0)
         {
             await ReadPacketAsync(ct); // EOF
         }
@@ -564,7 +564,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
 
             if (packet[0] == 0xff) // ERR — P2-2709: return failure, not partial success
             {
-                var errCode = ReadInt16LE(packet.AsSpan(1, 2));
+                var errCode = ReadInt16Le(packet.AsSpan(1, 2));
                 var errMsg = Encoding.UTF8.GetString(packet.AsSpan(9)); // skip marker + 5-byte SQL state
                 return new QueryResult
                 {
@@ -619,18 +619,18 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         offset++;
 
         // character_set
-        var charset = ReadInt16LE(packet.AsSpan(offset, 2));
+        var charset = ReadInt16Le(packet.AsSpan(offset, 2));
         offset += 2;
 
         // column_length
-        var columnLength = ReadInt32LE(packet.AsSpan(offset, 4));
+        var columnLength = ReadInt32Le(packet.AsSpan(offset, 4));
         offset += 4;
 
         // column_type
         var columnType = packet[offset++];
 
         // flags
-        var flags = ReadInt16LE(packet.AsSpan(offset, 2));
+        var flags = ReadInt16Le(packet.AsSpan(offset, 2));
         offset += 2;
 
         // decimals
@@ -804,7 +804,7 @@ public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
         return Encoding.UTF8.GetString(data.Slice(lenBytes, length));
     }
 
-    private static short ReadInt16LE(ReadOnlySpan<byte> buffer)
+    private static short ReadInt16Le(ReadOnlySpan<byte> buffer)
     {
         return (short)(buffer[0] | (buffer[1] << 8));
     }

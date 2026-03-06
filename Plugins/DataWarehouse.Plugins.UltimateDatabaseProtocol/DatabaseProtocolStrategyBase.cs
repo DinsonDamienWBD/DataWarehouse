@@ -16,10 +16,10 @@ public enum ProtocolFamily
     Relational,
 
     /// <summary>NoSQL database protocols (MongoDB, Redis, Cassandra).</summary>
-    NoSQL,
+    NoSql,
 
     /// <summary>NewSQL distributed database protocols (CockroachDB, TiDB).</summary>
-    NewSQL,
+    NewSql,
 
     /// <summary>Time series database protocols (InfluxDB, TimescaleDB).</summary>
     TimeSeries,
@@ -34,7 +34,7 @@ public enum ProtocolFamily
     Driver,
 
     /// <summary>Cloud data warehouse protocols (Snowflake, BigQuery, Redshift).</summary>
-    CloudDW,
+    CloudDw,
 
     /// <summary>Embedded database protocols (SQLite, DuckDB, LevelDB).</summary>
     Embedded,
@@ -85,10 +85,10 @@ public enum AuthenticationMethod
     ClearText,
 
     /// <summary>MD5 password hash authentication.</summary>
-    MD5,
+    Md5,
 
     /// <summary>SHA-256 password hash authentication.</summary>
-    SHA256,
+    Sha256,
 
     /// <summary>SCRAM-SHA-256 authentication (RFC 7677).</summary>
     ScramSha256,
@@ -100,13 +100,13 @@ public enum AuthenticationMethod
     Kerberos,
 
     /// <summary>LDAP authentication.</summary>
-    LDAP,
+    Ldap,
 
     /// <summary>Certificate-based authentication.</summary>
     Certificate,
 
     /// <summary>SASL authentication.</summary>
-    SASL,
+    Sasl,
 
     /// <summary>AWS IAM authentication.</summary>
     AwsIam,
@@ -130,7 +130,7 @@ public enum AuthenticationMethod
     CachingSha2,
 
     /// <summary>AWS IAM (Identity and Access Management).</summary>
-    IAM,
+    Iam,
 
     /// <summary>Active Directory authentication.</summary>
     ActiveDirectory,
@@ -207,7 +207,7 @@ public record ProtocolCapabilities
         SupportsServerCursors = true,
         SupportsBulkOperations = true,
         SupportsQueryCancellation = true,
-        SupportedAuthMethods = [AuthenticationMethod.ClearText, AuthenticationMethod.MD5, AuthenticationMethod.ScramSha256]
+        SupportedAuthMethods = [AuthenticationMethod.ClearText, AuthenticationMethod.Md5, AuthenticationMethod.ScramSha256]
     };
 
     /// <summary>Creates capabilities for a standard NoSQL database protocol.</summary>
@@ -893,7 +893,7 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
     }
 
     /// <summary>Writes a 32-bit integer in network byte order (big-endian).</summary>
-    protected static void WriteInt32BE(Span<byte> buffer, int value)
+    protected static void WriteInt32Be(Span<byte> buffer, int value)
     {
         buffer[0] = (byte)(value >> 24);
         buffer[1] = (byte)(value >> 16);
@@ -902,13 +902,13 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
     }
 
     /// <summary>Reads a 32-bit integer in network byte order (big-endian).</summary>
-    protected static int ReadInt32BE(ReadOnlySpan<byte> buffer)
+    protected static int ReadInt32Be(ReadOnlySpan<byte> buffer)
     {
         return (buffer[0] << 24) | (buffer[1] << 16) | (buffer[2] << 8) | buffer[3];
     }
 
     /// <summary>Writes a 32-bit integer in little-endian byte order.</summary>
-    protected static void WriteInt32LE(Span<byte> buffer, int value)
+    protected static void WriteInt32Le(Span<byte> buffer, int value)
     {
         buffer[0] = (byte)value;
         buffer[1] = (byte)(value >> 8);
@@ -917,20 +917,20 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
     }
 
     /// <summary>Reads a 32-bit integer in little-endian byte order.</summary>
-    protected static int ReadInt32LE(ReadOnlySpan<byte> buffer)
+    protected static int ReadInt32Le(ReadOnlySpan<byte> buffer)
     {
         return buffer[0] | (buffer[1] << 8) | (buffer[2] << 16) | (buffer[3] << 24);
     }
 
     /// <summary>Writes a 16-bit integer in network byte order (big-endian).</summary>
-    protected static void WriteInt16BE(Span<byte> buffer, short value)
+    protected static void WriteInt16Be(Span<byte> buffer, short value)
     {
         buffer[0] = (byte)(value >> 8);
         buffer[1] = (byte)value;
     }
 
     /// <summary>Reads a 16-bit integer in network byte order (big-endian).</summary>
-    protected static short ReadInt16BE(ReadOnlySpan<byte> buffer)
+    protected static short ReadInt16Be(ReadOnlySpan<byte> buffer)
     {
         return (short)((buffer[0] << 8) | buffer[1]);
     }
@@ -1248,8 +1248,8 @@ public sealed class DatabaseProtocolStrategyRegistry : IDatabaseProtocolStrategy
 /// </summary>
 public static class ArrayPool<T>
 {
-    private static readonly System.Buffers.ArrayPool<T> _pool = System.Buffers.ArrayPool<T>.Shared;
+    private static readonly System.Buffers.ArrayPool<T> Pool = System.Buffers.ArrayPool<T>.Shared;
 
     /// <summary>Gets the shared array pool.</summary>
-    public static System.Buffers.ArrayPool<T> Shared => _pool;
+    public static System.Buffers.ArrayPool<T> Shared => Pool;
 }

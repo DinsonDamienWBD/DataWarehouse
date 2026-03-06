@@ -30,7 +30,7 @@ public enum CompressionAlgorithm
     Snappy,
 
     /// <summary>LZO compression.</summary>
-    LZO
+    Lzo
 }
 
 /// <summary>
@@ -210,10 +210,10 @@ public sealed class ProtocolCompressionManager : IDisposable
             [CompressionAlgorithm.GZip] = new GZipCompressionProvider(),
             [CompressionAlgorithm.Deflate] = new DeflateCompressionProvider(),
             [CompressionAlgorithm.Brotli] = new BrotliCompressionProvider(),
-            [CompressionAlgorithm.Lz4] = new LZ4CompressionProvider(),
+            [CompressionAlgorithm.Lz4] = new Lz4CompressionProvider(),
             [CompressionAlgorithm.Zstd] = new ZstdCompressionProvider(),
             [CompressionAlgorithm.Snappy] = new SnappyCompressionProvider(),
-            [CompressionAlgorithm.LZO] = new LZOCompressionProvider()
+            [CompressionAlgorithm.Lzo] = new LzoCompressionProvider()
         };
     }
 
@@ -686,7 +686,7 @@ internal sealed class BrotliCompressionProvider : ICompressionProvider
 /// labeled as LZ4 — which real LZ4-speaking servers cannot decompress.
 /// Negotiate a different codec (GZip/Deflate/Brotli) until the package is wired.
 /// </summary>
-internal sealed class LZ4CompressionProvider : ICompressionProvider
+internal sealed class Lz4CompressionProvider : ICompressionProvider
 {
     private const string Msg = "LZ4 codec is not yet available. Add K4os.Compression.LZ4 package and implement the provider. Negotiate GZip, Deflate, or Brotli instead.";
     public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) => throw new NotSupportedException(Msg);
@@ -731,7 +731,7 @@ internal sealed class SnappyCompressionProvider : ICompressionProvider
 /// Throws NotSupportedException to prevent silently sending Deflate-encoded data
 /// labeled as LZO — which real LZO-speaking servers cannot decompress.
 /// </summary>
-internal sealed class LZOCompressionProvider : ICompressionProvider
+internal sealed class LzoCompressionProvider : ICompressionProvider
 {
     private const string Msg = "LZO codec is not yet available. Add lzo.net package and implement the provider. Negotiate GZip, Deflate, or Brotli instead.";
     public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level) => throw new NotSupportedException(Msg);

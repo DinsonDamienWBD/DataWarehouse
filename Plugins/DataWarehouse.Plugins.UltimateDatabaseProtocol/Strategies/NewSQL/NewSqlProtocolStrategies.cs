@@ -11,9 +11,9 @@ namespace DataWarehouse.Plugins.UltimateDatabaseProtocol.Strategies.NewSQL;
 public sealed class CockroachDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
     private const int ProtocolVersion3 = 196608; // 3.0
-    private int _processId;
-    private int _secretKey;
-    private string _serverVersion = "";
+    internal int ProcessId { get; private set; }
+    internal int SecretKey { get; private set; }
+    internal string ServerVersion { get; private set; } = "";
     private StreamReader? _reader = null;
     private StreamWriter? _writer = null;
 
@@ -29,7 +29,7 @@ public sealed class CockroachDbProtocolStrategy : DatabaseProtocolStrategyBase
         ProtocolName = "CockroachDB PostgreSQL Wire Protocol",
         ProtocolVersion = "3.0",
         DefaultPort = 26257,
-        Family = ProtocolFamily.NewSQL,
+        Family = ProtocolFamily.NewSql,
         MaxPacketSize = 1024 * 1024 * 1024,
         Capabilities = new ProtocolCapabilities
         {
@@ -48,7 +48,7 @@ public sealed class CockroachDbProtocolStrategy : DatabaseProtocolStrategyBase
             SupportedAuthMethods =
             [
                 AuthenticationMethod.ClearText,
-                AuthenticationMethod.MD5,
+                AuthenticationMethod.Md5,
                 AuthenticationMethod.ScramSha256,
                 AuthenticationMethod.Certificate
             ]
@@ -108,8 +108,8 @@ public sealed class CockroachDbProtocolStrategy : DatabaseProtocolStrategyBase
                     break;
 
                 case 'K': // BackendKeyData
-                    _processId = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(0));
-                    _secretKey = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(4));
+                    ProcessId = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(0));
+                    SecretKey = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(4));
                     break;
 
                 case 'S': // ParameterStatus
@@ -318,7 +318,7 @@ public sealed class CockroachDbProtocolStrategy : DatabaseProtocolStrategyBase
     {
         var parts = Encoding.UTF8.GetString(data).TrimEnd('\0').Split('\0');
         if (parts.Length >= 2 && parts[0] == "server_version")
-            _serverVersion = parts[1];
+            ServerVersion = parts[1];
     }
 
     private static string ParseErrorResponse(byte[] data)
@@ -546,9 +546,9 @@ public sealed class TiDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
     private const int MaxPacketSize = 16 * 1024 * 1024;
     private byte _sequenceId;
-    private uint _connectionId;
-    private string _serverVersion = "";
-    private uint _serverCapabilities;
+    internal uint ConnectionId { get; private set; }
+    internal string ServerVersion { get; private set; } = "";
+    internal uint ServerCapabilities { get; private set; }
     private byte _characterSet;
 
     /// <inheritdoc/>
@@ -563,7 +563,7 @@ public sealed class TiDbProtocolStrategy : DatabaseProtocolStrategyBase
         ProtocolName = "TiDB MySQL Wire Protocol",
         ProtocolVersion = "10",
         DefaultPort = 4000,
-        Family = ProtocolFamily.NewSQL,
+        Family = ProtocolFamily.NewSql,
         MaxPacketSize = MaxPacketSize,
         Capabilities = new ProtocolCapabilities
         {
@@ -603,11 +603,11 @@ public sealed class TiDbProtocolStrategy : DatabaseProtocolStrategyBase
 
         // Server version (null-terminated)
         var versionEnd = Array.IndexOf(packet, (byte)0, pos);
-        _serverVersion = Encoding.UTF8.GetString(packet, pos, versionEnd - pos);
+        ServerVersion = Encoding.UTF8.GetString(packet, pos, versionEnd - pos);
         pos = versionEnd + 1;
 
         // Connection ID
-        _connectionId = BitConverter.ToUInt32(packet, pos);
+        ConnectionId = BitConverter.ToUInt32(packet, pos);
         pos += 4;
 
         // Auth plugin data part 1 (8 bytes)
@@ -618,7 +618,7 @@ public sealed class TiDbProtocolStrategy : DatabaseProtocolStrategyBase
         pos++;
 
         // Capability flags lower 2 bytes
-        _serverCapabilities = BitConverter.ToUInt16(packet, pos);
+        ServerCapabilities = BitConverter.ToUInt16(packet, pos);
         pos += 2;
 
         if (pos < packet.Length)
@@ -630,7 +630,7 @@ public sealed class TiDbProtocolStrategy : DatabaseProtocolStrategyBase
             pos += 2;
 
             // Capability flags upper 2 bytes
-            _serverCapabilities |= (uint)(BitConverter.ToUInt16(packet, pos) << 16);
+            ServerCapabilities |= (uint)(BitConverter.ToUInt16(packet, pos) << 16);
         }
     }
 
@@ -1000,9 +1000,9 @@ public sealed class TiDbProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class YugabyteDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
     private const int ProtocolVersion3 = 196608;
-    private int _processId;
-    private int _secretKey;
-    private string _serverVersion = "";
+    internal int ProcessId { get; private set; }
+    internal int SecretKey { get; private set; }
+    internal string ServerVersion { get; private set; } = "";
 
     /// <inheritdoc/>
     public override string StrategyId => "yugabytedb-pgwire";
@@ -1016,7 +1016,7 @@ public sealed class YugabyteDbProtocolStrategy : DatabaseProtocolStrategyBase
         ProtocolName = "YugabyteDB PostgreSQL Wire Protocol",
         ProtocolVersion = "3.0",
         DefaultPort = 5433,
-        Family = ProtocolFamily.NewSQL,
+        Family = ProtocolFamily.NewSql,
         MaxPacketSize = 1024 * 1024 * 1024,
         Capabilities = new ProtocolCapabilities
         {
@@ -1035,7 +1035,7 @@ public sealed class YugabyteDbProtocolStrategy : DatabaseProtocolStrategyBase
             SupportedAuthMethods =
             [
                 AuthenticationMethod.ClearText,
-                AuthenticationMethod.MD5,
+                AuthenticationMethod.Md5,
                 AuthenticationMethod.ScramSha256,
                 AuthenticationMethod.Certificate
             ]
@@ -1091,8 +1091,8 @@ public sealed class YugabyteDbProtocolStrategy : DatabaseProtocolStrategyBase
                     break;
 
                 case 'K':
-                    _processId = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(0));
-                    _secretKey = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(4));
+                    ProcessId = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(0));
+                    SecretKey = BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(4));
                     break;
 
                 case 'S':
@@ -1160,7 +1160,7 @@ public sealed class YugabyteDbProtocolStrategy : DatabaseProtocolStrategyBase
     {
         var parts = Encoding.UTF8.GetString(data).TrimEnd('\0').Split('\0');
         if (parts.Length >= 2 && parts[0] == "server_version")
-            _serverVersion = parts[1];
+            ServerVersion = parts[1];
     }
 
     private static string ParseErrorResponse(byte[] data)
@@ -1378,7 +1378,7 @@ public sealed class VoltDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
     private const byte ProtocolVersion = 1;
     private long _clientHandle;
-    private string _serverVersion = "";
+    internal string ServerVersion { get; private set; } = "";
 
     /// <inheritdoc/>
     public override string StrategyId => "voltdb";
@@ -1392,7 +1392,7 @@ public sealed class VoltDbProtocolStrategy : DatabaseProtocolStrategyBase
         ProtocolName = "VoltDB Wire Protocol",
         ProtocolVersion = "1",
         DefaultPort = 21212,
-        Family = ProtocolFamily.NewSQL,
+        Family = ProtocolFamily.NewSql,
         MaxPacketSize = 50 * 1024 * 1024,
         Capabilities = new ProtocolCapabilities
         {
@@ -1411,7 +1411,7 @@ public sealed class VoltDbProtocolStrategy : DatabaseProtocolStrategyBase
             SupportedAuthMethods =
             [
                 AuthenticationMethod.ClearText,
-                AuthenticationMethod.SHA256
+                AuthenticationMethod.Sha256
             ]
         }
     };
@@ -1484,7 +1484,7 @@ public sealed class VoltDbProtocolStrategy : DatabaseProtocolStrategyBase
         {
             var buildLen = br.ReadInt16();
             if (buildLen > 0)
-                _serverVersion = Encoding.UTF8.GetString(br.ReadBytes(buildLen));
+                ServerVersion = Encoding.UTF8.GetString(br.ReadBytes(buildLen));
         }
     }
 

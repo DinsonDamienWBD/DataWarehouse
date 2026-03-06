@@ -102,7 +102,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
         ProtocolName = "Cassandra CQL Binary Protocol",
         ProtocolVersion = "4",
         DefaultPort = 9042,
-        Family = ProtocolFamily.NoSQL,
+        Family = ProtocolFamily.NoSql,
         MaxPacketSize = 256 * 1024 * 1024, // 256 MB
         Capabilities = new ProtocolCapabilities
         {
@@ -121,7 +121,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
             SupportedAuthMethods =
             [
                 AuthenticationMethod.ClearText,
-                AuthenticationMethod.SASL,
+                AuthenticationMethod.Sasl,
                 AuthenticationMethod.Certificate
             ]
         }
@@ -303,7 +303,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
         }
 
         var offset = 0;
-        var resultKind = ReadInt32BE(payload, ref offset);
+        var resultKind = ReadInt32Be(payload, ref offset);
 
         switch (resultKind)
         {
@@ -329,7 +329,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
                 // [short bytes] = 2-byte big-endian length followed by N bytes.
                 if (offset + 2 > payload.Length)
                     return new QueryResult { Success = false, ErrorMessage = "Malformed PREPARED response: truncated id length" };
-                var idLen = ReadInt16BE(payload, offset);
+                var idLen = ReadInt16Be(payload, offset);
                 offset += 2;
                 if (idLen < 0 || offset + idLen > payload.Length)
                     return new QueryResult { Success = false, ErrorMessage = "Malformed PREPARED response: id out of bounds" };
@@ -359,8 +359,8 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
     private QueryResult ParseRowsResult(byte[] payload, int offset)
     {
         // Parse metadata
-        var flags = ReadInt32BE(payload, ref offset);
-        var columnCount = ReadInt32BE(payload, ref offset);
+        var flags = ReadInt32Be(payload, ref offset);
+        var columnCount = ReadInt32Be(payload, ref offset);
 
         var hasGlobalTableSpec = (flags & 0x0001) != 0;
         var hasMorePages = (flags & 0x0002) != 0;
@@ -412,7 +412,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
         }
 
         // Parse rows
-        var rowCount = ReadInt32BE(payload, ref offset);
+        var rowCount = ReadInt32Be(payload, ref offset);
         var rows = new List<Dictionary<string, object?>>();
 
         for (int r = 0; r < rowCount; r++)
@@ -438,7 +438,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
 
     private (string typeName, int typeCode) ParseType(byte[] payload, ref int offset)
     {
-        var typeCode = ReadInt16BE(payload, ref offset);
+        var typeCode = ReadInt16Be(payload, ref offset);
 
         return typeCode switch
         {
@@ -489,7 +489,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
         offset += bytesRead;
         var udtName = ReadString(payload.AsSpan(offset), out bytesRead);
         offset += bytesRead;
-        var fieldCount = ReadInt16BE(payload, ref offset);
+        var fieldCount = ReadInt16Be(payload, ref offset);
 
         for (int i = 0; i < fieldCount; i++)
         {
@@ -503,7 +503,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
 
     private (string typeName, int typeCode) ParseTupleType(byte[] payload, ref int offset)
     {
-        var elementCount = ReadInt16BE(payload, ref offset);
+        var elementCount = ReadInt16Be(payload, ref offset);
         var types = new List<string>();
 
         for (int i = 0; i < elementCount; i++)
@@ -517,7 +517,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
 
     private object? ReadValue(byte[] payload, ref int offset, string typeName)
     {
-        var length = ReadInt32BE(payload, ref offset);
+        var length = ReadInt32Be(payload, ref offset);
         if (length < 0)
         {
             return null; // NULL value
@@ -528,17 +528,17 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
 
         return typeName switch
         {
-            "int" => ReadInt32BE(data.ToArray(), 0),
-            "bigint" or "counter" => ReadInt64BE(data.ToArray(), 0),
-            "smallint" => ReadInt16BE(data.ToArray(), 0),
+            "int" => ReadInt32Be(data.ToArray(), 0),
+            "bigint" or "counter" => ReadInt64Be(data.ToArray(), 0),
+            "smallint" => ReadInt16Be(data.ToArray(), 0),
             "tinyint" => (sbyte)data[0],
-            "float" => BitConverter.Int32BitsToSingle(ReadInt32BE(data.ToArray(), 0)),
-            "double" => BitConverter.Int64BitsToDouble(ReadInt64BE(data.ToArray(), 0)),
+            "float" => BitConverter.Int32BitsToSingle(ReadInt32Be(data.ToArray(), 0)),
+            "double" => BitConverter.Int64BitsToDouble(ReadInt64Be(data.ToArray(), 0)),
             "boolean" => data[0] != 0,
             "ascii" or "varchar" or "text" => Encoding.UTF8.GetString(data),
             "blob" => data.ToArray(),
             "uuid" or "timeuuid" => new Guid(data.ToArray()),
-            "timestamp" => DateTimeOffset.FromUnixTimeMilliseconds(ReadInt64BE(data.ToArray(), 0)).UtcDateTime,
+            "timestamp" => DateTimeOffset.FromUnixTimeMilliseconds(ReadInt64Be(data.ToArray(), 0)).UtcDateTime,
             "inet" => new IPAddress(data.ToArray()),
             _ => data.ToArray() // Return as blob for unknown types
         };
@@ -572,7 +572,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
         header[2] = (byte)(streamId >> 8);
         header[3] = (byte)streamId;
         header[4] = opcode;
-        WriteInt32BE(header.AsSpan(5, 4), payload.Length);
+        WriteInt32Be(header.AsSpan(5, 4), payload.Length);
 
         await SendAsync(header, ct);
         if (payload.Length > 0)
@@ -589,7 +589,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
         var flags = header[1];
         var streamId = (short)((header[2] << 8) | header[3]);
         var opcode = header[4];
-        var length = ReadInt32BE(header, 5);
+        var length = ReadInt32Be(header, 5);
 
         var payload = length > 0 ? await ReceiveExactAsync(length, ct) : [];
 
@@ -598,7 +598,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
 
     #region Encoding Helpers
 
-    private static new void WriteInt32BE(Span<byte> buffer, int value)
+    private static new void WriteInt32Be(Span<byte> buffer, int value)
     {
         buffer[0] = (byte)(value >> 24);
         buffer[1] = (byte)(value >> 16);
@@ -606,31 +606,31 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
         buffer[3] = (byte)value;
     }
 
-    private static int ReadInt32BE(byte[] buffer, int offset)
+    private static int ReadInt32Be(byte[] buffer, int offset)
     {
         return (buffer[offset] << 24) | (buffer[offset + 1] << 16) | (buffer[offset + 2] << 8) | buffer[offset + 3];
     }
 
-    private static int ReadInt32BE(byte[] buffer, ref int offset)
+    private static int ReadInt32Be(byte[] buffer, ref int offset)
     {
-        var value = ReadInt32BE(buffer, offset);
+        var value = ReadInt32Be(buffer, offset);
         offset += 4;
         return value;
     }
 
-    private static short ReadInt16BE(byte[] buffer, ref int offset)
+    private static short ReadInt16Be(byte[] buffer, ref int offset)
     {
         var value = (short)((buffer[offset] << 8) | buffer[offset + 1]);
         offset += 2;
         return value;
     }
 
-    private static short ReadInt16BE(byte[] buffer, int offset)
+    private static short ReadInt16Be(byte[] buffer, int offset)
     {
         return (short)((buffer[offset] << 8) | buffer[offset + 1]);
     }
 
-    private static long ReadInt64BE(byte[] buffer, int offset)
+    private static long ReadInt64Be(byte[] buffer, int offset)
     {
         return ((long)buffer[offset] << 56) | ((long)buffer[offset + 1] << 48) | ((long)buffer[offset + 2] << 40) |
                ((long)buffer[offset + 3] << 32) | ((long)buffer[offset + 4] << 24) | ((long)buffer[offset + 5] << 16) |
@@ -703,7 +703,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
     private static byte[] EncodeBytes(byte[] data)
     {
         var result = new byte[4 + data.Length];
-        WriteInt32BE(result.AsSpan(0, 4), data.Length);
+        WriteInt32Be(result.AsSpan(0, 4), data.Length);
         data.CopyTo(result, 4);
         return result;
     }
@@ -735,7 +735,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
     private static string ParseError(byte[] payload)
     {
         var offset = 0;
-        var errorCode = ReadInt32BE(payload, ref offset);
+        var errorCode = ReadInt32Be(payload, ref offset);
         var message = ReadString(payload.AsSpan(offset), out _);
         return $"[{errorCode:X4}] {message}";
     }
@@ -743,7 +743,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
     private static (int code, string message) ParseErrorDetailed(byte[] payload)
     {
         var offset = 0;
-        var errorCode = ReadInt32BE(payload, ref offset);
+        var errorCode = ReadInt32Be(payload, ref offset);
         var message = ReadString(payload.AsSpan(offset), out _);
         return (errorCode, message);
     }

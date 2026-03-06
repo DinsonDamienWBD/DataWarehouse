@@ -30,7 +30,7 @@ public sealed class SnowflakeProtocolStrategy : DatabaseProtocolStrategyBase
         ProtocolName = "Snowflake SQL REST API",
         ProtocolVersion = "2",
         DefaultPort = 443,
-        Family = ProtocolFamily.CloudDW,
+        Family = ProtocolFamily.CloudDw,
         MaxPacketSize = 16 * 1024 * 1024,
         Capabilities = new ProtocolCapabilities
         {
@@ -326,7 +326,7 @@ public sealed class BigQueryProtocolStrategy : DatabaseProtocolStrategyBase
         ProtocolName = "Google BigQuery REST API",
         ProtocolVersion = "v2",
         DefaultPort = 443,
-        Family = ProtocolFamily.CloudDW,
+        Family = ProtocolFamily.CloudDw,
         MaxPacketSize = 10 * 1024 * 1024,
         Capabilities = new ProtocolCapabilities
         {
@@ -566,9 +566,9 @@ public sealed class RedshiftProtocolStrategy : DatabaseProtocolStrategyBase
 {
     // Redshift uses PostgreSQL protocol
     private const int ProtocolVersion3 = 196608;
-    private int _processId;
-    private int _secretKey;
-    private string _serverVersion = "";
+    internal int ProcessId { get; private set; }
+    internal int SecretKey { get; private set; }
+    internal string ServerVersion { get; private set; } = "";
 
     /// <inheritdoc/>
     public override string StrategyId => "redshift-pgwire";
@@ -582,7 +582,7 @@ public sealed class RedshiftProtocolStrategy : DatabaseProtocolStrategyBase
         ProtocolName = "Amazon Redshift PostgreSQL Wire Protocol",
         ProtocolVersion = "3.0",
         DefaultPort = 5439,
-        Family = ProtocolFamily.CloudDW,
+        Family = ProtocolFamily.CloudDw,
         MaxPacketSize = 64 * 1024 * 1024,
         Capabilities = new ProtocolCapabilities
         {
@@ -601,8 +601,8 @@ public sealed class RedshiftProtocolStrategy : DatabaseProtocolStrategyBase
             SupportedAuthMethods =
             [
                 AuthenticationMethod.ClearText,
-                AuthenticationMethod.MD5,
-                AuthenticationMethod.IAM
+                AuthenticationMethod.Md5,
+                AuthenticationMethod.Iam
             ]
         }
     };
@@ -657,8 +657,8 @@ public sealed class RedshiftProtocolStrategy : DatabaseProtocolStrategyBase
                     break;
 
                 case 'K':
-                    _processId = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(0));
-                    _secretKey = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(4));
+                    ProcessId = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(0));
+                    SecretKey = System.Buffers.Binary.BinaryPrimitives.ReadInt32BigEndian(data.AsSpan(4));
                     break;
 
                 case 'S':
@@ -725,7 +725,7 @@ public sealed class RedshiftProtocolStrategy : DatabaseProtocolStrategyBase
     {
         var parts = Encoding.UTF8.GetString(data).TrimEnd('\0').Split('\0');
         if (parts.Length >= 2 && parts[0] == "server_version")
-            _serverVersion = parts[1];
+            ServerVersion = parts[1];
     }
 
     private static string ParseErrorResponse(byte[] data)
@@ -959,7 +959,7 @@ public sealed class DatabricksProtocolStrategy : DatabaseProtocolStrategyBase
         ProtocolName = "Databricks SQL REST API",
         ProtocolVersion = "2.0",
         DefaultPort = 443,
-        Family = ProtocolFamily.CloudDW,
+        Family = ProtocolFamily.CloudDw,
         MaxPacketSize = 100 * 1024 * 1024,
         Capabilities = new ProtocolCapabilities
         {
@@ -1182,7 +1182,7 @@ public sealed class SynapseProtocolStrategy : DatabaseProtocolStrategyBase
         ProtocolName = "Azure Synapse TDS Protocol",
         ProtocolVersion = "7.4",
         DefaultPort = 1433,
-        Family = ProtocolFamily.CloudDW,
+        Family = ProtocolFamily.CloudDw,
         MaxPacketSize = 32767,
         Capabilities = new ProtocolCapabilities
         {

@@ -23,8 +23,8 @@ public sealed class ClickHouseProtocolStrategy : DatabaseProtocolStrategyBase
     private const byte ServerPong = 4;
     private const byte ServerEndOfStream = 5;
 
-    private string _serverVersion = "";
-    private string _serverTimezone = "";
+    internal string ServerVersion { get; private set; } = "";
+    internal string ServerTimezone { get; private set; } = "";
 
     /// <inheritdoc/>
     public override string StrategyId => "clickhouse-native";
@@ -57,7 +57,7 @@ public sealed class ClickHouseProtocolStrategy : DatabaseProtocolStrategyBase
             SupportedAuthMethods =
             [
                 AuthenticationMethod.ClearText,
-                AuthenticationMethod.SHA256
+                AuthenticationMethod.Sha256
             ]
         }
     };
@@ -97,14 +97,14 @@ public sealed class ClickHouseProtocolStrategy : DatabaseProtocolStrategyBase
 
             if (serverRevision >= 54423)
             {
-                _serverTimezone = await ReadStringAsync(ct);
+                ServerTimezone = await ReadStringAsync(ct);
             }
             if (serverRevision >= 54410)
             {
                 var displayName = await ReadStringAsync(ct);
             }
 
-            _serverVersion = $"{serverMajor}.{serverMinor}.{serverRevision}";
+            ServerVersion = $"{serverMajor}.{serverMinor}.{serverRevision}";
         }
     }
 
@@ -371,7 +371,7 @@ public sealed class ClickHouseProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class HBaseProtocolStrategy : DatabaseProtocolStrategyBase
 {
     private HttpClient? _httpClient;
-    private string _namespace = "default";
+    internal string Namespace { get; private set; } = "default";
 
     /// <inheritdoc/>
     public override string StrategyId => "hbase-rest";
@@ -420,7 +420,7 @@ public sealed class HBaseProtocolStrategy : DatabaseProtocolStrategyBase
         };
         _httpClient.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-        _namespace = parameters.Database ?? "default";
+        Namespace = parameters.Database ?? "default";
         return Task.CompletedTask;
     }
 
@@ -686,7 +686,7 @@ public sealed class HBaseProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class CouchbaseProtocolStrategy : DatabaseProtocolStrategyBase
 {
     private HttpClient? _httpClient;
-    private string _bucket = "";
+    internal string Bucket { get; private set; } = "";
 
     /// <inheritdoc/>
     public override string StrategyId => "couchbase-n1ql";
@@ -700,7 +700,7 @@ public sealed class CouchbaseProtocolStrategy : DatabaseProtocolStrategyBase
         ProtocolName = "Couchbase N1QL REST API",
         ProtocolVersion = "7.x",
         DefaultPort = 8093,
-        Family = ProtocolFamily.NoSQL,
+        Family = ProtocolFamily.NoSql,
         MaxPacketSize = 20 * 1024 * 1024,
         Capabilities = new ProtocolCapabilities
         {
@@ -733,7 +733,7 @@ public sealed class CouchbaseProtocolStrategy : DatabaseProtocolStrategyBase
             Timeout = TimeSpan.FromSeconds(60)
         };
 
-        _bucket = parameters.Database ?? "default";
+        Bucket = parameters.Database ?? "default";
         return Task.CompletedTask;
     }
 

@@ -1122,7 +1122,7 @@ public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
     private string _databasePath = "";
-    private string _databaseType = "btree";
+    internal string DatabaseType { get; private set; } = "btree";
     private bool _isOpen;
 
     // P2-2695: BerkeleyDB requires a native library for real B-tree/hash-tree storage.
@@ -1172,7 +1172,7 @@ public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
     protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct)
     {
         _databasePath = parameters.Database ?? "./berkeleydb";
-        _databaseType = parameters.ExtendedProperties?.GetValueOrDefault("Type")?.ToString() ?? "btree";
+        DatabaseType = parameters.ExtendedProperties?.GetValueOrDefault("Type")?.ToString() ?? "btree";
         return Task.CompletedTask;
     }
 

@@ -33,7 +33,7 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
     private const byte OpNoop = 0x0a;
     private const byte OpVersion = 0x0b;
     private const byte OpGetK = 0x0c;
-    private const byte OpGetKQ = 0x0d;
+    private const byte OpGetKq = 0x0d;
     private const byte OpAppend = 0x0e;
     private const byte OpPrepend = 0x0f;
     private const byte OpStat = 0x10;
@@ -58,7 +58,7 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
     private const ushort StatusAuthContinue = 0x0021;
 
     private bool _useBinaryProtocol = true;
-    private string _serverVersion = "";
+    internal string ServerVersion { get; private set; } = "";
     private uint _opaque;
     private StreamReader? _textReader;
     private StreamWriter? _textWriter;
@@ -75,7 +75,7 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
         ProtocolName = "Memcached Binary/Text Protocol",
         ProtocolVersion = "1.6",
         DefaultPort = 11211,
-        Family = ProtocolFamily.NoSQL,
+        Family = ProtocolFamily.NoSql,
         MaxPacketSize = 1024 * 1024, // 1 MB default
         Capabilities = new ProtocolCapabilities
         {
@@ -94,7 +94,7 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
             SupportedAuthMethods =
             [
                 AuthenticationMethod.ClearText,
-                AuthenticationMethod.SASL
+                AuthenticationMethod.Sasl
             ]
         }
     };
@@ -110,7 +110,7 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
             if (versionResponse.Status == StatusNoError)
             {
                 _useBinaryProtocol = true;
-                _serverVersion = Encoding.UTF8.GetString(versionResponse.Value ?? []);
+                ServerVersion = Encoding.UTF8.GetString(versionResponse.Value ?? []);
                 return;
             }
         }
@@ -130,7 +130,7 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
         var line = await _textReader.ReadLineAsync(ct);
         if (line != null && line.StartsWith("VERSION "))
         {
-            _serverVersion = line[8..];
+            ServerVersion = line[8..];
         }
     }
 
@@ -242,7 +242,7 @@ public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
                         // Multi-get using quiet commands
                         foreach (var key in keys[..^1])
                         {
-                            await SendBinaryCommandNoResponseAsync(OpGetKQ, key, null, 0, 0, ct);
+                            await SendBinaryCommandNoResponseAsync(OpGetKq, key, null, 0, 0, ct);
                         }
                         // Last key uses non-quiet to get final response
                         var lastResponse = await SendBinaryCommandAsync(OpGetK, keys[^1], null, 0, 0, ct);

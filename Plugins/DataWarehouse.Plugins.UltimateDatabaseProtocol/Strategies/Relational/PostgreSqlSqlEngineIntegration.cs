@@ -30,8 +30,8 @@ public sealed class PostgreSqlSqlEngineIntegration : IDataSourceProvider
     // Transaction state: 'I' = idle, 'T' = in transaction, 'E' = failed transaction
     // P2-2748: volatile ensures visibility across async continuations without a full lock.
     private volatile int _transactionStatusCode = (int)'I'; // stored as int; char cannot be volatile
-    private long _transactionId;
-    private readonly List<string> _transactionLog = new();
+    internal long TransactionId { get; private set; }
+    internal List<string> TransactionLog { get; } = new();
 
     /// <summary>
     /// Gets the current transaction status character.
@@ -418,8 +418,8 @@ public sealed class PostgreSqlSqlEngineIntegration : IDataSourceProvider
         }
 
         _transactionStatus = 'T';
-        _transactionId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
-        _transactionLog.Clear();
+        TransactionId = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds();
+        TransactionLog.Clear();
         return Task.CompletedTask;
     }
 
@@ -433,13 +433,13 @@ public sealed class PostgreSqlSqlEngineIntegration : IDataSourceProvider
             // P2-2742/P2-2753: Cannot commit a failed transaction. Throw so the caller is aware;
             // the caller must issue ROLLBACK explicitly. Silently discarding is contract-breaking.
             _transactionStatus = 'I';
-            _transactionLog.Clear();
+            TransactionLog.Clear();
             throw new InvalidOperationException(
                 "Cannot COMMIT: transaction is in error state (status='E'). Issue ROLLBACK instead.");
         }
 
         _transactionStatus = 'I';
-        _transactionLog.Clear();
+        TransactionLog.Clear();
         return Task.CompletedTask;
     }
 
@@ -449,7 +449,7 @@ public sealed class PostgreSqlSqlEngineIntegration : IDataSourceProvider
     public Task RollbackTransactionAsync()
     {
         _transactionStatus = 'I';
-        _transactionLog.Clear();
+        TransactionLog.Clear();
         return Task.CompletedTask;
     }
 
@@ -483,7 +483,7 @@ public sealed class PostgreSqlSqlEngineIntegration : IDataSourceProvider
 
         if (_transactionStatus == 'T')
         {
-            _transactionLog.Add(sql);
+            TransactionLog.Add(sql);
         }
 
         // DDL operations are recorded; actual VDE metadata modification
@@ -502,7 +502,7 @@ public sealed class PostgreSqlSqlEngineIntegration : IDataSourceProvider
 
         if (_transactionStatus == 'T')
         {
-            _transactionLog.Add(sql);
+            TransactionLog.Add(sql);
         }
 
         // This SQL engine integration layer routes DML through the storage strategy and

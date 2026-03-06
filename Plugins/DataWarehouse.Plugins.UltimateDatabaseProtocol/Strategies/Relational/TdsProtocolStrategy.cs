@@ -117,11 +117,11 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
     private int _packetId;
     private readonly object _packetIdLock = new();
     private int _spid = 0;
-    private string _serverVersion = "";
-    private string _instanceName = "";
-    private bool _encryptionRequired;
-    private byte[] _serverNonce = [];
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, string> _envChanges = new();
+    internal string ServerVersion { get; private set; } = "";
+    internal string InstanceName { get; private set; } = "";
+    internal bool EncryptionRequired { get; private set; }
+    internal byte[] ServerNonce { get; private set; } = [];
+    internal System.Collections.Concurrent.ConcurrentDictionary<string, string> EnvChanges { get; } = new();
 
     /// <inheritdoc/>
     public override string StrategyId => "tds-protocol";
@@ -244,20 +244,20 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
                     case PreLoginVersion:
                         if (optLength >= 6)
                         {
-                            _serverVersion = $"{optData[0]}.{optData[1]}.{(optData[2] << 8) | optData[3]}";
+                            ServerVersion = $"{optData[0]}.{optData[1]}.{(optData[2] << 8) | optData[3]}";
                         }
                         break;
 
                     case PreLoginEncryption:
-                        _encryptionRequired = optData[0] == 0x01 || optData[0] == 0x03;
+                        EncryptionRequired = optData[0] == 0x01 || optData[0] == 0x03;
                         break;
 
                     case PreLoginInstance:
-                        _instanceName = Encoding.ASCII.GetString(optData).TrimEnd('\0');
+                        InstanceName = Encoding.ASCII.GetString(optData).TrimEnd('\0');
                         break;
 
                     case PreLoginNonceOpt:
-                        _serverNonce = optData.ToArray();
+                        ServerNonce = optData.ToArray();
                         break;
                 }
             }
@@ -519,7 +519,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
         index += 2;
 
         var interfaceType = payload[index++];
-        var tdsVersion = ReadInt32BE(payload.AsSpan(index, 4));
+        var tdsVersion = ReadInt32Be(payload.AsSpan(index, 4));
         index += 4;
 
         var progNameLen = payload[index++];
@@ -531,7 +531,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
         var serverBuild = payload[index] | (payload[index + 1] << 8);
         index += 2;
 
-        _serverVersion = $"{serverMajor}.{serverMinor}.{serverBuild}";
+        ServerVersion = $"{serverMajor}.{serverMinor}.{serverBuild}";
 
         return index;
     }
@@ -559,7 +559,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
                     index += newLen * 2;
                     var oldLen = payload[index++];
                     index += oldLen * 2;
-                    _envChanges[envType.ToString()] = newVal;
+                    EnvChanges[envType.ToString()] = newVal;
                     break;
 
                 default:
@@ -582,7 +582,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
         var length = payload[index] | (payload[index + 1] << 8);
         index += 2;
 
-        var number = ReadInt32LE(payload.AsSpan(index, 4));
+        var number = ReadInt32Le(payload.AsSpan(index, 4));
         index += 4;
 
         var state = payload[index++];
@@ -599,7 +599,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
         var procNameLen = payload[index++];
         index += procNameLen * 2;
 
-        var lineNumber = ReadInt32LE(payload.AsSpan(index, 4));
+        var lineNumber = ReadInt32Le(payload.AsSpan(index, 4));
         index += 4;
 
         return (index, message);
@@ -616,7 +616,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
         while (index < payload.Length && payload[index] != 0xff)
         {
             var featureId = payload[index++];
-            var featureDataLen = ReadInt32LE(payload.AsSpan(index, 4));
+            var featureDataLen = ReadInt32Le(payload.AsSpan(index, 4));
             index += 4 + (int)featureDataLen;
         }
         if (index < payload.Length)
@@ -640,20 +640,20 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
         var offset = 0;
 
         // Total length of headers
-        WriteInt32LE(packet.AsSpan(offset, 4), allHeadersLength);
+        WriteInt32Le(packet.AsSpan(offset, 4), allHeadersLength);
         offset += 4;
 
         // Transaction descriptor header
-        WriteInt32LE(packet.AsSpan(offset, 4), 18); // Header length
+        WriteInt32Le(packet.AsSpan(offset, 4), 18); // Header length
         offset += 4;
-        WriteInt16LE(packet.AsSpan(offset, 2), 2); // Header type: transaction descriptor
+        WriteInt16Le(packet.AsSpan(offset, 2), 2); // Header type: transaction descriptor
         offset += 2;
 
         // Transaction descriptor (8 bytes of zeros for no transaction)
         offset += 8;
 
         // Outstanding request count
-        WriteInt32LE(packet.AsSpan(offset, 4), 1);
+        WriteInt32Le(packet.AsSpan(offset, 4), 1);
         offset += 4;
 
         // Query text
@@ -718,7 +718,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
                         index += 2;
                         var curCmd = payload[index] | (payload[index + 1] << 8);
                         index += 2;
-                        rowsAffected = (long)ReadInt64LE(payload.AsSpan(index, 8));
+                        rowsAffected = (long)ReadInt64Le(payload.AsSpan(index, 8));
                         index += 8;
 
                         if ((status & 0x01) == 0) // Not DONE_MORE
@@ -781,7 +781,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
         for (int i = 0; i < columnCount; i++)
         {
             // User type
-            var userType = ReadInt32LE(payload.AsSpan(index, 4));
+            var userType = ReadInt32Le(payload.AsSpan(index, 4));
             index += 4;
 
             // Flags
@@ -925,7 +925,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
             case TypeText:
             case TypeNText:
             case TypeImage:
-                var lobLen = ReadInt32LE(payload.AsSpan(index, 4));
+                var lobLen = ReadInt32Le(payload.AsSpan(index, 4));
                 index += 4;
                 // Collation for text
                 if (typeId != TypeImage)
@@ -954,7 +954,7 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
                 return ("XML", null);
 
             case TypeVariant:
-                var varLen = ReadInt32LE(payload.AsSpan(index, 4));
+                var varLen = ReadInt32Le(payload.AsSpan(index, 4));
                 index += 4;
                 return ("SQL_VARIANT", varLen);
 
@@ -1007,12 +1007,12 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
         switch (dataType)
         {
             case "INT":
-                var intVal = ReadInt32LE(payload.AsSpan(index, 4));
+                var intVal = ReadInt32Le(payload.AsSpan(index, 4));
                 index += 4;
                 return intVal;
 
             case "BIGINT":
-                var longVal = ReadInt64LE(payload.AsSpan(index, 8));
+                var longVal = ReadInt64Le(payload.AsSpan(index, 8));
                 index += 8;
                 return longVal;
 
@@ -1045,21 +1045,21 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
             case "NUMERIC":
             case "MONEY":
                 // TDS MONEY is 8 bytes: high 4 bytes then low 4 bytes, value / 10000
-                var moneyHigh = ReadInt32LE(payload.AsSpan(index, 4));
-                var moneyLow = ReadInt32LE(payload.AsSpan(index + 4, 4));
+                var moneyHigh = ReadInt32Le(payload.AsSpan(index, 4));
+                var moneyLow = ReadInt32Le(payload.AsSpan(index + 4, 4));
                 index += 8;
                 var moneyRaw = ((long)moneyHigh << 32) | (uint)moneyLow;
                 return moneyRaw / 10000m;
 
             case "SMALLMONEY":
-                var smallMoneyRaw = ReadInt32LE(payload.AsSpan(index, 4));
+                var smallMoneyRaw = ReadInt32Le(payload.AsSpan(index, 4));
                 index += 4;
                 return smallMoneyRaw / 10000m;
 
             case "DATETIME":
                 // TDS DATETIME: 4 bytes days since 1900-01-01, 4 bytes 1/300th second intervals
-                var daysSince1900 = ReadInt32LE(payload.AsSpan(index, 4));
-                var timeTicks = ReadInt32LE(payload.AsSpan(index + 4, 4));
+                var daysSince1900 = ReadInt32Le(payload.AsSpan(index, 4));
+                var timeTicks = ReadInt32Le(payload.AsSpan(index + 4, 4));
                 index += 8;
                 var baseDate = new DateTime(1900, 1, 1, 0, 0, 0, DateTimeKind.Utc);
                 return baseDate.AddDays(daysSince1900).AddSeconds(timeTicks / 300.0);
@@ -1189,13 +1189,13 @@ public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
         return (packetType, ms.ToArray());
     }
 
-    private static void WriteInt16LE(Span<byte> buffer, short value)
+    private static void WriteInt16Le(Span<byte> buffer, short value)
     {
         buffer[0] = (byte)value;
         buffer[1] = (byte)(value >> 8);
     }
 
-    private static long ReadInt64LE(ReadOnlySpan<byte> buffer)
+    private static long ReadInt64Le(ReadOnlySpan<byte> buffer)
     {
         return (long)buffer[0] | ((long)buffer[1] << 8) | ((long)buffer[2] << 16) | ((long)buffer[3] << 24) |
                ((long)buffer[4] << 32) | ((long)buffer[5] << 40) | ((long)buffer[6] << 48) | ((long)buffer[7] << 56);

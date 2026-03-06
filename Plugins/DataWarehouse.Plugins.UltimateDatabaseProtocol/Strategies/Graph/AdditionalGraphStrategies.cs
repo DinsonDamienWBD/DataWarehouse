@@ -237,7 +237,7 @@ public sealed class ArangoDbProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class JanusGraphProtocolStrategy : DatabaseProtocolStrategyBase
 {
     private HttpClient? _httpClient;
-    private string _graphName = "";
+    internal string GraphName { get; private set; } = "";
 
     /// <inheritdoc/>
     public override string StrategyId => "janusgraph-gremlin";
@@ -278,7 +278,7 @@ public sealed class JanusGraphProtocolStrategy : DatabaseProtocolStrategyBase
     /// <inheritdoc/>
     protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct)
     {
-        _graphName = parameters.Database ?? "g";
+        GraphName = parameters.Database ?? "g";
         return Task.CompletedTask;
     }
 
@@ -442,7 +442,7 @@ public sealed class JanusGraphProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class TigerGraphProtocolStrategy : DatabaseProtocolStrategyBase
 {
     private HttpClient? _httpClient;
-    private string _graphName = "";
+    internal string GraphName { get; private set; } = "";
     private string? _token;
 
     /// <inheritdoc/>
@@ -487,7 +487,7 @@ public sealed class TigerGraphProtocolStrategy : DatabaseProtocolStrategyBase
     /// <inheritdoc/>
     protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct)
     {
-        _graphName = parameters.Database ?? "MyGraph";
+        GraphName = parameters.Database ?? "MyGraph";
         return Task.CompletedTask;
     }
 
@@ -509,7 +509,7 @@ public sealed class TigerGraphProtocolStrategy : DatabaseProtocolStrategyBase
             ]);
 
             using var response = await _httpClient.PostAsync(
-                $"/requesttoken?graph={_graphName}", tokenRequest, ct);
+                $"/requesttoken?graph={GraphName}", tokenRequest, ct);
             response.EnsureSuccessStatusCode();
 
             var result = await response.Content.ReadFromJsonAsync<JsonElement>(ct);
@@ -534,7 +534,7 @@ public sealed class TigerGraphProtocolStrategy : DatabaseProtocolStrategyBase
             throw new InvalidOperationException("Not connected");
 
         // Build query URL with parameters
-        var url = $"/query/{_graphName}/{query}";
+        var url = $"/query/{GraphName}/{query}";
         if (parameters != null && parameters.Count > 0)
         {
             var queryParams = string.Join("&", parameters

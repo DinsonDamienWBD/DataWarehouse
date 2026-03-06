@@ -39,9 +39,9 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
     // State
     private int _requestId;
     private string _currentDatabase = "admin";
-    private int _maxWireVersion;
-    private int _minWireVersion;
-    private string[]? _compressionMethods;
+    internal int MaxWireVersion { get; private set; }
+    internal int MinWireVersion { get; private set; }
+    internal string[]? CompressionMethods { get; private set; }
 
     /// <inheritdoc/>
     public override string StrategyId => "mongodb-wire";
@@ -55,7 +55,7 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
         ProtocolName = "MongoDB Wire Protocol",
         ProtocolVersion = "OP_MSG",
         DefaultPort = 27017,
-        Family = ProtocolFamily.NoSQL,
+        Family = ProtocolFamily.NoSql,
         MaxPacketSize = 48 * 1024 * 1024, // 48 MB
         Capabilities = new ProtocolCapabilities
         {
@@ -116,11 +116,11 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
         if (response.TryGetValue("ok", out var ok) && Convert.ToDouble(ok) == 1.0)
         {
             if (response.TryGetValue("maxWireVersion", out var maxWire))
-                _maxWireVersion = Convert.ToInt32(maxWire);
+                MaxWireVersion = Convert.ToInt32(maxWire);
             if (response.TryGetValue("minWireVersion", out var minWire))
-                _minWireVersion = Convert.ToInt32(minWire);
+                MinWireVersion = Convert.ToInt32(minWire);
             if (response.TryGetValue("compression", out var compression) && compression is IEnumerable<object> methods)
-                _compressionMethods = methods.Select(m => m.ToString()!).ToArray();
+                CompressionMethods = methods.Select(m => m.ToString()!).ToArray();
         }
         else
         {
@@ -432,17 +432,17 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
         var offset = 0;
 
         // Message header
-        WriteInt32LE(packet.AsSpan(offset, 4), messageLength);
+        WriteInt32Le(packet.AsSpan(offset, 4), messageLength);
         offset += 4;
-        WriteInt32LE(packet.AsSpan(offset, 4), requestId);
+        WriteInt32Le(packet.AsSpan(offset, 4), requestId);
         offset += 4;
-        WriteInt32LE(packet.AsSpan(offset, 4), responseTo);
+        WriteInt32Le(packet.AsSpan(offset, 4), responseTo);
         offset += 4;
-        WriteInt32LE(packet.AsSpan(offset, 4), opCode);
+        WriteInt32Le(packet.AsSpan(offset, 4), opCode);
         offset += 4;
 
         // Flags
-        WriteInt32LE(packet.AsSpan(offset, 4), (int)flags);
+        WriteInt32Le(packet.AsSpan(offset, 4), (int)flags);
         offset += 4;
 
         // Section: body
@@ -459,10 +459,10 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
     {
         // Read message header
         var header = await ReceiveExactAsync(16, ct);
-        var messageLength = ReadInt32LE(header.AsSpan(0, 4));
-        var requestId = ReadInt32LE(header.AsSpan(4, 4));
-        var responseTo = ReadInt32LE(header.AsSpan(8, 4));
-        var opCode = ReadInt32LE(header.AsSpan(12, 4));
+        var messageLength = ReadInt32Le(header.AsSpan(0, 4));
+        var requestId = ReadInt32Le(header.AsSpan(4, 4));
+        var responseTo = ReadInt32Le(header.AsSpan(8, 4));
+        var opCode = ReadInt32Le(header.AsSpan(12, 4));
 
         // Read rest of message
         var payloadLength = messageLength - 16;
@@ -471,7 +471,7 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
         if (opCode == OpMsg)
         {
             // Parse OP_MSG response
-            var flags = (uint)ReadInt32LE(payload.AsSpan(0, 4));
+            var flags = (uint)ReadInt32Le(payload.AsSpan(0, 4));
             var offset = 4;
 
             // Read sections
@@ -481,13 +481,13 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
 
                 if (sectionType == SectionBody)
                 {
-                    var docLength = ReadInt32LE(payload.AsSpan(offset, 4));
+                    var docLength = ReadInt32Le(payload.AsSpan(offset, 4));
                     var bsonData = payload.AsSpan(offset, docLength).ToArray();
                     return DeserializeFromBson(bsonData);
                 }
                 else if (sectionType == SectionDocumentSequence)
                 {
-                    var seqLength = ReadInt32LE(payload.AsSpan(offset, 4));
+                    var seqLength = ReadInt32Le(payload.AsSpan(offset, 4));
                     offset += seqLength;
                 }
             }
@@ -495,14 +495,14 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
         else if (opCode == OpReply)
         {
             // Parse legacy OP_REPLY
-            var responseFlags = ReadInt32LE(payload.AsSpan(0, 4));
-            var cursorId = ReadInt64LE(payload.AsSpan(4, 8));
-            var startingFrom = ReadInt32LE(payload.AsSpan(12, 4));
-            var numberReturned = ReadInt32LE(payload.AsSpan(16, 4));
+            var responseFlags = ReadInt32Le(payload.AsSpan(0, 4));
+            var cursorId = ReadInt64Le(payload.AsSpan(4, 8));
+            var startingFrom = ReadInt32Le(payload.AsSpan(12, 4));
+            var numberReturned = ReadInt32Le(payload.AsSpan(16, 4));
 
             if (numberReturned > 0)
             {
-                var docLength = ReadInt32LE(payload.AsSpan(20, 4));
+                var docLength = ReadInt32Le(payload.AsSpan(20, 4));
                 var bsonData = payload.AsSpan(20, docLength).ToArray();
                 return DeserializeFromBson(bsonData);
             }
@@ -734,7 +734,7 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
         return Convert.ToDouble(response.GetValueOrDefault("ok", 0.0)) == 1.0;
     }
 
-    private static long ReadInt64LE(ReadOnlySpan<byte> buffer)
+    private static long ReadInt64Le(ReadOnlySpan<byte> buffer)
     {
         return (long)buffer[0] | ((long)buffer[1] << 8) | ((long)buffer[2] << 16) | ((long)buffer[3] << 24) |
                ((long)buffer[4] << 32) | ((long)buffer[5] << 40) | ((long)buffer[6] << 48) | ((long)buffer[7] << 56);

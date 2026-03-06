@@ -9,7 +9,7 @@ namespace DataWarehouse.Plugins.UltimateDatabaseProtocol.Strategies.TimeSeries;
 /// </summary>
 public sealed class InfluxDbLineProtocolStrategy : DatabaseProtocolStrategyBase
 {
-    private string _bucket = "";
+    internal string Bucket { get; private set; } = "";
     private string _org = "";
     private string _token = "";
     private HttpClient? _httpClient;
@@ -49,7 +49,7 @@ public sealed class InfluxDbLineProtocolStrategy : DatabaseProtocolStrategyBase
     /// <inheritdoc/>
     protected override Task PerformHandshakeAsync(ConnectionParameters parameters, CancellationToken ct)
     {
-        _bucket = parameters.Database ?? "default";
+        Bucket = parameters.Database ?? "default";
         _org = parameters.AdditionalParameters.TryGetValue("org", out var org) ? org : "default";
         _token = parameters.Password ?? parameters.AdditionalParameters.GetValueOrDefault("token", "") ?? "";
 
@@ -155,7 +155,7 @@ public sealed class InfluxDbLineProtocolStrategy : DatabaseProtocolStrategyBase
         var content = new StringContent(command, Encoding.UTF8, "text/plain");
 
         using var response = await _httpClient.PostAsync(
-            $"/api/v2/write?org={Uri.EscapeDataString(_org)}&bucket={Uri.EscapeDataString(_bucket)}&precision=ns",
+            $"/api/v2/write?org={Uri.EscapeDataString(_org)}&bucket={Uri.EscapeDataString(Bucket)}&precision=ns",
             content, ct);
 
         if (!response.IsSuccessStatusCode)

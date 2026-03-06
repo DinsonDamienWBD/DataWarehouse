@@ -36,7 +36,7 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
     private const byte Push = (byte)'>';
 
     // Connection state
-    private string _serverVersion = "";
+    internal string ServerVersion { get; private set; } = "";
     // P2-2701: volatile ensures visibility across async continuations without a full lock for the bool.
     private volatile bool _inTransaction;
     private readonly List<string> _transactionQueue = new();
@@ -57,7 +57,7 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
         ProtocolName = "Redis Serialization Protocol (RESP)",
         ProtocolVersion = "3",
         DefaultPort = 6379,
-        Family = ProtocolFamily.NoSQL,
+        Family = ProtocolFamily.NoSql,
         MaxPacketSize = 512 * 1024 * 1024, // 512 MB
         Capabilities = new ProtocolCapabilities
         {
@@ -95,7 +95,7 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
             if (response is Dictionary<string, object> helloResponse)
             {
                 if (helloResponse.TryGetValue("version", out var version))
-                    _serverVersion = version?.ToString() ?? "";
+                    ServerVersion = version?.ToString() ?? "";
             }
         }
         catch
@@ -113,7 +113,7 @@ public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
                     {
                         if (line.StartsWith("redis_version:"))
                         {
-                            _serverVersion = line.Split(':')[1].Trim();
+                            ServerVersion = line.Split(':')[1].Trim();
                             break;
                         }
                     }

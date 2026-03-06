@@ -22,8 +22,8 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
     private HttpClient? _httpClient;
     private string _baseUrl = "";
     private string? _apiKey;
-    private string _clusterName = "";
-    private string _clusterVersion = "";
+    internal string ClusterName { get; private set; } = "";
+    internal string ClusterVersion { get; private set; } = "";
 
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -121,11 +121,11 @@ public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
         using var info = JsonDocument.Parse(content);
 
         if (info.RootElement.TryGetProperty("cluster_name", out var clusterName))
-            _clusterName = clusterName.GetString() ?? "";
+            ClusterName = clusterName.GetString() ?? "";
 
         if (info.RootElement.TryGetProperty("version", out var version) &&
             version.TryGetProperty("number", out var number))
-            _clusterVersion = number.GetString() ?? "";
+            ClusterVersion = number.GetString() ?? "";
     }
 
     /// <inheritdoc/>
@@ -692,7 +692,7 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
 {
     private HttpClient? _httpClient;
     private string _baseUrl = "";
-    private string _clusterVersion = "";
+    internal string ClusterVersion { get; private set; } = "";
 
     private readonly JsonSerializerOptions _jsonOptions = new()
     {
@@ -733,7 +733,7 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
                 AuthenticationMethod.ClearText,
                 AuthenticationMethod.Token,
                 AuthenticationMethod.Certificate,
-                AuthenticationMethod.SASL
+                AuthenticationMethod.Sasl
             ]
         }
     };
@@ -780,7 +780,7 @@ public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
 
         if (info.RootElement.TryGetProperty("version", out var version) &&
             version.TryGetProperty("number", out var number))
-            _clusterVersion = number.GetString() ?? "";
+            ClusterVersion = number.GetString() ?? "";
     }
 
     /// <inheritdoc/>

@@ -64,7 +64,7 @@ public sealed class KafkaProtocolStrategy : DatabaseProtocolStrategyBase
             SupportedAuthMethods =
             [
                 AuthenticationMethod.ClearText,
-                AuthenticationMethod.SASL,
+                AuthenticationMethod.Sasl,
                 AuthenticationMethod.Certificate
             ]
         }
@@ -616,7 +616,7 @@ public sealed class RabbitMqProtocolStrategy : DatabaseProtocolStrategyBase
             SupportedAuthMethods =
             [
                 AuthenticationMethod.ClearText,
-                AuthenticationMethod.SASL
+                AuthenticationMethod.Sasl
             ]
         }
     };
@@ -1132,7 +1132,7 @@ public sealed class NatsProtocolStrategy : DatabaseProtocolStrategyBase
 {
     private StreamReader? _reader;
     private StreamWriter? _writer;
-    private string _serverInfo = "";
+    internal string ServerInfo { get; private set; } = "";
     private int _subscriptionId;
 
     /// <inheritdoc/>
@@ -1182,7 +1182,7 @@ public sealed class NatsProtocolStrategy : DatabaseProtocolStrategyBase
         var infoLine = await _reader.ReadLineAsync(ct);
         if (infoLine?.StartsWith("INFO ") == true)
         {
-            _serverInfo = infoLine[5..];
+            ServerInfo = infoLine[5..];
         }
     }
 
@@ -1433,7 +1433,7 @@ public sealed class PulsarProtocolStrategy : DatabaseProtocolStrategyBase
 {
     private HttpClient? _httpClient;
     private string _tenant = "public";
-    private string _namespace = "default";
+    internal string PulsarNamespace { get; private set; } = "default";
 
     /// <inheritdoc/>
     public override string StrategyId => "pulsar-binary";
@@ -1483,7 +1483,7 @@ public sealed class PulsarProtocolStrategy : DatabaseProtocolStrategyBase
         };
 
         _tenant = parameters.ExtendedProperties?.GetValueOrDefault("Tenant")?.ToString() ?? "public";
-        _namespace = parameters.Database ?? "default";
+        PulsarNamespace = parameters.Database ?? "default";
 
         return Task.CompletedTask;
     }
@@ -1526,7 +1526,7 @@ public sealed class PulsarProtocolStrategy : DatabaseProtocolStrategyBase
     private async Task<QueryResult> ListTopicsAsync(CancellationToken ct)
     {
         var response = await _httpClient!.GetAsync(
-            $"/admin/v2/persistent/{_tenant}/{_namespace}", ct);
+            $"/admin/v2/persistent/{_tenant}/{PulsarNamespace}", ct);
         var content = await response.Content.ReadAsStringAsync(ct);
 
         var topics = JsonSerializer.Deserialize<List<string>>(content) ?? [];
@@ -1547,7 +1547,7 @@ public sealed class PulsarProtocolStrategy : DatabaseProtocolStrategyBase
     {
         var topic = parts.Length > 2 ? parts[2] : "";
         var response = await _httpClient!.PutAsync(
-            $"/admin/v2/persistent/{_tenant}/{_namespace}/{topic}",
+            $"/admin/v2/persistent/{_tenant}/{PulsarNamespace}/{topic}",
             null, ct);
 
         return new QueryResult
@@ -1562,7 +1562,7 @@ public sealed class PulsarProtocolStrategy : DatabaseProtocolStrategyBase
     {
         var topic = parts.Length > 2 ? parts[2] : "";
         var response = await _httpClient!.DeleteAsync(
-            $"/admin/v2/persistent/{_tenant}/{_namespace}/{topic}", ct);
+            $"/admin/v2/persistent/{_tenant}/{PulsarNamespace}/{topic}", ct);
 
         return new QueryResult
         {
@@ -1576,7 +1576,7 @@ public sealed class PulsarProtocolStrategy : DatabaseProtocolStrategyBase
     {
         var topic = parts.Length > 1 ? parts[1] : "";
         var response = await _httpClient!.GetAsync(
-            $"/admin/v2/persistent/{_tenant}/{_namespace}/{topic}/stats", ct);
+            $"/admin/v2/persistent/{_tenant}/{PulsarNamespace}/{topic}/stats", ct);
         var content = await response.Content.ReadAsStringAsync(ct);
 
         return new QueryResult

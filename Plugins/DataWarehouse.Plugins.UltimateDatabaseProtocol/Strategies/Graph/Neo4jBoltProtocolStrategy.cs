@@ -82,8 +82,8 @@ public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
 
     // State
     private int _protocolVersion = 0x00040004; // Bolt 4.4
-    private string _serverAgent = "";
-    private string _connectionId = "";
+    internal string ServerAgent { get; private set; } = "";
+    internal string Neo4jConnectionId { get; private set; } = "";
     private bool _inTransaction;
     private readonly List<ColumnMetadata> _currentFields = new();
 
@@ -134,19 +134,19 @@ public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
         // Format: major.minor (2 bytes each, big-endian)
         var versionProposal = new byte[16];
         // Bolt 5.0
-        WriteInt32BE(versionProposal.AsSpan(0, 4), 0x00050000);
+        WriteInt32Be(versionProposal.AsSpan(0, 4), 0x00050000);
         // Bolt 4.4
-        WriteInt32BE(versionProposal.AsSpan(4, 4), 0x00040004);
+        WriteInt32Be(versionProposal.AsSpan(4, 4), 0x00040004);
         // Bolt 4.3
-        WriteInt32BE(versionProposal.AsSpan(8, 4), 0x00040003);
+        WriteInt32Be(versionProposal.AsSpan(8, 4), 0x00040003);
         // Bolt 4.0
-        WriteInt32BE(versionProposal.AsSpan(12, 4), 0x00040000);
+        WriteInt32Be(versionProposal.AsSpan(12, 4), 0x00040000);
 
         await SendAsync(versionProposal, ct);
 
         // Read selected version
         var selectedVersion = await ReceiveExactAsync(4, ct);
-        _protocolVersion = ReadInt32BE(selectedVersion.AsSpan());
+        _protocolVersion = ReadInt32Be(selectedVersion.AsSpan());
 
         if (_protocolVersion == 0)
         {
@@ -181,9 +181,9 @@ public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
         if (signature == MsgSuccess)
         {
             if (metadata.TryGetValue("server", out var server))
-                _serverAgent = server?.ToString() ?? "";
+                ServerAgent = server?.ToString() ?? "";
             if (metadata.TryGetValue("connection_id", out var connId))
-                _connectionId = connId?.ToString() ?? "";
+                Neo4jConnectionId = connId?.ToString() ?? "";
         }
     }
 

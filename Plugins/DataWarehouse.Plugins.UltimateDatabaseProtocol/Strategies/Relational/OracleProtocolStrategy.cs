@@ -31,7 +31,7 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
 
     private volatile int _sdu = 8192;
     private volatile int _tdu = 32767;
-    private byte[] _sessionKey = [];
+    internal byte[] SessionKey { get; private set; } = [];
     private int _sequenceNumber; // Access via Interlocked (finding 2731)
 
     /// <inheritdoc/>
@@ -327,7 +327,7 @@ public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
         // Extract session key for future communication
         if (resultData.Length >= 17)
         {
-            _sessionKey = resultData[1..17];
+            SessionKey = resultData[1..17];
         }
     }
 
