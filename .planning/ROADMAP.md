@@ -2874,7 +2874,7 @@ Plans:
   | UltimateDataProtection | 231 | 6575-6810 |
   | UltimateDataQuality | 53 | 6811-6868 |
   | UltimateDataTransit | 70 | 6869-6943 |
-  | UltimateDeployment | 101 | 10/10 | Complete   | 2026-03-06 | 21 | 7050-7075 |
+  | UltimateDeployment | 101 | 10/10 | Complete    | 2026-03-06 | 21 | 7050-7075 |
   | UltimateEdgeComputing | 63 | 7076-7143 |
   | UltimateEncryption | 180 | 7144-7342 |
   | UltimateFilesystem | 101 | 7343-7448 |
