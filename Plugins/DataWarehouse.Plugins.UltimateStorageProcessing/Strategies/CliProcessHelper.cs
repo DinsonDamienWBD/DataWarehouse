@@ -251,10 +251,10 @@ internal static class CliProcessHelper
     public static void ValidateNoShellMetachars(string value, string paramName)
     {
         // Shell metacharacters that could inject additional commands or arguments
-        const string Forbidden = ";&|`$(){}[]<>!\\\"'\n\r\t";
+        const string forbidden = ";&|`$(){}[]<>!\\\"'\n\r\t";
         foreach (var c in value)
         {
-            if (Forbidden.Contains(c))
+            if (forbidden.Contains(c))
             {
                 throw new ArgumentException(
                     $"'{paramName}' contains forbidden character '{c}' (0x{(int)c:X2}) that could enable command injection.",

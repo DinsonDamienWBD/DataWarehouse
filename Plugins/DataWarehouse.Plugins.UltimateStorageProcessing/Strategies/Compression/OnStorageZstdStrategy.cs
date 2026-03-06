@@ -59,7 +59,7 @@ internal sealed class OnStorageZstdStrategy : StorageProcessingStrategyBase
         {
             var pattern = GetFilterValue<string>(query, "pattern") ?? "*";
             var files = Directory.EnumerateFiles(sourcePath, pattern, SearchOption.AllDirectories);
-            var limit = query.Limit ?? int.MaxValue;
+            var limit = query.Limit ?? 10_000;
             var offset = query.Offset ?? 0;
             var count = 0;
 
@@ -121,7 +121,7 @@ internal sealed class OnStorageZstdStrategy : StorageProcessingStrategyBase
     }
 
     /// <inheritdoc/>
-    public override async Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default)
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default)
     {
         ValidateQuery(query);
         ValidateAggregation(aggregationType);
@@ -145,7 +145,7 @@ internal sealed class OnStorageZstdStrategy : StorageProcessingStrategyBase
         var result = ComputeAggregation(sizes, aggregationType);
         sw.Stop();
 
-        return await Task.FromResult(new AggregationResult
+        return Task.FromResult(new AggregationResult
         {
             AggregationType = aggregationType,
             Value = result,

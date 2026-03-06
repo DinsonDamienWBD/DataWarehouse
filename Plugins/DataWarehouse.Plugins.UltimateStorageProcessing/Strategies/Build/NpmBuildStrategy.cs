@@ -33,6 +33,10 @@ internal sealed class NpmBuildStrategy : StorageProcessingStrategyBase
         var script = CliProcessHelper.GetOption<string>(query, "script") ?? "build";
         var prefix = CliProcessHelper.GetOption<string>(query, "prefix");
 
+        // Validate user-supplied values before interpolation into CLI args (findings 45-46)
+        CliProcessHelper.ValidateIdentifier(script, "script");
+        if (prefix != null) CliProcessHelper.ValidateNoShellMetachars(prefix, "prefix");
+
         var args = $"run {script}";
         if (prefix != null) args += $" --prefix \"{prefix}\"";
 

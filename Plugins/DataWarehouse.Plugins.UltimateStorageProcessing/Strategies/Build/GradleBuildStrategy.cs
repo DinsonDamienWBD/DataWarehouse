@@ -34,6 +34,9 @@ internal sealed class GradleBuildStrategy : StorageProcessingStrategyBase
         var noDaemon = CliProcessHelper.GetOption<bool>(query, "noDaemon");
         var parallel = CliProcessHelper.GetOption<bool>(query, "parallel");
 
+        // Validate user-supplied task before interpolation into CLI args (findings 29-30)
+        CliProcessHelper.ValidateIdentifier(task, "task");
+
         var workDir = Directory.Exists(query.Source) ? query.Source : Path.GetDirectoryName(query.Source);
 
         // Detect wrapper

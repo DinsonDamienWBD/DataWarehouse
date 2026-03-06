@@ -35,6 +35,10 @@ internal sealed class RustBuildStrategy : StorageProcessingStrategyBase
         var target = CliProcessHelper.GetOption<string>(query, "target");
         var features = CliProcessHelper.GetOption<string>(query, "features");
 
+        // Validate user-supplied values before interpolation into CLI args (findings 67-68)
+        if (target != null) CliProcessHelper.ValidateIdentifier(target, "target");
+        if (features != null) CliProcessHelper.ValidateNoShellMetachars(features, "features");
+
         var args = "build";
         if (release) args += " --release";
         if (target != null) args += $" --target {target}";

@@ -35,13 +35,18 @@ internal sealed class DotNetBuildStrategy : StorageProcessingStrategyBase
         var verbosity = CliProcessHelper.GetOption<string>(query, "verbosity") ?? "minimal";
         var outputDir = CliProcessHelper.GetOption<string>(query, "output");
 
+        // Validate user-supplied values before interpolation into CLI args (findings 23-25)
+        CliProcessHelper.ValidateIdentifier(configuration, "configuration");
+        CliProcessHelper.ValidateIdentifier(verbosity, "verbosity");
+        if (outputDir != null) CliProcessHelper.ValidateNoShellMetachars(outputDir, "output");
+
         var args = $"build \"{query.Source}\" --configuration {configuration} --verbosity {verbosity}";
         if (outputDir != null) args += $" --output \"{outputDir}\"";
 
         var result = await CliProcessHelper.RunAsync("dotnet", args, Path.GetDirectoryName(query.Source), ct: ct);
 
-        var errors = Regex.Matches(result.StandardOutput + result.StandardError, @": error \w+:");
-        var warnings = Regex.Matches(result.StandardOutput + result.StandardError, @": warning \w+:");
+        var errors = Regex.Matches(result.StandardOutput + result.StandardError, @": error \w+:", RegexOptions.None, TimeSpan.FromMilliseconds(100));
+        var warnings = Regex.Matches(result.StandardOutput + result.StandardError, @": warning \w+:", RegexOptions.None, TimeSpan.FromMilliseconds(100));
 
         return CliProcessHelper.ToProcessingResult(result, query.Source, "dotnet build", new Dictionary<string, object?>
         {

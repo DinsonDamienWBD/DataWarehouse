@@ -34,6 +34,9 @@ internal sealed class GoBuildStrategy : StorageProcessingStrategyBase
         var race = CliProcessHelper.GetOption<bool>(query, "race");
         var trimpath = CliProcessHelper.GetOption<bool>(query, "trimpath");
 
+        // Validate user-supplied values before interpolation into CLI args (finding 26)
+        if (outputPath != null) CliProcessHelper.ValidateNoShellMetachars(outputPath, "output");
+
         var args = "build";
         if (outputPath != null) args += $" -o \"{outputPath}\"";
         if (race) args += " -race";

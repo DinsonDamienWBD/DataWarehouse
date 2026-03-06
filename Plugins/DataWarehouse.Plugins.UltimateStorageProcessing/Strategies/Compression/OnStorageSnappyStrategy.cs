@@ -51,7 +51,7 @@ internal sealed class OnStorageSnappyStrategy : StorageProcessingStrategyBase
         var sw = Stopwatch.StartNew();
         if (!Directory.Exists(query.Source)) { await Task.CompletedTask; yield break; }
 
-        var limit = query.Limit ?? int.MaxValue;
+        var limit = query.Limit ?? 10_000;
         var offset = query.Offset ?? 0;
         var idx = 0;
         foreach (var file in Directory.EnumerateFiles(query.Source, "*", SearchOption.AllDirectories))

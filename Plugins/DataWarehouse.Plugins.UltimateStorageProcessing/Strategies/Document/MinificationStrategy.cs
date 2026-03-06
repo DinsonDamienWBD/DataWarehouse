@@ -97,16 +97,18 @@ internal sealed class MinificationStrategy : StorageProcessingStrategyBase
         return CliProcessHelper.AggregateProjectFiles(query, aggregationType, new[] { ".js", ".css", ".html" }, ct);
     }
 
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(100);
+
     private static string MinifyJavaScript(string js)
     {
         // Remove single-line comments (but not URLs like http://)
-        var result = Regex.Replace(js, @"(?<!:)//[^\n]*", "");
+        var result = Regex.Replace(js, @"(?<!:)//[^\n]*", "", RegexOptions.None, RegexTimeout);
         // Remove multi-line comments
-        result = Regex.Replace(result, @"/\*[\s\S]*?\*/", "");
+        result = Regex.Replace(result, @"/\*[\s\S]*?\*/", "", RegexOptions.None, RegexTimeout);
         // Collapse whitespace
-        result = Regex.Replace(result, @"\s+", " ");
+        result = Regex.Replace(result, @"\s+", " ", RegexOptions.None, RegexTimeout);
         // Remove spaces around operators
-        result = Regex.Replace(result, @"\s*([{};,()=+\-*/<>!&|?:])\s*", "$1");
+        result = Regex.Replace(result, @"\s*([{};,()=+\-*/<>!&|?:])\s*", "$1", RegexOptions.None, RegexTimeout);
         // Remove trailing semicolons before closing braces
         result = result.Replace(";}", "}");
         return result.Trim();
@@ -115,30 +117,30 @@ internal sealed class MinificationStrategy : StorageProcessingStrategyBase
     private static string MinifyCss(string css)
     {
         // Remove comments
-        var result = Regex.Replace(css, @"/\*[\s\S]*?\*/", "");
+        var result = Regex.Replace(css, @"/\*[\s\S]*?\*/", "", RegexOptions.None, RegexTimeout);
         // Collapse whitespace
-        result = Regex.Replace(result, @"\s+", " ");
+        result = Regex.Replace(result, @"\s+", " ", RegexOptions.None, RegexTimeout);
         // Remove spaces around CSS punctuation
-        result = Regex.Replace(result, @"\s*([{};:,>~+])\s*", "$1");
+        result = Regex.Replace(result, @"\s*([{};:,>~+])\s*", "$1", RegexOptions.None, RegexTimeout);
         // Shorten hex colors (#aabbcc -> #abc)
-        result = Regex.Replace(result, @"#([0-9a-fA-F])\1([0-9a-fA-F])\2([0-9a-fA-F])\3", "#$1$2$3");
+        result = Regex.Replace(result, @"#([0-9a-fA-F])\1([0-9a-fA-F])\2([0-9a-fA-F])\3", "#$1$2$3", RegexOptions.None, RegexTimeout);
         // Remove trailing semicolons before closing braces
         result = result.Replace(";}", "}");
         // Remove leading zeros (0.5 -> .5)
-        result = Regex.Replace(result, @"(?<=:|\s)0\.(\d)", ".$1");
+        result = Regex.Replace(result, @"(?<=:|\s)0\.(\d)", ".$1", RegexOptions.None, RegexTimeout);
         return result.Trim();
     }
 
     private static string MinifyHtml(string html)
     {
         // Remove HTML comments
-        var result = Regex.Replace(html, @"<!--[\s\S]*?-->", "");
+        var result = Regex.Replace(html, @"<!--[\s\S]*?-->", "", RegexOptions.None, RegexTimeout);
         // Collapse whitespace between tags
-        result = Regex.Replace(result, @">\s+<", "><");
+        result = Regex.Replace(result, @">\s+<", "><", RegexOptions.None, RegexTimeout);
         // Collapse internal whitespace
-        result = Regex.Replace(result, @"\s{2,}", " ");
+        result = Regex.Replace(result, @"\s{2,}", " ", RegexOptions.None, RegexTimeout);
         // Remove optional closing tags
-        result = Regex.Replace(result, @"</(?:li|dt|dd|p|tr|td|th|thead|tbody|tfoot|option)>", "", RegexOptions.IgnoreCase);
+        result = Regex.Replace(result, @"</(?:li|dt|dd|p|tr|td|th|thead|tbody|tfoot|option)>", "", RegexOptions.IgnoreCase, RegexTimeout);
         return result.Trim();
     }
 

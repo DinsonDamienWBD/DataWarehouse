@@ -63,7 +63,7 @@ internal sealed class OnStorageLz4Strategy : StorageProcessingStrategyBase
     private static async IAsyncEnumerable<ProcessingResult> EnumerateFiles(ProcessingQuery query, string extension, Stopwatch sw, [EnumeratorCancellation] CancellationToken ct)
     {
         if (!Directory.Exists(query.Source)) yield break;
-        var limit = query.Limit ?? int.MaxValue;
+        var limit = query.Limit ?? 10_000;
         var offset = query.Offset ?? 0;
         var idx = 0;
 

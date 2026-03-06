@@ -106,7 +106,7 @@ internal sealed class MarkdownRenderStrategy : StorageProcessingStrategyBase
             if (line.Contains('|') && line.Trim().StartsWith('|'))
             {
                 if (!inTable) { html.AppendLine("<table>"); inTable = true; }
-                if (Regex.IsMatch(line, @"^\|[\s\-:|]+\|$")) continue; // separator
+                if (Regex.IsMatch(line, @"^\|[\s\-:|]+\|$", RegexOptions.None, RegexTimeout)) continue; // separator
                 var cells = line.Split('|', StringSplitOptions.RemoveEmptyEntries);
                 html.Append("<tr>");
                 foreach (var cell in cells) html.Append($"<td>{InlineMarkdown(cell.Trim())}</td>");
@@ -116,22 +116,22 @@ internal sealed class MarkdownRenderStrategy : StorageProcessingStrategyBase
             if (inTable) { html.AppendLine("</table>"); inTable = false; }
 
             // Headings
-            var headingMatch = Regex.Match(line, @"^(#{1,6})\s+(.+)");
+            var headingMatch = Regex.Match(line, @"^(#{1,6})\s+(.+)", RegexOptions.None, RegexTimeout);
             if (headingMatch.Success)
             {
                 if (inList) { html.AppendLine("</ul>"); inList = false; }
                 var level = headingMatch.Groups[1].Value.Length;
                 var text = headingMatch.Groups[2].Value;
-                var id = Regex.Replace(text.ToLowerInvariant(), @"[^\w]+", "-").Trim('-');
-                html.AppendLine($"<h{level} id=\"{id}\">{InlineMarkdown(text)}</h{level}>");
+                var id = Regex.Replace(text.ToLowerInvariant(), @"[^\w]+", "-", RegexOptions.None, RegexTimeout).Trim('-');
+                html.AppendLine($"<h{level} id=\"{System.Net.WebUtility.HtmlEncode(id)}\">{InlineMarkdown(text)}</h{level}>");
                 continue;
             }
 
             // Unordered lists
-            if (Regex.IsMatch(line, @"^\s*[-*+]\s"))
+            if (Regex.IsMatch(line, @"^\s*[-*+]\s", RegexOptions.None, RegexTimeout))
             {
                 if (!inList) { html.AppendLine("<ul>"); inList = true; }
-                var content = Regex.Replace(line, @"^\s*[-*+]\s", "");
+                var content = Regex.Replace(line, @"^\s*[-*+]\s", "", RegexOptions.None, RegexTimeout);
                 // GFM task lists
                 if (content.StartsWith("[ ] ")) html.AppendLine($"<li><input type=\"checkbox\" disabled> {InlineMarkdown(content[4..])}</li>");
                 else if (content.StartsWith("[x] ", StringComparison.OrdinalIgnoreCase)) html.AppendLine($"<li><input type=\"checkbox\" checked disabled> {InlineMarkdown(content[4..])}</li>");
@@ -141,7 +141,7 @@ internal sealed class MarkdownRenderStrategy : StorageProcessingStrategyBase
             if (inList) { html.AppendLine("</ul>"); inList = false; }
 
             // Horizontal rule
-            if (Regex.IsMatch(line, @"^(\*{3,}|-{3,}|_{3,})$")) { html.AppendLine("<hr>"); continue; }
+            if (Regex.IsMatch(line, @"^(\*{3,}|-{3,}|_{3,})$", RegexOptions.None, RegexTimeout)) { html.AppendLine("<hr>"); continue; }
 
             // Blockquote
             if (line.StartsWith("> ")) { html.AppendLine($"<blockquote>{InlineMarkdown(line[2..])}</blockquote>"); continue; }
@@ -160,31 +160,42 @@ internal sealed class MarkdownRenderStrategy : StorageProcessingStrategyBase
         return html.ToString();
     }
 
+    private static readonly TimeSpan RegexTimeout = TimeSpan.FromMilliseconds(100);
+
     private static string InlineMarkdown(string text)
     {
+        // HTML-encode first to prevent XSS (findings 35-39: unescaped user content in headings, table cells, links)
+        text = System.Net.WebUtility.HtmlEncode(text);
         // Bold
-        text = Regex.Replace(text, @"\*\*(.+?)\*\*", "<strong>$1</strong>");
-        text = Regex.Replace(text, @"__(.+?)__", "<strong>$1</strong>");
+        text = Regex.Replace(text, @"\*\*(.+?)\*\*", "<strong>$1</strong>", RegexOptions.None, RegexTimeout);
+        text = Regex.Replace(text, @"__(.+?)__", "<strong>$1</strong>", RegexOptions.None, RegexTimeout);
         // Italic
-        text = Regex.Replace(text, @"\*(.+?)\*", "<em>$1</em>");
-        text = Regex.Replace(text, @"_(.+?)_", "<em>$1</em>");
+        text = Regex.Replace(text, @"\*(.+?)\*", "<em>$1</em>", RegexOptions.None, RegexTimeout);
+        text = Regex.Replace(text, @"_(.+?)_", "<em>$1</em>", RegexOptions.None, RegexTimeout);
         // Code
-        text = Regex.Replace(text, @"`(.+?)`", "<code>$1</code>");
-        // Links
-        text = Regex.Replace(text, @"\[(.+?)\]\((.+?)\)", "<a href=\"$2\">$1</a>");
+        text = Regex.Replace(text, @"`(.+?)`", "<code>$1</code>", RegexOptions.None, RegexTimeout);
+        // Links — block javascript: scheme URLs to prevent XSS (finding 38-39)
+        text = Regex.Replace(text, @"\[(.+?)\]\((.+?)\)", m =>
+        {
+            var linkText = m.Groups[1].Value;
+            var href = m.Groups[2].Value;
+            if (href.TrimStart().StartsWith("javascript:", StringComparison.OrdinalIgnoreCase))
+                return linkText; // Strip dangerous link, keep text only
+            return $"<a href=\"{href}\">{linkText}</a>";
+        }, RegexOptions.None, RegexTimeout);
         // Images
-        text = Regex.Replace(text, @"!\[(.+?)\]\((.+?)\)", "<img src=\"$2\" alt=\"$1\">");
+        text = Regex.Replace(text, @"!\[(.+?)\]\((.+?)\)", "<img src=\"$2\" alt=\"$1\">", RegexOptions.None, RegexTimeout);
         // Autolinks (GFM)
-        text = Regex.Replace(text, @"(https?://[^\s<>]+)", "<a href=\"$1\">$1</a>");
+        text = Regex.Replace(text, @"(https?://[^\s&lt;&gt;]+)", "<a href=\"$1\">$1</a>", RegexOptions.None, RegexTimeout);
         // Strikethrough (GFM)
-        text = Regex.Replace(text, @"~~(.+?)~~", "<del>$1</del>");
+        text = Regex.Replace(text, @"~~(.+?)~~", "<del>$1</del>", RegexOptions.None, RegexTimeout);
         return text;
     }
 
     private static List<(int Level, string Text)> ExtractHeadings(string markdown)
     {
         var headings = new List<(int, string)>();
-        foreach (Match m in Regex.Matches(markdown, @"^(#{1,6})\s+(.+)", RegexOptions.Multiline))
+        foreach (Match m in Regex.Matches(markdown, @"^(#{1,6})\s+(.+)", RegexOptions.Multiline, RegexTimeout))
             headings.Add((m.Groups[1].Value.Length, m.Groups[2].Value.Trim()));
         return headings;
     }
@@ -192,7 +203,7 @@ internal sealed class MarkdownRenderStrategy : StorageProcessingStrategyBase
     private static List<string> ExtractLinks(string markdown)
     {
         var links = new List<string>();
-        foreach (Match m in Regex.Matches(markdown, @"\[.+?\]\((.+?)\)"))
+        foreach (Match m in Regex.Matches(markdown, @"\[.+?\]\((.+?)\)", RegexOptions.None, RegexTimeout))
             links.Add(m.Groups[1].Value);
         return links;
     }
@@ -203,8 +214,8 @@ internal sealed class MarkdownRenderStrategy : StorageProcessingStrategyBase
         var sb = new StringBuilder("<nav><ul>");
         foreach (var (level, text) in headings)
         {
-            var id = Regex.Replace(text.ToLowerInvariant(), @"[^\w]+", "-").Trim('-');
-            sb.Append($"<li style=\"margin-left:{(level - 1) * 20}px\"><a href=\"#{id}\">{text}</a></li>");
+            var id = Regex.Replace(text.ToLowerInvariant(), @"[^\w]+", "-", RegexOptions.None, RegexTimeout).Trim('-');
+            sb.Append($"<li style=\"margin-left:{(level - 1) * 20}px\"><a href=\"#{System.Net.WebUtility.HtmlEncode(id)}\">{System.Net.WebUtility.HtmlEncode(text)}</a></li>");
         }
         sb.Append("</ul></nav>");
         return sb.ToString();

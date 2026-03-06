@@ -185,14 +185,14 @@ internal sealed class VectorEmbeddingStrategy : StorageProcessingStrategyBase
     {
         // Deterministic random projection using FNV-1a hash for speed in tight loops (finding 4276:
         // per-token SHA-256 is unnecessary crypto overhead for random projection seeds).
-        var docHash = Fnv1a(doc);
+        var docHash = Fnv1A(doc);
         var rng = new Random(docHash ^ seed);
         var result = new double[dims];
         _ = rng; // doc-level rng unused in projection but kept for seeding purposes
         var tokens = Tokenize(doc);
         foreach (var token in tokens)
         {
-            var tokenHash = Fnv1a(token);
+            var tokenHash = Fnv1A(token);
             var tokenRng = new Random(tokenHash);
             for (var i = 0; i < dims; i++)
                 result[i] += tokenRng.NextDouble() * 2.0 - 1.0;
@@ -205,19 +205,19 @@ internal sealed class VectorEmbeddingStrategy : StorageProcessingStrategyBase
     /// <summary>
     /// FNV-1a 32-bit hash — fast non-cryptographic hash suitable for deterministic projection seeds.
     /// </summary>
-    private static int Fnv1a(string value)
+    private static int Fnv1A(string value)
     {
-        const uint FnvPrime = 16777619u;
-        const uint OffsetBasis = 2166136261u;
-        var hash = OffsetBasis;
+        const uint fnvPrime = 16777619u;
+        const uint offsetBasis = 2166136261u;
+        var hash = offsetBasis;
         foreach (var c in value)
         {
             hash ^= (byte)(c & 0xFF);
-            hash *= FnvPrime;
+            hash *= fnvPrime;
             hash ^= (byte)(c >> 8);
-            hash *= FnvPrime;
+            hash *= fnvPrime;
         }
-        return (int)hash;
+        return unchecked((int)hash);
     }
 
     private static ProcessingResult MakeError(string msg, Stopwatch sw)

@@ -36,6 +36,11 @@ internal sealed class MavenBuildStrategy : StorageProcessingStrategyBase
         var modules = CliProcessHelper.GetOption<string>(query, "modules");
         var profiles = CliProcessHelper.GetOption<string>(query, "profiles");
 
+        // Validate user-supplied values before interpolation into CLI args (findings 40-41)
+        CliProcessHelper.ValidateIdentifier(goal, "goal");
+        if (modules != null) CliProcessHelper.ValidateNoShellMetachars(modules, "modules");
+        if (profiles != null) CliProcessHelper.ValidateNoShellMetachars(profiles, "profiles");
+
         var args = goal;
         if (skipTests) args += " -DskipTests";
         if (modules != null) args += $" -pl {modules}";
@@ -44,8 +49,8 @@ internal sealed class MavenBuildStrategy : StorageProcessingStrategyBase
         var workDir = Directory.Exists(query.Source) ? query.Source : Path.GetDirectoryName(query.Source);
         var result = await CliProcessHelper.RunAsync("mvn", args, workDir, ct: ct);
 
-        var infoCount = Regex.Matches(result.StandardOutput, @"^\[INFO\]", RegexOptions.Multiline).Count;
-        var errorCount = Regex.Matches(result.StandardOutput, @"^\[ERROR\]", RegexOptions.Multiline).Count;
+        var infoCount = Regex.Matches(result.StandardOutput, @"^\[INFO\]", RegexOptions.Multiline, TimeSpan.FromMilliseconds(100)).Count;
+        var errorCount = Regex.Matches(result.StandardOutput, @"^\[ERROR\]", RegexOptions.Multiline, TimeSpan.FromMilliseconds(100)).Count;
         var buildSuccess = result.StandardOutput.Contains("BUILD SUCCESS");
 
         return CliProcessHelper.ToProcessingResult(result, query.Source, "mvn", new Dictionary<string, object?>
