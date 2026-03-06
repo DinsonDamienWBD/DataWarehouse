@@ -811,7 +811,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
                 ? tc
                 : new TierConfig { Tier = tier };
 
-            await _tieredMemoryStrategy.ConfigureTierAsync(tier, enabled, currentConfig.Persistence, currentConfig.MaxCapacityBytes, currentConfig.TTL);
+            await _tieredMemoryStrategy.ConfigureTierAsync(tier, enabled, currentConfig.Persistence, currentConfig.MaxCapacityBytes, currentConfig.Ttl);
         }
         catch
         {

@@ -37,7 +37,7 @@ public sealed record RocksDbPersistenceConfig : PersistenceBackendConfig
     public int BloomFilterBitsPerKey { get; init; } = 10;
 
     /// <summary>Enable write-ahead logging.</summary>
-    public bool EnableWAL { get; init; } = true;
+    public bool EnableWal { get; init; } = true;
 
     /// <summary>WAL directory (default: same as data path).</summary>
     public string? WalPath { get; init; }
@@ -227,7 +227,7 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
             }
 
             // Write to WAL first if enabled
-            if (_config.EnableWAL)
+            if (_config.EnableWal)
             {
                 await WriteToWalAsync(new WalEntry
                 {
@@ -354,7 +354,7 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
             }
 
             // Write to WAL
-            if (_config.EnableWAL)
+            if (_config.EnableWal)
             {
                 await WriteToWalAsync(new WalEntry
                 {
@@ -400,7 +400,7 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
             if (_columnFamilies[tier].TryRemove(id, out var record))
             {
                 // Write to WAL
-                if (_config.EnableWAL)
+                if (_config.EnableWal)
                 {
                     await WriteToWalAsync(new WalEntry
                     {
@@ -467,7 +467,7 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
                 _recordTierMap[id] = record.Tier;
                 UpdateIndexes(processedRecord, isDelete: false);
 
-                if (_config.EnableWAL)
+                if (_config.EnableWal)
                 {
                     walEntries.Add(new WalEntry
                     {
@@ -480,7 +480,7 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
             }
 
             // Atomic WAL write for batch
-            if (_config.EnableWAL && walEntries.Count > 0)
+            if (_config.EnableWal && walEntries.Count > 0)
             {
                 await WriteBatchToWalAsync(walEntries, ct);
             }
@@ -823,7 +823,7 @@ public sealed class RocksDbPersistenceBackend : IProductionPersistenceBackend
         try
         {
             // Flush WAL to disk
-            if (_config.EnableWAL)
+            if (_config.EnableWal)
             {
                 await FlushWalAsync(ct);
             }

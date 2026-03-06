@@ -266,7 +266,7 @@ public sealed class OntologyBasedOrganizationStrategy : FeatureStrategyBase
             // Use AI for enhanced classification if available
             if (AiProvider != null && results.Count == 0)
             {
-                var aiClassification = await ClassifyWithAIAsync(content, ct);
+                var aiClassification = await ClassifyWithAiAsync(content, ct);
                 results.AddRange(aiClassification);
             }
 
@@ -474,7 +474,7 @@ public sealed class OntologyBasedOrganizationStrategy : FeatureStrategyBase
         return true;
     }
 
-    private async Task<List<OntologyClassMatch>> ClassifyWithAIAsync(string content, CancellationToken ct)
+    private async Task<List<OntologyClassMatch>> ClassifyWithAiAsync(string content, CancellationToken ct)
     {
         if (AiProvider == null || _classes.Count == 0)
             return new List<OntologyClassMatch>();
@@ -1847,7 +1847,7 @@ public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
             // AI-enhanced validation
             if (GetConfigBool("EnableAIValidation", true) && AiProvider != null)
             {
-                var aiIssues = await ValidateWithAIAsync(content, schema, ct);
+                var aiIssues = await ValidateWithAiAsync(content, schema, ct);
                 issues.AddRange(aiIssues);
             }
 
@@ -1939,7 +1939,7 @@ public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
             // AI-enhanced inference
             if (AiProvider != null && inferences.Count == 0)
             {
-                var aiType = await InferTypeWithAIAsync(content, ct);
+                var aiType = await InferTypeWithAiAsync(content, ct);
                 if (aiType != null)
                     inferences.Add(aiType);
             }
@@ -2018,7 +2018,7 @@ public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
         };
     }
 
-    private async Task<List<SemanticValidationIssue>> ValidateWithAIAsync(string content, SemanticSchema schema, CancellationToken ct)
+    private async Task<List<SemanticValidationIssue>> ValidateWithAiAsync(string content, SemanticSchema schema, CancellationToken ct)
     {
         if (AiProvider == null)
             return new List<SemanticValidationIssue>();
@@ -2043,7 +2043,7 @@ public sealed class SemanticDataValidationStrategy : FeatureStrategyBase
         return issues;
     }
 
-    private async Task<SemanticTypeMatch?> InferTypeWithAIAsync(string content, CancellationToken ct)
+    private async Task<SemanticTypeMatch?> InferTypeWithAiAsync(string content, CancellationToken ct)
     {
         if (AiProvider == null)
             return null;
@@ -2277,7 +2277,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
             // Use AI for additional alignments
             if (AiProvider != null)
             {
-                var aiMappings = await DiscoverAlignmentsWithAIAsync(vocab1, vocab2, ct);
+                var aiMappings = await DiscoverAlignmentsWithAiAsync(vocab1, vocab2, ct);
                 termMappings.AddRange(aiMappings.Where(m => !termMappings.Any(t =>
                     t.SourceTerm == m.SourceTerm && t.TargetTerm == m.TargetTerm)));
             }
@@ -2375,7 +2375,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
             // AI-enhanced annotation
             if (AiProvider != null)
             {
-                var aiAnnotations = await AnnotateWithAIAsync(content, vocabulary, ct);
+                var aiAnnotations = await AnnotateWithAiAsync(content, vocabulary, ct);
                 annotations.AddRange(aiAnnotations);
             }
 
@@ -2503,7 +2503,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
         return 0.5f;
     }
 
-    private async Task<List<TermMapping>> DiscoverAlignmentsWithAIAsync(StandardVocabulary vocab1, StandardVocabulary vocab2, CancellationToken ct)
+    private async Task<List<TermMapping>> DiscoverAlignmentsWithAiAsync(StandardVocabulary vocab1, StandardVocabulary vocab2, CancellationToken ct)
     {
         if (AiProvider == null)
             return new List<TermMapping>();
@@ -2538,7 +2538,7 @@ public sealed class SemanticInteroperabilityStrategy : FeatureStrategyBase
         return mappings;
     }
 
-    private async Task<List<SemanticAnnotationItem>> AnnotateWithAIAsync(string content, StandardVocabulary vocabulary, CancellationToken ct)
+    private async Task<List<SemanticAnnotationItem>> AnnotateWithAiAsync(string content, StandardVocabulary vocabulary, CancellationToken ct)
     {
         if (AiProvider == null)
             return new List<SemanticAnnotationItem>();

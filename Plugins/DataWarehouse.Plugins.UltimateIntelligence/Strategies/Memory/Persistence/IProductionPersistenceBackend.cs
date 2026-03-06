@@ -199,7 +199,7 @@ public enum PersistenceCapabilities
     Snapshots = 1 << 4,
 
     /// <summary>Supports TTL-based expiration.</summary>
-    TTL = 1 << 5,
+    Ttl = 1 << 5,
 
     /// <summary>Supports secondary indexes.</summary>
     SecondaryIndexes = 1 << 6,
@@ -229,7 +229,7 @@ public enum PersistenceCapabilities
     AllLocal = Transactions | Compression | Encryption | Snapshots | SecondaryIndexes | AtomicBatch,
 
     /// <summary>All distributed capabilities.</summary>
-    AllDistributed = Replication | TTL | ChangeStreams | DistributedLocking,
+    AllDistributed = Replication | Ttl | ChangeStreams | DistributedLocking,
 
     /// <summary>All search capabilities.</summary>
     AllSearch = SecondaryIndexes | FullTextSearch | VectorSearch | GeoSpatial
@@ -537,7 +537,8 @@ public sealed class PersistenceCircuitBreaker
     private readonly object _lock = new();
 
     private int _failureCount;
-    private DateTimeOffset _lastFailure;
+    /// <summary>Gets the timestamp of the last recorded failure.</summary>
+    internal DateTimeOffset LastFailure { get; private set; }
     private DateTimeOffset _openedAt;
     private CircuitBreakerState _state = CircuitBreakerState.Closed;
 
@@ -591,7 +592,7 @@ public sealed class PersistenceCircuitBreaker
         lock (_lock)
         {
             _failureCount++;
-            _lastFailure = DateTimeOffset.UtcNow;
+            LastFailure = DateTimeOffset.UtcNow;
 
             if (_failureCount >= _failureThreshold)
             {

@@ -2556,7 +2556,7 @@ public sealed class ResultFormatter
     /// <param name="response">The response to format.</param>
     /// <param name="options">Formatting options.</param>
     /// <returns>Formatted string.</returns>
-    public string FormatForAI(KnowledgeQueryResponse response, FormatOptions options)
+    public string FormatForAi(KnowledgeQueryResponse response, FormatOptions options)
     {
         ArgumentNullException.ThrowIfNull(response);
         ArgumentNullException.ThrowIfNull(options);
@@ -2586,7 +2586,7 @@ public sealed class ResultFormatter
     /// <param name="result">The result to format.</param>
     /// <param name="options">Formatting options.</param>
     /// <returns>Formatted string.</returns>
-    public string FormatForAI(CommandResult result, FormatOptions options)
+    public string FormatForAi(CommandResult result, FormatOptions options)
     {
         ArgumentNullException.ThrowIfNull(result);
         ArgumentNullException.ThrowIfNull(options);

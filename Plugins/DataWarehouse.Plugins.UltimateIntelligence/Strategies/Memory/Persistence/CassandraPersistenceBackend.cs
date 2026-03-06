@@ -142,7 +142,7 @@ public sealed class CassandraPersistenceBackend : IProductionPersistenceBackend
 
     /// <inheritdoc/>
     public PersistenceCapabilities Capabilities =>
-        PersistenceCapabilities.TTL |
+        PersistenceCapabilities.Ttl |
         PersistenceCapabilities.Replication |
         PersistenceCapabilities.SecondaryIndexes |
         PersistenceCapabilities.Compression;

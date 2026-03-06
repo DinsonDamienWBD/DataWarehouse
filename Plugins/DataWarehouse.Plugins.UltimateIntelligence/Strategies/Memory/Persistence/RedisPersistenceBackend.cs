@@ -30,10 +30,10 @@ public sealed record RedisPersistenceConfig : PersistenceBackendConfig
     public string KeyPrefix { get; init; } = "memory:";
 
     /// <summary>Default TTL for records (null = no expiration).</summary>
-    public TimeSpan? DefaultTTL { get; init; }
+    public TimeSpan? DefaultTtl { get; init; }
 
-    /// <summary>TTL per tier (overrides DefaultTTL for specific tiers).</summary>
-    public Dictionary<MemoryTier, TimeSpan> TierTTL { get; init; } = new()
+    /// <summary>TTL per tier (overrides DefaultTtl for specific tiers).</summary>
+    public Dictionary<MemoryTier, TimeSpan> TierTtl { get; init; } = new()
     {
         [MemoryTier.Immediate] = TimeSpan.FromMinutes(30),
         [MemoryTier.Working] = TimeSpan.FromHours(24),
@@ -109,7 +109,7 @@ public sealed class RedisPersistenceBackend : IProductionPersistenceBackend
 
     /// <inheritdoc/>
     public PersistenceCapabilities Capabilities =>
-        PersistenceCapabilities.TTL |
+        PersistenceCapabilities.Ttl |
         PersistenceCapabilities.Replication |
         PersistenceCapabilities.ChangeStreams |
         PersistenceCapabilities.SecondaryIndexes |
@@ -899,7 +899,6 @@ public sealed class RedisPersistenceBackend : IProductionPersistenceBackend
     /// <summary>
     /// Executes an atomic conditional store (SET NX equivalent).
     /// </summary>
-    /// <param name="id">Record ID.</param>
     /// <param name="record">Record to store.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>True if stored, false if key already exists.</returns>
@@ -996,14 +995,14 @@ public sealed class RedisPersistenceBackend : IProductionPersistenceBackend
 
     private DateTimeOffset? GetExpiration(MemoryTier tier)
     {
-        if (_config.TierTTL.TryGetValue(tier, out var ttl))
+        if (_config.TierTtl.TryGetValue(tier, out var ttl))
         {
             return DateTimeOffset.UtcNow.Add(ttl);
         }
 
-        if (_config.DefaultTTL.HasValue)
+        if (_config.DefaultTtl.HasValue)
         {
-            return DateTimeOffset.UtcNow.Add(_config.DefaultTTL.Value);
+            return DateTimeOffset.UtcNow.Add(_config.DefaultTtl.Value);
         }
 
         return null;

@@ -781,7 +781,7 @@ public sealed class SemanticClusterIndex : ContextIndexBase
     {
         throw new InvalidOperationException(
             "Pre-computed embedding is required. Content must be embedded using a configured " +
-            "embedding provider (e.g., ONNXEmbeddingProvider) before indexing into SemanticClusterIndex. " +
+            "embedding provider (e.g., OnnxEmbeddingProvider) before indexing into SemanticClusterIndex. " +
             "Random placeholder embeddings are not suitable for production use.");
     }
 

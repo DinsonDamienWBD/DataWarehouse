@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.NLP;
 /// Message bus topics for NLP operations.
 /// NLP components use these topics to request AI capabilities from the intelligence system.
 /// </summary>
-public static class NLPTopics
+public static class NlpTopics
 {
     // === M1: Query Understanding ===
 
@@ -321,11 +321,11 @@ public sealed class QueryParser
         var intent = UserIntent.Unknown;
         double intentConfidence = 0;
 
-        if (_messageBusPublisher != null && _options.EnableAIParsing)
+        if (_messageBusPublisher != null && _options.EnableAiParsing)
         {
             try
             {
-                var aiResult = await RequestAIParsingAsync(query, ct).ConfigureAwait(false);
+                var aiResult = await RequestAiParsingAsync(query, ct).ConfigureAwait(false);
                 if (aiResult != null)
                 {
                     entities = aiResult.Entities;
@@ -535,16 +535,16 @@ public sealed class QueryParser
         return UserIntent.Unknown;
     }
 
-    private async Task<AIParseResult?> RequestAIParsingAsync(string query, CancellationToken ct)
+    private async Task<AiParseResult?> RequestAiParsingAsync(string query, CancellationToken ct)
     {
         if (_messageBusPublisher == null) return null;
 
         var payload = JsonSerializer.Serialize(new { query });
-        var response = await _messageBusPublisher(NLPTopics.ParseQuery, payload, ct).ConfigureAwait(false);
+        var response = await _messageBusPublisher(NlpTopics.ParseQuery, payload, ct).ConfigureAwait(false);
 
         if (string.IsNullOrEmpty(response)) return null;
 
-        return JsonSerializer.Deserialize<AIParseResult>(response);
+        return JsonSerializer.Deserialize<AiParseResult>(response);
     }
 
     private static long? ParseSizeToBytes(string value, string unit)
@@ -584,7 +584,7 @@ public sealed class QueryParser
         };
     }
 
-    private sealed class AIParseResult
+    private sealed class AiParseResult
     {
         public IReadOnlyList<ExtractedEntity> Entities { get; set; } = Array.Empty<ExtractedEntity>();
         public UserIntent Intent { get; set; } = UserIntent.Unknown;
@@ -610,7 +610,7 @@ public sealed class QueryParserOptions
     public int MaxKeywords { get; set; } = 50;
 
     /// <summary>Gets or sets whether to enable AI-powered parsing.</summary>
-    public bool EnableAIParsing { get; set; } = true;
+    public bool EnableAiParsing { get; set; } = true;
 }
 
 /// <summary>
@@ -686,11 +686,11 @@ public sealed class IntentDetector
 
         IntentDetectionResult result;
 
-        if (_messageBusPublisher != null && _options.EnableAIDetection)
+        if (_messageBusPublisher != null && _options.EnableAiDetection)
         {
             try
             {
-                result = await DetectWithAIAsync(query, context, ct).ConfigureAwait(false);
+                result = await DetectWithAiAsync(query, context, ct).ConfigureAwait(false);
             }
             catch
             {
@@ -709,7 +709,7 @@ public sealed class IntentDetector
         return result;
     }
 
-    private async Task<IntentDetectionResult> DetectWithAIAsync(
+    private async Task<IntentDetectionResult> DetectWithAiAsync(
         string query,
         ConversationContext? context,
         CancellationToken ct)
@@ -725,7 +725,7 @@ public sealed class IntentDetector
             } : null
         });
 
-        var response = await _messageBusPublisher!(NLPTopics.DetectIntent, payload, ct).ConfigureAwait(false);
+        var response = await _messageBusPublisher!(NlpTopics.DetectIntent, payload, ct).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(response))
         {
@@ -919,7 +919,7 @@ public sealed class ConversationContext
 public sealed class IntentDetectorOptions
 {
     /// <summary>Gets or sets whether to enable AI-powered detection.</summary>
-    public bool EnableAIDetection { get; set; } = true;
+    public bool EnableAiDetection { get; set; } = true;
 
     /// <summary>Gets or sets the confidence threshold below which clarification is requested.</summary>
     public double ClarificationThreshold { get; set; } = 0.5;
@@ -988,11 +988,11 @@ public sealed class EntityExtractor
         var entities = new List<ExtractedEntity>();
 
         // Use AI extraction if available
-        if (_messageBusPublisher != null && _options.EnableAIExtraction)
+        if (_messageBusPublisher != null && _options.EnableAiExtraction)
         {
             try
             {
-                var aiEntities = await ExtractWithAIAsync(text, entityTypes, ct).ConfigureAwait(false);
+                var aiEntities = await ExtractWithAiAsync(text, entityTypes, ct).ConfigureAwait(false);
                 entities.AddRange(aiEntities);
             }
             catch
@@ -1015,13 +1015,13 @@ public sealed class EntityExtractor
             .ToList();
     }
 
-    private async Task<IReadOnlyList<ExtractedEntity>> ExtractWithAIAsync(
+    private async Task<IReadOnlyList<ExtractedEntity>> ExtractWithAiAsync(
         string text,
         EntityType[]? entityTypes,
         CancellationToken ct)
     {
         var payload = JsonSerializer.Serialize(new { text, entityTypes = entityTypes?.Select(t => t.ToString()) });
-        var response = await _messageBusPublisher!(NLPTopics.ExtractEntities, payload, ct).ConfigureAwait(false);
+        var response = await _messageBusPublisher!(NlpTopics.ExtractEntities, payload, ct).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(response))
         {
@@ -1127,7 +1127,7 @@ public sealed class EntityExtractor
 public sealed class EntityExtractorOptions
 {
     /// <summary>Gets or sets whether to enable AI-powered extraction.</summary>
-    public bool EnableAIExtraction { get; set; } = true;
+    public bool EnableAiExtraction { get; set; } = true;
 
     /// <summary>Gets or sets custom entity patterns.</summary>
     public Dictionary<EntityType, string> CustomPatterns { get; set; } = new();
@@ -1175,11 +1175,11 @@ public sealed class ResponseGenerator
     {
         ArgumentNullException.ThrowIfNull(context);
 
-        if (_messageBusPublisher != null && _options.EnableAIGeneration)
+        if (_messageBusPublisher != null && _options.EnableAiGeneration)
         {
             try
             {
-                return await GenerateWithAIAsync(context, ct).ConfigureAwait(false);
+                return await GenerateWithAiAsync(context, ct).ConfigureAwait(false);
             }
             catch
             {
@@ -1191,10 +1191,10 @@ public sealed class ResponseGenerator
         return GenerateWithTemplates(context);
     }
 
-    private async Task<GeneratedResponse> GenerateWithAIAsync(ResponseContext context, CancellationToken ct)
+    private async Task<GeneratedResponse> GenerateWithAiAsync(ResponseContext context, CancellationToken ct)
     {
         var payload = JsonSerializer.Serialize(context);
-        var response = await _messageBusPublisher!(NLPTopics.GenerateResponse, payload, ct).ConfigureAwait(false);
+        var response = await _messageBusPublisher!(NlpTopics.GenerateResponse, payload, ct).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(response))
         {
@@ -1410,7 +1410,7 @@ public sealed class GeneratedResponse
 public sealed class ResponseGeneratorOptions
 {
     /// <summary>Gets or sets whether to enable AI-powered generation.</summary>
-    public bool EnableAIGeneration { get; set; } = true;
+    public bool EnableAiGeneration { get; set; } = true;
 
     /// <summary>Gets or sets the message for no results.</summary>
     public string NoResultsMessage { get; set; } = "I couldn't find any results matching your query.";
@@ -1579,7 +1579,7 @@ public sealed class UnifiedVectorStore : IAsyncDisposable
         if (_messageBusPublisher != null)
         {
             var payload = JsonSerializer.Serialize(new { text });
-            var response = await _messageBusPublisher(NLPTopics.GetEmbeddings, payload, ct).ConfigureAwait(false);
+            var response = await _messageBusPublisher(NlpTopics.GetEmbeddings, payload, ct).ConfigureAwait(false);
             if (!string.IsNullOrEmpty(response))
             {
                 var embedding = JsonSerializer.Deserialize<float[]>(response);
@@ -1823,8 +1823,8 @@ public sealed class SemanticIndexer
     private void UpdateStats(string domain, int chunksAdded)
     {
         var stats = _indexStats.GetOrAdd(domain, _ => new IndexStats { Domain = domain });
-        Interlocked.Add(ref stats._totalChunks, chunksAdded);
-        Interlocked.Increment(ref stats._totalDocuments);
+        Interlocked.Add(ref stats.TotalChunksField, chunksAdded);
+        Interlocked.Increment(ref stats.TotalDocumentsField);
         stats.LastUpdated = DateTimeOffset.UtcNow;
     }
 }
@@ -1834,17 +1834,17 @@ public sealed class SemanticIndexer
 /// </summary>
 public sealed class IndexStats
 {
-    internal long _totalChunks;
-    internal long _totalDocuments;
+    internal long TotalChunksField;
+    internal long TotalDocumentsField;
 
     /// <summary>Gets or sets the domain.</summary>
     public required string Domain { get; init; }
 
     /// <summary>Gets the total chunks indexed.</summary>
-    public long TotalChunks => Interlocked.Read(ref _totalChunks);
+    public long TotalChunks => Interlocked.Read(ref TotalChunksField);
 
     /// <summary>Gets the total documents indexed.</summary>
-    public long TotalDocuments => Interlocked.Read(ref _totalDocuments);
+    public long TotalDocuments => Interlocked.Read(ref TotalDocumentsField);
 
     /// <summary>Gets or sets the last update time.</summary>
     public DateTimeOffset LastUpdated { get; set; }
@@ -1878,9 +1878,11 @@ public sealed class SemanticIndexerOptions
 /// </remarks>
 public sealed class SemanticSearch
 {
-    private readonly SemanticSearchOptions _options;
     private readonly UnifiedVectorStore _vectorStore;
     private readonly QueryParser? _queryParser;
+
+    /// <summary>Gets the search options.</summary>
+    internal SemanticSearchOptions Options { get; }
 
     /// <summary>
     /// Creates a new SemanticSearch instance.
@@ -1895,7 +1897,7 @@ public sealed class SemanticSearch
     {
         _vectorStore = vectorStore ?? throw new ArgumentNullException(nameof(vectorStore));
         _queryParser = queryParser;
-        _options = options ?? new SemanticSearchOptions();
+        Options = options ?? new SemanticSearchOptions();
     }
 
     /// <summary>
@@ -2084,13 +2086,17 @@ public sealed class SemanticSearchOptions
 /// </remarks>
 public sealed class UnifiedKnowledgeGraph : IAsyncDisposable
 {
-    private readonly UnifiedKnowledgeGraphOptions _options;
     private readonly BoundedDictionary<string, KnowledgeNode> _nodes = new BoundedDictionary<string, KnowledgeNode>(1000);
     private readonly BoundedDictionary<string, KnowledgeEdge> _edges = new BoundedDictionary<string, KnowledgeEdge>(1000);
     private readonly BoundedDictionary<string, HashSet<string>> _nodeEdges = new BoundedDictionary<string, HashSet<string>>(1000);
-    private readonly Func<string, string, CancellationToken, Task<string?>>? _messageBusPublisher;
     private readonly SemaphoreSlim _modifyLock = new(1, 1);
     private bool _disposed;
+
+    /// <summary>Gets the graph options.</summary>
+    internal UnifiedKnowledgeGraphOptions GraphOptions { get; }
+
+    /// <summary>Gets the message bus publisher delegate.</summary>
+    internal Func<string, string, CancellationToken, Task<string?>>? MessageBusPublisher { get; }
 
     /// <summary>
     /// Creates a new UnifiedKnowledgeGraph.
@@ -2101,8 +2107,8 @@ public sealed class UnifiedKnowledgeGraph : IAsyncDisposable
         UnifiedKnowledgeGraphOptions? options = null,
         Func<string, string, CancellationToken, Task<string?>>? messageBusPublisher = null)
     {
-        _options = options ?? new UnifiedKnowledgeGraphOptions();
-        _messageBusPublisher = messageBusPublisher;
+        GraphOptions = options ?? new UnifiedKnowledgeGraphOptions();
+        MessageBusPublisher = messageBusPublisher;
     }
 
     /// <summary>
@@ -2413,11 +2419,11 @@ public sealed class RelationshipDiscovery
         }
 
         // Use AI for semantic relationship discovery
-        if (_messageBusPublisher != null && _options.EnableAIDiscovery)
+        if (_messageBusPublisher != null && _options.EnableAiDiscovery)
         {
             try
             {
-                var aiRelationships = await DiscoverWithAIAsync(nodeA, nodeB, ct).ConfigureAwait(false);
+                var aiRelationships = await DiscoverWithAiAsync(nodeA, nodeB, ct).ConfigureAwait(false);
                 relationships.AddRange(aiRelationships);
             }
             catch
@@ -2461,7 +2467,7 @@ public sealed class RelationshipDiscovery
         return count;
     }
 
-    private async Task<IReadOnlyList<DiscoveredRelationship>> DiscoverWithAIAsync(
+    private async Task<IReadOnlyList<DiscoveredRelationship>> DiscoverWithAiAsync(
         KnowledgeNode nodeA,
         KnowledgeNode nodeB,
         CancellationToken ct)
@@ -2472,7 +2478,7 @@ public sealed class RelationshipDiscovery
             nodeB = new { nodeB.Id, nodeB.Labels, nodeB.Properties }
         });
 
-        var response = await _messageBusPublisher!(NLPTopics.DiscoverRelationships, payload, ct).ConfigureAwait(false);
+        var response = await _messageBusPublisher!(NlpTopics.DiscoverRelationships, payload, ct).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(response))
         {
@@ -2511,7 +2517,7 @@ public sealed class DiscoveredRelationship
 public sealed class RelationshipDiscoveryOptions
 {
     /// <summary>Gets or sets whether to enable AI-powered discovery.</summary>
-    public bool EnableAIDiscovery { get; set; } = true;
+    public bool EnableAiDiscovery { get; set; } = true;
 
     /// <summary>Gets or sets the minimum confidence for adding relationships.</summary>
     public double MinConfidence { get; set; } = 0.5;
@@ -2633,7 +2639,7 @@ public sealed class GraphQuery
             } : null
         });
 
-        var response = await _messageBusPublisher!(NLPTopics.GraphQuery, payload, ct).ConfigureAwait(false);
+        var response = await _messageBusPublisher!(NlpTopics.GraphQuery, payload, ct).ConfigureAwait(false);
 
         if (!string.IsNullOrEmpty(response))
         {

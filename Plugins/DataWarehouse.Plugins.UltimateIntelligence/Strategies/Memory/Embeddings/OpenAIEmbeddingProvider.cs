@@ -18,7 +18,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Embedding
 /// - Cost tracking per request
 /// - Support for dimension reduction (text-embedding-3 models)
 /// </summary>
-public sealed class OpenAIEmbeddingProvider : EmbeddingProviderBase
+public sealed class OpenAiEmbeddingProvider : EmbeddingProviderBase
 {
     private const string DefaultApiBase = "https://api.openai.com/v1";
     private const string DefaultModel = "text-embedding-3-small";
@@ -119,7 +119,7 @@ public sealed class OpenAIEmbeddingProvider : EmbeddingProviderBase
     /// </summary>
     /// <param name="config">Provider configuration with ApiKey required.</param>
     /// <param name="httpClient">Optional HTTP client.</param>
-    public OpenAIEmbeddingProvider(EmbeddingProviderConfig config, HttpClient? httpClient = null)
+    public OpenAiEmbeddingProvider(EmbeddingProviderConfig config, HttpClient? httpClient = null)
         : base(config, httpClient)
     {
         if (string.IsNullOrWhiteSpace(config.ApiKey))
@@ -161,7 +161,7 @@ public sealed class OpenAIEmbeddingProvider : EmbeddingProviderBase
 
     private async Task<float[][]> ProcessBatchAsync(string[] texts, CancellationToken ct)
     {
-        var payload = new OpenAIEmbeddingRequest
+        var payload = new OpenAiEmbeddingRequest
         {
             Input = texts,
             Model = _currentModel,
@@ -208,7 +208,7 @@ public sealed class OpenAIEmbeddingProvider : EmbeddingProviderBase
             };
         }
 
-        var result = await response.Content.ReadFromJsonAsync<OpenAIEmbeddingResponse>(cancellationToken: ct);
+        var result = await response.Content.ReadFromJsonAsync<OpenAiEmbeddingResponse>(cancellationToken: ct);
         if (result?.Data == null || result.Data.Count == 0)
             throw new EmbeddingException("Empty response from OpenAI API") { ProviderId = ProviderId };
 
@@ -228,7 +228,7 @@ public sealed class OpenAIEmbeddingProvider : EmbeddingProviderBase
         }
         catch
         {
-            Debug.WriteLine($"Caught exception in OpenAIEmbeddingProvider.cs");
+            Debug.WriteLine($"Caught exception in OpenAiEmbeddingProvider.cs");
             return false;
         }
     }
@@ -315,7 +315,7 @@ public sealed class OpenAIEmbeddingProvider : EmbeddingProviderBase
     }
 
     // Request/Response models
-    private sealed class OpenAIEmbeddingRequest
+    private sealed class OpenAiEmbeddingRequest
     {
         public string[] Input { get; set; } = Array.Empty<string>();
         public string Model { get; set; } = "";
@@ -323,16 +323,16 @@ public sealed class OpenAIEmbeddingProvider : EmbeddingProviderBase
         public int? Dimensions { get; set; }
     }
 
-    private sealed class OpenAIEmbeddingResponse
+    private sealed class OpenAiEmbeddingResponse
     {
         [JsonPropertyName("data")]
-        public List<OpenAIEmbeddingData> Data { get; set; } = new();
+        public List<OpenAiEmbeddingData> Data { get; set; } = new();
 
         [JsonPropertyName("usage")]
-        public OpenAIUsage? Usage { get; set; }
+        public OpenAiUsage? Usage { get; set; }
     }
 
-    private sealed class OpenAIEmbeddingData
+    private sealed class OpenAiEmbeddingData
     {
         [JsonPropertyName("embedding")]
         public float[] Embedding { get; set; } = Array.Empty<float>();
@@ -341,7 +341,7 @@ public sealed class OpenAIEmbeddingProvider : EmbeddingProviderBase
         public int Index { get; set; }
     }
 
-    private sealed class OpenAIUsage
+    private sealed class OpenAiUsage
     {
         [JsonPropertyName("prompt_tokens")]
         public int PromptTokens { get; set; }

@@ -155,7 +155,7 @@ public sealed class FullTextSearchStrategy : FeatureStrategyBase
                 // Apply metadata filter
                 if (filter != null && !MatchesFilter(doc.Metadata, filter)) continue;
 
-                var score = CalculateBM25Score(stemmedQuery, doc.Content, documents.Count, avgDocLength);
+                var score = CalculateBm25Score(stemmedQuery, doc.Content, documents.Count, avgDocLength);
                 var snippet = GenerateSnippet(doc.Content, queryTokens);
 
                 results.Add(new FullTextSearchResult
@@ -220,7 +220,7 @@ public sealed class FullTextSearchStrategy : FeatureStrategyBase
         return 1.0f - (float)d[a.Length, b.Length] / maxLen;
     }
 
-    private float CalculateBM25Score(List<string> queryTerms, string document, int totalDocs, double avgDocLength)
+    private float CalculateBm25Score(List<string> queryTerms, string document, int totalDocs, double avgDocLength)
     {
         const float k1 = 1.5f;
         const float b = 0.75f;

@@ -1745,11 +1745,11 @@ public sealed class ReportGenerator : FeatureStrategyBase
         }
 
         // AI summary if provider available
-        if (AiProvider != null && definition.IncludeAISummary)
+        if (AiProvider != null && definition.IncludeAiSummary)
         {
             try
             {
-                var summary = await GenerateAISummaryAsync(report, ct);
+                var summary = await GenerateAiSummaryAsync(report, ct);
                 report.Summary = summary;
             }
             catch
@@ -1795,7 +1795,7 @@ public sealed class ReportGenerator : FeatureStrategyBase
         };
     }
 
-    private async Task<string> GenerateAISummaryAsync(GeneratedReport report, CancellationToken ct)
+    private async Task<string> GenerateAiSummaryAsync(GeneratedReport report, CancellationToken ct)
     {
         var content = string.Join("\n\n", report.Sections.Select(s => $"## {s.Title}\n{s.Content}"));
         var prompt = $"Summarize this report in 2-3 sentences:\n\n{content}";
@@ -1834,7 +1834,7 @@ public sealed class ReportDefinition
     public List<ReportDataSource> DataSources { get; init; } = new();
 
     /// <summary>Whether to include AI summary.</summary>
-    public bool IncludeAISummary { get; init; } = true;
+    public bool IncludeAiSummary { get; init; } = true;
 
     /// <summary>Scheduled task ID.</summary>
     public string? ScheduledTaskId { get; set; }

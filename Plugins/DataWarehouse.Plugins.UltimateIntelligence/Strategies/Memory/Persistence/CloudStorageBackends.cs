@@ -95,7 +95,7 @@ public sealed class AzureBlobPersistenceBackend : IProductionPersistenceBackend
         PersistenceCapabilities.Replication |
         PersistenceCapabilities.Snapshots |
         PersistenceCapabilities.SecondaryIndexes |
-        PersistenceCapabilities.TTL;
+        PersistenceCapabilities.Ttl;
 
     /// <inheritdoc/>
     public bool IsConnected => _isConnected && !_disposed;

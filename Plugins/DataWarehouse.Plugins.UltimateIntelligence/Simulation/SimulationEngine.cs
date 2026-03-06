@@ -1148,7 +1148,7 @@ public sealed class ImpactAnalyzer
         {
             try
             {
-                var aiAnalysis = await PerformAIAnalysisAsync(fork, ct);
+                var aiAnalysis = await PerformAiAnalysisAsync(fork, ct);
                 recommendations.AddRange(aiAnalysis.Recommendations);
                 warnings.AddRange(aiAnalysis.Warnings);
 
@@ -1247,7 +1247,7 @@ public sealed class ImpactAnalyzer
     }
 
     private async Task<(List<string> Recommendations, List<string> Warnings, List<RiskFactor> AdditionalRiskFactors)>
-        PerformAIAnalysisAsync(StateFork fork, CancellationToken ct)
+        PerformAiAnalysisAsync(StateFork fork, CancellationToken ct)
     {
         var changesDescription = string.Join("\n",
             fork.AppliedChanges.Take(10).Select(c => $"- {c.Type}: {c.TargetPath}"));

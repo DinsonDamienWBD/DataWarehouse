@@ -11,9 +11,9 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory;
 /// <summary>
 /// Semantic vector encoder implementing AI-native encoding using information theory principles.
 /// Creates ultra-dense representations that preserve semantic meaning while minimizing storage.
-/// Implements the IAIContextEncoder interface for the tiered memory system.
+/// Implements the IAiContextEncoder interface for the tiered memory system.
 /// </summary>
-public sealed class SemanticVectorEncoder : IAIContextEncoder
+public sealed class SemanticVectorEncoder : IAiContextEncoder
 {
     private readonly int _vectorDimensions;
     private readonly BoundedDictionary<string, float[]> _vocabularyVectors = new BoundedDictionary<string, float[]>(1000);
@@ -604,15 +604,15 @@ internal sealed class RelationshipEncoder
 /// Differential encoder for incremental context updates.
 /// Stores only the delta between states for efficient memory usage.
 /// </summary>
-public sealed class DifferentialContextEncoder : IAIContextEncoder
+public sealed class DifferentialContextEncoder : IAiContextEncoder
 {
-    private readonly IAIContextEncoder _baseEncoder;
+    private readonly IAiContextEncoder _baseEncoder;
     private readonly BoundedDictionary<string, EncodedContext> _baseStates = new BoundedDictionary<string, EncodedContext>(1000);
 
     private long _totalOriginalBytes;
     private long _totalEncodedBytes;
 
-    public DifferentialContextEncoder(IAIContextEncoder? baseEncoder = null)
+    public DifferentialContextEncoder(IAiContextEncoder? baseEncoder = null)
     {
         _baseEncoder = baseEncoder ?? new SemanticVectorEncoder();
     }
@@ -736,7 +736,7 @@ public sealed class DifferentialContextEncoder : IAIContextEncoder
 /// Advanced AI context encoder that combines compression with semantic preservation.
 /// Uses multiple encoding strategies based on content characteristics.
 /// </summary>
-public sealed class AdaptiveContextEncoder : IAIContextEncoder
+public sealed class AdaptiveContextEncoder : IAiContextEncoder
 {
     private readonly SemanticVectorEncoder _semanticEncoder = new();
     private readonly DifferentialContextEncoder _differentialEncoder;

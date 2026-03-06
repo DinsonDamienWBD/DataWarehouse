@@ -18,28 +18,28 @@ public sealed record TieredMemoryConfig
             Tier = MemoryTier.Immediate,
             Persistence = MemoryPersistence.Volatile,
             MaxCapacityBytes = 10 * 1024 * 1024, // 10MB
-            TTL = TimeSpan.FromMinutes(30)
+            Ttl = TimeSpan.FromMinutes(30)
         },
         [MemoryTier.Working] = new TierConfig
         {
             Tier = MemoryTier.Working,
             Persistence = MemoryPersistence.Volatile,
             MaxCapacityBytes = 50 * 1024 * 1024, // 50MB
-            TTL = TimeSpan.FromHours(24)
+            Ttl = TimeSpan.FromHours(24)
         },
         [MemoryTier.ShortTerm] = new TierConfig
         {
             Tier = MemoryTier.ShortTerm,
             Persistence = MemoryPersistence.Hybrid,
             MaxCapacityBytes = 200 * 1024 * 1024, // 200MB
-            TTL = TimeSpan.FromDays(30)
+            Ttl = TimeSpan.FromDays(30)
         },
         [MemoryTier.LongTerm] = new TierConfig
         {
             Tier = MemoryTier.LongTerm,
             Persistence = MemoryPersistence.Persistent,
             MaxCapacityBytes = 1024 * 1024 * 1024, // 1GB
-            TTL = null // No expiration
+            Ttl = null // No expiration
         }
     };
 
@@ -283,7 +283,7 @@ public sealed class TieredMemoryStrategy : LongTermMemoryStrategyBase, ITierAwar
 {
     private readonly InMemoryTieredMemorySystem _memorySystem;
     private EvolvingContextManager? _evolutionManager = null;
-    private AIContextRegenerator? _regenerator;
+    private AiContextRegenerator? _regenerator;
 
     /// <inheritdoc/>
     public override string StrategyId => "ltm-tiered-hierarchical";
@@ -336,7 +336,7 @@ public sealed class TieredMemoryStrategy : LongTermMemoryStrategyBase, ITierAwar
     {
         Configuration = new TieredMemoryConfig();
         _memorySystem = new InMemoryTieredMemorySystem(Configuration);
-        _regenerator = new AIContextRegenerator();
+        _regenerator = new AiContextRegenerator();
     }
 
     #region ITierAwareMemoryStrategy Implementation
@@ -420,7 +420,7 @@ public sealed class TieredMemoryStrategy : LongTermMemoryStrategyBase, ITierAwar
                 Enabled = enabled,
                 Persistence = persistence,
                 MaxCapacityBytes = maxCapacityBytes,
-                TTL = ttl
+                Ttl = ttl
             };
 
             var newTiers = new Dictionary<MemoryTier, TierConfig>(Configuration.Tiers)
@@ -581,8 +581,8 @@ public sealed class TieredMemoryStrategy : LongTermMemoryStrategyBase, ITierAwar
             WorkingMemoryCount = immediateStats.EntryCount + workingStats.EntryCount,
             ShortTermMemoryCount = shortTermStats.EntryCount,
             LongTermMemoryCount = longTermStats.EntryCount,
-            TotalAccessCount = Interlocked.Read(ref _totalMemoriesRetrieved),
-            ConsolidationCount = Interlocked.Read(ref _totalConsolidations),
+            TotalAccessCount = Interlocked.Read(ref TotalMemoriesRetrieved),
+            ConsolidationCount = Interlocked.Read(ref TotalConsolidations),
             MemorySizeBytes = immediateStats.BytesUsed + workingStats.BytesUsed + shortTermStats.BytesUsed + longTermStats.BytesUsed
         };
     }

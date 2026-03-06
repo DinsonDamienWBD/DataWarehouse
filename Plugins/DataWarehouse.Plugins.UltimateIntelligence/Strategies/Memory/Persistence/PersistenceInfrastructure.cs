@@ -358,7 +358,7 @@ public sealed record TieredPersistenceManagerConfig
     public int HealthCheckIntervalSeconds { get; init; } = 30;
 
     /// <summary>Enable write-ahead logging for durability.</summary>
-    public bool EnableWAL { get; init; } = true;
+    public bool EnableWal { get; init; } = true;
 
     /// <summary>WAL storage path.</summary>
     public string? WalPath { get; init; }
@@ -414,7 +414,7 @@ public sealed class TieredPersistenceManager : IProductionPersistenceBackend
         _registry = registry ?? throw new ArgumentNullException(nameof(registry));
 
         // Initialize WAL if enabled
-        if (_config.EnableWAL && !string.IsNullOrEmpty(_config.WalPath))
+        if (_config.EnableWal && !string.IsNullOrEmpty(_config.WalPath))
         {
             _wal = new WriteAheadLog(_config.WalPath);
         }
@@ -426,7 +426,7 @@ public sealed class TieredPersistenceManager : IProductionPersistenceBackend
         if (_config.EnableFailover && _config.HealthCheckIntervalSeconds > 0)
         {
             _healthCheckTimer = new Timer(
-                _ => _ = PerformHealthCheckAsync(),
+                async _ => { try { await PerformHealthCheckAsync(); } catch (Exception ex) { Debug.WriteLine($"Health check failed: {ex.Message}"); } },
                 null,
                 TimeSpan.FromSeconds(_config.HealthCheckIntervalSeconds),
                 TimeSpan.FromSeconds(_config.HealthCheckIntervalSeconds));
@@ -1024,7 +1024,7 @@ public sealed record PersistenceEncryptionConfig
     public required string MasterKey { get; init; }
 
     /// <summary>Encryption algorithm.</summary>
-    public EncryptionAlgorithm Algorithm { get; init; } = EncryptionAlgorithm.AES256GCM;
+    public EncryptionAlgorithm Algorithm { get; init; } = EncryptionAlgorithm.Aes256Gcm;
 
     /// <summary>Key derivation iterations.</summary>
     public int KeyDerivationIterations { get; init; } = 10000;
@@ -1048,10 +1048,10 @@ public sealed record PersistenceEncryptionConfig
 public enum EncryptionAlgorithm
 {
     /// <summary>AES-256 with GCM mode.</summary>
-    AES256GCM,
+    Aes256Gcm,
 
     /// <summary>AES-256 with CBC mode.</summary>
-    AES256CBC,
+    Aes256Cbc,
 
     /// <summary>ChaCha20-Poly1305.</summary>
     ChaCha20Poly1305

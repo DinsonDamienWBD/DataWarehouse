@@ -293,8 +293,8 @@ public sealed class EmbeddingProviderRegistry : IDisposable
         _registrations["openai"] = new ProviderRegistration
         {
             ProviderId = "openai",
-            ProviderType = typeof(OpenAIEmbeddingProvider),
-            Factory = config => new OpenAIEmbeddingProvider(config)
+            ProviderType = typeof(OpenAiEmbeddingProvider),
+            Factory = config => new OpenAiEmbeddingProvider(config)
         };
 
         _registrations["azure-openai"] = new ProviderRegistration
@@ -328,7 +328,7 @@ public sealed class EmbeddingProviderRegistry : IDisposable
         _registrations["onnx"] = new ProviderRegistration
         {
             ProviderId = "onnx",
-            ProviderType = typeof(ONNXEmbeddingProvider)
+            ProviderType = typeof(OnnxEmbeddingProvider)
             // Factory requires model path, so left null
         };
 

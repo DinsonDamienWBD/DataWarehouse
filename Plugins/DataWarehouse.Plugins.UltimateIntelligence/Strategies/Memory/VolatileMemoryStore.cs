@@ -96,8 +96,8 @@ public sealed class VolatileMemoryStore
         if (_entries.TryGetValue(entryId, out var entry))
         {
             // Check TTL
-            if (_config.TTL.HasValue &&
-                DateTime.UtcNow - entry.CreatedAt > _config.TTL.Value)
+            if (_config.Ttl.HasValue &&
+                DateTime.UtcNow - entry.CreatedAt > _config.Ttl.Value)
             {
                 // Expired - remove and return null
                 DeleteSync(entryId);
@@ -191,8 +191,8 @@ public sealed class VolatileMemoryStore
                 if (_entries.TryGetValue(entryId, out var entry))
                 {
                     // Check TTL
-                    if (_config.TTL.HasValue &&
-                        DateTime.UtcNow - entry.CreatedAt > _config.TTL.Value)
+                    if (_config.Ttl.HasValue &&
+                        DateTime.UtcNow - entry.CreatedAt > _config.Ttl.Value)
                     {
                         continue; // Skip expired
                     }
@@ -216,8 +216,8 @@ public sealed class VolatileMemoryStore
             {
                 if (_entries.TryGetValue(entryId, out var entry))
                 {
-                    if (_config.TTL.HasValue &&
-                        DateTime.UtcNow - entry.CreatedAt > _config.TTL.Value)
+                    if (_config.Ttl.HasValue &&
+                        DateTime.UtcNow - entry.CreatedAt > _config.Ttl.Value)
                     {
                         continue;
                     }

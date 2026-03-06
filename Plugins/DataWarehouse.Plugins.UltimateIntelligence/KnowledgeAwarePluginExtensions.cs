@@ -28,7 +28,7 @@ public static class KnowledgeAwarePluginExtensions
     /// <summary>
     /// Knowledge registration cache to track registered plugins.
     /// </summary>
-    private static readonly BoundedDictionary<string, KnowledgeRegistrationInfo> _registrations = new BoundedDictionary<string, KnowledgeRegistrationInfo>(1000);
+    private static readonly BoundedDictionary<string, KnowledgeRegistrationInfo> Registrations = new BoundedDictionary<string, KnowledgeRegistrationInfo>(1000);
 
     /// <summary>
     /// Gets a KnowledgeObject describing the plugin's capabilities for registration with Universal Intelligence.
@@ -265,7 +265,7 @@ public static class KnowledgeAwarePluginExtensions
         try
         {
             // Check if already registered
-            if (_registrations.ContainsKey(plugin.Id))
+            if (Registrations.ContainsKey(plugin.Id))
             {
                 return new KnowledgeRegistrationResult
                 {
@@ -305,7 +305,7 @@ public static class KnowledgeAwarePluginExtensions
                 RegisteredAt = DateTimeOffset.UtcNow,
                 GatewayId = GetGatewayId(gateway)
             };
-            _registrations[plugin.Id] = registrationInfo;
+            Registrations[plugin.Id] = registrationInfo;
 
             return new KnowledgeRegistrationResult
             {
@@ -355,7 +355,7 @@ public static class KnowledgeAwarePluginExtensions
         try
         {
             // Remove from tracking
-            if (!_registrations.TryRemove(plugin.Id, out var registrationInfo))
+            if (!Registrations.TryRemove(plugin.Id, out var registrationInfo))
             {
                 return new KnowledgeUnregistrationResult
                 {
@@ -401,7 +401,7 @@ public static class KnowledgeAwarePluginExtensions
     public static bool IsRegisteredWithGateway(this PluginBase plugin)
     {
         ArgumentNullException.ThrowIfNull(plugin);
-        return _registrations.ContainsKey(plugin.Id);
+        return Registrations.ContainsKey(plugin.Id);
     }
 
     /// <summary>
@@ -412,7 +412,7 @@ public static class KnowledgeAwarePluginExtensions
     public static KnowledgeRegistrationInfo? GetRegistrationInfo(this PluginBase plugin)
     {
         ArgumentNullException.ThrowIfNull(plugin);
-        return _registrations.TryGetValue(plugin.Id, out var info) ? info : null;
+        return Registrations.TryGetValue(plugin.Id, out var info) ? info : null;
     }
 
     #region Private Helper Methods

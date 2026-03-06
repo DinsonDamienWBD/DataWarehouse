@@ -56,7 +56,7 @@ public sealed record TierConfig
     public long MaxCapacityBytes { get; init; } = 100 * 1024 * 1024; // 100MB default
 
     /// <summary>Time-to-live for entries (null = no expiration).</summary>
-    public TimeSpan? TTL { get; init; }
+    public TimeSpan? Ttl { get; init; }
 }
 
 /// <summary>
@@ -204,7 +204,7 @@ public sealed record EncodedContext
 /// <summary>
 /// Interface for AI context encoders that transform context for efficient storage.
 /// </summary>
-public interface IAIContextEncoder
+public interface IAiContextEncoder
 {
     /// <summary>
     /// Encodes context content into an AI-native representation.
@@ -255,7 +255,7 @@ public interface IContextRegenerator
 /// <summary>
 /// Simple AI context regenerator that wraps the advanced implementation.
 /// </summary>
-public sealed class AIContextRegenerator : IContextRegenerator
+public sealed class AiContextRegenerator : IContextRegenerator
 {
     private readonly AiAdvancedContextRegenerator _advanced = new();
 
@@ -387,9 +387,9 @@ public sealed record MemoryStatistics
 /// </summary>
 public abstract class LongTermMemoryStrategyBase : IntelligenceStrategyBase
 {
-    protected long _totalMemoriesStored;
-    protected long _totalMemoriesRetrieved;
-    protected long _totalConsolidations;
+    protected long TotalMemoriesStored;
+    protected long TotalMemoriesRetrieved;
+    protected long TotalConsolidations;
 
     /// <inheritdoc/>
     public override IntelligenceStrategyCategory Category => IntelligenceStrategyCategory.LongTermMemory;
@@ -421,17 +421,17 @@ public abstract class LongTermMemoryStrategyBase : IntelligenceStrategyBase
 
     protected void RecordMemoryStored()
     {
-        Interlocked.Increment(ref _totalMemoriesStored);
+        Interlocked.Increment(ref TotalMemoriesStored);
     }
 
     protected void RecordMemoryRetrieved(int count = 1)
     {
-        Interlocked.Add(ref _totalMemoriesRetrieved, count);
+        Interlocked.Add(ref TotalMemoriesRetrieved, count);
     }
 
     protected void RecordConsolidation()
     {
-        Interlocked.Increment(ref _totalConsolidations);
+        Interlocked.Increment(ref TotalConsolidations);
     }
 }
 
@@ -609,8 +609,8 @@ public sealed class MemGptStrategy : LongTermMemoryStrategyBase, ITierAwareMemor
                 WorkingMemoryCount = _workingMemory.Count,
                 ShortTermMemoryCount = _shortTermMemory.Count,
                 LongTermMemoryCount = _longTermMemory.Count,
-                TotalAccessCount = Interlocked.Read(ref _totalMemoriesRetrieved),
-                ConsolidationCount = Interlocked.Read(ref _totalConsolidations),
+                TotalAccessCount = Interlocked.Read(ref TotalMemoriesRetrieved),
+                ConsolidationCount = Interlocked.Read(ref TotalConsolidations),
                 LastConsolidation = _lastConsolidation
             };
         });
@@ -752,10 +752,8 @@ public sealed class MemGptStrategy : LongTermMemoryStrategyBase, ITierAwareMemor
     {
         await ExecuteWithTrackingAsync(async () =>
         {
-            MemoryEntry? entry = null;
-
             // Find and remove from current location
-            if (_workingMemory.TryRemove(memoryId, out entry) ||
+            if (_workingMemory.TryRemove(memoryId, out var entry) ||
                 _shortTermMemory.TryRemove(memoryId, out entry) ||
                 _longTermMemory.TryRemove(memoryId, out entry))
             {
@@ -954,8 +952,8 @@ public sealed class ChromaMemoryStrategy : LongTermMemoryStrategyBase, ITierAwar
             {
                 TotalMemories = _episodes.Count,
                 EpisodicMemoryCount = _episodes.Count,
-                TotalAccessCount = Interlocked.Read(ref _totalMemoriesRetrieved),
-                ConsolidationCount = Interlocked.Read(ref _totalConsolidations),
+                TotalAccessCount = Interlocked.Read(ref TotalMemoriesRetrieved),
+                ConsolidationCount = Interlocked.Read(ref TotalConsolidations),
                 LastConsolidation = _lastConsolidation
             };
         });
@@ -1230,8 +1228,8 @@ public sealed class RedisMemoryStrategy : LongTermMemoryStrategyBase, ITierAware
                 TotalMemories = _cache.Count + _longTermStorage.Count,
                 WorkingMemoryCount = _cache.Count,
                 LongTermMemoryCount = _longTermStorage.Count,
-                TotalAccessCount = Interlocked.Read(ref _totalMemoriesRetrieved),
-                ConsolidationCount = Interlocked.Read(ref _totalConsolidations),
+                TotalAccessCount = Interlocked.Read(ref TotalMemoriesRetrieved),
+                ConsolidationCount = Interlocked.Read(ref TotalConsolidations),
                 LastConsolidation = _lastConsolidation
             };
         });
@@ -1475,8 +1473,8 @@ public sealed class PgVectorMemoryStrategy : LongTermMemoryStrategyBase
             {
                 TotalMemories = _memories.Count,
                 SemanticMemoryCount = _memories.Count,
-                TotalAccessCount = Interlocked.Read(ref _totalMemoriesRetrieved),
-                ConsolidationCount = Interlocked.Read(ref _totalConsolidations),
+                TotalAccessCount = Interlocked.Read(ref TotalMemoriesRetrieved),
+                ConsolidationCount = Interlocked.Read(ref TotalConsolidations),
                 LastConsolidation = _lastConsolidation
             };
         });
@@ -1710,8 +1708,8 @@ public sealed class HybridMemoryStrategy : LongTermMemoryStrategyBase, ITierAwar
                 WorkingMemoryCount = workingStats.WorkingMemoryCount,
                 EpisodicMemoryCount = episodicStats.EpisodicMemoryCount,
                 SemanticMemoryCount = semanticStats.SemanticMemoryCount,
-                TotalAccessCount = Interlocked.Read(ref _totalMemoriesRetrieved),
-                ConsolidationCount = Interlocked.Read(ref _totalConsolidations),
+                TotalAccessCount = Interlocked.Read(ref TotalMemoriesRetrieved),
+                ConsolidationCount = Interlocked.Read(ref TotalConsolidations),
                 LastConsolidation = _lastConsolidation
             };
         });

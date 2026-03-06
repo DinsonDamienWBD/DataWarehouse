@@ -306,7 +306,7 @@ public static class MemoryPayloads
         public long? MaxCapacityBytes { get; init; }
 
         /// <summary>Time-to-live in seconds (null for no expiration).</summary>
-        public int? TTLSeconds { get; init; }
+        public int? TtlSeconds { get; init; }
     }
 
     /// <summary>

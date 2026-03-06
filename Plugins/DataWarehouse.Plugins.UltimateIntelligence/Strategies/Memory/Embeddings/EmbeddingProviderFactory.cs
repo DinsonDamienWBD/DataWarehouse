@@ -63,7 +63,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
     {
         return providerId.ToLowerInvariant() switch
         {
-            "openai" => new OpenAIEmbeddingProvider(config, _sharedHttpClient),
+            "openai" => new OpenAiEmbeddingProvider(config, _sharedHttpClient),
             "azure-openai" or "azureopenai" => CreateAzureOpenAi(config),
             "cohere" => new CohereEmbeddingProvider(config, _sharedHttpClient),
             "huggingface" or "hf" => new HuggingFaceEmbeddingProvider(config, _sharedHttpClient),
@@ -142,7 +142,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
     /// <param name="model">Model name (default: text-embedding-3-small).</param>
     /// <param name="organization">Optional organization ID.</param>
     /// <returns>The created provider instance.</returns>
-    public OpenAIEmbeddingProvider CreateOpenAi(
+    public OpenAiEmbeddingProvider CreateOpenAi(
         string apiKey,
         string? model = null,
         string? organization = null)
@@ -155,7 +155,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
                 ? new() { ["Organization"] = organization }
                 : new()
         };
-        return new OpenAIEmbeddingProvider(config, _sharedHttpClient);
+        return new OpenAiEmbeddingProvider(config, _sharedHttpClient);
     }
 
     /// <summary>
@@ -245,7 +245,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
     /// <param name="tokenizerPath">Optional path to tokenizer files.</param>
     /// <param name="useGpu">Whether to use GPU acceleration.</param>
     /// <returns>The created provider instance.</returns>
-    public ONNXEmbeddingProvider CreateOnnx(
+    public OnnxEmbeddingProvider CreateOnnx(
         string modelPath,
         string? tokenizerPath = null,
         bool useGpu = false)
@@ -257,7 +257,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
                 ["UseGpu"] = useGpu
             }
         };
-        return new ONNXEmbeddingProvider(config, modelPath, tokenizerPath, _sharedHttpClient);
+        return new OnnxEmbeddingProvider(config, modelPath, tokenizerPath, _sharedHttpClient);
     }
 
     /// <summary>
@@ -338,7 +338,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
         return new AzureOpenAiEmbeddingProvider(config, deploymentName, _sharedHttpClient);
     }
 
-    private ONNXEmbeddingProvider CreateOnnx(EmbeddingProviderConfig config)
+    private OnnxEmbeddingProvider CreateOnnx(EmbeddingProviderConfig config)
     {
         var modelPath = config.AdditionalConfig.TryGetValue("ModelPath", out var mp)
             ? mp?.ToString() ?? throw new ArgumentException("ModelPath is required for ONNX")
@@ -348,7 +348,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
             ? tp?.ToString()
             : null;
 
-        return new ONNXEmbeddingProvider(config, modelPath, tokenizerPath, _sharedHttpClient);
+        return new OnnxEmbeddingProvider(config, modelPath, tokenizerPath, _sharedHttpClient);
     }
 
     private static string DetermineProviderId(EmbeddingProviderConfig config)

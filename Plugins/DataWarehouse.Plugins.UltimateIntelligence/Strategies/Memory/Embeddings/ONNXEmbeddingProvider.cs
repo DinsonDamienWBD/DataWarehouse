@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Embedding
 /// - Memory-efficient batch processing
 /// - Support for various sentence-transformer ONNX exports
 /// </summary>
-public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
+public sealed class OnnxEmbeddingProvider : EmbeddingProviderBase
 {
     private static readonly IReadOnlyList<EmbeddingModelInfo> Models = new[]
     {
@@ -130,7 +130,7 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
     /// <param name="modelPath">Path to the .onnx model file.</param>
     /// <param name="tokenizerPath">Optional path to tokenizer files (vocab.txt or tokenizer.json).</param>
     /// <param name="httpClient">Optional HTTP client (not used for ONNX but required by base).</param>
-    public ONNXEmbeddingProvider(
+    public OnnxEmbeddingProvider(
         EmbeddingProviderConfig config,
         string modelPath,
         string? tokenizerPath = null,
@@ -411,7 +411,7 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
         }
         catch
         {
-            Debug.WriteLine($"Caught exception in ONNXEmbeddingProvider.cs");
+            Debug.WriteLine($"Caught exception in OnnxEmbeddingProvider.cs");
             return false;
         }
     }
@@ -427,9 +427,9 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
     /// <summary>
     /// Gets information about the loaded model.
     /// </summary>
-    public ONNXModelInfo GetModelInfo()
+    public OnnxModelInfo GetModelInfo()
     {
-        return new ONNXModelInfo
+        return new OnnxModelInfo
         {
             ModelPath = _modelPath,
             TokenizerPath = _tokenizerPath,
@@ -478,7 +478,7 @@ public enum PoolingStrategy
 /// <summary>
 /// Information about a loaded ONNX model.
 /// </summary>
-public sealed record ONNXModelInfo
+public sealed record OnnxModelInfo
 {
     /// <summary>Path to the model file.</summary>
     public string ModelPath { get; init; } = "";
