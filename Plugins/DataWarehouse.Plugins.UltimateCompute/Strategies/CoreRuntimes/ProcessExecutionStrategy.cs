@@ -273,9 +273,9 @@ internal sealed class ScriptExecutionStrategy : ComputeRuntimeStrategyBase
     private async Task<(byte[] output, string? logs)> ExecuteCSharpScriptAsync(string code, ComputeTask task, TimeSpan timeout, CancellationToken ct)
     {
         // C# scripting via dotnet-script or csi
-        var _tmpBase1 = Path.GetTempFileName();
-        var scriptFile = Path.ChangeExtension(_tmpBase1, ".csx");
-        File.Move(_tmpBase1, scriptFile);
+        var tmpBase1 = Path.GetTempFileName();
+        var scriptFile = Path.ChangeExtension(tmpBase1, ".csx");
+        File.Move(tmpBase1, scriptFile);
         try
         {
             // Inject variables from task environment
@@ -303,9 +303,9 @@ internal sealed class ScriptExecutionStrategy : ComputeRuntimeStrategyBase
 
     private async Task<(byte[] output, string? logs)> ExecuteJavaScriptAsync(string code, ComputeTask task, TimeSpan timeout, CancellationToken ct)
     {
-        var _tmpBase2 = Path.GetTempFileName();
-        var scriptFile = Path.ChangeExtension(_tmpBase2, ".js");
-        File.Move(_tmpBase2, scriptFile);
+        var tmpBase2 = Path.GetTempFileName();
+        var scriptFile = Path.ChangeExtension(tmpBase2, ".js");
+        File.Move(tmpBase2, scriptFile);
         try
         {
             await File.WriteAllTextAsync(scriptFile, code, ct);
@@ -325,9 +325,9 @@ internal sealed class ScriptExecutionStrategy : ComputeRuntimeStrategyBase
 
     private async Task<(byte[] output, string? logs)> ExecutePythonScriptAsync(string code, ComputeTask task, TimeSpan timeout, CancellationToken ct)
     {
-        var _tmpBase3 = Path.GetTempFileName();
-        var scriptFile = Path.ChangeExtension(_tmpBase3, ".py");
-        File.Move(_tmpBase3, scriptFile);
+        var tmpBase3 = Path.GetTempFileName();
+        var scriptFile = Path.ChangeExtension(tmpBase3, ".py");
+        File.Move(tmpBase3, scriptFile);
         try
         {
             await File.WriteAllTextAsync(scriptFile, code, ct);

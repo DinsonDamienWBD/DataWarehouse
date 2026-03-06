@@ -21,7 +21,7 @@ namespace DataWarehouse.Plugins.UltimateCompute.Strategies.IndustryFirst;
 internal sealed class SelfOptimizingPipelineStrategy : ComputeRuntimeStrategyBase
 {
     private readonly BoundedDictionary<string, PipelineConfig> _configs = new BoundedDictionary<string, PipelineConfig>(1000);
-    private readonly BoundedDictionary<string, double> _emaThoughput = new BoundedDictionary<string, double>(1000);
+    private readonly BoundedDictionary<string, double> _emaThroughput = new BoundedDictionary<string, double>(1000);
     private const double EmaAlpha = 0.3; // Exponential moving average decay
 
     /// <inheritdoc/>
@@ -122,9 +122,9 @@ internal sealed class SelfOptimizingPipelineStrategy : ComputeRuntimeStrategyBas
             var throughput = itemsProcessed / Math.Max(0.001, sw.Elapsed.TotalSeconds);
 
             // Update EMA throughput
-            var prevEma = _emaThoughput.GetOrAdd(pipelineKey, throughput);
+            var prevEma = _emaThroughput.GetOrAdd(pipelineKey, throughput);
             var newEma = EmaAlpha * throughput + (1.0 - EmaAlpha) * prevEma;
-            _emaThoughput[pipelineKey] = newEma;
+            _emaThroughput[pipelineKey] = newEma;
 
             // Hill-climbing optimization: perturb one parameter
             var newConfig = HillClimb(config, throughput, prevEma);

@@ -36,7 +36,7 @@ internal sealed class WazeroStrategy : ComputeRuntimeStrategyBase
         ValidateTask(task);
         return await MeasureExecutionAsync(task.Id, async () =>
         {
-            var _wasmBase = Path.GetTempFileName(); var wasmPath = Path.ChangeExtension(_wasmBase, ".wasm"); File.Move(_wasmBase, wasmPath);
+            var wasmBase = Path.GetTempFileName(); var wasmPath = Path.ChangeExtension(wasmBase, ".wasm"); File.Move(wasmBase, wasmPath);
             try
             {
                 await File.WriteAllBytesAsync(wasmPath, task.Code.ToArray(), cancellationToken);

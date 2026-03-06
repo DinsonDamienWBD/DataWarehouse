@@ -89,12 +89,12 @@ internal sealed class WasmInterpreterStrategy : ComputeRuntimeStrategyBase
                 // Read LEB128 section size — bounds-checked to prevent infinite loop on malformed input.
                 long sectionSize = 0;
                 int shift = 0;
-                byte b = 0;
+                byte b;
                 int leb128Bytes = 0;
-                const int MaxLeb128Bytes = 5; // 32-bit LEB128 max 5 bytes; use 5 for section size
+                const int maxLeb128Bytes = 5; // 32-bit LEB128 max 5 bytes; use 5 for section size
                 do
                 {
-                    if (offset >= code.Length || leb128Bytes >= MaxLeb128Bytes) break;
+                    if (offset >= code.Length || leb128Bytes >= maxLeb128Bytes) break;
                     b = code[offset++];
                     leb128Bytes++;
                     sectionSize |= (long)(b & 0x7F) << shift;

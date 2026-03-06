@@ -37,12 +37,12 @@ internal sealed class TensorRtStrategy : ComputeRuntimeStrategyBase
         ValidateTask(task);
         return await MeasureExecutionAsync(task.Id, async () =>
         {
-            var _onnxBase = Path.GetTempFileName();
-            var modelPath = Path.ChangeExtension(_onnxBase, ".onnx");
-            File.Move(_onnxBase, modelPath);
-            var _engineBase = Path.GetTempFileName();
-            var enginePath = Path.ChangeExtension(_engineBase, ".engine");
-            File.Move(_engineBase, enginePath);
+            var onnxBase = Path.GetTempFileName();
+            var modelPath = Path.ChangeExtension(onnxBase, ".onnx");
+            File.Move(onnxBase, modelPath);
+            var engineBase = Path.GetTempFileName();
+            var enginePath = Path.ChangeExtension(engineBase, ".engine");
+            File.Move(engineBase, enginePath);
             string? inputPath = null; // hoisted so finally block can delete it
             try
             {
@@ -89,9 +89,9 @@ internal sealed class TensorRtStrategy : ComputeRuntimeStrategyBase
 
                 if (task.InputData.Length > 0)
                 {
-                    var _binBase = Path.GetTempFileName();
-                    inputPath = Path.ChangeExtension(_binBase, ".bin");
-                    File.Move(_binBase, inputPath);
+                    var binBase = Path.GetTempFileName();
+                    inputPath = Path.ChangeExtension(binBase, ".bin");
+                    File.Move(binBase, inputPath);
                     await File.WriteAllBytesAsync(inputPath, task.InputData.ToArray(), cancellationToken);
                     inferArgs.Append($"--loadInputs={inputPath} ");
                 }

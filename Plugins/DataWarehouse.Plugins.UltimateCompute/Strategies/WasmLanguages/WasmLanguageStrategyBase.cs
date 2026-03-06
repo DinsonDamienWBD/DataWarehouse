@@ -157,11 +157,6 @@ internal abstract class WasmLanguageStrategyBase : ComputeRuntimeStrategyBase
     /// Compile-time toolchain presence is a build/deploy concern, not a runtime execution concern.
     /// Override <see cref="VerifyLanguageAsync"/> in a subclass to add compiler presence checks if needed.
     /// </remarks>
-    /// <param name="cancellationToken">Cancellation token.</param>
-    /// <returns>
-    /// A <see cref="WasmLanguageVerificationResult"/> indicating whether wasmtime is available (ToolchainAvailable),
-    /// the sample bytes are valid WASM (CompilationSuccessful), and execution produced expected output.
-    /// </returns>
     /// <summary>
     /// Returns the names of upstream compiler/toolchain binaries required for this language (e.g., "javy", "teavm", "python3").
     /// Override in subclasses to verify that the language-specific toolchain (not just wasmtime) is present.

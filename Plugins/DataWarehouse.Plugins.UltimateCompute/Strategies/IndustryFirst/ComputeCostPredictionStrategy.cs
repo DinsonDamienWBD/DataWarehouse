@@ -127,13 +127,13 @@ internal sealed class ComputeCostPredictionStrategy : ComputeRuntimeStrategyBase
 
         // Ordinary Least Squares: duration = a * input_size + b
         var n = records.Count;
-        double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+        double sumX = 0, sumY = 0, sumXy = 0, sumX2 = 0;
 
         foreach (var record in records)
         {
             sumX += record.InputSize;
             sumY += record.Duration;
-            sumXY += record.InputSize * record.Duration;
+            sumXy += record.InputSize * record.Duration;
             sumX2 += record.InputSize * record.InputSize;
         }
 
@@ -146,7 +146,7 @@ internal sealed class ComputeCostPredictionStrategy : ComputeRuntimeStrategyBase
         }
         else
         {
-            a = (n * sumXY - sumX * sumY) / denominator;
+            a = (n * sumXy - sumX * sumY) / denominator;
             b = (sumY - a * sumX) / n;
         }
 
