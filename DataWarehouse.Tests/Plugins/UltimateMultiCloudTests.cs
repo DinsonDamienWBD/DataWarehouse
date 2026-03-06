@@ -36,7 +36,7 @@ public class UltimateMultiCloudTests
         {
             ProviderId = "aws-us",
             Name = "AWS US East",
-            Type = CloudProviderType.AWS,
+            Type = CloudProviderType.Aws,
             Regions = new List<string> { "us-east-1", "us-west-2" },
             Priority = 10,
             CostMultiplier = 1.0
@@ -56,7 +56,7 @@ public class UltimateMultiCloudTests
         {
             ProviderId = "aws-1",
             Name = "AWS",
-            Type = CloudProviderType.AWS,
+            Type = CloudProviderType.Aws,
             Regions = new List<string> { "us-east-1" },
             Priority = 10,
             CostMultiplier = 1.5
@@ -65,7 +65,7 @@ public class UltimateMultiCloudTests
         {
             ProviderId = "gcp-1",
             Name = "GCP",
-            Type = CloudProviderType.GCP,
+            Type = CloudProviderType.Gcp,
             Regions = new List<string> { "us-east-1" },
             Priority = 5,
             CostMultiplier = 1.0
@@ -96,9 +96,9 @@ public class UltimateMultiCloudTests
     [Fact]
     public void CloudProviderType_HasExpectedValues()
     {
-        Assert.True(Enum.IsDefined(typeof(CloudProviderType), CloudProviderType.AWS));
+        Assert.True(Enum.IsDefined(typeof(CloudProviderType), CloudProviderType.Aws));
         Assert.True(Enum.IsDefined(typeof(CloudProviderType), CloudProviderType.Azure));
-        Assert.True(Enum.IsDefined(typeof(CloudProviderType), CloudProviderType.GCP));
+        Assert.True(Enum.IsDefined(typeof(CloudProviderType), CloudProviderType.Gcp));
         Assert.True(Enum.IsDefined(typeof(CloudProviderType), CloudProviderType.OnPremise));
     }
 }
