@@ -278,8 +278,8 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
             detectedPatterns.AddRange(piiResults.Select(p => $"PII:{p.Key}"));
 
             var piiConfidence = Math.Min(1.0, piiResults.Sum(r => r.Value * 0.1) + 0.5);
-            scores[ClassificationLabel.PII] = Math.Max(
-                scores.GetValueOrDefault(ClassificationLabel.PII, 0),
+            scores[ClassificationLabel.Pii] = Math.Max(
+                scores.GetValueOrDefault(ClassificationLabel.Pii, 0),
                 piiConfidence);
         }
 
@@ -287,8 +287,8 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
         if (ContainsPhiIndicators(content, data))
         {
             detectedPatterns.Add("PHI:HealthIndicators");
-            scores[ClassificationLabel.PHI] = Math.Max(
-                scores.GetValueOrDefault(ClassificationLabel.PHI, 0),
+            scores[ClassificationLabel.Phi] = Math.Max(
+                scores.GetValueOrDefault(ClassificationLabel.Phi, 0),
                 0.85);
         }
 
@@ -296,8 +296,8 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
         if (ContainsPciIndicators(content, data))
         {
             detectedPatterns.Add("PCI:PaymentIndicators");
-            scores[ClassificationLabel.PCI] = Math.Max(
-                scores.GetValueOrDefault(ClassificationLabel.PCI, 0),
+            scores[ClassificationLabel.Pci] = Math.Max(
+                scores.GetValueOrDefault(ClassificationLabel.Pci, 0),
                 0.85);
         }
 
@@ -458,7 +458,7 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
             RuleId = "pii-content",
             Name = "PII Content Detection",
             Description = "Detects personally identifiable information in content",
-            Label = ClassificationLabel.PII,
+            Label = ClassificationLabel.Pii,
             Priority = 100,
             ContentPatterns = new List<string>
             {
@@ -727,13 +727,13 @@ public sealed class DataClassificationStrategy : LifecycleStrategyBase
             var tagLower = data.Tags.Select(t => t.ToLowerInvariant()).ToHashSet();
 
             if (tagLower.Contains("pii") || tagLower.Contains("personal"))
-                return (ClassificationLabel.PII, 0.9);
+                return (ClassificationLabel.Pii, 0.9);
 
             if (tagLower.Contains("phi") || tagLower.Contains("health"))
-                return (ClassificationLabel.PHI, 0.9);
+                return (ClassificationLabel.Phi, 0.9);
 
             if (tagLower.Contains("pci") || tagLower.Contains("payment"))
-                return (ClassificationLabel.PCI, 0.9);
+                return (ClassificationLabel.Pci, 0.9);
 
             if (tagLower.Contains("confidential") || tagLower.Contains("secret"))
                 return (ClassificationLabel.Confidential, 0.85);

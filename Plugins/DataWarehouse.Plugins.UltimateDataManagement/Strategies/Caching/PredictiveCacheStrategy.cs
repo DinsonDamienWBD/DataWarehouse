@@ -66,6 +66,9 @@ public sealed class PredictiveCacheStrategy : CachingStrategyBase
 
     private IMessageBus? _messageBus;
     private IntelligenceCapabilities _capabilities = IntelligenceCapabilities.None;
+
+    /// <summary>Current intelligence capabilities (exposed for testing/monitoring).</summary>
+    internal IntelligenceCapabilities IntelligenceCapabilitiesField => _capabilities;
     private readonly List<IDisposable> _subscriptions = new();
 
     private readonly long _maxSize;

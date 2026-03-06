@@ -26,7 +26,7 @@ public sealed class ReadThroughCacheConfig
     /// <summary>
     /// Default TTL for cached entries.
     /// </summary>
-    public TimeSpan DefaultTTL { get; init; } = TimeSpan.FromMinutes(30);
+    public TimeSpan DefaultTtl { get; init; } = TimeSpan.FromMinutes(30);
 
     /// <summary>
     /// Maximum cache size in bytes.
@@ -214,7 +214,7 @@ public sealed class ReadThroughCacheStrategy : CachingStrategyBase
     {
         EnsureCapacity(value.Length);
 
-        var ttl = options.TTL ?? _config.DefaultTTL;
+        var ttl = options.TTL ?? _config.DefaultTtl;
         var entry = new ReadThroughEntry
         {
             Value = value,
@@ -362,7 +362,7 @@ public sealed class ReadThroughCacheStrategy : CachingStrategyBase
                     EnsureCapacity(value.Length);
 
                     newEntry.Value = value;
-                    newEntry.ExpiresAt = DateTime.UtcNow.Add(_config.DefaultTTL);
+                    newEntry.ExpiresAt = DateTime.UtcNow.Add(_config.DefaultTtl);
                     newEntry.LoadedAt = DateTime.UtcNow;
                     newEntry.IsLoading = false;
 
@@ -403,7 +403,7 @@ public sealed class ReadThroughCacheStrategy : CachingStrategyBase
                 {
                     await SetCoreAsync(key, value, new CacheOptions
                     {
-                        TTL = _config.DefaultTTL,
+                        TTL = _config.DefaultTtl,
                         Tags = tags
                     }, ct);
                 }

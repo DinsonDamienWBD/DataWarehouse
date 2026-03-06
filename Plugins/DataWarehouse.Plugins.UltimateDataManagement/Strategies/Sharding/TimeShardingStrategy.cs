@@ -91,6 +91,10 @@ public sealed class TimeShardingStrategy : ShardingStrategyBase
     private readonly int _cacheMaxSize;
     private readonly Timer? _partitionMaintenanceTimer;
     private string _timestampKeyPattern = @"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})";
+
+    /// <summary>Timestamp key pattern for shard routing (exposed for testing/monitoring).</summary>
+    internal string TimestampKeyPattern => _timestampKeyPattern;
+
     // P2-2430: Cache compiled regex to avoid per-call compilation in ExtractTimestamp hot path.
     private Regex _compiledTimestampRegex = new Regex(@"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", RegexOptions.Compiled, TimeSpan.FromMilliseconds(100));
 

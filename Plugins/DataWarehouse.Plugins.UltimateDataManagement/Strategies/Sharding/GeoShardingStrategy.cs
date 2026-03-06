@@ -489,7 +489,7 @@ public sealed class GeoShardingStrategy : ShardingStrategyBase
         }
 
         // Haversine formula
-        const double R = 6371; // Earth's radius in km
+        const double r = 6371; // Earth's radius in km
 
         var lat1Rad = loc1.Latitude.Value * Math.PI / 180;
         var lat2Rad = loc2.Latitude.Value * Math.PI / 180;
@@ -502,7 +502,7 @@ public sealed class GeoShardingStrategy : ShardingStrategyBase
 
         var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
 
-        return R * c;
+        return r * c;
     }
 
     /// <summary>

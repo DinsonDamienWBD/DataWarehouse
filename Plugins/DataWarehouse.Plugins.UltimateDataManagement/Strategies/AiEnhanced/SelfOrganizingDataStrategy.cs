@@ -178,6 +178,9 @@ public sealed class SelfOrganizingDataStrategy : AiEnhancedStrategyBase
     private readonly string[] _defaultCategories;
     private readonly TimeSpan _cacheTtl;
 
+    /// <summary>Cache TTL for organization results (exposed for testing/monitoring).</summary>
+    internal TimeSpan CacheTtl => _cacheTtl;
+
     /// <summary>
     /// Initializes a new SelfOrganizingDataStrategy.
     /// </summary>

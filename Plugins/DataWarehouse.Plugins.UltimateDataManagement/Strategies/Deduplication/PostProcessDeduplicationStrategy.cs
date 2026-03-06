@@ -28,6 +28,9 @@ public sealed class PostProcessDeduplicationStrategy : DeduplicationStrategyBase
     private readonly TimeSpan _batchInterval;
     private volatile bool _isProcessing;
 
+    /// <summary>Batch processing interval (exposed for testing/monitoring).</summary>
+    internal TimeSpan BatchInterval => _batchInterval;
+
     /// <summary>
     /// Initializes with default batch size of 100 and 30-second interval.
     /// </summary>

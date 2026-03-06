@@ -102,17 +102,17 @@ public enum ClassificationLabel
     /// <summary>
     /// Personally Identifiable Information - highest protection.
     /// </summary>
-    PII = 4,
+    Pii = 4,
 
     /// <summary>
     /// Protected Health Information (HIPAA).
     /// </summary>
-    PHI = 5,
+    Phi = 5,
 
     /// <summary>
     /// Payment Card Industry data.
     /// </summary>
-    PCI = 6,
+    Pci = 6,
 
     /// <summary>
     /// Sensitive data requiring special handling.

@@ -104,7 +104,7 @@ public sealed class CarbonFootprint
     /// <summary>
     /// Carbon emissions in grams CO2 equivalent.
     /// </summary>
-    public double GramsCO2e { get; init; }
+    public double GramsCo2E { get; init; }
 
     /// <summary>
     /// Energy consumed in kWh.
@@ -129,7 +129,7 @@ public sealed class CarbonFootprint
     /// <summary>
     /// Net carbon footprint after offsets.
     /// </summary>
-    public double NetGramsCO2e => Math.Max(0, GramsCO2e - RenewableOffsetGrams);
+    public double NetGramsCo2E => Math.Max(0, GramsCo2E - RenewableOffsetGrams);
 }
 
 /// <summary>
@@ -205,12 +205,12 @@ public sealed class CarbonAwareDataManagementStrategy : AiEnhancedStrategyBase
     private readonly BoundedDictionary<string, ScheduledOperation> _scheduledOperations = new BoundedDictionary<string, ScheduledOperation>(1000);
     private readonly BoundedDictionary<string, CarbonFootprint> _operationFootprints = new BoundedDictionary<string, CarbonFootprint>(1000);
     private readonly object _statsLock = new();
-    private double _totalCO2eGrams;
+    private double _totalCo2EGrams;
     private double _totalEnergyKwh;
     private long _operationCount;
 
     // Energy estimates per operation type (kWh per GB)
-    private static readonly Dictionary<string, double> EnergyPerGBByOperation = new()
+    private static readonly Dictionary<string, double> EnergyPerGbByOperation = new()
     {
         ["read"] = 0.0001,
         ["write"] = 0.0002,
@@ -315,19 +315,19 @@ public sealed class CarbonAwareDataManagementStrategy : AiEnhancedStrategyBase
         ArgumentException.ThrowIfNullOrWhiteSpace(operationType);
         ArgumentException.ThrowIfNullOrWhiteSpace(regionId);
 
-        var dataSizeGB = dataSizeBytes / (1024.0 * 1024 * 1024);
-        var energyPerGB = EnergyPerGBByOperation.TryGetValue(operationType.ToLowerInvariant(), out var e) ? e : 0.0002;
-        var energyKwh = dataSizeGB * energyPerGB;
+        var dataSizeGb = dataSizeBytes / (1024.0 * 1024 * 1024);
+        var energyPerGb = EnergyPerGbByOperation.TryGetValue(operationType.ToLowerInvariant(), out var e) ? e : 0.0002;
+        var energyKwh = dataSizeGb * energyPerGb;
 
         var intensity = GetRegionIntensity(regionId);
         var carbonIntensity = intensity?.CurrentIntensity ?? 400; // Default to moderate intensity
 
-        var gramsCO2e = energyKwh * carbonIntensity;
-        var renewableOffset = intensity != null ? gramsCO2e * (intensity.RenewablePercentage / 100) : 0;
+        var gramsCo2E = energyKwh * carbonIntensity;
+        var renewableOffset = intensity != null ? gramsCo2E * (intensity.RenewablePercentage / 100) : 0;
 
         return new CarbonFootprint
         {
-            GramsCO2e = gramsCO2e,
+            GramsCo2E = gramsCo2E,
             EnergyKwh = energyKwh,
             Region = regionId,
             CarbonIntensityUsed = carbonIntensity,
@@ -347,7 +347,7 @@ public sealed class CarbonAwareDataManagementStrategy : AiEnhancedStrategyBase
 
         lock (_statsLock)
         {
-            _totalCO2eGrams += footprint.NetGramsCO2e;
+            _totalCo2EGrams += footprint.NetGramsCo2E;
             _totalEnergyKwh += footprint.EnergyKwh;
             _operationCount++;
         }
@@ -424,13 +424,13 @@ public sealed class CarbonAwareDataManagementStrategy : AiEnhancedStrategyBase
         lock (_statsLock)
         {
             var avgIntensity = _operationCount > 0 && _totalEnergyKwh > 0
-                ? _totalCO2eGrams / _totalEnergyKwh
+                ? _totalCo2EGrams / _totalEnergyKwh
                 : 0;
 
             return new Dictionary<string, object>
             {
-                ["TotalCO2eGrams"] = _totalCO2eGrams,
-                ["TotalCO2eKg"] = _totalCO2eGrams / 1000,
+                ["TotalCo2EGrams"] = _totalCo2EGrams,
+                ["TotalCo2EKg"] = _totalCo2EGrams / 1000,
                 ["TotalEnergyKwh"] = _totalEnergyKwh,
                 ["OperationCount"] = _operationCount,
                 ["AverageIntensityGramsPerKwh"] = avgIntensity,
@@ -455,7 +455,7 @@ public sealed class CarbonAwareDataManagementStrategy : AiEnhancedStrategyBase
                 g => g.Key,
                 g => new
                 {
-                    TotalCO2eGrams = g.Sum(f => f.GramsCO2e),
+                    TotalCo2EGrams = g.Sum(f => f.GramsCo2E),
                     TotalEnergyKwh = g.Sum(f => f.EnergyKwh),
                     OperationCount = g.Count()
                 });

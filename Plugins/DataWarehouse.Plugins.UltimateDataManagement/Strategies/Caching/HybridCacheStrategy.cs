@@ -30,12 +30,12 @@ public sealed class HybridCacheConfig
     /// <summary>
     /// Default TTL for L1 cache.
     /// </summary>
-    public TimeSpan L1DefaultTTL { get; init; } = TimeSpan.FromMinutes(5);
+    public TimeSpan L1DefaultTtl { get; init; } = TimeSpan.FromMinutes(5);
 
     /// <summary>
     /// Default TTL for L2 cache.
     /// </summary>
-    public TimeSpan L2DefaultTTL { get; init; } = TimeSpan.FromMinutes(30);
+    public TimeSpan L2DefaultTtl { get; init; } = TimeSpan.FromMinutes(30);
 }
 
 /// <summary>
@@ -231,7 +231,7 @@ public sealed class HybridCacheStrategy : CachingStrategyBase
 
     private async Task PromoteToL1Async(string key, byte[] value, CancellationToken ct)
     {
-        var options = new CacheOptions { TTL = _config.L1DefaultTTL };
+        var options = new CacheOptions { TTL = _config.L1DefaultTtl };
         await _l1Cache.SetAsync(key, value, options, ct);
         // Keep in L2 for durability
     }
@@ -240,7 +240,7 @@ public sealed class HybridCacheStrategy : CachingStrategyBase
     {
         return new CacheOptions
         {
-            TTL = original.TTL ?? _config.L1DefaultTTL,
+            TTL = original.TTL ?? _config.L1DefaultTtl,
             SlidingExpiration = original.SlidingExpiration,
             Priority = original.Priority,
             Tags = original.Tags
@@ -251,7 +251,7 @@ public sealed class HybridCacheStrategy : CachingStrategyBase
     {
         return new CacheOptions
         {
-            TTL = original.TTL ?? _config.L2DefaultTTL,
+            TTL = original.TTL ?? _config.L2DefaultTtl,
             SlidingExpiration = original.SlidingExpiration,
             Priority = original.Priority,
             Tags = original.Tags

@@ -270,7 +270,7 @@ public sealed class UnifiedAccessStrategy : DataManagementStrategyBase
 /// AI-Enhanced Fabric Strategy - AI-powered auto-discovery and optimization.
 /// Merged from UltimateDataFabric plugin (T137).
 /// </summary>
-public sealed class AIEnhancedFabricStrategy : DataManagementStrategyBase
+public sealed class AiEnhancedFabricStrategy : DataManagementStrategyBase
 {
     public override string StrategyId => "fabric-ai-enhanced";
     public override string DisplayName => "AI-Enhanced Fabric";

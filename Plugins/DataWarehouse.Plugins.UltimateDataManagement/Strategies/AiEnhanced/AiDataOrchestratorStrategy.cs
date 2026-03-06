@@ -147,6 +147,9 @@ public sealed class AiDataOrchestratorStrategy : AiEnhancedStrategyBase
     private readonly TimeSpan _observationWindow;
     private DateTime _lastBatchAnalysis = DateTime.MinValue;
 
+    /// <summary>Timestamp of last batch analysis (exposed for testing/monitoring).</summary>
+    internal DateTime LastBatchAnalysis => _lastBatchAnalysis;
+
     /// <summary>
     /// Initializes a new AiDataOrchestratorStrategy.
     /// </summary>

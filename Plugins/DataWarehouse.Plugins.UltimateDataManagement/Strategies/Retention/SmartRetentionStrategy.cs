@@ -24,6 +24,9 @@ public sealed class SmartRetentionStrategy : RetentionStrategyBase
     private readonly FeatureWeights _weights;
     private readonly TimeSpan _predictionCacheTtl;
 
+    /// <summary>Prediction cache TTL (exposed for testing/monitoring).</summary>
+    internal TimeSpan PredictionCacheTtl => _predictionCacheTtl;
+
     /// <summary>
     /// Initializes with default thresholds and built-in scoring.
     /// </summary>

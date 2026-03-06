@@ -54,9 +54,9 @@ public enum ArchiveCompression
     Brotli,
 
     /// <summary>
-    /// LZ4 compression.
+    /// Lz4 compression.
     /// </summary>
-    LZ4,
+    Lz4,
 
     /// <summary>
     /// Zstandard compression.
@@ -64,9 +64,9 @@ public enum ArchiveCompression
     Zstd,
 
     /// <summary>
-    /// LZMA compression.
+    /// Lzma compression.
     /// </summary>
-    LZMA
+    Lzma
 }
 
 /// <summary>
@@ -822,9 +822,9 @@ public sealed class DataArchivalStrategy : LifecycleStrategyBase
             ArchiveCompression.None => 1.0,
             ArchiveCompression.GZip => 0.35,
             ArchiveCompression.Brotli => 0.30,
-            ArchiveCompression.LZ4 => 0.45,
+            ArchiveCompression.Lz4 => 0.45,
             ArchiveCompression.Zstd => 0.28,
-            ArchiveCompression.LZMA => 0.25,
+            ArchiveCompression.Lzma => 0.25,
             _ => 1.0
         };
 

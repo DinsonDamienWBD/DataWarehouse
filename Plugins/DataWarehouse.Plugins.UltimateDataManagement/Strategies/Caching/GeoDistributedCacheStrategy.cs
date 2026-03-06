@@ -109,7 +109,7 @@ public sealed class GeoDistributedCacheConfig
     /// <summary>
     /// Default TTL for cached entries.
     /// </summary>
-    public TimeSpan DefaultTTL { get; init; } = TimeSpan.FromMinutes(30);
+    public TimeSpan DefaultTtl { get; init; } = TimeSpan.FromMinutes(30);
 
     /// <summary>
     /// Whether to replicate writes to all regions.
@@ -625,7 +625,7 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
     private static double CalculateDistance(double lat1, double lon1, double lat2, double lon2)
     {
         // Haversine formula for great-circle distance
-        const double R = 6371; // Earth's radius in km
+        const double r = 6371; // Earth's radius in km
 
         var dLat = ToRadians(lat2 - lat1);
         var dLon = ToRadians(lon2 - lon1);
@@ -636,7 +636,7 @@ public sealed class GeoDistributedCacheStrategy : CachingStrategyBase
 
         var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
 
-        return R * c;
+        return r * c;
     }
 
     private static double ToRadians(double degrees) => degrees * Math.PI / 180;

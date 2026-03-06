@@ -53,7 +53,7 @@ public sealed partial class FullTextIndexStrategy : IndexingStrategyBase
     {
         "a", "an", "and", "are", "as", "at", "be", "by", "for", "from",
         "has", "he", "in", "is", "it", "its", "of", "on", "that", "the",
-        "to", "was", "were", "will", "with", "the", "this", "but", "they",
+        "to", "was", "were", "will", "with", "this", "but", "they",
         "have", "had", "what", "when", "where", "who", "which", "why", "how"
     };
 

@@ -276,7 +276,7 @@ public sealed class DataPurgingStrategy : LifecycleStrategyBase
     private readonly SemaphoreSlim _purgeLock = new(2, 2); // Limit concurrent purges
     // Local key registry for crypto-shred: key ID -> key material handle.
     // Production deployments integrate with T94 KMS for full key lifecycle management.
-    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> EncryptionKeyRegistry = new();
+    private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]> _encryptionKeyRegistry = new();
     private long _totalPurged;
     private long _totalBytesPurged;
 
@@ -672,7 +672,7 @@ public sealed class DataPurgingStrategy : LifecycleStrategyBase
         // Check classification-based retention
         switch (data.Classification)
         {
-            case ClassificationLabel.PII:
+            case ClassificationLabel.Pii:
                 regulations.Add("GDPR");
                 regulations.Add("CCPA");
                 if (data.Age < TimeSpan.FromDays(365))
@@ -681,7 +681,7 @@ public sealed class DataPurgingStrategy : LifecycleStrategyBase
                 }
                 break;
 
-            case ClassificationLabel.PHI:
+            case ClassificationLabel.Phi:
                 regulations.Add("HIPAA");
                 if (data.Age < TimeSpan.FromDays(365 * 6)) // HIPAA 6-year retention
                 {
@@ -689,7 +689,7 @@ public sealed class DataPurgingStrategy : LifecycleStrategyBase
                 }
                 break;
 
-            case ClassificationLabel.PCI:
+            case ClassificationLabel.Pci:
                 regulations.Add("PCI-DSS");
                 break;
         }
@@ -884,7 +884,7 @@ public sealed class DataPurgingStrategy : LifecycleStrategyBase
         // In a production deployment this must also call the external KMS (T94) to revoke
         // the key material.  The local removal here provides the in-process guarantee so
         // any cached references to the key are cleaned up immediately.
-        EncryptionKeyRegistry.TryRemove(keyId, out _);
+        _encryptionKeyRegistry.TryRemove(keyId, out _);
         return Task.CompletedTask;
     }
 

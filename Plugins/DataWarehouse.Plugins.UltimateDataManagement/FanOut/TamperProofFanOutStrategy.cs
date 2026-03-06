@@ -42,14 +42,14 @@ public sealed class TamperProofFanOutStrategy : FanOutStrategyBase
     // so PreviousHash correctly links each block to the prior one instead of always "genesis".
     private string _lastAnchorHash = "genesis";
 
-    private static readonly HashSet<WriteDestinationType> _enabledDestinations = new()
+    private static readonly HashSet<WriteDestinationType> EnabledDestinationsSet = new()
     {
         WriteDestinationType.PrimaryStorage,
         WriteDestinationType.MetadataStorage,
         WriteDestinationType.DocumentStore   // For blockchain and WORM
     };
 
-    private static readonly HashSet<WriteDestinationType> _requiredDestinations = new()
+    private static readonly HashSet<WriteDestinationType> RequiredDestinationsSet = new()
     {
         WriteDestinationType.PrimaryStorage,
         WriteDestinationType.MetadataStorage,
@@ -75,10 +75,10 @@ public sealed class TamperProofFanOutStrategy : FanOutStrategyBase
     public override bool AllowChildOverride => false;
 
     /// <inheritdoc/>
-    public override IReadOnlySet<WriteDestinationType> EnabledDestinations => _enabledDestinations;
+    public override IReadOnlySet<WriteDestinationType> EnabledDestinations => EnabledDestinationsSet;
 
     /// <inheritdoc/>
-    public override IReadOnlySet<WriteDestinationType> RequiredDestinations => _requiredDestinations;
+    public override IReadOnlySet<WriteDestinationType> RequiredDestinations => RequiredDestinationsSet;
 
     /// <summary>
     /// Initializes a new TamperProofFanOutStrategy.

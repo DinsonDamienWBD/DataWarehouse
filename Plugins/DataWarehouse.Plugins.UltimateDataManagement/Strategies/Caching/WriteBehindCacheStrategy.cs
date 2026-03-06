@@ -37,7 +37,7 @@ public sealed class WriteBehindConfig
     /// <summary>
     /// Default TTL for cache entries.
     /// </summary>
-    public TimeSpan DefaultTTL { get; init; } = TimeSpan.FromMinutes(15);
+    public TimeSpan DefaultTtl { get; init; } = TimeSpan.FromMinutes(15);
 
     /// <summary>
     /// Maximum queue size for pending writes.
@@ -211,9 +211,9 @@ public sealed class WriteBehindCacheStrategy : CachingStrategyBase
         if (data != null)
         {
             // Populate cache
-            var options = new CacheOptions { TTL = _config.DefaultTTL };
+            var options = new CacheOptions { TTL = _config.DefaultTtl };
             await _cache.SetAsync(key, data, options, ct);
-            return CacheResult<byte[]>.Hit(data, _config.DefaultTTL);
+            return CacheResult<byte[]>.Hit(data, _config.DefaultTtl);
         }
 
         return CacheResult<byte[]>.Miss();
@@ -225,7 +225,7 @@ public sealed class WriteBehindCacheStrategy : CachingStrategyBase
         // Write to cache immediately
         var cacheOptions = new CacheOptions
         {
-            TTL = options.TTL ?? _config.DefaultTTL,
+            TTL = options.TTL ?? _config.DefaultTtl,
             SlidingExpiration = options.SlidingExpiration,
             Priority = options.Priority,
             Tags = options.Tags

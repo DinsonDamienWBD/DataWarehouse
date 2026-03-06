@@ -109,7 +109,7 @@ public sealed class ComplianceAnalysis
     /// <summary>
     /// Types of PII detected.
     /// </summary>
-    public IReadOnlyList<string> PIITypes { get; init; } = Array.Empty<string>();
+    public IReadOnlyList<string> PiiTypes { get; init; } = Array.Empty<string>();
 
     /// <summary>
     /// Required retention period.
@@ -518,7 +518,7 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
             SensitivityLevel = sensitivity,
             ApplicableFrameworks = frameworks,
             ContainsPii = containsPii,
-            PIITypes = piiTypes,
+            PiiTypes = piiTypes,
             RequiredRetention = policy?.MinRetention,
             DisposalMethod = policy?.DisposalMethod ?? "standard",
             RequiredControls = GetRequiredControls(sensitivity, frameworks),
@@ -578,7 +578,7 @@ public sealed class ComplianceAwareLifecycleStrategy : AiEnhancedStrategyBase
             SensitivityLevel = sensitivity,
             ApplicableFrameworks = frameworks,
             ContainsPii = containsPii,
-            PIITypes = piiTypes,
+            PiiTypes = piiTypes,
             RequiredRetention = GetDefaultRetention(frameworks),
             DisposalMethod = containsPii ? "secure-delete" : "standard",
             RequiredControls = GetRequiredControls(sensitivity, frameworks),

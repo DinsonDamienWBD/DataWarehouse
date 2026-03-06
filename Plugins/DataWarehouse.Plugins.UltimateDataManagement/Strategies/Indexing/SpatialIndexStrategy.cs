@@ -107,7 +107,7 @@ public sealed class SpatialIndexStrategy : IndexingStrategyBase
         /// <returns>Distance in kilometers.</returns>
         public double HaversineDistanceTo(Point2D other)
         {
-            const double R = 6371.0; // Earth radius in km
+            const double r = 6371.0; // Earth radius in km
             var lat1 = Y * Math.PI / 180.0;
             var lat2 = other.Y * Math.PI / 180.0;
             var dLat = (other.Y - Y) * Math.PI / 180.0;
@@ -118,7 +118,7 @@ public sealed class SpatialIndexStrategy : IndexingStrategyBase
                     Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
             var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
 
-            return R * c;
+            return r * c;
         }
 
         /// <inheritdoc/>

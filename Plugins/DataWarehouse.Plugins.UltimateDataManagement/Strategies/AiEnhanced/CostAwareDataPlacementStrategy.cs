@@ -37,7 +37,7 @@ public sealed class StoragePricing
     /// <summary>
     /// Data retrieval cost per GB.
     /// </summary>
-    public decimal RetrievalCostPerGB { get; init; }
+    public decimal RetrievalCostPerGb { get; init; }
 
     /// <summary>
     /// Minimum storage duration in days.
@@ -47,7 +47,7 @@ public sealed class StoragePricing
     /// <summary>
     /// Early deletion penalty per GB.
     /// </summary>
-    public decimal EarlyDeletionCostPerGB { get; init; }
+    public decimal EarlyDeletionCostPerGb { get; init; }
 
     /// <summary>
     /// Typical access latency in milliseconds.
@@ -405,7 +405,7 @@ public sealed class CostAwareDataPlacementStrategy : AiEnhancedStrategyBase
         {
             ["objectId"] = objectId,
             ["currentTier"] = metrics.Tier,
-            ["sizeGB"] = metrics.SizeBytes / (1024.0 * 1024 * 1024),
+            ["sizeGb"] = metrics.SizeBytes / (1024.0 * 1024 * 1024),
             ["dailyReadOps"] = dailyReads,
             ["dailyWriteOps"] = dailyWrites,
             ["trackedDays"] = daysSinceTracking,
@@ -502,8 +502,8 @@ public sealed class CostAwareDataPlacementStrategy : AiEnhancedStrategyBase
 
     private static decimal CalculateMonthlyCost(long sizeBytes, long monthlyReadOps, long monthlyWriteOps, StoragePricing tier, TimeSpan duration)
     {
-        var sizeGB = sizeBytes / (1024m * 1024 * 1024);
-        var storageCost = sizeGB * tier.StorageCostPerGbMonth;
+        var sizeGb = sizeBytes / (1024m * 1024 * 1024);
+        var storageCost = sizeGb * tier.StorageCostPerGbMonth;
         var readCost = (monthlyReadOps / 10000m) * tier.ReadCostPer10K;
         var writeCost = (monthlyWriteOps / 10000m) * tier.WriteCostPer10K;
 
@@ -512,10 +512,10 @@ public sealed class CostAwareDataPlacementStrategy : AiEnhancedStrategyBase
 
     private static decimal CalculateMigrationCost(long sizeBytes, StoragePricing? from, StoragePricing to)
     {
-        var sizeGB = sizeBytes / (1024m * 1024 * 1024);
+        var sizeGb = sizeBytes / (1024m * 1024 * 1024);
 
         // Retrieval cost from source
-        var retrievalCost = from != null ? sizeGB * from.RetrievalCostPerGB : 0;
+        var retrievalCost = from != null ? sizeGb * from.RetrievalCostPerGb : 0;
 
         // Write cost to destination
         var writeCost = to.WriteCostPer10K / 10000m; // Assuming 1 write operation per object
@@ -532,9 +532,9 @@ public sealed class CostAwareDataPlacementStrategy : AiEnhancedStrategyBase
             StorageCostPerGbMonth = 0.023m,
             ReadCostPer10K = 0.004m,
             WriteCostPer10K = 0.005m,
-            RetrievalCostPerGB = 0m,
+            RetrievalCostPerGb = 0m,
             MinStorageDays = 0,
-            EarlyDeletionCostPerGB = 0m,
+            EarlyDeletionCostPerGb = 0m,
             TypicalLatencyMs = 1
         });
 
@@ -545,9 +545,9 @@ public sealed class CostAwareDataPlacementStrategy : AiEnhancedStrategyBase
             StorageCostPerGbMonth = 0.01m,
             ReadCostPer10K = 0.01m,
             WriteCostPer10K = 0.01m,
-            RetrievalCostPerGB = 0.01m,
+            RetrievalCostPerGb = 0.01m,
             MinStorageDays = 30,
-            EarlyDeletionCostPerGB = 0.01m,
+            EarlyDeletionCostPerGb = 0.01m,
             TypicalLatencyMs = 10
         });
 
@@ -558,9 +558,9 @@ public sealed class CostAwareDataPlacementStrategy : AiEnhancedStrategyBase
             StorageCostPerGbMonth = 0.002m,
             ReadCostPer10K = 0.10m,
             WriteCostPer10K = 0.10m,
-            RetrievalCostPerGB = 0.02m,
+            RetrievalCostPerGb = 0.02m,
             MinStorageDays = 180,
-            EarlyDeletionCostPerGB = 0.02m,
+            EarlyDeletionCostPerGb = 0.02m,
             TypicalLatencyMs = 3600000 // Hours for archive retrieval
         });
     }
