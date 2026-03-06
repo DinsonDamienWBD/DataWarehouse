@@ -3,7 +3,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.CDP
     /// <summary>
     /// Journal-based continuous data protection using write-ahead log capture.
     /// </summary>
-    public sealed class JournalCDPStrategy : DataProtectionStrategyBase
+    public sealed class JournalCdpStrategy : DataProtectionStrategyBase
     {
         /// <inheritdoc/>
         public override string StrategyId => "journal-cdp";
@@ -73,7 +73,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.CDP
     /// <summary>
     /// Real-time replication-based continuous data protection.
     /// </summary>
-    public sealed class ReplicationCDPStrategy : DataProtectionStrategyBase
+    public sealed class ReplicationCdpStrategy : DataProtectionStrategyBase
     {
         /// <inheritdoc/>
         public override string StrategyId => "replication-cdp";
@@ -142,7 +142,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.CDP
     /// <summary>
     /// High-frequency snapshot-based continuous data protection.
     /// </summary>
-    public sealed class SnapshotCDPStrategy : DataProtectionStrategyBase
+    public sealed class SnapshotCdpStrategy : DataProtectionStrategyBase
     {
         /// <inheritdoc/>
         public override string StrategyId => "snapshot-cdp";
@@ -212,7 +212,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.CDP
     /// <summary>
     /// Hybrid CDP combining journal and periodic snapshots.
     /// </summary>
-    public sealed class HybridCDPStrategy : DataProtectionStrategyBase
+    public sealed class HybridCdpStrategy : DataProtectionStrategyBase
     {
         /// <inheritdoc/>
         public override string StrategyId => "hybrid-cdp";

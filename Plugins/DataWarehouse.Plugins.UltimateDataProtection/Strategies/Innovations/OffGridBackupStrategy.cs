@@ -92,7 +92,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         public long TotalCapacityBytes { get; set; } = 4L * 1024 * 1024 * 1024 * 1024; // 4 TB default
 
         /// <summary>Gets or sets the storage type.</summary>
-        public StorageType Type { get; set; } = StorageType.SSD;
+        public StorageType Type { get; set; } = StorageType.Ssd;
 
         /// <summary>Gets or sets whether RAID is enabled.</summary>
         public bool RaidEnabled { get; set; } = true;
@@ -113,13 +113,13 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
     public enum StorageType
     {
         /// <summary>Solid-state drive.</summary>
-        SSD,
+        Ssd,
 
         /// <summary>Hard disk drive.</summary>
-        HDD,
+        Hdd,
 
         /// <summary>NVMe drive.</summary>
-        NVMe,
+        NvMe,
 
         /// <summary>Hybrid drive.</summary>
         Hybrid

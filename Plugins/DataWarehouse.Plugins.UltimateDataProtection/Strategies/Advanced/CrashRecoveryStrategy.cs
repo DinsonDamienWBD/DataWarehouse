@@ -432,7 +432,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
 
                 // Check 4: WAL integrity
                 checks.Add("WALIntegrity");
-                var walValid = await VerifyWALIntegrityAsync(log.TransactionId, ct);
+                var walValid = await VerifyWalIntegrityAsync(log.TransactionId, ct);
                 if (!walValid)
                 {
                     issues.Add(new ValidationIssue
@@ -704,7 +704,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Advanced
             return Task.CompletedTask;
         }
 
-        private Task<bool> VerifyWALIntegrityAsync(string transactionId, CancellationToken ct)
+        private Task<bool> VerifyWalIntegrityAsync(string transactionId, CancellationToken ct)
         {
             // In production, verify WAL checksums
             return Task.FromResult(true);

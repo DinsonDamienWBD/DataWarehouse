@@ -715,7 +715,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         private double CalculateDistance(GeoLocation origin, GeoLocation destination)
         {
             // Haversine formula for great-circle distance
-            const double R = 6371; // Earth's radius in km
+            const double r = 6371; // Earth's radius in km
 
             var lat1 = origin.Latitude * Math.PI / 180;
             var lat2 = destination.Latitude * Math.PI / 180;
@@ -728,7 +728,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
             var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
 
-            return R * c;
+            return r * c;
         }
 
         #endregion

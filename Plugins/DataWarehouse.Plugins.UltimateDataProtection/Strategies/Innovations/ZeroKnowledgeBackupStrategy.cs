@@ -649,7 +649,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 encryptedChunks.Add(new EncryptedChunk
                 {
                     FilePath = file.Path,
-                    IV = iv,
+                    Iv = iv,
                     CiphertextHash = ComputeHash(encryptedContent),
                     Size = encryptedContent.Length
                 });
@@ -821,7 +821,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             // Store in in-memory encrypted store. Production deployments upload to cloud via MessageBus.
             // Combine per-chunk IV + CiphertextHash as a storage marker (actual ciphertext is on disk).
             var combined = encryptedData.Chunks
-                .SelectMany(c => c.IV.Concat(c.CiphertextHash))
+                .SelectMany(c => c.Iv.Concat(c.CiphertextHash))
                 .ToArray();
             _encryptedStore[backupId] = combined;
             return Task.FromResult(encryptedData.TotalEncryptedSize);
@@ -991,7 +991,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         private class EncryptedChunk
         {
             public string FilePath { get; set; } = string.Empty;
-            public byte[] IV { get; set; } = Array.Empty<byte>();
+            public byte[] Iv { get; set; } = Array.Empty<byte>();
             public byte[] CiphertextHash { get; set; } = Array.Empty<byte>();
             public long Size { get; set; }
         }

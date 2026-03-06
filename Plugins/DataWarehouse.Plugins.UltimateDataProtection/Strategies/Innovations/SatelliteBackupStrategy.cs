@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         Telesat,
 
         /// <summary>SES O3b mPOWER constellation.</summary>
-        SES_O3b,
+        SesO3B,
 
         /// <summary>Custom or other provider.</summary>
         Custom

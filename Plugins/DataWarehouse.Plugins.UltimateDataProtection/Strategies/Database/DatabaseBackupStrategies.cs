@@ -93,7 +93,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Database
     /// <summary>
     /// Oracle RMAN backup strategy.
     /// </summary>
-    public sealed class OracleRMANBackupStrategy : DataProtectionStrategyBase
+    public sealed class OracleRmanBackupStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "oracle-rman-backup";
         public override string StrategyName => "Oracle RMAN Backup";
@@ -124,7 +124,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Database
     /// <summary>
     /// MongoDB backup strategy using mongodump and oplog.
     /// </summary>
-    public sealed class MongoDBBackupStrategy : DataProtectionStrategyBase
+    public sealed class MongoDbBackupStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "mongodb-backup";
         public override string StrategyName => "MongoDB Backup";

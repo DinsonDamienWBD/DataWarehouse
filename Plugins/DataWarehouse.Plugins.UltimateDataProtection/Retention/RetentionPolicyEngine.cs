@@ -96,8 +96,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Retention
                     ApplySimpleRetention(policy, allBackups, toKeep);
                     break;
 
-                case RetentionType.GFS:
-                    ApplyGFSRetention(policy, allBackups, toKeep);
+                case RetentionType.Gfs:
+                    ApplyGfsRetention(policy, allBackups, toKeep);
                     break;
 
                 case RetentionType.TimeBased:
@@ -193,7 +193,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Retention
             }
         }
 
-        private static void ApplyGFSRetention(RetentionPolicy policy, List<BackupCatalogEntry> backups, HashSet<string> toKeep)
+        private static void ApplyGfsRetention(RetentionPolicy policy, List<BackupCatalogEntry> backups, HashSet<string> toKeep)
         {
             var now = DateTimeOffset.UtcNow;
 
@@ -349,7 +349,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Retention
         Simple,
 
         /// <summary>Grandfather-Father-Son rotation.</summary>
-        GFS,
+        Gfs,
 
         /// <summary>Keep backups within a time window.</summary>
         TimeBased,

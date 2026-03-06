@@ -175,15 +175,15 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Versioning.Policies
 
             // If no previous size, use absolute change size
             // Logarithmic scale for absolute sizes
-            var sizeInKB = context.ChangeSize / 1024.0;
-            if (sizeInKB < 1)
+            var sizeInKb = context.ChangeSize / 1024.0;
+            if (sizeInKb < 1)
                 return 0.1; // < 1 KB
-            else if (sizeInKB < 100)
-                return 0.2 + (Math.Log10(sizeInKB) / 2.0) * 0.3; // 1-100 KB -> 0.2-0.5
-            else if (sizeInKB < 10_000)
-                return 0.5 + (Math.Log10(sizeInKB / 100.0) / 2.0) * 0.3; // 100 KB - 10 MB -> 0.5-0.8
+            else if (sizeInKb < 100)
+                return 0.2 + (Math.Log10(sizeInKb) / 2.0) * 0.3; // 1-100 KB -> 0.2-0.5
+            else if (sizeInKb < 10_000)
+                return 0.5 + (Math.Log10(sizeInKb / 100.0) / 2.0) * 0.3; // 100 KB - 10 MB -> 0.5-0.8
             else
-                return 0.8 + Math.Min((Math.Log10(sizeInKB / 10_000.0) / 2.0) * 0.2, 0.2); // 10+ MB -> 0.8-1.0
+                return 0.8 + Math.Min((Math.Log10(sizeInKb / 10_000.0) / 2.0) * 0.2, 0.2); // 10+ MB -> 0.8-1.0
         }
 
         /// <inheritdoc/>

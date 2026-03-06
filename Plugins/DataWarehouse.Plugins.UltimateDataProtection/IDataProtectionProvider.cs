@@ -24,7 +24,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection
         Intelligence = 8,
 
         /// <summary>Supports continuous data protection.</summary>
-        CDP = 16,
+        Cdp = 16,
 
         /// <summary>Supports disaster recovery orchestration.</summary>
         DisasterRecovery = 32,

@@ -47,7 +47,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
             {
                 try
                 {
-                    var aiRecommendation = await GetAIStrategyRecommendationAsync(context, ct);
+                    var aiRecommendation = await GetAiStrategyRecommendationAsync(context, ct);
                     if (aiRecommendation != null)
                     {
                         return aiRecommendation;
@@ -299,7 +299,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Subsystems
         /// <summary>
         /// Gets AI-powered strategy recommendation via message bus.
         /// </summary>
-        private async Task<StrategyRecommendation?> GetAIStrategyRecommendationAsync(
+        private async Task<StrategyRecommendation?> GetAiStrategyRecommendationAsync(
             Dictionary<string, object> context,
             CancellationToken ct)
         {

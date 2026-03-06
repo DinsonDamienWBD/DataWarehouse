@@ -63,7 +63,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Snapshot
     /// <summary>
     /// Windows VSS (Volume Shadow Copy Service) snapshot strategy.
     /// </summary>
-    public sealed class VSSSnapshotStrategy : DataProtectionStrategyBase
+    public sealed class VssSnapshotStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "vss-snapshot";
         public override bool IsProductionReady => false;
@@ -93,7 +93,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Snapshot
     /// <summary>
     /// Linux LVM snapshot strategy.
     /// </summary>
-    public sealed class LVMSnapshotStrategy : DataProtectionStrategyBase
+    public sealed class LvmSnapshotStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "lvm-snapshot";
         public override bool IsProductionReady => false;
@@ -123,7 +123,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Snapshot
     /// <summary>
     /// ZFS snapshot strategy with send/receive support.
     /// </summary>
-    public sealed class ZFSSnapshotStrategy : DataProtectionStrategyBase
+    public sealed class ZfsSnapshotStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "zfs-snapshot";
         public override bool IsProductionReady => false;

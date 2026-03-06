@@ -103,7 +103,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 });
 
                 var qkdAvailable = IsQkdHardwareAvailable();
-                var keyExchangeMethod = qkdAvailable ? KeyExchangeMethod.QKD : KeyExchangeMethod.PostQuantum;
+                var keyExchangeMethod = qkdAvailable ? KeyExchangeMethod.Qkd : KeyExchangeMethod.PostQuantum;
 
                 var backup = new QkdBackup
                 {
@@ -147,10 +147,10 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                     });
 
                     var channelQuality = await VerifyQuantumChannelAsync(session, ct);
-                    backup.QuantumBitErrorRate = channelQuality.QBER;
+                    backup.QuantumBitErrorRate = channelQuality.Qber;
                     backup.KeyRate = channelQuality.KeyRate;
 
-                    if (channelQuality.QBER > 0.11) // BB84 security threshold
+                    if (channelQuality.Qber > 0.11) // Bb84 security threshold
                     {
                         return new BackupResult
                         {
@@ -158,7 +158,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                             BackupId = backupId,
                             StartTime = startTime,
                             EndTime = DateTimeOffset.UtcNow,
-                            ErrorMessage = $"Quantum channel compromised: QBER {channelQuality.QBER:P2} exceeds security threshold"
+                            ErrorMessage = $"Quantum channel compromised: Qber {channelQuality.Qber:P2} exceeds security threshold"
                         };
                     }
                 }
@@ -309,7 +309,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
                 if (qkdAvailable)
                 {
-                    warnings.Add($"QBER: {backup.QuantumBitErrorRate:P2}");
+                    warnings.Add($"Qber: {backup.QuantumBitErrorRate:P2}");
                     warnings.Add($"Key Rate: {backup.KeyRate} kbps");
                 }
                 else
@@ -389,7 +389,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 if (!_quantumKeys.TryGetValue(backup.KeyId, out var encryptionKey))
                 {
                     // Try to regenerate key via QKD or PQC
-                    if (backup.KeyExchangeMethod == KeyExchangeMethod.QKD && IsQkdHardwareAvailable())
+                    if (backup.KeyExchangeMethod == KeyExchangeMethod.Qkd && IsQkdHardwareAvailable())
                     {
                         var session = await EstablishQkdSessionAsync(
                             new BackupRequest { Options = request.Options },
@@ -602,7 +602,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
                 // Check 3: QKD/PQC availability for key regeneration
                 checks.Add("KeyRegenerationCapability");
-                if (backup.KeyExchangeMethod == KeyExchangeMethod.QKD && !IsQkdHardwareAvailable())
+                if (backup.KeyExchangeMethod == KeyExchangeMethod.Qkd && !IsQkdHardwareAvailable())
                 {
                     issues.Add(new ValidationIssue
                     {
@@ -614,15 +614,15 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
                 // Check 4: Quantum channel quality (if applicable)
                 checks.Add("QuantumChannelQuality");
-                if (backup.KeyExchangeMethod == KeyExchangeMethod.QKD)
+                if (backup.KeyExchangeMethod == KeyExchangeMethod.Qkd)
                 {
                     if (backup.QuantumBitErrorRate > 0.05)
                     {
                         issues.Add(new ValidationIssue
                         {
                             Severity = ValidationSeverity.Warning,
-                            Code = "HIGH_QBER",
-                            Message = $"High QBER at backup time: {backup.QuantumBitErrorRate:P2}"
+                            Code = "HIGH_Qber",
+                            Message = $"High Qber at backup time: {backup.QuantumBitErrorRate:P2}"
                         });
                     }
 
@@ -795,7 +795,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             // Simulated channel quality
             return new ChannelQuality
             {
-                QBER = 0.02, // 2% quantum bit error rate
+                Qber = 0.02, // 2% quantum bit error rate
                 KeyRate = 10.5, // 10.5 kbps
                 ChannelLoss = 3.2 // dB
             };
@@ -1188,7 +1188,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         public class ChannelQuality
         {
             /// <summary>Quantum Bit Error Rate.</summary>
-            public double QBER { get; set; }
+            public double Qber { get; set; }
 
             /// <summary>Key generation rate in kbps.</summary>
             public double KeyRate { get; set; }
@@ -1216,7 +1216,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         public enum KeyExchangeMethod
         {
             /// <summary>Quantum Key Distribution.</summary>
-            QKD,
+            Qkd,
 
             /// <summary>Post-Quantum Cryptography.</summary>
             PostQuantum
@@ -1227,7 +1227,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         /// </summary>
         public enum QkdProtocol
         {
-            /// <summary>BB84 protocol.</summary>
+            /// <summary>Bb84 protocol.</summary>
             Bb84,
 
             /// <summary>E91 protocol (entanglement-based).</summary>
@@ -1236,14 +1236,14 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             /// <summary>B92 protocol.</summary>
             B92,
 
-            /// <summary>SARG04 protocol.</summary>
-            SARG04,
+            /// <summary>Sarg04 protocol.</summary>
+            Sarg04,
 
             /// <summary>Decoy-state BB84.</summary>
-            DecoyBB84,
+            DecoyBb84,
 
             /// <summary>Continuous-variable QKD.</summary>
-            CVQKD
+            Cvqkd
         }
 
         /// <summary>

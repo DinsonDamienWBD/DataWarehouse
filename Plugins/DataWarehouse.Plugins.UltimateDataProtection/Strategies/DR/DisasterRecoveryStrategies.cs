@@ -3,7 +3,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.DR
     /// <summary>
     /// Active-Passive disaster recovery with primary/secondary failover.
     /// </summary>
-    public sealed class ActivePassiveDRStrategy : DataProtectionStrategyBase
+    public sealed class ActivePassiveDrStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "active-passive-dr";
         public override string StrategyName => "Active-Passive DR";
@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.DR
     /// <summary>
     /// Active-Active disaster recovery with multi-site active operations.
     /// </summary>
-    public sealed class ActiveActiveDRStrategy : DataProtectionStrategyBase
+    public sealed class ActiveActiveDrStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "active-active-dr";
         public override string StrategyName => "Active-Active DR";
@@ -63,7 +63,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.DR
     /// <summary>
     /// Pilot Light DR with minimal standby infrastructure.
     /// </summary>
-    public sealed class PilotLightDRStrategy : DataProtectionStrategyBase
+    public sealed class PilotLightDrStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "pilot-light-dr";
         public override string StrategyName => "Pilot Light DR";
@@ -93,7 +93,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.DR
     /// <summary>
     /// Warm Standby DR with ready-to-run secondary site.
     /// </summary>
-    public sealed class WarmStandbyDRStrategy : DataProtectionStrategyBase
+    public sealed class WarmStandbyDrStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "warm-standby-dr";
         public override string StrategyName => "Warm Standby DR";
@@ -123,7 +123,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.DR
     /// <summary>
     /// Cross-Region DR with geographic redundancy.
     /// </summary>
-    public sealed class CrossRegionDRStrategy : DataProtectionStrategyBase
+    public sealed class CrossRegionDrStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "cross-region-dr";
         public override string StrategyName => "Cross-Region DR";

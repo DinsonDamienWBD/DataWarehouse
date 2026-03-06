@@ -558,7 +558,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Configuration
         public bool EnableRecommendations { get; init; } = true;
 
         /// <summary>Message bus topic for AI provider communication.</summary>
-        public string AIProviderTopic { get; init; } = "ai.intelligence.request";
+        public string AiProviderTopic { get; init; } = "ai.intelligence.request";
 
         /// <summary>Anomaly detection threshold (0.0 - 1.0).</summary>
         public double AnomalyThreshold { get; init; } = 0.75;
@@ -597,7 +597,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Configuration
         public TimeSpan ModelUpdateInterval { get; init; } = TimeSpan.FromHours(24);
 
         /// <summary>Maximum AI request timeout.</summary>
-        public TimeSpan AIRequestTimeout { get; init; } = TimeSpan.FromSeconds(30);
+        public TimeSpan AiRequestTimeout { get; init; } = TimeSpan.FromSeconds(30);
 
         /// <summary>Enable telemetry collection for model improvement.</summary>
         public bool EnableTelemetry { get; init; } = true;
@@ -610,8 +610,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Configuration
         {
             var errors = new List<string>();
 
-            if (string.IsNullOrWhiteSpace(AIProviderTopic))
-                errors.Add("AIProviderTopic cannot be empty");
+            if (string.IsNullOrWhiteSpace(AiProviderTopic))
+                errors.Add("AiProviderTopic cannot be empty");
 
             if (AnomalyThreshold < 0.0 || AnomalyThreshold > 1.0)
                 errors.Add("AnomalyThreshold must be between 0.0 and 1.0");
@@ -634,8 +634,8 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Configuration
             if (ModelUpdateInterval < TimeSpan.Zero)
                 errors.Add("ModelUpdateInterval cannot be negative");
 
-            if (AIRequestTimeout < TimeSpan.Zero)
-                errors.Add("AIRequestTimeout cannot be negative");
+            if (AiRequestTimeout < TimeSpan.Zero)
+                errors.Add("AiRequestTimeout cannot be negative");
 
             return errors;
         }
@@ -665,9 +665,9 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Configuration
         public TimeSpan KeyRotationInterval { get; init; } = TimeSpan.FromDays(90);
 
         /// <summary>Use hardware security module (HSM) if available.</summary>
-        public bool UseHSM { get; init; } = false;
+        public bool UseHsm { get; init; } = false;
 
         /// <summary>HSM provider configuration.</summary>
-        public string? HSMProvider { get; init; }
+        public string? HsmProvider { get; init; }
     }
 }

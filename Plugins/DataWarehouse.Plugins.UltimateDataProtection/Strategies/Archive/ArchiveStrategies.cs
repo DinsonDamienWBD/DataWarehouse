@@ -61,7 +61,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Archive
     /// <summary>
     /// WORM (Write Once Read Many) immutable archive.
     /// </summary>
-    public sealed class WORMArchiveStrategy : DataProtectionStrategyBase
+    public sealed class WormArchiveStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "worm-archive";
         public override string StrategyName => "WORM Archive";

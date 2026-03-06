@@ -68,7 +68,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
         NetworkShare,
 
         /// <summary>iSCSI target.</summary>
-        iSCSI,
+        IScsi,
 
         /// <summary>Object storage (S3-compatible).</summary>
         ObjectStorage

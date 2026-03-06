@@ -63,7 +63,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Cloud
     /// <summary>
     /// Google Cloud Storage backup strategy.
     /// </summary>
-    public sealed class GCSBackupStrategy : DataProtectionStrategyBase
+    public sealed class GcsBackupStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "gcs-backup";
         public override string StrategyName => "Google Cloud Storage Backup";

@@ -747,7 +747,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
 
                 // Check 8: FIDO2 availability (if used)
                 checks.Add("Fido2Availability");
-                if (backup.EnrolledModalities.Contains(BiometricType.FIDO2) && !IsFido2Available())
+                if (backup.EnrolledModalities.Contains(BiometricType.Fido2) && !IsFido2Available())
                 {
                     issues.Add(new ValidationIssue
                     {
@@ -829,7 +829,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                 modalities.Add(BiometricType.Iris);
 
             if (request.Options.TryGetValue("RequireFIDO2", out var fido) && (bool)fido)
-                modalities.Add(BiometricType.FIDO2);
+                modalities.Add(BiometricType.Fido2);
 
             if (!modalities.Any())
                 modalities.Add(BiometricType.Fingerprint); // Default
@@ -851,7 +851,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             if (!IsBiometricHardwareAvailable() && !IsFido2Available())
             {
                 var requireHardware = requirements.RequiredModalities.Any(m =>
-                    m != BiometricType.FIDO2 || !IsFido2Available());
+                    m != BiometricType.Fido2 || !IsFido2Available());
 
                 if (requireHardware)
                 {
@@ -898,7 +898,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                         }
                         break;
 
-                    case BiometricType.FIDO2:
+                    case BiometricType.Fido2:
                         if (_fido2Provider != null && _fido2Provider.IsAvailable())
                         {
                             var registerResult = await _fido2Provider.RegisterAsync(enrollmentId, ct);
@@ -991,7 +991,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
                         }
                         break;
 
-                    case BiometricType.FIDO2:
+                    case BiometricType.Fido2:
                         if (_fido2Provider != null && _fido2Provider.IsAvailable())
                         {
                             var authResult = await _fido2Provider.AuthenticateAsync(
@@ -1605,7 +1605,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Innovations
             Iris,
 
             /// <summary>FIDO2/WebAuthn authentication.</summary>
-            FIDO2,
+            Fido2,
 
             /// <summary>Voice recognition.</summary>
             Voice,

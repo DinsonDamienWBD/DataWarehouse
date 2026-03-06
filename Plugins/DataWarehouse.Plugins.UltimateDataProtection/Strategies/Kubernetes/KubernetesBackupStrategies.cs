@@ -65,7 +65,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Kubernetes
     /// <summary>
     /// Persistent Volume Claim (PVC) backup strategy.
     /// </summary>
-    public sealed class PVCBackupStrategy : DataProtectionStrategyBase
+    public sealed class PvcBackupStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "pvc-backup";
         public override bool IsProductionReady => false;
@@ -127,7 +127,7 @@ namespace DataWarehouse.Plugins.UltimateDataProtection.Strategies.Kubernetes
     /// <summary>
     /// Custom Resource Definition (CRD) backup strategy.
     /// </summary>
-    public sealed class CRDBackupStrategy : DataProtectionStrategyBase
+    public sealed class CrdBackupStrategy : DataProtectionStrategyBase
     {
         public override string StrategyId => "crd-backup";
         public override bool IsProductionReady => false;
