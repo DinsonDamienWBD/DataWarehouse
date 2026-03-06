@@ -22,7 +22,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Blockchain
             try { using var r = await handle.GetConnection<HttpClient>().GetAsync("/node_info", ct); return r.IsSuccessStatusCode; }
             catch (OperationCanceledException) { throw; } catch { return false; }
         }
-        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>().Dispose(); return Task.CompletedTask; }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>().Dispose(); if (handle is DefaultConnectionHandle dh) dh.MarkDisconnected(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Blockchain
             sw.Stop();
             return new ConnectionHealth(isHealthy, isHealthy ? "Cosmos node reachable" : "Cosmos node unreachable", sw.Elapsed, DateTimeOffset.UtcNow);
         }
-        public override Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default) => throw new NotSupportedException("Requires Cosmos SDK");
-        public override Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default) => throw new NotSupportedException("Requires Cosmos SDK");
+        public override async Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default) { var client = handle.GetConnection<HttpClient>(); using var response = await client.GetAsync($"/blocks/{blockIdentifier}", ct); response.EnsureSuccessStatusCode(); return await response.Content.ReadAsStringAsync(ct); }
+        public override async Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default) { var client = handle.GetConnection<HttpClient>(); using var response = await client.PostAsync("/txs", new System.Net.Http.StringContent(signedTransaction, System.Text.Encoding.UTF8, "application/json"), ct); response.EnsureSuccessStatusCode(); return await response.Content.ReadAsStringAsync(ct); }
     }
 }

@@ -13,7 +13,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
     /// </summary>
     public class ApacheDruidConnectionStrategy : DatabaseConnectionStrategyBase
     {
-        private HttpClient? _httpClient;
+        private volatile HttpClient? _httpClient;
+        private readonly ILogger? _druidLogger;
 
         public override string StrategyId => "druid";
         public override string DisplayName => "Apache Druid";
@@ -33,7 +34,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
             SupportedAuthMethods: new[] { "basic", "kerberos" }
         );
 
-        public ApacheDruidConnectionStrategy(ILogger<ApacheDruidConnectionStrategy>? logger = null) : base(logger) { }
+        public ApacheDruidConnectionStrategy(ILogger<ApacheDruidConnectionStrategy>? logger = null) : base(logger) { _druidLogger = logger; }
 
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
@@ -70,7 +71,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 using var response = await _httpClient.GetAsync("/status", ct);
                 return response.IsSuccessStatusCode;
             }
-            catch { return false; /* Connection validation - failure acceptable */ }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex) { _druidLogger?.LogWarning(ex, "Druid health check failed"); return false; }
         }
 
         protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) {
@@ -102,8 +104,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 var results = System.Text.Json.JsonSerializer.Deserialize<List<Dictionary<string, object?>>>(json);
                 return results ?? new List<Dictionary<string, object?>>();
             }
-            catch
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
             {
+                _druidLogger?.LogWarning(ex, "Druid query execution failed");
                 return new List<Dictionary<string, object?>>();
             }
         }
@@ -140,8 +144,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SpecializedDb
                 }
                 return schemas;
             }
-            catch
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
             {
+                _druidLogger?.LogWarning(ex, "Druid schema discovery failed");
                 return new List<DataSchema>();
             }
         }

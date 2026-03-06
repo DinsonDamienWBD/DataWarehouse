@@ -162,9 +162,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Healthcare
             string modality = tags.TryGetValue(0x00080060, out var mod) ? mod : "UNKNOWN";
             string description = tags.TryGetValue(0x00081030, out var desc) ? desc : "";
             string sopInstanceUid = tags.TryGetValue(0x00080018, out var sop) ? sop : "UNKNOWN";
-            string rowsStr = tags.TryGetValue(0x00280010, out var rows_str) ? rows_str : "0";
-            string columnsStr = tags.TryGetValue(0x00280011, out var cols_str) ? cols_str : "0";
-            string bitsAllocatedStr = tags.TryGetValue(0x00280100, out var bits_str) ? bits_str : "0";
+            string rowsStr = tags.TryGetValue(0x00280010, out var rowsRaw) ? rowsRaw : "0";
+            string columnsStr = tags.TryGetValue(0x00280011, out var colsRaw) ? colsRaw : "0";
+            string bitsAllocatedStr = tags.TryGetValue(0x00280100, out var bitsRaw) ? bitsRaw : "0";
             string photometricInterpretation = tags.TryGetValue(0x00280004, out var photo) ? photo : "UNKNOWN";
 
             int rows = int.TryParse(rowsStr, out int r) ? r : 0;

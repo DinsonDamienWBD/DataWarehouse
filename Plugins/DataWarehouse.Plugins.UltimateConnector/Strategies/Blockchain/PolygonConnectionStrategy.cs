@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Blockchain
             try { using var r = await handle.GetConnection<HttpClient>().PostAsync("/", new StringContent(@"{""jsonrpc"":""2.0"",""method"":""eth_blockNumber"",""params"":[],""id"":1}", Encoding.UTF8, "application/json"), ct); return r.IsSuccessStatusCode; }
             catch (OperationCanceledException) { throw; } catch { return false; }
         }
-        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>().Dispose(); return Task.CompletedTask; }
+        protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct) { handle.GetConnection<HttpClient>().Dispose(); if (handle is DefaultConnectionHandle dh) dh.MarkDisconnected(); return Task.CompletedTask; }
         protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct)
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Blockchain
             sw.Stop();
             return new ConnectionHealth(isHealthy, isHealthy ? "Polygon node reachable" : "Polygon node unreachable", sw.Elapsed, DateTimeOffset.UtcNow);
         }
-        public override Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default) => throw new NotSupportedException("Requires Web3 library");
-        public override Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default) => throw new NotSupportedException("Requires Web3 library");
+        public override async Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default) { var client = handle.GetConnection<HttpClient>(); using var response = await client.PostAsync("/", new StringContent($@"{{""jsonrpc"":""2.0"",""method"":""eth_getBlockByNumber"",""params"":[""{blockIdentifier}"",true],""id"":1}}", Encoding.UTF8, "application/json"), ct); response.EnsureSuccessStatusCode(); return await response.Content.ReadAsStringAsync(ct); }
+        public override async Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default) { var client = handle.GetConnection<HttpClient>(); using var response = await client.PostAsync("/", new StringContent($@"{{""jsonrpc"":""2.0"",""method"":""eth_sendRawTransaction"",""params"":[""{signedTransaction}""],""id"":1}}", Encoding.UTF8, "application/json"), ct); response.EnsureSuccessStatusCode(); return await response.Content.ReadAsStringAsync(ct); }
     }
 }

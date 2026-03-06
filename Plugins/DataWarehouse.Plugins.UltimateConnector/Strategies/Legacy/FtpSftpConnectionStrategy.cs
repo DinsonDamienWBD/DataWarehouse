@@ -223,20 +223,22 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Legacy
                 request.EnableSsl = info.Protocol == "FTPS";
                 request.UseBinary = true;
 
-                var fileContent = await File.ReadAllBytesAsync(localPath, ct);
-                request.ContentLength = fileContent.Length;
-
-                // Finding 1991: FtpWebRequest.GetRequestStream() is synchronous with no async variant.
-                // Off-load to a thread-pool thread via Task.Run to avoid blocking the calling thread.
+                // Finding 89: Stream file content instead of loading entire file into memory (OOM for large files)
                 using var requestStream = await Task.Run(() => request.GetRequestStream(), ct);
-                await requestStream.WriteAsync(fileContent, ct);
+                long bytesTransferred;
+                await using (var fileStream = new FileStream(localPath, FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true))
+                {
+                    request.ContentLength = fileStream.Length;
+                    bytesTransferred = fileStream.Length;
+                    await fileStream.CopyToAsync(requestStream, 81920, ct);
+                }
 
                 using var response = (FtpWebResponse)await request.GetResponseAsync();
 
                 return new FtpTransferResult
                 {
                     Success = true,
-                    BytesTransferred = fileContent.Length,
+                    BytesTransferred = bytesTransferred,
                     RemotePath = remotePath,
                     LocalPath = localPath
                 };

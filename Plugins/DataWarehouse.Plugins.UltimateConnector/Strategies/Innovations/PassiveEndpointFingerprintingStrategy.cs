@@ -419,20 +419,20 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 if (values.Length < 3) return 0.0;
 
                 var n = values.Length;
-                double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+                double sumX = 0, sumY = 0, sumXy = 0, sumX2 = 0;
 
                 for (int i = 0; i < n; i++)
                 {
                     sumX += i;
                     sumY += values[i];
-                    sumXY += i * values[i];
+                    sumXy += i * values[i];
                     sumX2 += (double)i * i;
                 }
 
                 var denominator = n * sumX2 - sumX * sumX;
                 if (Math.Abs(denominator) < 1e-10) return 0.0;
 
-                return (n * sumXY - sumX * sumY) / denominator;
+                return (n * sumXy - sumX * sumY) / denominator;
             }
         }
 

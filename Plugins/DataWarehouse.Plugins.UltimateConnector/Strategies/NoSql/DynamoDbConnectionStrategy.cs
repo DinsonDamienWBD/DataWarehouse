@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -311,10 +312,10 @@ public sealed class DynamoDbConnectionStrategy : DatabaseConnectionStrategyBase
         return value switch
         {
             string s => new AttributeValue { S = s },
-            int i => new AttributeValue { N = i.ToString() },
-            long l => new AttributeValue { N = l.ToString() },
-            double d => new AttributeValue { N = d.ToString() },
-            decimal dec => new AttributeValue { N = dec.ToString() },
+            int i => new AttributeValue { N = i.ToString(CultureInfo.InvariantCulture) },
+            long l => new AttributeValue { N = l.ToString(CultureInfo.InvariantCulture) },
+            double d => new AttributeValue { N = d.ToString(CultureInfo.InvariantCulture) },
+            decimal dec => new AttributeValue { N = dec.ToString(CultureInfo.InvariantCulture) },
             bool b => new AttributeValue { BOOL = b },
             _ => new AttributeValue { S = value.ToString() }
         };
