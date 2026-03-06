@@ -2171,8 +2171,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
         {
             IncrementCounter("generative.compress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Generative");
@@ -2258,8 +2258,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
         {
             IncrementCounter("generative.decompress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Generative");
@@ -2289,7 +2289,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Generative
             {
                 // Read remaining data as hybrid compressed
                 var hybridData = new byte[input.Length - 6];
-                stream.Read(hybridData, 0, hybridData.Length);
+                stream.ReadExactly(hybridData, 0, hybridData.Length);
                 return _hybridCompressor.Decompress(hybridData);
             }
 

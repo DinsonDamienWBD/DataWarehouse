@@ -122,7 +122,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         {
             IncrementCounter("tar.archive");
 
-            if (input == null || input.Length == 0)
+            if (input.Length == 0)
                 return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
@@ -230,7 +230,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         {
             IncrementCounter("tar.extract");
 
-            if (input == null || input.Length == 0)
+            if (input.Length == 0)
                 return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)

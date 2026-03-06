@@ -126,8 +126,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
         {
             IncrementCounter("vcdiff.compress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for VCDIFF");
@@ -274,8 +274,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
         {
             IncrementCounter("vcdiff.decompress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for VCDIFF");

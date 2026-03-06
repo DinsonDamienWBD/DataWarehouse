@@ -111,8 +111,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
         {
             IncrementCounter("zling-rolz.compress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Zling-ROLZ");
@@ -141,14 +141,14 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
 
             // Context table: for each byte context, maintain the last 32 positions (only 32 are scanned).
             // Capping at 32 prevents unbounded growth on highly-repetitive input.
-            const int ContextBucketDepth = 32;
+            const int contextBucketDepth = 32;
             var contextTable = new Dictionary<byte, List<int>>();
             for (int i = 0; i < ContextSize; i++)
-                contextTable[(byte)i] = new List<int>(ContextBucketDepth);
+                contextTable[(byte)i] = new List<int>(contextBucketDepth);
 
             // MTF array for match offsets — fixed-size array avoids O(n) List<T> Insert/RemoveAt shifts.
-            const int MtfCapacity = 256;
-            var mtfArray = new int[MtfCapacity];
+            const int mtfCapacity = 256;
+            var mtfArray = new int[mtfCapacity];
             int mtfCount = 0;
 
             byte context = 0;
@@ -193,11 +193,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
 
                     if (mtfPos == -1)
                     {
-                        // New distance — shift array right by one (capped at MtfCapacity) and prepend.
-                        int insertCount = Math.Min(mtfCount, MtfCapacity - 1);
+                        // New distance — shift array right by one (capped at mtfCapacity) and prepend.
+                        int insertCount = Math.Min(mtfCount, mtfCapacity - 1);
                         Array.Copy(mtfArray, 0, mtfArray, 1, insertCount);
                         mtfArray[0] = distance;
-                        if (mtfCount < MtfCapacity) mtfCount++;
+                        if (mtfCount < mtfCapacity) mtfCount++;
 
                         // Encode as raw
                         output.WriteByte(255); // MTF escape
@@ -214,11 +214,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                     // Encode match length
                     output.WriteByte((byte)Math.Min(bestMatchLen, 255));
 
-                    // Update context table for matched region (bounded to ContextBucketDepth)
+                    // Update context table for matched region (bounded to contextBucketDepth)
                     for (int i = 0; i < bestMatchLen; i++)
                     {
                         var ctxBucket = contextTable[context];
-                        if (ctxBucket.Count >= ContextBucketDepth) ctxBucket.RemoveAt(0);
+                        if (ctxBucket.Count >= contextBucketDepth) ctxBucket.RemoveAt(0);
                         ctxBucket.Add(pos + i);
                         if (pos + i + 1 < input.Length)
                             context = input[pos + i];
@@ -233,7 +233,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                     output.WriteByte(currentByte);
 
                     var litCtxBucket = contextTable[context];
-                    if (litCtxBucket.Count >= ContextBucketDepth) litCtxBucket.RemoveAt(0);
+                    if (litCtxBucket.Count >= contextBucketDepth) litCtxBucket.RemoveAt(0);
                     litCtxBucket.Add(pos);
                     context = currentByte;
                     pos++;
@@ -293,8 +293,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
         {
             IncrementCounter("zling-rolz.decompress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Zling-ROLZ");
@@ -325,8 +325,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
             using var output = new MemoryStream(originalLength);
 
             // Fixed-size MTF array mirrors the compressor to avoid O(n) List<T> shifts.
-            const int DecompMtfCapacity = 256;
-            var decompMtfArray = new int[DecompMtfCapacity];
+            const int decompMtfCapacity = 256;
+            var decompMtfArray = new int[decompMtfCapacity];
             int decompMtfCount = 0;
 
             while (output.Length < originalLength && compressedStream.Position < compressedStream.Length)
@@ -349,10 +349,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Emerging
                     {
                         // Raw distance — shift array right and prepend.
                         distance = (int)ReadVarint(compressedStream);
-                        int insertCount = Math.Min(decompMtfCount, DecompMtfCapacity - 1);
+                        int insertCount = Math.Min(decompMtfCount, decompMtfCapacity - 1);
                         Array.Copy(decompMtfArray, 0, decompMtfArray, 1, insertCount);
                         decompMtfArray[0] = distance;
-                        if (decompMtfCount < DecompMtfCapacity) decompMtfCount++;
+                        if (decompMtfCount < decompMtfCapacity) decompMtfCount++;
                     }
                     else
                     {

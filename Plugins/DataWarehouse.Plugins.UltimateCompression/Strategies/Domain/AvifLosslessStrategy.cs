@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
         /// </summary>
         private enum PredictionMode : byte
         {
-            DC = 0,        // Average of neighbors
+            Dc = 0,        // Average of neighbors
             Horizontal = 1, // Predict from left
             Vertical = 2,   // Predict from top
             Diagonal = 3    // Predict from diagonal average
@@ -119,8 +119,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
         {
             IncrementCounter("avif-lossless.compress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for AVIF-Lossless");
@@ -202,8 +202,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
         private static PredictionMode ChoosePredictionMode(byte[,] grid, int startX, int startY, int blockWidth, int blockHeight)
         {
             // Simple heuristic: try each mode and pick the one with smallest residuals
-            var modes = new[] { PredictionMode.DC, PredictionMode.Horizontal, PredictionMode.Vertical, PredictionMode.Diagonal };
-            PredictionMode bestMode = PredictionMode.DC;
+            var modes = new[] { PredictionMode.Dc, PredictionMode.Horizontal, PredictionMode.Vertical, PredictionMode.Diagonal };
+            PredictionMode bestMode = PredictionMode.Dc;
             long bestCost = long.MaxValue;
 
             foreach (var mode in modes)
@@ -239,7 +239,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
 
             switch (mode)
             {
-                case PredictionMode.DC:
+                case PredictionMode.Dc:
                     {
                         int sum = 0, count = 0;
                         if (x > 0) { sum += grid[y, x - 1]; count++; }
@@ -385,8 +385,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
         {
             IncrementCounter("avif-lossless.decompress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for AVIF-Lossless");

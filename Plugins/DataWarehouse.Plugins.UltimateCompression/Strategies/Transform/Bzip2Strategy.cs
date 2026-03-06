@@ -106,12 +106,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         {
             IncrementCounter("bzip2.compress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for BZip2");
-            if (input == null || input.Length == 0)
+            if (input.Length == 0)
                 return Array.Empty<byte>();
 
             using var output = new MemoryStream(input.Length + 256);
@@ -127,12 +127,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         {
             IncrementCounter("bzip2.decompress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for BZip2");
-            if (input == null || input.Length == 0)
+            if (input.Length == 0)
                 return Array.Empty<byte>();
 
             // Verify BZip2 magic number
@@ -159,9 +159,6 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         /// <inheritdoc/>
         protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen)
         {
-            if (input == null)
-                throw new ArgumentNullException(nameof(input));
-
             return BZip2Stream.Create(input, SharpCompress.Compressors.CompressionMode.Decompress, false, false);
         }
 

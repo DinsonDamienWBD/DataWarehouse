@@ -117,7 +117,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         {
             IncrementCounter("7zip.compress");
 
-            if (input == null || input.Length == 0)
+            if (input.Length == 0)
                 return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
@@ -165,7 +165,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         {
             IncrementCounter("7zip.decompress");
 
-            if (input == null || input.Length == 0)
+            if (input.Length == 0)
                 return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
@@ -187,7 +187,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
             using var compressedStream = new MemoryStream(compressed);
             // LzmaStream for decompression: read first 5 bytes as properties, then decompress
             byte[] props = new byte[5];
-            compressedStream.Read(props, 0, 5);
+            compressedStream.ReadExactly(props, 0, 5);
             using var lzmaDecoder = LzmaStream.Create(props, compressedStream, originalLength, false);
             using var decompressedStream = new MemoryStream(4096);
 

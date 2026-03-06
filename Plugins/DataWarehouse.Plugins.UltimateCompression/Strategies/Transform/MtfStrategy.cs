@@ -122,7 +122,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         {
             IncrementCounter("mtf.encode");
 
-            if (input == null || input.Length == 0)
+            if (input.Length == 0)
                 return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
@@ -151,7 +151,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         {
             IncrementCounter("mtf.decode");
 
-            if (input == null || input.Length == 0)
+            if (input.Length == 0)
                 return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)

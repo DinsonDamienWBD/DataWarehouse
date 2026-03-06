@@ -119,7 +119,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         {
             IncrementCounter("bwt.transform");
 
-            if (input == null || input.Length == 0)
+            if (input.Length == 0)
                 return Array.Empty<byte>();
 
             // Limit input size to prevent excessive memory usage
@@ -174,7 +174,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         {
             IncrementCounter("bwt.inverse");
 
-            if (input == null || input.Length <= 4)
+            if (input.Length <= 4)
                 return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)

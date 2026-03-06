@@ -118,8 +118,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
         {
             IncrementCounter("ppm.compress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for PPM");
@@ -152,8 +152,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.ContextMixing
         {
             IncrementCounter("ppm.decompress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for PPM");

@@ -123,8 +123,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
         {
             IncrementCounter("adaptive-transit.compress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Adaptive-Transit");
@@ -142,8 +142,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
         {
             IncrementCounter("adaptive-transit.decompress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Adaptive-Transit");
@@ -176,8 +176,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
         /// <inheritdoc/>
         protected override async Task<byte[]> DecompressAsyncCore(byte[] input, CancellationToken cancellationToken)
         {
-            if (input == null || input.Length < 2)
-                return input ?? Array.Empty<byte>();
+            if (input.Length < 2)
+                return Array.Empty<byte>();
             byte algoId = input[0];
             var payload = new byte[input.Length - 1];
             Buffer.BlockCopy(input, 1, payload, 0, payload.Length);

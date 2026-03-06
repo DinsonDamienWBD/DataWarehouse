@@ -125,8 +125,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
         {
             IncrementCounter("zdelta.compress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Zdelta");
@@ -142,10 +142,10 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                 return output.ToArray();
 
             // Initialize hash table with lazy-allocated lists.
-            // Each bucket is capped at MaxBucketDepth to bound memory: older entries are dropped.
+            // Each bucket is capped at maxBucketDepth to bound memory: older entries are dropped.
             // P2-1595: Use null-initialized array to avoid 16K heap allocations upfront;
             // buckets are created on first use so sparse inputs only pay for touched slots.
-            const int MaxBucketDepth = 8;
+            const int maxBucketDepth = 8;
             var hashTable = new List<int>?[HashSize];
 
             int pos = 0;
@@ -194,8 +194,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         {
                             uint h = RollingHash(input, pos, MinMatchLength);
                             int hIdx = (int)(h & (HashSize - 1));
-                            var zBucket = hashTable[hIdx] ??= new List<int>(MaxBucketDepth);
-                            if (zBucket.Count >= MaxBucketDepth) zBucket.RemoveAt(0);
+                            var zBucket = hashTable[hIdx] ??= new List<int>(maxBucketDepth);
+                            if (zBucket.Count >= maxBucketDepth) zBucket.RemoveAt(0);
                             zBucket.Add(pos);
                         }
                         pos++;
@@ -240,8 +240,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         {
                             uint h = RollingHash(input, pos, MinMatchLength);
                             int hIdx = (int)(h & (HashSize - 1));
-                            var zBucket = hashTable[hIdx] ??= new List<int>(MaxBucketDepth);
-                            if (zBucket.Count >= MaxBucketDepth) zBucket.RemoveAt(0);
+                            var zBucket = hashTable[hIdx] ??= new List<int>(maxBucketDepth);
+                            if (zBucket.Count >= maxBucketDepth) zBucket.RemoveAt(0);
                             zBucket.Add(pos);
                         }
 
@@ -267,8 +267,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
         {
             IncrementCounter("zdelta.decompress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Zdelta");

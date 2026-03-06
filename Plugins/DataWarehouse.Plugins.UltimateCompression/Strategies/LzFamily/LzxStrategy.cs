@@ -127,7 +127,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB");
 
-            if (input == null || input.Length == 0)
+            if (input.Length == 0)
                 return Array.Empty<byte>();
 
             using var output = new MemoryStream(input.Length + 256);
@@ -201,7 +201,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
             IncrementCounter("lzx.decompress");
 
             // Edge case: validate header
-            if (input == null || input.Length < 8)
+            if (input.Length < 8)
                 return Array.Empty<byte>();
 
             using var inputStream = new MemoryStream(input);

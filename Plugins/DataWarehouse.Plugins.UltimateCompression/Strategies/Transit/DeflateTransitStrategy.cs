@@ -109,8 +109,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
         {
             IncrementCounter("deflate-transit.compress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Deflate-Transit");
@@ -127,8 +127,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transit
         {
             IncrementCounter("deflate-transit.decompress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Deflate-Transit");

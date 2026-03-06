@@ -131,12 +131,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         {
             IncrementCounter("brotli.compress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Brotli");
-            if (input == null || input.Length == 0)
+            if (input.Length == 0)
                 return Array.Empty<byte>();
 
             // Use BrotliEncoder for better control over compression
@@ -193,12 +193,12 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         {
             IncrementCounter("brotli.decompress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Brotli");
-            if (input == null || input.Length == 0)
+            if (input.Length == 0)
                 return Array.Empty<byte>();
 
             // Use BrotliDecoder for decompression
@@ -267,9 +267,6 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Transform
         /// <inheritdoc/>
         protected override Stream CreateDecompressionStreamCore(Stream input, bool leaveOpen)
         {
-            if (input == null)
-                throw new ArgumentNullException(nameof(input));
-
             return new BrotliStream(input, System.IO.Compression.CompressionMode.Decompress, leaveOpen);
         }
 

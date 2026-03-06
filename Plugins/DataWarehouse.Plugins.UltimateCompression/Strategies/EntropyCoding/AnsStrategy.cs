@@ -41,6 +41,11 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.EntropyCoding
         private readonly int _tableLogSize;
         private readonly int _precision;
 
+        /// <summary>Gets the configured ANS table log size.</summary>
+        internal int ConfiguredTableLogSize => _tableLogSize;
+        /// <summary>Gets the configured ANS precision.</summary>
+        internal int ConfiguredPrecision => _precision;
+
         /// <summary>
         /// Initializes a new instance of the <see cref="AnsStrategy"/> class
         /// with the default compression level, table log size 11, and precision 11.

@@ -123,8 +123,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
         {
             IncrementCounter("xdelta.compress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Xdelta");
@@ -139,8 +139,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                 return output.ToArray();
 
             // Build hash table for sliding window.
-            // Each bucket is capped at MaxBucketDepth to bound memory: older entries are dropped.
-            const int MaxBucketDepth = 8;
+            // Each bucket is capped at maxBucketDepth to bound memory: older entries are dropped.
+            const int maxBucketDepth = 8;
             var hashTable = new Dictionary<uint, List<int>>();
             int pos = 0;
 
@@ -185,9 +185,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         {
                             uint h = ComputeHash(input, pos, BlockSize);
                             if (!hashTable.ContainsKey(h))
-                                hashTable[h] = new List<int>(MaxBucketDepth);
+                                hashTable[h] = new List<int>(maxBucketDepth);
                             var bucket = hashTable[h];
-                            if (bucket.Count >= MaxBucketDepth) bucket.RemoveAt(0);
+                            if (bucket.Count >= maxBucketDepth) bucket.RemoveAt(0);
                             bucket.Add(pos);
                         }
                         pos++;
@@ -228,9 +228,9 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
                         {
                             uint h = ComputeHash(input, pos, BlockSize);
                             if (!hashTable.ContainsKey(h))
-                                hashTable[h] = new List<int>(MaxBucketDepth);
+                                hashTable[h] = new List<int>(maxBucketDepth);
                             var bucket = hashTable[h];
-                            if (bucket.Count >= MaxBucketDepth) bucket.RemoveAt(0);
+                            if (bucket.Count >= maxBucketDepth) bucket.RemoveAt(0);
                             bucket.Add(pos);
                         }
 
@@ -255,8 +255,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Delta
         {
             IncrementCounter("xdelta.decompress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for Xdelta");

@@ -117,8 +117,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
         {
             IncrementCounter("webplossless.compress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for WebPLossless");
@@ -183,8 +183,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Domain
         {
             IncrementCounter("webplossless.decompress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for WebPLossless");

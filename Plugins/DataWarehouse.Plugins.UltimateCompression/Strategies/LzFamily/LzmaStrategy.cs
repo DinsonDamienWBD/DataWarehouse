@@ -105,8 +105,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         {
             IncrementCounter("lzma.compress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for LZMA");
@@ -135,8 +135,8 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
         {
             IncrementCounter("lzma.decompress");
 
-            if (input == null || input.Length == 0)
-                return input ?? Array.Empty<byte>();
+            if (input.Length == 0)
+                return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
                 throw new ArgumentException($"Input exceeds maximum size of {MaxInputSize / (1024 * 1024)} MB for LZMA");
@@ -163,7 +163,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.LzFamily
 
             // Use SharpCompress LzmaStream for decompression
             var remainingBytes = new byte[input.Length - 12];
-            inputStream.Read(remainingBytes, 0, remainingBytes.Length);
+            inputStream.ReadExactly(remainingBytes, 0, remainingBytes.Length);
 
             // Read properties (first 5 bytes of compressed data)
             using var compressedStream = new MemoryStream(remainingBytes);

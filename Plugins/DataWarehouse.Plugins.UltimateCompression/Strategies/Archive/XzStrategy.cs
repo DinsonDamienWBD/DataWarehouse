@@ -128,7 +128,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         {
             IncrementCounter("xz.compress");
 
-            if (input == null || input.Length == 0)
+            if (input.Length == 0)
                 return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
@@ -157,7 +157,7 @@ namespace DataWarehouse.Plugins.UltimateCompression.Strategies.Archive
         {
             IncrementCounter("xz.decompress");
 
-            if (input == null || input.Length == 0)
+            if (input.Length == 0)
                 return Array.Empty<byte>();
 
             if (input.Length > MaxInputSize)
