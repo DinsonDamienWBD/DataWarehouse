@@ -2678,7 +2678,7 @@ STAGE 4: CI/CD Fortress
 - [x] **Phase 96: Stage 1 — Hardening: SDK Part 1** — TDD loop for SDK findings 1-1249 (CONSOLIDATED-FINDINGS.md lines 876-2148)
 - [ ] **Phase 97: Stage 1 — Hardening: SDK Part 2** — TDD loop for SDK findings 1250-2499 (CONSOLIDATED-FINDINGS.md lines 2149-3440)
 - [ ] **Phase 98: Stage 1 — Hardening: Core Infrastructure** — TDD loop for AedsCore (139), Kernel (148), Plugin (195), Shared (61), TamperProof (81), Tests (126) — 750 findings
-- [ ] **Phase 99: Stage 1 — Hardening: Large Plugins A** — TDD loop for UltimateStorage (1243), UltimateIntelligence (562), UltimateConnector (542) — 2,347 findings
+- [x] **Phase 99: Stage 1 — Hardening: Large Plugins A** — TDD loop for UltimateStorage (1243), UltimateIntelligence (562), UltimateConnector (542) — 2,347 findings COMPLETE
 - [ ] **Phase 100: Stage 1 — Hardening: Large Plugins B** — TDD loop for UltimateAccessControl (409), UltimateKeyManagement (380), UltimateRAID (380), UltimateCompliance (271), UltimateDataManagement (285) — 1,725 findings
 - [ ] **Phase 101: Stage 1 — Hardening: Medium + Small Plugins + Companions** — TDD loop for remaining 47 projects — 3,557 findings
 - [ ] **Phase 102: Stage 1 — Full Audit (Coyote + dotCover)** — Run full Coyote concurrency testing + dotCover coverage on entire hardened codebase
@@ -2801,8 +2801,8 @@ Plans:
 - [x] 099-07-PLAN.md -- UltimateIntelligence findings 188-374
 - [x] 099-08-PLAN.md -- UltimateIntelligence findings 375-562
 - [x] 099-09-PLAN.md -- UltimateConnector findings 1-180
-- [ ] 099-10-PLAN.md -- UltimateConnector findings 181-360
-- [ ] 099-11-PLAN.md -- UltimateConnector findings 361-542
+- [x] 099-10-PLAN.md -- UltimateConnector findings 181-360
+- [x] 099-11-PLAN.md -- UltimateConnector findings 361-542
 
 ### Phase 100: Stage 1, Steps 1-3 — Hardening: Large Plugins B
 **Goal**: All findings in the next tier of large plugins have failing tests followed by production fixes
