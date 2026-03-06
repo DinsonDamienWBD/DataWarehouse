@@ -810,12 +810,12 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
                             CreatedAt = kvp.Value.CreatedAt
                         };
             }
-            catch { /* corrupted state — start fresh */ }
+            catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"[UltimateDataManagementPlugin] Corrupted policy state, starting fresh: {ex.Message}"); }
         }
     }
 
     /// <inheritdoc/>
-    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct)
+    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct = default)
     {
         var dtos = _policies.ToDictionary(
             kvp => kvp.Key,

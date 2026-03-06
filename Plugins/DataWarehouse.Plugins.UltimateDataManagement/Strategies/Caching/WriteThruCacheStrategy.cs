@@ -78,7 +78,7 @@ public sealed class WriteThruCacheStrategy : CachingStrategyBase
 {
     private readonly InMemoryCacheStrategy _cache;
     private readonly ICacheBackingStore _backingStore;
-    private readonly TimeSpan _defaultTTL;
+    private readonly TimeSpan _defaultTtl;
 
     /// <summary>
     /// Initializes a new WriteThruCacheStrategy with default backing store.
@@ -90,15 +90,15 @@ public sealed class WriteThruCacheStrategy : CachingStrategyBase
     /// </summary>
     /// <param name="backingStore">The backing store for persistent data.</param>
     /// <param name="cacheMaxSize">Maximum cache size in bytes.</param>
-    /// <param name="defaultTTL">Default time-to-live for cache entries.</param>
+    /// <param name="defaultTtl">Default time-to-live for cache entries.</param>
     public WriteThruCacheStrategy(
         ICacheBackingStore backingStore,
         long cacheMaxSize = 128 * 1024 * 1024,
-        TimeSpan? defaultTTL = null)
+        TimeSpan? defaultTtl = null)
     {
         _backingStore = backingStore ?? throw new ArgumentNullException(nameof(backingStore));
         _cache = new InMemoryCacheStrategy(cacheMaxSize);
-        _defaultTTL = defaultTTL ?? TimeSpan.FromMinutes(15);
+        _defaultTtl = defaultTtl ?? TimeSpan.FromMinutes(15);
     }
 
     /// <inheritdoc/>
@@ -161,9 +161,9 @@ public sealed class WriteThruCacheStrategy : CachingStrategyBase
         if (data != null)
         {
             // Populate cache
-            var options = new CacheOptions { TTL = _defaultTTL };
+            var options = new CacheOptions { TTL = _defaultTtl };
             await _cache.SetAsync(key, data, options, ct);
-            return CacheResult<byte[]>.Hit(data, _defaultTTL);
+            return CacheResult<byte[]>.Hit(data, _defaultTtl);
         }
 
         return CacheResult<byte[]>.Miss();
@@ -178,7 +178,7 @@ public sealed class WriteThruCacheStrategy : CachingStrategyBase
         // Then write to cache (if backing store succeeds)
         var cacheOptions = new CacheOptions
         {
-            TTL = options.TTL ?? _defaultTTL,
+            TTL = options.TTL ?? _defaultTtl,
             SlidingExpiration = options.SlidingExpiration,
             Priority = options.Priority,
             Tags = options.Tags

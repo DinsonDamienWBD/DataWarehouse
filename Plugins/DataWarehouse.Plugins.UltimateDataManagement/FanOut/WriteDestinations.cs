@@ -390,15 +390,15 @@ public sealed class VectorStoreDestination : WriteDestinationPluginBase
 public sealed class CacheDestination : WriteDestinationPluginBase
 {
     private readonly ICachingStrategy _cacheStrategy;
-    private readonly TimeSpan _defaultTTL;
+    private readonly TimeSpan _defaultTtl;
 
     /// <summary>
     /// Initializes a new CacheDestination.
     /// </summary>
-    public CacheDestination(ICachingStrategy cacheStrategy, TimeSpan? defaultTTL = null)
+    public CacheDestination(ICachingStrategy cacheStrategy, TimeSpan? defaultTtl = null)
     {
         _cacheStrategy = cacheStrategy ?? throw new ArgumentNullException(nameof(cacheStrategy));
-        _defaultTTL = defaultTTL ?? TimeSpan.FromMinutes(15);
+        _defaultTtl = defaultTtl ?? TimeSpan.FromMinutes(15);
     }
 
     /// <inheritdoc/>
@@ -442,7 +442,7 @@ public sealed class CacheDestination : WriteDestinationPluginBase
 
             var options = new Strategies.Caching.CacheOptions
             {
-                TTL = _defaultTTL,
+                TTL = _defaultTtl,
                 Tags = new[] { "content", content.ContentType ?? "unknown" }
             };
 

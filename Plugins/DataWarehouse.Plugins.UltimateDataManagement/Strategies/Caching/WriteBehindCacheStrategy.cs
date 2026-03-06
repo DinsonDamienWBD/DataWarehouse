@@ -180,13 +180,14 @@ public sealed class WriteBehindCacheStrategy : CachingStrategyBase
     protected override async Task DisposeCoreAsync()
     {
         // Stop accepting new writes
-        _flushTimer?.Dispose();
+        if (_flushTimer != null)
+            await _flushTimer.DisposeAsync();
         _writeQueue.Writer.Complete();
 
         // Wait for queue to drain
         await Task.WhenAll(_workers);
 
-        _shutdownCts.Cancel();
+        await _shutdownCts.CancelAsync();
         await _cache.DisposeAsync();
     }
 
