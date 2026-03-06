@@ -28,14 +28,14 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     /// </remarks>
     public sealed class PartialReplicationFeature : IDisposable
     {
-        private readonly ReplicationStrategyRegistry _registry;
+        internal ReplicationStrategyRegistry Registry { get; }
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, ReplicationFilter> _filters = new BoundedDictionary<string, ReplicationFilter>(1000);
         private readonly BoundedDictionary<string, FilterSubscription> _subscriptions = new BoundedDictionary<string, FilterSubscription>(1000);
         // Pre-compiled regexes keyed by "{filterId}:{ruleIndex}" to avoid ReDoS (finding 3706).
         // Compiled once at filter creation time with a 1 s match timeout.
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Regex> _compiledPatterns = new();
-        private static readonly TimeSpan _regexTimeout = TimeSpan.FromSeconds(1);
+        private static readonly TimeSpan RegexTimeout = TimeSpan.FromSeconds(1);
         private bool _disposed;
         private IDisposable? _messageBusSubscription;
 
@@ -57,7 +57,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             ReplicationStrategyRegistry registry,
             IMessageBus messageBus)
         {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            Registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
 
             _messageBusSubscription = _messageBus.Subscribe(FilterEvaluateTopic, HandleFilterEvaluateAsync);
@@ -104,7 +104,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
                     _compiledPatterns[key] = new Regex(
                         rule.Pattern,
                         RegexOptions.Compiled | RegexOptions.CultureInvariant,
-                        _regexTimeout);
+                        RegexTimeout);
                 }
             }
 
@@ -277,7 +277,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             }
 
             // Fallback: runtime regex with timeout (no compiled instance available)
-            var fallbackMatched = Regex.IsMatch(dataKey, pattern, RegexOptions.None, _regexTimeout);
+            var fallbackMatched = Regex.IsMatch(dataKey, pattern, RegexOptions.None, RegexTimeout);
             return invert ? !fallbackMatched : fallbackMatched;
         }
 

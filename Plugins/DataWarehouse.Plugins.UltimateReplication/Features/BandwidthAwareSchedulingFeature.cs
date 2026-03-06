@@ -26,7 +26,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     /// </remarks>
     public sealed class BandwidthAwareSchedulingFeature : IDisposable
     {
-        private readonly ReplicationStrategyRegistry _registry;
+        internal ReplicationStrategyRegistry Registry { get; }
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, BandwidthSample> _linkBandwidth = new BoundedDictionary<string, BandwidthSample>(1000);
         private readonly ConcurrentQueue<ScheduledTransfer> _deferredQueue = new();
@@ -64,7 +64,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             double lowUtilizationThreshold = 0.3,
             long largeTransferThresholdBytes = 10 * 1024 * 1024)
         {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            Registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
             _highUtilizationThreshold = highUtilizationThreshold;
             _lowUtilizationThreshold = lowUtilizationThreshold;

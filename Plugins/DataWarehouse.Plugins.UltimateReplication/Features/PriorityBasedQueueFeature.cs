@@ -23,7 +23,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     /// </remarks>
     public sealed class PriorityBasedQueueFeature : IDisposable
     {
-        private readonly ReplicationStrategyRegistry _registry;
+        internal ReplicationStrategyRegistry Registry { get; }
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<ReplicationPriority, ConcurrentQueue<QueuedReplication>> _queues;
         private readonly BoundedDictionary<string, QueuedReplication> _itemIndex = new BoundedDictionary<string, QueuedReplication>(1000);
@@ -56,7 +56,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             TimeSpan? starvationThreshold = null,
             int maxQueueDepth = 10000)
         {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            Registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
             _starvationThreshold = starvationThreshold ?? TimeSpan.FromMinutes(5);
             _maxQueueDepth = maxQueueDepth;

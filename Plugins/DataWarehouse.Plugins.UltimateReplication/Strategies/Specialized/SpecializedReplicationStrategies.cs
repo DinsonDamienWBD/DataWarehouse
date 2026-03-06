@@ -455,7 +455,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Specialized
         private readonly BoundedDictionary<string, (byte[] EncryptedData, byte[] IV)> _dataStore = new BoundedDictionary<string, (byte[] EncryptedData, byte[] IV)>(1000);
         private readonly BoundedDictionary<string, byte[]> _nodeKeys = new BoundedDictionary<string, byte[]>(1000);
         private byte[] _masterKey = GenerateInitialKey();
-        private EncryptionAlgorithm _algorithm = EncryptionAlgorithm.AES256;
+        internal EncryptionAlgorithm ConfiguredAlgorithm { get; set; } = EncryptionAlgorithm.Aes256;
 
         private static byte[] GenerateInitialKey()
         {
@@ -470,8 +470,8 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Specialized
         /// </summary>
         public enum EncryptionAlgorithm
         {
-            AES128,
-            AES256,
+            Aes128,
+            Aes256,
             ChaCha20
         }
 
@@ -534,7 +534,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Specialized
         /// </summary>
         public void SetAlgorithm(EncryptionAlgorithm algorithm)
         {
-            _algorithm = algorithm;
+            ConfiguredAlgorithm = algorithm;
         }
 
         /// <summary>

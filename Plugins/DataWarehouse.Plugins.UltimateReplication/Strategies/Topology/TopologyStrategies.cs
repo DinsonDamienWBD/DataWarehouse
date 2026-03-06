@@ -527,7 +527,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Topology
     {
         private readonly BoundedDictionary<string, TopologyNode> _nodes = new BoundedDictionary<string, TopologyNode>(1000);
         private readonly BoundedDictionary<string, (byte[] Data, int Depth)> _dataStore = new BoundedDictionary<string, (byte[] Data, int Depth)>(1000);
-        private string? _rootNodeId;
+        internal string? RootNodeId { get; private set; }
         private int _maxFanOut = 5;
 
         /// <inheritdoc/>
@@ -566,7 +566,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Topology
         {
             node.Role = TopologyRole.Primary;
             _nodes[node.NodeId] = node;
-            _rootNodeId = node.NodeId;
+            RootNodeId = node.NodeId;
         }
 
         /// <summary>

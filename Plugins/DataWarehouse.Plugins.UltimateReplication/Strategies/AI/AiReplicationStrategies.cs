@@ -1667,7 +1667,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         private readonly BoundedDictionary<string, LatencyMeasurement> _latencyMatrix = new BoundedDictionary<string, LatencyMeasurement>(1000);
         private readonly BoundedDictionary<string, (byte[] Data, string OptimalRoute)> _dataStore = new BoundedDictionary<string, (byte[] Data, string OptimalRoute)>(1000);
         private readonly BoundedDictionary<string, List<double>> _latencyHistory = new BoundedDictionary<string, List<double>>(1000);
-        private double _slaTargetMs = 100.0;
+        internal double SlaTargetMs { get; private set; } = 100.0;
 
         /// <summary>
         /// Latency measurement between two nodes.
@@ -1718,7 +1718,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.AI
         /// <summary>
         /// Sets the latency SLA target.
         /// </summary>
-        public void SetSlaTarget(double targetMs) => _slaTargetMs = targetMs;
+        public void SetSlaTarget(double targetMs) => SlaTargetMs = targetMs;
 
         /// <summary>
         /// Records a latency measurement between two nodes.

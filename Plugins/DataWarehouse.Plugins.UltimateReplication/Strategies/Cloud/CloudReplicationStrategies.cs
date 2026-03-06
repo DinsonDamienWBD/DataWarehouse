@@ -54,9 +54,9 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
     /// </summary>
     public enum CloudProviderType
     {
-        AWS,
+        Aws,
         Azure,
-        GCP,
+        Gcp,
         OnPremise,
         Edge,
         Kubernetes,
@@ -86,7 +86,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
         private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)> _s3Store = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp)>(1000);
         private string? _primaryRegion;
         private bool _enableTransferAcceleration = true;
-        private bool _enableIntelligentTiering = true;
+        internal bool EnableIntelligentTiering { get; private set; } = true;
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -126,7 +126,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
             {
                 ProviderId = $"aws-{regionCode}",
                 Name = $"AWS {regionCode}",
-                Type = CloudProviderType.AWS,
+                Type = CloudProviderType.Aws,
                 RegionalEndpoints = { [regionCode] = endpoint },
                 WritePriority = priority,
                 ReadPriority = priority
@@ -148,7 +148,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
         /// </summary>
         public void SetIntelligentTiering(bool enabled)
         {
-            _enableIntelligentTiering = enabled;
+            EnableIntelligentTiering = enabled;
         }
 
         /// <inheritdoc/>
@@ -229,7 +229,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
         private readonly BoundedDictionary<string, CloudProvider> _regions = new BoundedDictionary<string, CloudProvider>(1000);
         private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp, string ETag)> _cosmosStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp, string ETag)>(1000);
         private ConsistencyModel _cosmosConsistencyLevel = ConsistencyModel.SessionConsistent;
-        private string? _writeRegion;
+        internal string? WriteRegion { get; private set; }
         private readonly List<string> _readRegions = new();
         private readonly object _readRegionsLock = new();
 
@@ -289,7 +289,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
 
             if (isWriteRegion)
             {
-                _writeRegion = regionName;
+                WriteRegion = regionName;
             }
             else
             {
@@ -381,7 +381,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
         private readonly BoundedDictionary<string, CloudProvider> _regions = new BoundedDictionary<string, CloudProvider>(1000);
         private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset CommitTimestamp)> _spannerStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset CommitTimestamp)>(1000);
         private bool _enableExternalConsistency = true;
-        private string? _leaderRegion;
+        internal string? LeaderRegion { get; private set; }
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -429,13 +429,13 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Cloud
             {
                 ProviderId = $"gcp-{regionName}",
                 Name = $"GCP {regionName}",
-                Type = CloudProviderType.GCP
+                Type = CloudProviderType.Gcp
             };
             _regions[regionName] = provider;
 
             if (isLeader)
             {
-                _leaderRegion = regionName;
+                LeaderRegion = regionName;
             }
         }
 

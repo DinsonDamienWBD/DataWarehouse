@@ -32,7 +32,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     /// </remarks>
     public sealed class StorageIntegrationFeature : IDisposable
     {
-        private readonly ReplicationStrategyRegistry _registry;
+        internal ReplicationStrategyRegistry Registry { get; }
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, StorageBackendInfo> _backends = new BoundedDictionary<string, StorageBackendInfo>(1000);
         private readonly BoundedDictionary<string, StorageReplicaMapping> _replicaMappings = new BoundedDictionary<string, StorageReplicaMapping>(1000);
@@ -63,7 +63,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             ReplicationStrategyRegistry registry,
             IMessageBus messageBus)
         {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            Registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
 
             _capacitySubscription = _messageBus.Subscribe(StorageCapacityTopic, HandleCapacityUpdateAsync);

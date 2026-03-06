@@ -85,7 +85,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
         private int _partitionCount = 8;
         // LOW-3775: no default — callers must call Configure(...) before producing/consuming.
         // Using localhost default silently fails in non-local deployments.
-        private string? _bootstrapServers;
+        internal string? BootstrapServers { get; private set; }
         private bool _enableExactlyOnce = true;
 
         /// <inheritdoc/>
@@ -122,7 +122,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
         /// </summary>
         public void Configure(string bootstrapServers, int partitionCount)
         {
-            _bootstrapServers = bootstrapServers;
+            BootstrapServers = bootstrapServers;
             _partitionCount = partitionCount;
 
             for (int i = 0; i < partitionCount; i++)
@@ -441,7 +441,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
         private readonly BoundedDictionary<string, (byte[] Data, long BinlogPosition)> _dataStore = new BoundedDictionary<string, (byte[] Data, long BinlogPosition)>(1000);
         private string? _currentBinlog;
         private long _currentPosition;
-        private bool _bootstrapEnabled = true;
+        internal bool BootstrapEnabled { get; private set; } = true;
 
         /// <summary>
         /// Maxwell-style CDC event.
@@ -494,7 +494,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.CDC
         /// </summary>
         public void SetBootstrap(bool enabled)
         {
-            _bootstrapEnabled = enabled;
+            BootstrapEnabled = enabled;
         }
 
         /// <summary>

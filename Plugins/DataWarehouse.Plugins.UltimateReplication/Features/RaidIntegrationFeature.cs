@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     /// </remarks>
     public sealed class RaidIntegrationFeature : IDisposable
     {
-        private readonly ReplicationStrategyRegistry _registry;
+        internal ReplicationStrategyRegistry Registry { get; }
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, RaidParityStatus> _parityStatus = new BoundedDictionary<string, RaidParityStatus>(1000);
         private readonly BoundedDictionary<string, RebuildOperation> _activeRebuilds = new BoundedDictionary<string, RebuildOperation>(1000);
@@ -61,7 +61,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             ReplicationStrategyRegistry registry,
             IMessageBus messageBus)
         {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            Registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
 
             _healthSubscription = _messageBus.Subscribe(RaidHealthTopic, HandleRaidHealthAsync);

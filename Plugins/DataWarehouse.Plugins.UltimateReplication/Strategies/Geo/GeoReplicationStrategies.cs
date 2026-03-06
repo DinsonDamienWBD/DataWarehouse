@@ -182,7 +182,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Geo
                 return double.MaxValue;
 
             // Haversine formula
-            const double R = 6371; // Earth radius in km
+            const double r = 6371; // Earth radius in km
             var lat1 = r1.Latitude * Math.PI / 180;
             var lat2 = r2.Latitude * Math.PI / 180;
             var dLat = (r2.Latitude - r1.Latitude) * Math.PI / 180;
@@ -193,7 +193,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.Geo
                     Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
             var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
 
-            return R * c;
+            return r * c;
         }
 
         /// <summary>

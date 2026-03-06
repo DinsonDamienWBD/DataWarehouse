@@ -90,7 +90,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
         private readonly BoundedDictionary<string, DRSite> _sites = new BoundedDictionary<string, DRSite>(1000);
         private readonly BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp, long Checkpoint)> _dataStore = new BoundedDictionary<string, (byte[] Data, DateTimeOffset Timestamp, long Checkpoint)>(1000);
         private readonly BoundedDictionary<string, long> _siteCheckpoints = new BoundedDictionary<string, long>(1000);
-        private string? _primarySiteId;
+        internal string? PrimarySiteId { get; private set; }
         private long _currentCheckpoint;
         private int _rpoSeconds = 300; // 5 minutes default
 
@@ -141,7 +141,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
 
             if (site.Role == DRSiteRole.Primary)
             {
-                _primarySiteId = site.SiteId;
+                PrimarySiteId = site.SiteId;
             }
         }
 
@@ -398,7 +398,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
         private readonly BoundedDictionary<string, (byte[] Data, long Lsn)> _dataStore = new BoundedDictionary<string, (byte[] Data, long Lsn)>(1000);
         private readonly BoundedDictionary<string, long> _siteLsn = new BoundedDictionary<string, long>(1000);
         private long _currentLsn;
-        private string? _primarySiteId;
+        internal string? ZeroPrimarySiteId { get; private set; }
 
         /// <summary>
         /// Represents a transaction log entry for Zero-RPO replication.
@@ -445,7 +445,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
 
             if (site.Role == DRSiteRole.Primary)
             {
-                _primarySiteId = site.SiteId;
+                ZeroPrimarySiteId = site.SiteId;
             }
         }
 
@@ -567,7 +567,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
         private readonly List<FailoverEvent> _failoverHistory = new();
         private readonly object _failoverHistoryLock = new();
         private bool _autoFailoverEnabled = true;
-        private int _healthCheckIntervalMs = 5000;
+        internal int HealthCheckIntervalMs { get; private set; } = 5000;
 
         /// <summary>
         /// Represents a failover event for Active-Passive replication.
@@ -621,7 +621,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
         /// </summary>
         public void SetHealthCheckInterval(int intervalMs)
         {
-            _healthCheckIntervalMs = intervalMs;
+            HealthCheckIntervalMs = intervalMs;
         }
 
         /// <summary>
@@ -802,7 +802,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
         private string? _currentPrimary;
         private string? _previousPrimary;
         private FailoverStatus _currentStatus = FailoverStatus.NotStarted;
-        private DateTimeOffset? _failoverStartTime;
+        internal DateTimeOffset? FailoverStartTime { get; private set; }
 
         /// <inheritdoc/>
         public override ReplicationCharacteristics Characteristics { get; } = new()
@@ -872,7 +872,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Strategies.DR
                 return false;
 
             _currentStatus = FailoverStatus.InProgress;
-            _failoverStartTime = DateTimeOffset.UtcNow;
+            FailoverStartTime = DateTimeOffset.UtcNow;
             _previousPrimary = _currentPrimary;
 
             try

@@ -33,7 +33,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     /// </remarks>
     public sealed class GeoDistributedShardingFeature : IDisposable
     {
-        private readonly ReplicationStrategyRegistry _registry;
+        internal ReplicationStrategyRegistry Registry { get; }
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, ShardDistributionRecord> _shardRecords = new BoundedDictionary<string, ShardDistributionRecord>(1000);
         private readonly BoundedDictionary<string, GeoShardRegion> _regions = new BoundedDictionary<string, GeoShardRegion>(1000);
@@ -76,7 +76,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             int defaultDataShards = 4,
             int defaultParityShards = 2)
         {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            Registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
             _defaultDataShards = defaultDataShards;
             _defaultParityShards = defaultParityShards;

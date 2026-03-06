@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     /// </remarks>
     public sealed class ReplicationLagMonitoringFeature : IDisposable
     {
-        private readonly ReplicationStrategyRegistry _registry;
+        internal ReplicationStrategyRegistry Registry { get; }
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, LagNodeStatus> _nodeStatus = new BoundedDictionary<string, LagNodeStatus>(1000);
         private readonly BoundedDictionary<string, List<LagSample>> _lagHistory = new BoundedDictionary<string, List<LagSample>>(1000);
@@ -71,7 +71,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             long emergencyThresholdMs = 30000,
             int maxHistorySamples = 1000)
         {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            Registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
             _warningThresholdMs = warningThresholdMs;
             _criticalThresholdMs = criticalThresholdMs;

@@ -35,7 +35,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     /// </remarks>
     public sealed class GeoWormReplicationFeature : IDisposable
     {
-        private readonly ReplicationStrategyRegistry _registry;
+        internal ReplicationStrategyRegistry Registry { get; }
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, WormReplicationRecord> _replicationRecords = new BoundedDictionary<string, WormReplicationRecord>(1000);
         private readonly BoundedDictionary<string, GeoWormRegion> _regions = new BoundedDictionary<string, GeoWormRegion>(1000);
@@ -74,7 +74,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             IMessageBus messageBus,
             TimeSpan? operationTimeout = null)
         {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            Registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
             _operationTimeout = operationTimeout ?? TimeSpan.FromSeconds(60);
 

@@ -519,14 +519,14 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
 
             var sumX = xValues.Sum();
             var sumY = yValues.Sum();
-            var sumXY = xValues.Zip(yValues, (x, y) => x * y).Sum();
+            var sumXy = xValues.Zip(yValues, (x, y) => x * y).Sum();
             var sumX2 = xValues.Sum(x => x * x);
 
             var denominator = n * sumX2 - sumX * sumX;
             if (Math.Abs(denominator) < 1e-10)
                 return (0, sumY / n);
 
-            var slope = (n * sumXY - sumX * sumY) / denominator;
+            var slope = (n * sumXy - sumX * sumY) / denominator;
             var intercept = (sumY - slope * sumX) / n;
 
             return (slope, intercept);

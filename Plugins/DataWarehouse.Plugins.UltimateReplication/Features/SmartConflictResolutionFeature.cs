@@ -31,7 +31,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     /// </remarks>
     public sealed class SmartConflictResolutionFeature : IDisposable
     {
-        private readonly ReplicationStrategyRegistry _registry;
+        internal ReplicationStrategyRegistry Registry { get; }
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, ConflictResolutionRecord> _resolutionHistory = new BoundedDictionary<string, ConflictResolutionRecord>(1000);
         private readonly TimeSpan _intelligenceTimeout;
@@ -62,7 +62,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             IMessageBus messageBus,
             TimeSpan? intelligenceTimeout = null)
         {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            Registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
             _intelligenceTimeout = intelligenceTimeout ?? TimeSpan.FromSeconds(5);
 

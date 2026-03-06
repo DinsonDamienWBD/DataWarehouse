@@ -30,7 +30,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
     /// </remarks>
     public sealed class GlobalTransactionCoordinationFeature : IDisposable
     {
-        private readonly ReplicationStrategyRegistry _registry;
+        internal ReplicationStrategyRegistry Registry { get; }
         private readonly IMessageBus _messageBus;
         private readonly BoundedDictionary<string, TransactionState> _activeTransactions = new BoundedDictionary<string, TransactionState>(1000);
         private readonly BoundedDictionary<string, TransactionLog> _transactionLog = new BoundedDictionary<string, TransactionLog>(1000);
@@ -38,7 +38,7 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, TaskCompletionSource<bool>> _voteTcs =
             new System.Collections.Concurrent.ConcurrentDictionary<string, TaskCompletionSource<bool>>();
         private readonly TimeSpan _prepareTimeout;
-        private readonly TimeSpan _commitTimeout;
+        internal TimeSpan CommitTimeout { get; }
         private bool _disposed;
         private IDisposable? _subscription;
 
@@ -69,10 +69,10 @@ namespace DataWarehouse.Plugins.UltimateReplication.Features
             TimeSpan? prepareTimeout = null,
             TimeSpan? commitTimeout = null)
         {
-            _registry = registry ?? throw new ArgumentNullException(nameof(registry));
+            Registry = registry ?? throw new ArgumentNullException(nameof(registry));
             _messageBus = messageBus ?? throw new ArgumentNullException(nameof(messageBus));
             _prepareTimeout = prepareTimeout ?? TimeSpan.FromSeconds(30);
-            _commitTimeout = commitTimeout ?? TimeSpan.FromSeconds(60);
+            CommitTimeout = commitTimeout ?? TimeSpan.FromSeconds(60);
 
             _subscription = _messageBus.Subscribe(TxnPrepareResponseTopic, HandlePrepareResponseAsync);
         }
