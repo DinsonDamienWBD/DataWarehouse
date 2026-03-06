@@ -97,8 +97,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Nested
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var groupCount = diskList.Count / _disksPerRaid3Group;
             var stripeInfo = CalculateStripe(offset / _chunkSize, diskList.Count);
 
@@ -148,8 +148,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Nested
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var groupCount = diskList.Count / _disksPerRaid3Group;
 
             var result = new byte[length];
@@ -346,7 +346,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Nested
         private byte[] CalculateXorParity(List<byte[]> chunks)
         {
             var parity = new byte[_chunkSize];
-            foreach (var chunk in chunks.Where(c => c != null))
+            foreach (var chunk in chunks)
             {
                 for (int i = 0; i < _chunkSize && i < chunk.Length; i++)
                 {
@@ -366,7 +366,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Nested
                 var diskIndex = i % diskCount;
                 var posInChunk = i / diskCount;
 
-                if (chunks[diskIndex] != null && posInChunk < chunks[diskIndex].Length)
+                if (posInChunk < chunks[diskIndex].Length)
                 {
                     result[i] = chunks[diskIndex][posInChunk];
                 }

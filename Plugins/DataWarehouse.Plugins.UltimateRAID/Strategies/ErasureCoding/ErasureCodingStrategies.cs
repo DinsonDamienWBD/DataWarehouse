@@ -77,8 +77,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var blockIndex = offset / Capabilities.StripeSize;
             var stripe = CalculateStripe(blockIndex, diskList.Count);
 
@@ -102,8 +102,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var blockIndex = offset / Capabilities.StripeSize;
             var stripe = CalculateStripe(blockIndex, diskList.Count);
 
@@ -392,13 +392,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
                     throw new InvalidOperationException(
                         $"Reed-Solomon matrix is singular at row {i}: cannot invert. " +
                         "Ensure the generator matrix is constructed over GF(2^8) with distinct evaluation points.");
-                if (pivot != 0)
+
+                var inverse = GaloisInverse(pivot);
+                for (int j = 0; j < 2 * n; j++)
                 {
-                    var inverse = GaloisInverse(pivot);
-                    for (int j = 0; j < 2 * n; j++)
-                    {
-                        augmented[i, j] = GaloisMultiply(augmented[i, j], inverse);
-                    }
+                    augmented[i, j] = GaloisMultiply(augmented[i, j], inverse);
                 }
 
                 // Eliminate column
@@ -416,16 +414,16 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             }
 
             // Extract inverse from right half
-            var inverse_matrix = new byte[n, n];
+            var inverseMatrix = new byte[n, n];
             for (int i = 0; i < n; i++)
             {
                 for (int j = 0; j < n; j++)
                 {
-                    inverse_matrix[i, j] = augmented[i, n + j];
+                    inverseMatrix[i, j] = augmented[i, n + j];
                 }
             }
 
-            return inverse_matrix;
+            return inverseMatrix;
         }
 
         private byte GaloisMultiply(byte a, byte b)
@@ -457,14 +455,14 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             if (n == 0) return 1;
 
             byte result = 1;
-            byte base_val = a;
+            byte baseVal = a;
 
             while (n > 0)
             {
                 if ((n & 1) != 0)
-                    result = GaloisMultiply(result, base_val);
+                    result = GaloisMultiply(result, baseVal);
 
-                base_val = GaloisMultiply(base_val, base_val);
+                baseVal = GaloisMultiply(baseVal, baseVal);
                 n >>= 1;
             }
 
@@ -589,8 +587,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var blockIndex = offset / Capabilities.StripeSize;
             var stripe = CalculateStripe(blockIndex, diskList.Count);
 
@@ -650,8 +648,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var blockIndex = offset / Capabilities.StripeSize;
             var stripe = CalculateStripe(blockIndex, diskList.Count);
 
@@ -1051,8 +1049,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var blockIndex = offset / Capabilities.StripeSize;
             var stripe = CalculateStripe(blockIndex, diskList.Count);
 
@@ -1074,8 +1072,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var blockIndex = offset / Capabilities.StripeSize;
             var stripe = CalculateStripe(blockIndex, diskList.Count);
 

@@ -505,6 +505,7 @@ public sealed class IoScheduler
 {
     private readonly PriorityQueue<IoRequest, int> _queue = new();
     private readonly SchedulerConfig _config;
+    internal SchedulerConfig Config => _config;
     private readonly object _queueLock = new();
     private long _totalRequests;
     private long _completedRequests;
@@ -560,11 +561,16 @@ public sealed class IoScheduler
 
     public SchedulerStatistics GetStatistics()
     {
+        int pendingCount;
+        lock (_queueLock)
+        {
+            pendingCount = _queue.Count;
+        }
         return new SchedulerStatistics
         {
             TotalRequests = _totalRequests,
             CompletedRequests = _completedRequests,
-            PendingRequests = _queue.Count
+            PendingRequests = pendingCount
         };
     }
 

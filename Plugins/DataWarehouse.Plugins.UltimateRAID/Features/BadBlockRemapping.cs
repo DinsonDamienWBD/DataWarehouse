@@ -45,7 +45,7 @@ public sealed class BadBlockRemapping
             return new RemapResult(
                 Success: true,
                 Message: "Block already remapped",
-                RemappedLBA: map.GetRemappedAddress(logicalBlockAddress));
+                RemappedLba: map.GetRemappedAddress(logicalBlockAddress));
         }
 
         // Find a spare block
@@ -56,7 +56,7 @@ public sealed class BadBlockRemapping
             return new RemapResult(
                 Success: false,
                 Message: "No spare blocks available",
-                RemappedLBA: -1);
+                RemappedLba: -1);
         }
 
         try
@@ -91,7 +91,7 @@ public sealed class BadBlockRemapping
             return new RemapResult(
                 Success: true,
                 Message: $"Block remapped successfully. Disk health: {healthStatus}",
-                RemappedLBA: spareBlock,
+                RemappedLba: spareBlock,
                 DataRecovered: recoveredData != null,
                 DiskHealthStatus: healthStatus);
         }
@@ -101,7 +101,7 @@ public sealed class BadBlockRemapping
             return new RemapResult(
                 Success: false,
                 Message: $"Remapping failed: {ex.Message}",
-                RemappedLBA: -1);
+                RemappedLba: -1);
         }
     }
 
@@ -138,16 +138,16 @@ public sealed class BadBlockRemapping
     /// </summary>
     public async Task<ScanResult> ScanForBadBlocksAsync(
         string diskId,
-        long startLBA,
-        long endLBA,
+        long startLba,
+        long endLba,
         IProgress<double>? progress = null,
         CancellationToken cancellationToken = default)
     {
-        var result = new ScanResult { DiskId = diskId, StartLBA = startLBA, EndLBA = endLBA };
-        var totalBlocks = endLBA - startLBA;
+        var result = new ScanResult { DiskId = diskId, StartLba = startLba, EndLba = endLba };
+        var totalBlocks = endLba - startLba;
         var scannedBlocks = 0L;
 
-        for (var lba = startLBA; lba < endLBA; lba++)
+        for (var lba = startLba; lba < endLba; lba++)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
@@ -157,7 +157,7 @@ public sealed class BadBlockRemapping
             {
                 result.BadBlocks.Add(new BadBlockInfo
                 {
-                    LBA = lba,
+                    Lba = lba,
                     Type = blockStatus switch
                     {
                         BlockTestResult.ReadError => BadBlockType.ReadError,
@@ -216,7 +216,7 @@ public sealed class BadBlockRemapping
         var map = _diskMaps.GetOrAdd(export.DiskId, _ => new DiskBadBlockMap(export.DiskId));
         foreach (var entry in export.Entries)
         {
-            map.AddRemapping(entry.OriginalLBA, entry.RemappedLBA, entry.BlockType);
+            map.AddRemapping(entry.OriginalLba, entry.RemappedLba, entry.BlockType);
         }
     }
 
@@ -347,6 +347,7 @@ public sealed class BadBlockRemapping
 public sealed class DiskBadBlockMap
 {
     private readonly string _diskId;
+    internal string DiskId => _diskId;
     private readonly BoundedDictionary<long, long> _remappings = new BoundedDictionary<long, long>(1000);
     private readonly BoundedDictionary<long, BadBlockType> _blockTypes = new BoundedDictionary<long, BadBlockType>(1000);
     private long _nextSpareBlock;
@@ -370,7 +371,7 @@ public sealed class DiskBadBlockMap
     {
         lock (_spareLock)
         {
-            if (unchecked(_nextSpareBlock >= SpareAreaStart + SpareAreaSize))
+            if (_nextSpareBlock - SpareAreaStart >= SpareAreaSize)
                 return -1; // No more spare blocks
 
             return _nextSpareBlock++;
@@ -387,8 +388,8 @@ public sealed class DiskBadBlockMap
     {
         return _remappings.Select(kvp => new BadBlockMapEntry
         {
-            OriginalLBA = kvp.Key,
-            RemappedLBA = kvp.Value,
+            OriginalLba = kvp.Key,
+            RemappedLba = kvp.Value,
             BlockType = _blockTypes.GetValueOrDefault(kvp.Key, BadBlockType.Unknown)
         }).ToList();
     }
@@ -438,7 +439,7 @@ public sealed class RemappingStatistics
 public record RemapResult(
     bool Success,
     string Message,
-    long RemappedLBA,
+    long RemappedLba,
     bool DataRecovered = false,
     DiskHealthStatus DiskHealthStatus = DiskHealthStatus.Healthy);
 
@@ -447,7 +448,7 @@ public record RemapResult(
 /// </summary>
 public sealed class BadBlockInfo
 {
-    public long LBA { get; set; }
+    public long Lba { get; set; }
     public BadBlockType Type { get; set; }
     public DateTime DetectedTime { get; set; } = DateTime.UtcNow;
 }
@@ -458,10 +459,10 @@ public sealed class BadBlockInfo
 public sealed class ScanResult
 {
     public string DiskId { get; set; } = string.Empty;
-    public long StartLBA { get; set; }
-    public long EndLBA { get; set; }
+    public long StartLba { get; set; }
+    public long EndLba { get; set; }
     public long TotalBlocksScanned { get; set; }
-    public List<BadBlockInfo> BadBlocks { get; set; } = new();
+    public List<BadBlockInfo> BadBlocks { get; init; } = new();
     public DateTime ScanCompleted { get; set; }
 }
 
@@ -470,8 +471,8 @@ public sealed class ScanResult
 /// </summary>
 public sealed class BadBlockMapEntry
 {
-    public long OriginalLBA { get; set; }
-    public long RemappedLBA { get; set; }
+    public long OriginalLba { get; set; }
+    public long RemappedLba { get; set; }
     public BadBlockType BlockType { get; set; }
 }
 

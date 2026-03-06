@@ -590,9 +590,12 @@ public sealed class DeviceRaid10Strategy : DeviceLevelRaidStrategyBase
         if (offline == 0) return ArrayState.Optimal;
 
         // RAID 10 can survive one failure per mirror pair.
-        // Worst case: if more pairs have both members offline, it is failed.
-        // Simple heuristic: if at least half the devices are online, we are degraded.
-        if (online >= total / 2) return ArrayState.Degraded;
+        // Check per-pair: each pair needs at least one online member.
+        int pairCount = total / 2;
+
+        // If at least one disk per pair is online (online >= pairCount), array is degraded.
+        // If fewer than pairCount are online, at least one pair has lost both members => failed.
+        if (online >= pairCount) return ArrayState.Degraded;
 
         return ArrayState.Failed;
     }

@@ -65,8 +65,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var stripeInfo = CalculateStripe(offset / _chunkSize, diskList.Count);
 
             var dataBytes = data.ToArray();
@@ -100,8 +100,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var stripeInfo = CalculateStripe(offset / _chunkSize, diskList.Count);
 
             var chunks = new Dictionary<int, byte[]>();
@@ -187,7 +187,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         private byte[] CalculateXorParity(List<byte[]> chunks)
         {
             var parity = new byte[_chunkSize];
-            foreach (var chunk in chunks.Where(c => c != null))
+            foreach (var chunk in chunks)
                 for (int i = 0; i < _chunkSize && i < chunk.Length; i++)
                     parity[i] ^= chunk[i];
             return parity;
@@ -198,7 +198,6 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             var parity = new byte[_chunkSize];
             for (int i = 0; i < chunks.Count; i++)
             {
-                if (chunks[i] == null) continue;
                 for (int j = 0; j < _chunkSize && j < chunks[i].Length; j++)
                     parity[(j + i) % _chunkSize] ^= chunks[i][j];
             }
@@ -210,7 +209,6 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             var parity = new byte[_chunkSize];
             for (int i = 0; i < chunks.Count; i++)
             {
-                if (chunks[i] == null) continue;
                 for (int j = 0; j < _chunkSize && j < chunks[i].Length; j++)
                     parity[(j - i + _chunkSize) % _chunkSize] ^= chunks[i][j];
             }
@@ -222,7 +220,6 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             var parity = new byte[_chunkSize];
             for (int i = 0; i < chunks.Count; i++)
             {
-                if (chunks[i] == null) continue;
                 var coefficient = (byte)((i + 1) % 256);
                 for (int j = 0; j < _chunkSize && j < chunks[i].Length; j++)
                     parity[j] ^= GaloisMultiply(chunks[i][j], coefficient);
@@ -267,7 +264,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             var result = parities[0].ToArray();
             foreach (var kvp in chunks)
             {
-                if (kvp.Key != failedIndex && kvp.Value != null)
+                if (kvp.Key != failedIndex)
                 {
                     for (int i = 0; i < _chunkSize; i++)
                         result[i] ^= kvp.Value[i];
@@ -412,8 +409,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks,
             long offset, CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var dataBytes = data.ToArray();
 
             var writeTasks = diskList.Where(d => d.HealthStatus == SdkDiskHealthStatus.Healthy)
@@ -518,8 +515,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks,
             long offset, CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var dataBytes = data.ToArray();
 
             // Find which disk this offset falls on
@@ -530,8 +527,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks,
             long offset, int length, CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             var (diskIndex, diskOffset) = MapOffsetToDisk(diskList, offset);
             return await ReadFromDiskAsync(diskList[diskIndex], diskOffset, length, cancellationToken);
@@ -624,8 +621,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks,
             long offset, CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var stripeInfo = CalculateStripe(offset / _chunkSize, diskList.Count);
 
             var dataBytes = data.ToArray();
@@ -658,8 +655,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks,
             long offset, int length, CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var stripeInfo = CalculateStripe(offset / _chunkSize, diskList.Count);
 
             var decryptedChunks = new Dictionary<int, byte[]>();
@@ -754,7 +751,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         private byte[] CalculateXorParity(List<byte[]> chunks)
         {
             var parity = new byte[_chunkSize];
-            foreach (var chunk in chunks.Where(c => c != null))
+            foreach (var chunk in chunks)
                 for (int i = 0; i < _chunkSize && i < chunk.Length; i++)
                     parity[i] ^= chunk[i];
             return parity;
@@ -771,7 +768,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             var result = parity.ToArray();
             foreach (var kvp in chunks)
             {
-                if (kvp.Key != failedIndex && kvp.Value != null)
+                if (kvp.Key != failedIndex)
                     for (int i = 0; i < _chunkSize; i++)
                         result[i] ^= kvp.Value[i];
             }
@@ -907,8 +904,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks,
             long offset, CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var stripeInfo = CalculateStripe(offset / _chunkSize, diskList.Count);
 
             var dataBytes = data.ToArray();
@@ -924,8 +921,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks,
             long offset, int length, CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var stripeInfo = CalculateStripe(offset / _chunkSize, diskList.Count);
 
             var dataDisk = diskList[stripeInfo.DataDisks[0]];
@@ -1015,8 +1012,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks,
             long offset, CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var (diskIndex, diskOffset) = MapOffsetToDisk(diskList, offset);
             await WriteToDiskAsync(diskList[diskIndex], data.ToArray(), diskOffset, cancellationToken);
         }
@@ -1024,8 +1021,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks,
             long offset, int length, CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var (diskIndex, diskOffset) = MapOffsetToDisk(diskList, offset);
             return await ReadFromDiskAsync(diskList[diskIndex], diskOffset, length, cancellationToken);
         }
@@ -1084,6 +1081,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         private readonly int _chunkSize;
         private readonly BoundedDictionary<string, DiskPowerState> _diskStates;
         private readonly TimeSpan _spinDownDelay;
+        internal TimeSpan SpinDownDelay => _spinDownDelay;
 
         public MaidStrategy(int chunkSize = 64 * 1024, int spinDownMinutes = 10)
         {
@@ -1117,8 +1115,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks,
             long offset, CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var stripeInfo = CalculateStripe(offset / _chunkSize, diskList.Count);
 
             // Spin up required disks
@@ -1142,8 +1140,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks,
             long offset, int length, CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var stripeInfo = CalculateStripe(offset / _chunkSize, diskList.Count);
 
             // Spin up required disks
@@ -1251,7 +1249,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         private byte[] CalculateXorParity(List<byte[]> chunks)
         {
             var parity = new byte[_chunkSize];
-            foreach (var chunk in chunks.Where(c => c != null))
+            foreach (var chunk in chunks)
                 for (int i = 0; i < _chunkSize && i < chunk.Length; i++)
                     parity[i] ^= chunk[i];
             return parity;
@@ -1323,8 +1321,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         public override async Task WriteAsync(ReadOnlyMemory<byte> data, IEnumerable<DiskInfo> disks,
             long offset, CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var (diskIndex, diskOffset) = MapOffsetToDisk(diskList, offset);
             await WriteToDiskAsync(diskList[diskIndex], data.ToArray(), diskOffset, cancellationToken);
         }
@@ -1332,8 +1330,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
         public override async Task<ReadOnlyMemory<byte>> ReadAsync(IEnumerable<DiskInfo> disks,
             long offset, int length, CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var (diskIndex, diskOffset) = MapOffsetToDisk(diskList, offset);
             return await ReadFromDiskAsync(diskList[diskIndex], diskOffset, length, cancellationToken);
         }

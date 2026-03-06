@@ -332,7 +332,7 @@ public abstract class RaidStrategyBase : StrategyBase, IRaidStrategy
                 SmartData = disk.SmartData
             };
 
-            var ioStats = disk.DiskIO.GetStatistics();
+            var ioStats = disk.DiskIo.GetStatistics();
             diskStatus.ReadErrors = ioStats.ReadErrors;
             diskStatus.WriteErrors = ioStats.WriteErrors;
             diskStatus.TemperatureCelsius = disk.SmartData?.Temperature ?? 0;
@@ -717,7 +717,7 @@ public abstract class RaidStrategyBase : StrategyBase, IRaidStrategy
 
         var disk = _disks[diskIndex];
         var smartData = disk.SmartData;
-        var ioStats = disk.DiskIO.GetStatistics();
+        var ioStats = disk.DiskIo.GetStatistics();
 
         var correlationId = Guid.NewGuid().ToString("N");
         var tcs = new TaskCompletionSource<DiskFailurePrediction?>();

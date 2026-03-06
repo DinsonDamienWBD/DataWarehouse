@@ -16,6 +16,7 @@ public sealed class GeoRaid
     private readonly BoundedDictionary<string, PendingParitySync> _pendingSyncs = new BoundedDictionary<string, PendingParitySync>(1000);
     // Per-datacenter parity ring: stores the last-known parity block for XOR chaining.
     private readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte[]?> _parityRing = new();
+    internal IReadOnlyDictionary<string, byte[]?> ParityRing => _parityRing;
     /// <summary>Optional message bus for publishing parity updates to remote DCs.</summary>
     public DataWarehouse.SDK.Contracts.IMessageBus? MessageBus { get; set; }
 
@@ -46,7 +47,7 @@ public sealed class GeoRaid
             case ParityDistributionStrategy.DistributedParity:
                 DistributeParityAcrossDatacenters(array);
                 break;
-            case ParityDistributionStrategy.DedicatedParityDC:
+            case ParityDistributionStrategy.DedicatedParityDc:
                 AssignDedicatedParityDatacenter(array, dcList.Last());
                 break;
             case ParityDistributionStrategy.LocalParityRemoteMirror:
@@ -113,7 +114,7 @@ public sealed class GeoRaid
             allocation.DataDiskAssignments.Add(new DiskAssignment
             {
                 DatacenterId = sortedDCs[i].DatacenterId,
-                DiskId = SelectBestDiskInDC(sortedDCs[i]),
+                DiskId = SelectBestDiskInDc(sortedDCs[i]),
                 IsParityDisk = false,
                 EstimatedLatencyMs = sortedDCs[i].P50LatencyMs
             });
@@ -125,7 +126,7 @@ public sealed class GeoRaid
             allocation.ParityDiskAssignments.Add(new DiskAssignment
             {
                 DatacenterId = sortedDCs[i].DatacenterId,
-                DiskId = SelectBestDiskInDC(sortedDCs[i]),
+                DiskId = SelectBestDiskInDc(sortedDCs[i]),
                 IsParityDisk = true,
                 EstimatedLatencyMs = sortedDCs[i].P50LatencyMs
             });
@@ -238,7 +239,7 @@ public sealed class GeoRaid
         var minRequired = array.ParityStrategy switch
         {
             ParityDistributionStrategy.DistributedParity => array.Datacenters.Count - 1,
-            ParityDistributionStrategy.DedicatedParityDC => array.Datacenters.Count - array.ParityDatacenterCount - 1,
+            ParityDistributionStrategy.DedicatedParityDc => array.Datacenters.Count - array.ParityDatacenterCount - 1,
             ParityDistributionStrategy.LocalParityRemoteMirror => 1,
             _ => array.Datacenters.Count - 1
         };
@@ -257,12 +258,12 @@ public sealed class GeoRaid
         array.ParityDatacenterCount = array.Datacenters.Count;
     }
 
-    private void AssignDedicatedParityDatacenter(GeoRaidArray array, DatacenterConfig parityDC)
+    private void AssignDedicatedParityDatacenter(GeoRaidArray array, DatacenterConfig parityDc)
     {
         foreach (var dc in array.Datacenters)
         {
-            dc.HoldsData = dc.DatacenterId != parityDC.DatacenterId;
-            dc.HoldsParity = dc.DatacenterId == parityDC.DatacenterId;
+            dc.HoldsData = dc.DatacenterId != parityDc.DatacenterId;
+            dc.HoldsParity = dc.DatacenterId == parityDc.DatacenterId;
         }
         array.ParityDatacenterCount = 1;
     }
@@ -283,7 +284,7 @@ public sealed class GeoRaid
         array.ParityDatacenterCount = 1;
     }
 
-    private string SelectBestDiskInDC(DatacenterConfig dc)
+    private string SelectBestDiskInDc(DatacenterConfig dc)
     {
         // Select disk with lowest queue depth and best health
         return dc.Disks
@@ -298,9 +299,9 @@ public sealed class GeoRaid
 
         try
         {
-            var parityDCs = array.Datacenters.Where(dc => dc.HoldsParity).ToList();
+            var parityDcs = array.Datacenters.Where(dc => dc.HoldsParity).ToList();
 
-            foreach (var dc in parityDCs)
+            foreach (var dc in parityDcs)
             {
                 ct.ThrowIfCancellationRequested();
 
@@ -383,7 +384,7 @@ public sealed class DatacenterConfig
     public DateTime LastHeartbeat { get; set; } = DateTime.UtcNow;
     public bool HoldsData { get; set; }
     public bool HoldsParity { get; set; }
-    public List<GeoDiskInfo> Disks { get; set; } = new();
+    public List<GeoDiskInfo> Disks { get; init; } = new();
 }
 
 /// <summary>
@@ -441,7 +442,7 @@ public enum FailureDomainType
 public enum ParityDistributionStrategy
 {
     DistributedParity,
-    DedicatedParityDC,
+    DedicatedParityDc,
     LocalParityRemoteMirror
 }
 
@@ -475,7 +476,7 @@ public sealed class StripeAllocation
 {
     public long BlockIndex { get; set; }
     public List<DiskAssignment> DataDiskAssignments { get; set; } = new();
-    public List<DiskAssignment> ParityDiskAssignments { get; set; } = new();
+    public List<DiskAssignment> ParityDiskAssignments { get; init; } = new();
     public int EstimatedWriteLatencyMs { get; set; }
     public int EstimatedReadLatencyMs { get; set; }
 }
@@ -551,7 +552,7 @@ public sealed class GeoRaidStatus
     public int HealthyDatacenters { get; set; }
     public int PendingSyncs { get; set; }
     public ParityDistributionStrategy ParityStrategy { get; set; }
-    public List<DatacenterStatus> DatacenterStatuses { get; set; } = new();
+    public List<DatacenterStatus> DatacenterStatuses { get; init; } = new();
 }
 
 /// <summary>

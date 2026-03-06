@@ -278,7 +278,7 @@ public sealed class VirtualDisk
     /// <summary>
     /// I/O operations delegate for reading/writing to this disk.
     /// </summary>
-    public required IDiskIO DiskIO { get; init; }
+    public required IDiskIo DiskIo { get; init; }
 
     /// <summary>
     /// Whether this disk supports TRIM/UNMAP commands.
@@ -295,7 +295,7 @@ public sealed class VirtualDisk
 /// Interface for disk I/O operations.
 /// Abstracts physical disk access for testing and flexibility.
 /// </summary>
-public interface IDiskIO
+public interface IDiskIo
 {
     /// <summary>
     /// Reads data from the disk.
@@ -315,13 +315,13 @@ public interface IDiskIO
     /// <summary>
     /// Gets the current I/O statistics for this disk.
     /// </summary>
-    DiskIOStatistics GetStatistics();
+    DiskIoStatistics GetStatistics();
 }
 
 /// <summary>
 /// Disk I/O statistics.
 /// </summary>
-public sealed class DiskIOStatistics
+public sealed class DiskIoStatistics
 {
     public long TotalReads { get; set; }
     public long TotalWrites { get; set; }
@@ -368,7 +368,7 @@ public sealed class RaidVerificationResult
     public long TotalBlocks { get; set; }
     public long VerifiedBlocks { get; set; }
     public long ErrorCount { get; set; }
-    public List<string> Errors { get; set; } = new();
+    public List<string> Errors { get; init; } = new();
     public TimeSpan Duration { get; set; }
 }
 
@@ -383,7 +383,7 @@ public sealed class RaidScrubResult
     public long ErrorsDetected { get; set; }
     public long ErrorsCorrected { get; set; }
     public long ErrorsUncorrectable { get; set; }
-    public List<string> Details { get; set; } = new();
+    public List<string> Details { get; init; } = new();
     public TimeSpan Duration { get; set; }
 }
 

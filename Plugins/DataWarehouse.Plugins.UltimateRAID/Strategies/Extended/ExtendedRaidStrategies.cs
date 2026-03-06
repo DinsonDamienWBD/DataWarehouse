@@ -37,8 +37,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             // RAID 0+1: Stripe data first, then mirror the stripes
             var halfCount = diskList.Count / 2;
@@ -69,8 +69,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var halfCount = diskList.Count / 2;
 
             var result = new byte[length];
@@ -250,8 +250,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             // RAID 100: Multiple RAID 10 arrays striped together
             var raid10Groups = diskList.Count / 4; // Each RAID 10 needs 4 disks minimum
@@ -287,8 +287,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var raid10Groups = diskList.Count / 4;
 
             var result = new byte[length];
@@ -468,8 +468,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             // Distribute across RAID 5 sets
             var raid5Sets = diskList.Count / 3; // Minimum 3 disks per RAID 5 set
@@ -518,8 +518,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var raid5Sets = diskList.Count / 3;
             var disksPerSet = diskList.Count / raid5Sets;
 
@@ -670,7 +670,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
 
             for (int i = 0; i < chunks.Count; i++)
             {
-                if (i != missingIndex && chunks[i] != null)
+                if (i != missingIndex)
                 {
                     for (int j = 0; j < Math.Min(Capabilities.StripeSize, chunks[i].Length); j++)
                     {
@@ -749,8 +749,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             var raid6Sets = diskList.Count / 4; // Minimum 4 disks per RAID 6 set
             var disksPerSet = diskList.Count / raid6Sets;
@@ -805,8 +805,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var raid6Sets = diskList.Count / 4;
             var disksPerSet = diskList.Count / raid6Sets;
 
@@ -955,7 +955,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
 
             for (int i = 0; i < chunks.Count; i++)
             {
-                if (i != missingIndex && chunks[i] != null)
+                if (i != missingIndex)
                 {
                     for (int j = 0; j < Math.Min(Capabilities.StripeSize, chunks[i].Length); j++)
                     {
@@ -1034,8 +1034,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var dataBytes = data.ToArray();
             var chunks = SplitIntoChunks(dataBytes, Capabilities.StripeSize);
 
@@ -1062,8 +1062,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             var result = new byte[length];
             var chunksNeeded = (int)Math.Ceiling((double)length / Capabilities.StripeSize);
@@ -1234,8 +1234,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var stripeInfo = CalculateStripe(offset / Capabilities.StripeSize, diskList.Count);
 
             var dataBytes = data.ToArray();
@@ -1274,8 +1274,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             var result = new byte[length];
             var chunksNeeded = (int)Math.Ceiling((double)length / Capabilities.StripeSize);
@@ -1414,7 +1414,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
 
             for (int i = 0; i < chunks.Count; i++)
             {
-                if (i != missingIndex && chunks[i] != null)
+                if (i != missingIndex)
                 {
                     for (int j = 0; j < Math.Min(Capabilities.StripeSize, chunks[i].Length); j++)
                     {
@@ -1493,8 +1493,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             var dataBytes = data.ToArray();
             var chunks = SplitIntoChunks(dataBytes, Capabilities.StripeSize);
@@ -1532,8 +1532,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             var result = new byte[length];
             var chunksNeeded = (int)Math.Ceiling((double)length / Capabilities.StripeSize);
@@ -1665,7 +1665,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
 
             for (int i = 0; i < chunks.Count; i++)
             {
-                if (i != missingIndex && chunks[i] != null)
+                if (i != missingIndex)
                 {
                     for (int j = 0; j < Math.Min(Capabilities.StripeSize, chunks[i].Length); j++)
                     {
@@ -1744,8 +1744,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             var dataBytes = data.ToArray();
             var chunks = SplitIntoChunks(dataBytes, Capabilities.StripeSize);
@@ -1787,8 +1787,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             var result = new byte[length];
             var chunksNeeded = (int)Math.Ceiling((double)length / Capabilities.StripeSize);
@@ -1920,7 +1920,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Extended
 
             for (int i = 0; i < chunks.Count; i++)
             {
-                if (i != missingIndex && chunks[i] != null)
+                if (i != missingIndex)
                 {
                     for (int j = 0; j < Math.Min(Capabilities.StripeSize, chunks[i].Length); j++)
                     {

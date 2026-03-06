@@ -96,8 +96,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var stripeInfo = CalculateStripe(offset / _chunkSize, diskList.Count);
 
             var dataBytes = data.ToArray();
@@ -129,8 +129,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var stripeInfo = CalculateStripe(offset / _chunkSize, diskList.Count);
 
             var availableChunks = new Dictionary<int, byte[]>();
@@ -234,7 +234,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             // Generate a regular LDPC parity-check matrix
             var n = _dataChunks + _parityChunks;
             var m = _parityChunks; // Number of parity equations
-            var H = new byte[m, n];
+            var h = new byte[m, n];
 
             // Use progressive edge growth algorithm (simplified)
             var random = new Random(42); // Deterministic for consistency
@@ -251,18 +251,18 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
                         // Check row weight constraint
                         var rowWeight = 0;
                         for (int k = 0; k < n; k++)
-                            if (H[pos, k] == 1) rowWeight++;
+                            if (h[pos, k] == 1) rowWeight++;
 
                         if (rowWeight < _rowWeight)
                         {
-                            H[pos, j] = 1;
+                            h[pos, j] = 1;
                             positions.Add(pos);
                         }
                     }
                 }
             }
 
-            return H;
+            return h;
         }
 
         private Dictionary<int, byte[]> EncodeLdpc(Dictionary<int, ReadOnlyMemory<byte>> dataChunks)
@@ -435,6 +435,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
         private readonly int _encodedSymbols; // n (but can generate more)
         private readonly double _overheadFactor;
         private readonly Random _random;
+        internal Random Random => _random;
         private readonly int[] _robustSolitonDegrees;
 
         /// <summary>
@@ -495,8 +496,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
             var stripeInfo = CalculateStripe(offset / _chunkSize, diskList.Count);
 
             var dataBytes = data.ToArray();
@@ -521,8 +522,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             var availableSymbols = new List<EncodedSymbol>();
 
@@ -635,8 +636,8 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             // Ideal soliton + spike
             var c = 0.1; // Tuning parameter
             var delta = 0.5; // Failure probability
-            var R = c * Math.Log(_sourceSymbols / delta) * Math.Sqrt(_sourceSymbols);
-            var threshold = (int)Math.Ceiling(_sourceSymbols / R);
+            var r = c * Math.Log(_sourceSymbols / delta) * Math.Sqrt(_sourceSymbols);
+            var threshold = (int)Math.Ceiling(_sourceSymbols / r);
 
             for (int i = 0; i < _sourceSymbols; i++)
             {
@@ -762,11 +763,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
                         // XOR out already-decoded neighbors
                         foreach (var neighbor in symbol.Neighbors)
                         {
-                            if (decoded[neighbor] && sourceSymbols[neighbor] != null)
+                            if (decoded[neighbor] && sourceSymbols[neighbor] is { } neighborData)
                             {
-                                for (int j = 0; j < _chunkSize && j < sourceSymbols[neighbor].Length; j++)
+                                for (int j = 0; j < _chunkSize && j < neighborData.Length; j++)
                                 {
-                                    sourceData[j] ^= sourceSymbols[neighbor][j];
+                                    sourceData[j] ^= neighborData[j];
                                 }
                             }
                         }
@@ -787,10 +788,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ErasureCoding
             // Fill in any still-missing symbols with zeros
             for (int i = 0; i < _sourceSymbols; i++)
             {
-                if (sourceSymbols[i] == null)
-                {
-                    sourceSymbols[i] = new byte[_chunkSize];
-                }
+                sourceSymbols[i] ??= new byte[_chunkSize];
             }
 
             return sourceSymbols.ToList();

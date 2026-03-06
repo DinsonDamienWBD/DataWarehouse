@@ -739,10 +739,10 @@ public sealed class ComplianceReporter
         // Check compliance requirements based on standard
         report.Checks = standard switch
         {
-            ComplianceStandard.SOC2 => CheckSoc2Compliance(entries),
-            ComplianceStandard.HIPAA => CheckHipaaCompliance(entries),
-            ComplianceStandard.GDPR => CheckGdprCompliance(entries),
-            ComplianceStandard.PCI_DSS => CheckPciCompliance(entries),
+            ComplianceStandard.Soc2 => CheckSoc2Compliance(entries),
+            ComplianceStandard.Hipaa => CheckHipaaCompliance(entries),
+            ComplianceStandard.Gdpr => CheckGdprCompliance(entries),
+            ComplianceStandard.PciDss => CheckPciCompliance(entries),
             _ => new List<ComplianceCheck>()
         };
 
@@ -1012,7 +1012,7 @@ public sealed class AuditQuery
     public int? Limit { get; set; }
 }
 
-public enum ComplianceStandard { SOC2, HIPAA, GDPR, PCI_DSS, ISO27001 }
+public enum ComplianceStandard { Soc2, Hipaa, Gdpr, PciDss, Iso27001 }
 
 public sealed class ComplianceReport
 {
@@ -1049,7 +1049,7 @@ public sealed class IntegrityChain
     public string ChainId { get; set; } = string.Empty;
     public string ArrayId { get; set; } = string.Empty;
     public DateTime CreatedTime { get; set; }
-    public List<ChainLink> Links { get; set; } = new();
+    public List<ChainLink> Links { get; init; } = new();
     public byte[] RootHash { get; set; } = Array.Empty<byte>();
 }
 

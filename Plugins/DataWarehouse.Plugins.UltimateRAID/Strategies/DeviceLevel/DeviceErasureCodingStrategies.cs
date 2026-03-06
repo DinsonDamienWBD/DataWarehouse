@@ -446,7 +446,7 @@ public sealed class DeviceReedSolomonStrategy : RaidStrategyBase, IDeviceErasure
                 }
             }
 
-            decodingMatrix = InvertMatrixGF(subMatrix);
+            decodingMatrix = InvertMatrixGf(subMatrix);
             _decodingMatrixCache.TryAdd(cacheKey, decodingMatrix);
         }
 
@@ -594,7 +594,7 @@ public sealed class DeviceReedSolomonStrategy : RaidStrategyBase, IDeviceErasure
     /// <summary>
     /// Inverts a square matrix in GF(2^8) using Gauss-Jordan elimination.
     /// </summary>
-    private static byte[,] InvertMatrixGF(byte[,] matrix)
+    private static byte[,] InvertMatrixGf(byte[,] matrix)
     {
         int n = matrix.GetLength(0);
         var augmented = new byte[n, 2 * n];
@@ -1127,8 +1127,8 @@ public sealed class DeviceFountainCodeStrategy : RaidStrategyBase, IDeviceErasur
         {
             int offset = i * blockSize;
             int copyLen = Math.Min(blockSize, dataLength - offset);
-            if (copyLen > 0 && recovered[i] != null)
-                recovered[i].AsSpan(0, copyLen).CopyTo(result.AsSpan(offset));
+            if (copyLen > 0 && recovered[i] is { } recoveredBlock)
+                recoveredBlock.AsSpan(0, copyLen).CopyTo(result.AsSpan(offset));
         }
 
         return result.AsMemory(0, dataLength);
@@ -1256,18 +1256,18 @@ public sealed class DeviceFountainCodeStrategy : RaidStrategyBase, IDeviceErasur
         // Robust Soliton: add spike at degree 1 and k/S
         double c = 0.1; // Tuning constant
         double delta = 0.05; // Failure probability
-        double S = c * Math.Log(k / delta) * Math.Sqrt(k);
+        double s = c * Math.Log(k / delta) * Math.Sqrt(k);
 
         var tau = new double[k + 1];
-        int kOverS = Math.Max(1, (int)Math.Round(k / S));
+        int kOverS = Math.Max(1, (int)Math.Round(k / s));
 
         for (int d = 1; d < kOverS && d <= k; d++)
         {
-            tau[d] = S / ((double)k * d);
+            tau[d] = s / ((double)k * d);
         }
         if (kOverS <= k)
         {
-            tau[kOverS] = S * Math.Log(S / delta) / k;
+            tau[kOverS] = s * Math.Log(s / delta) / k;
         }
 
         // Combine and normalize
@@ -1323,7 +1323,7 @@ public sealed class DeviceFountainCodeStrategy : RaidStrategyBase, IDeviceErasur
 [SdkCompatibility("6.0.0", Notes = "Phase 91: Device erasure coding (CBDV-03)")]
 public static class DeviceErasureCodingRegistry
 {
-    private static readonly ConcurrentDictionary<string, IDeviceErasureCodingStrategy> _strategies = new();
+    private static readonly ConcurrentDictionary<string, IDeviceErasureCodingStrategy> Strategies = new();
 
     static DeviceErasureCodingRegistry()
     {
@@ -1340,7 +1340,7 @@ public static class DeviceErasureCodingRegistry
     public static void Register(IDeviceErasureCodingStrategy strategy)
     {
         ArgumentNullException.ThrowIfNull(strategy);
-        _strategies[strategy.StrategyId] = strategy;
+        Strategies[strategy.StrategyId] = strategy;
     }
 
     /// <summary>
@@ -1350,7 +1350,7 @@ public static class DeviceErasureCodingRegistry
     /// <returns>The strategy, or null if not found.</returns>
     public static IDeviceErasureCodingStrategy? Get(string strategyId)
     {
-        _strategies.TryGetValue(strategyId, out var strategy);
+        Strategies.TryGetValue(strategyId, out var strategy);
         return strategy;
     }
 
@@ -1359,7 +1359,7 @@ public static class DeviceErasureCodingRegistry
     /// </summary>
     public static IReadOnlyCollection<IDeviceErasureCodingStrategy> GetAll()
     {
-        return _strategies.Values.ToList().AsReadOnly();
+        return Strategies.Values.ToList().AsReadOnly();
     }
 }
 

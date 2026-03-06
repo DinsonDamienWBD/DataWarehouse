@@ -518,11 +518,13 @@ public sealed class RaidDeduplication
 public sealed class DedupIndex
 {
     private readonly string _arrayId;
+    internal string ArrayId => _arrayId;
     private readonly BoundedDictionary<byte[], DedupEntry> _entries = new(1000, new ByteArrayComparer());
     // address -> canonical address mapping for UpdateBlockReference redirects
     private readonly System.Collections.Concurrent.ConcurrentDictionary<long, long> _referenceRedirects = new();
     // freed addresses not yet reclaimed
     private readonly System.Collections.Concurrent.ConcurrentBag<long> _freedAddresses = new();
+    internal IReadOnlyCollection<long> FreedAddresses => _freedAddresses.ToArray();
 
     /// <summary>Block device path (e.g. file path or raw device) backing this RAID array.</summary>
     public string? DevicePath { get; set; }
@@ -653,7 +655,7 @@ public sealed class DedupAwareParity
     public List<byte[]> ParityBlocks { get; set; } = new();
     public long ParityBytesCalculated { get; set; }
     public double ParityOptimizationRatio { get; set; }
-    public List<DedupParityReference> DuplicateReferences { get; set; } = new();
+    public List<DedupParityReference> DuplicateReferences { get; init; } = new();
 }
 
 /// <summary>
@@ -706,7 +708,7 @@ internal sealed class ByteArrayComparer : IEqualityComparer<byte[]>
 
     public int GetHashCode(byte[] obj)
     {
-        if (obj == null || obj.Length == 0) return 0;
+        if (obj.Length == 0) return 0;
         unchecked
         {
             int hash = 17;

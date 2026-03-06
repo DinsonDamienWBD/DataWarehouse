@@ -55,13 +55,12 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
+            var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             // Track write patterns
             lock (_metricsLock) { _workloadMetrics["WriteCount"]++; }
-            AdaptToWorkload(disks);
-
-            var diskList = disks.ToList();
+            AdaptToWorkload(diskList);
             var stripeInfo = CalculateStripe(offset / Capabilities.StripeSize, diskList.Count);
 
             // Write using current adaptive strategy
@@ -74,13 +73,12 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
+            var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             // Track read patterns
             lock (_metricsLock) { _workloadMetrics["ReadCount"]++; }
-            AdaptToWorkload(disks);
-
-            var diskList = disks.ToList();
+            AdaptToWorkload(diskList);
             var stripeInfo = CalculateStripe(offset / Capabilities.StripeSize, diskList.Count);
 
             // Read using current adaptive strategy
@@ -514,12 +512,12 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
+            var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             // Monitor health during writes
-            await MonitorDiskHealth(disks, cancellationToken);
+            await MonitorDiskHealth(diskList, cancellationToken);
 
-            var diskList = disks.ToList();
             var stripeInfo = CalculateStripe(offset / Capabilities.StripeSize, diskList.Count);
 
             var chunks = DistributeData(data, stripeInfo);
@@ -555,19 +553,18 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
+            var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
 
             // Monitor health during reads
-            await MonitorDiskHealth(disks, cancellationToken);
+            await MonitorDiskHealth(diskList, cancellationToken);
 
-            var diskList = disks.ToList();
             var stripeInfo = CalculateStripe(offset / Capabilities.StripeSize, diskList.Count);
 
             var result = new byte[length];
             var position = 0;
 
             // Read data chunks from data disks
-            var readChunks = new List<ReadOnlyMemory<byte>>();
             var failedDiskIndices = new List<int>();
 
             for (int i = 0; i < stripeInfo.DataDisks.Length && position < length; i++)
@@ -580,13 +577,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                 {
                     // In production: var chunk = disk.Read(offset, chunkSize)
                     var chunk = new byte[chunkSize];
-                    readChunks.Add(chunk);
                     Array.Copy(chunk, 0, result, position, chunkSize);
                 }
                 else
                 {
                     failedDiskIndices.Add(i);
-                    readChunks.Add(ReadOnlyMemory<byte>.Empty);
                 }
 
                 position += chunkSize;
@@ -704,10 +699,11 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             IEnumerable<DiskInfo> disks,
             CancellationToken cancellationToken = default)
         {
-            var baseHealth = await base.CheckHealthAsync(disks, cancellationToken);
+            var diskList = disks.ToList();
+            var baseHealth = await base.CheckHealthAsync(diskList, cancellationToken);
 
             // AI-driven predictive failure detection
-            var predictedFailures = await PredictDiskFailures(disks, cancellationToken);
+            var predictedFailures = await PredictDiskFailures(diskList, cancellationToken);
 
             var warnings = baseHealth.SmartWarnings.ToList();
             foreach (var prediction in predictedFailures)
@@ -1052,9 +1048,9 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
-
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
+
             var blockIndex = offset / Capabilities.StripeSize;
 
             // Track access patterns
@@ -1080,9 +1076,9 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
-
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
+
             var blockIndex = offset / Capabilities.StripeSize;
             TrackAccess(blockIndex, isWrite: false);
 
@@ -1167,17 +1163,6 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                 var tier = DetermineDataTier(blockIndex);
                 var tierDisks = SelectDisksForTier(diskList, tier);
                 var stripeInfo = CalculateStripe(blockIndex, tierDisks.Count + 1);
-
-                // Read data from healthy disks in tier
-                var dataChunks = new List<ReadOnlyMemory<byte>>();
-                foreach (var diskIndex in stripeInfo.DataDisks)
-                {
-                    if (tierDisks[diskIndex].HealthStatus == SdkDiskHealthStatus.Healthy)
-                    {
-                        // In production: dataChunks.Add(tierDisks[diskIndex].Read(offset, Capabilities.StripeSize))
-                        dataChunks.Add(new byte[Capabilities.StripeSize]);
-                    }
-                }
 
                 // Read P and Q parity from tier
                 var pParity = new byte[Capabilities.StripeSize];
@@ -1303,7 +1288,13 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             var promotionCandidates = new List<(long blockIndex, StorageTier currentTier, StorageTier targetTier)>();
             var demotionCandidates = new List<(long blockIndex, StorageTier currentTier, StorageTier targetTier)>();
 
-            foreach (var kvp in _accessPatterns)
+            List<KeyValuePair<long, AccessPattern>> accessSnapshot;
+            lock (_accessPatternsLock)
+            {
+                accessSnapshot = _accessPatterns.ToList();
+            }
+
+            foreach (var kvp in accessSnapshot)
             {
                 var blockIndex = kvp.Key;
                 var currentTier = GetCurrentTier(blockIndex);
@@ -1495,9 +1486,9 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             long offset,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
-
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
+
             var partition = DeterminePartition(offset, diskList);
 
             // Write to appropriate partition with its RAID level
@@ -1513,9 +1504,9 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
             int length,
             CancellationToken cancellationToken = default)
         {
-            ValidateDiskConfiguration(disks);
-
             var diskList = disks.ToList();
+            ValidateDiskConfiguration(diskList);
+
             var partition = DeterminePartition(offset, diskList);
 
             // Calculate stripe within this partition
@@ -1648,8 +1639,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
 
                         case RaidLevel.Raid10:
                             // Read from mirror disk
-                            var mirrorDiskIndex = GetMirrorDiskIndex(0, diskList.Count);
-                            // In production: reconstructedData = diskList[mirrorDiskIndex].Read(offset, Capabilities.StripeSize)
+                            _ = GetMirrorDiskIndex(0, diskList.Count);
                             reconstructedData = new byte[Capabilities.StripeSize];
                             break;
 
@@ -2764,7 +2754,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                 var efficiency = GetStorageEfficiency(level, availableDisks);
                 var usableCapacityFactor = efficiency * availableDisks;
                 var totalCost = availableDisks * costPerDiskUsd;
-                var costPerUsableTB = usableCapacityFactor > 0 ? totalCost / usableCapacityFactor : double.MaxValue;
+                var costPerUsableTb = usableCapacityFactor > 0 ? totalCost / usableCapacityFactor : double.MaxValue;
 
                 configs.Add(new CostConfiguration
                 {
@@ -2772,7 +2762,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
                     DiskCount = availableDisks,
                     StorageEfficiency = efficiency,
                     TotalCostUsd = totalCost,
-                    CostPerUsableDiskEquivalent = Math.Round(costPerUsableTB, 2),
+                    CostPerUsableDiskEquivalent = Math.Round(costPerUsableTb, 2),
                     PerformanceFit = ScorePerformanceFit(level, workload)
                 });
             }
@@ -3049,6 +3039,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
     public sealed class RecommendationGenerator
     {
         private readonly bool _isIntelligenceAvailable;
+        internal bool IsIntelligenceAvailable => _isIntelligenceAvailable;
 
         public RecommendationGenerator(bool isIntelligenceAvailable = false)
         {
@@ -3381,7 +3372,7 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.Adaptive
 
     public sealed class RaidSystemStatus
     {
-        public List<RaidArrayStatus> Arrays { get; set; } = new();
+        public List<RaidArrayStatus> Arrays { get; init; } = new();
         public double AverageReadThroughputMBps { get; set; }
         public double AverageWriteThroughputMBps { get; set; }
     }
