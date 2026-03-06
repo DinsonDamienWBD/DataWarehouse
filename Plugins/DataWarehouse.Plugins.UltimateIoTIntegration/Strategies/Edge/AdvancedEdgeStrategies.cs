@@ -194,7 +194,7 @@ public sealed class OfflineSyncStrategy : EdgeIntegrationStrategyBase
     private readonly ConcurrentQueue<OfflineOperation> _operationLog = new();
     private readonly BoundedDictionary<string, long> _vectorClock = new BoundedDictionary<string, long>(1000);
     private bool _isOnline;
-    private DateTimeOffset _lastSyncTime = DateTimeOffset.MinValue;
+    internal DateTimeOffset LastSyncTime { get; private set; } = DateTimeOffset.MinValue;
 
     /// <summary>Records an operation while offline.</summary>
     public void RecordOfflineOperation(string key, OfflineOperationType type, byte[]? data = null)
@@ -258,7 +258,7 @@ public sealed class OfflineSyncStrategy : EdgeIntegrationStrategyBase
         }
 
         result.PendingRemaining = _operationLog.Count;
-        _lastSyncTime = DateTimeOffset.UtcNow;
+        LastSyncTime = DateTimeOffset.UtcNow;
         _isOnline = true;
         return result;
     }
@@ -704,18 +704,18 @@ public sealed class EdgeAnalyticsStrategy : EdgeIntegrationStrategyBase
         var n = values.Length;
         var sumX = 0.0;
         var sumY = 0.0;
-        var sumXY = 0.0;
+        var sumXy = 0.0;
         var sumX2 = 0.0;
 
         for (var i = 0; i < n; i++)
         {
             sumX += i;
             sumY += values[i].Value;
-            sumXY += i * values[i].Value;
+            sumXy += i * values[i].Value;
             sumX2 += i * i;
         }
 
-        var slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
+        var slope = (n * sumXy - sumX * sumY) / (n * sumX2 - sumX * sumX);
         var intercept = (sumY - slope * sumX) / n;
 
         return new TrendAnalysis

@@ -10,10 +10,10 @@ namespace DataWarehouse.Plugins.UltimateIoTIntegration.Strategies.SensorFusion;
 public enum SensorType
 {
     /// <summary>GPS location sensor.</summary>
-    GPS,
+    Gps,
 
     /// <summary>Inertial Measurement Unit.</summary>
-    IMU,
+    Imu,
 
     /// <summary>Accelerometer sensor.</summary>
     Accelerometer,

@@ -93,8 +93,8 @@ public sealed class SensorFusionEngine
         var sensorTypes = alignedReadings.Select(r => r.SensorType).Distinct().ToArray();
 
         // GPS + IMU → Kalman filter
-        if (sensorTypes.Contains(SensorType.GPS) &&
-            (sensorTypes.Contains(SensorType.IMU) || sensorTypes.Contains(SensorType.Accelerometer)))
+        if (sensorTypes.Contains(SensorType.Gps) &&
+            (sensorTypes.Contains(SensorType.Imu) || sensorTypes.Contains(SensorType.Accelerometer)))
         {
             if (_kalmanFilter != null)
             {
@@ -137,8 +137,8 @@ public sealed class SensorFusionEngine
         ct.ThrowIfCancellationRequested();
 
         // Find GPS and IMU/Accelerometer readings
-        var gpsReading = readings.FirstOrDefault(r => r.SensorType == SensorType.GPS);
-        var imuReading = readings.FirstOrDefault(r => r.SensorType == SensorType.IMU)
+        var gpsReading = readings.FirstOrDefault(r => r.SensorType == SensorType.Gps);
+        var imuReading = readings.FirstOrDefault(r => r.SensorType == SensorType.Imu)
                         ?? readings.FirstOrDefault(r => r.SensorType == SensorType.Accelerometer);
 
         if (gpsReading == null || imuReading == null)

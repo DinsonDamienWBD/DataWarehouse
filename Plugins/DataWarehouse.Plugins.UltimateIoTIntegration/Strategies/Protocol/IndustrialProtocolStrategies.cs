@@ -405,7 +405,7 @@ public class Iec104ProtocolStrategy : ProtocolStrategyBase
     public Task<Iec104Response> ClockSyncAsync(string connectionId, int commonAddress, CancellationToken ct = default)
     {
         var now = DateTimeOffset.UtcNow;
-        var cp56 = EncodeCP56Time2a(now);
+        var cp56 = EncodeCp56Time2A(now);
 
         var asdu = BuildAsdu(103, 0x06, commonAddress, // C_CS_NA_1, act
             new byte[] { 0x00, 0x00, 0x00 }.Concat(cp56).ToArray());
@@ -478,7 +478,7 @@ public class Iec104ProtocolStrategy : ProtocolStrategyBase
         return asdu.ToArray();
     }
 
-    private static byte[] EncodeCP56Time2a(DateTimeOffset time)
+    private static byte[] EncodeCp56Time2A(DateTimeOffset time)
     {
         var ms = time.Millisecond + time.Second * 1000;
         return new byte[]
@@ -1561,13 +1561,13 @@ public class RtosBridgeStrategy : ProtocolStrategyBase
 }
 
 /// <summary>RTOS platforms.</summary>
-public enum RtosPlatform { Simulation, VxWorks, QNX, FreeRTOS, Zephyr, Unknown }
+public enum RtosPlatform { Simulation, VxWorks, Qnx, FreeRtos, Zephyr, Unknown }
 
 /// <summary>RTOS task run states.</summary>
 public enum RtosTaskRunState { Ready, Running, Blocked, Suspended, Terminated }
 
 /// <summary>RTOS memory pools.</summary>
-public enum RtosMemoryPool { Default, DMA, HighPriority, Shared }
+public enum RtosMemoryPool { Default, Dma, HighPriority, Shared }
 
 /// <summary>RTOS task handle.</summary>
 public sealed class RtosTaskHandle

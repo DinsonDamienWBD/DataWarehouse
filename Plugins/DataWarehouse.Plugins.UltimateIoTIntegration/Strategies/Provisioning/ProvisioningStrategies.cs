@@ -204,7 +204,7 @@ public class TpmProvisioningStrategy : ProvisioningStrategyBase
     public override string StrategyName => "TPM Attestation Provisioning";
     public override string Description => "Hardware-backed device provisioning using TPM attestation";
     public override string[] Tags => new[] { "iot", "provisioning", "tpm", "attestation", "hardware", "security" };
-    public override CredentialType[] SupportedCredentialTypes => new[] { CredentialType.TPMEndorsementKey };
+    public override CredentialType[] SupportedCredentialTypes => new[] { CredentialType.TpmEndorsementKey };
 
     public override Task<ProvisioningResult> ProvisionAsync(ProvisioningRequest request, CancellationToken ct = default)
     {
@@ -225,7 +225,7 @@ public class TpmProvisioningStrategy : ProvisioningStrategyBase
         var credentials = new DeviceCredentials
         {
             DeviceId = deviceId,
-            Type = CredentialType.TPMEndorsementKey,
+            Type = CredentialType.TpmEndorsementKey,
             ExpiresAt = DateTimeOffset.MaxValue // TPM keys don't expire
         };
 
@@ -253,7 +253,7 @@ public class DpsEnrollmentStrategy : ProvisioningStrategyBase
     public override string StrategyName => "DPS Enrollment";
     public override string Description => "Cloud-based Device Provisioning Service enrollment";
     public override string[] Tags => new[] { "iot", "provisioning", "dps", "cloud", "enrollment", "azure", "aws" };
-    public override CredentialType[] SupportedCredentialTypes => new[] { CredentialType.SymmetricKey, CredentialType.X509Certificate, CredentialType.TPMEndorsementKey };
+    public override CredentialType[] SupportedCredentialTypes => new[] { CredentialType.SymmetricKey, CredentialType.X509Certificate, CredentialType.TpmEndorsementKey };
 
     public override Task<ProvisioningResult> ProvisionAsync(ProvisioningRequest request, CancellationToken ct = default)
     {

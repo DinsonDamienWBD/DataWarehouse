@@ -340,7 +340,7 @@ public sealed class DicomNetworkStrategy : ProtocolStrategyBase
             {
                 PresentationContextId = (byte)(i * 2 + 1), // Odd numbers per DICOM spec
                 AbstractSyntax = sop.Uid,
-                TransferSyntaxes = new[] { DicomTransferSyntax.ExplicitVRLittleEndian, DicomTransferSyntax.ImplicitVRLittleEndian },
+                TransferSyntaxes = new[] { DicomTransferSyntax.ExplicitVrLittleEndian, DicomTransferSyntax.ImplicitVrLittleEndian },
                 Result = DicomPresentationContextResult.Acceptance
             }).ToArray(),
             NegotiatedAt = DateTimeOffset.UtcNow
@@ -532,9 +532,9 @@ public enum DicomPresentationContextResult
 /// <summary>DICOM transfer syntax UIDs.</summary>
 public static class DicomTransferSyntax
 {
-    public const string ImplicitVRLittleEndian = "1.2.840.10008.1.2";
-    public const string ExplicitVRLittleEndian = "1.2.840.10008.1.2.1";
-    public const string ExplicitVRBigEndian = "1.2.840.10008.1.2.2";
+    public const string ImplicitVrLittleEndian = "1.2.840.10008.1.2";
+    public const string ExplicitVrLittleEndian = "1.2.840.10008.1.2.1";
+    public const string ExplicitVrBigEndian = "1.2.840.10008.1.2.2";
     public const string Jpeg2000Lossless = "1.2.840.10008.1.2.4.90";
     public const string Jpeg2000 = "1.2.840.10008.1.2.4.91";
 }
@@ -554,8 +554,8 @@ public sealed class DicomSopClass
     public static readonly DicomSopClass DxImageStorage = new("1.2.840.10008.5.1.4.1.1.1.1", "Digital X-Ray Image Storage");
     public static readonly DicomSopClass NmImageStorage = new("1.2.840.10008.5.1.4.1.1.20", "Nuclear Medicine Image Storage");
     public static readonly DicomSopClass PetImageStorage = new("1.2.840.10008.5.1.4.1.1.128", "PET Image Storage");
-    public static readonly DicomSopClass PatientRootQR = new("1.2.840.10008.5.1.4.1.2.1.1", "Patient Root Query/Retrieve - FIND");
-    public static readonly DicomSopClass StudyRootQR = new("1.2.840.10008.5.1.4.1.2.2.1", "Study Root Query/Retrieve - FIND");
+    public static readonly DicomSopClass PatientRootQr = new("1.2.840.10008.5.1.4.1.2.1.1", "Patient Root Query/Retrieve - FIND");
+    public static readonly DicomSopClass StudyRootQr = new("1.2.840.10008.5.1.4.1.2.2.1", "Study Root Query/Retrieve - FIND");
 }
 
 /// <summary>DICOM query/retrieve level.</summary>
@@ -570,7 +570,7 @@ public enum DicomStatus : ushort
     Cancel = 0xFE00,
     ProcessingFailure = 0x0110,
     ClassInstanceConflict = 0x0119,
-    DuplicateSOPInstance = 0x0111,
+    DuplicateSopInstance = 0x0111,
     OutOfResources = 0xA700,
     UnableToProcess = 0xC000
 }
@@ -644,7 +644,7 @@ public sealed class FhirR4Strategy : ProtocolStrategyBase
     public override async IAsyncEnumerable<byte[]> SubscribeAsync(string topic, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default)
     { yield break; }
 
-    private static readonly Dictionary<string, FhirResourceDefinition> _resourceDefinitions = InitializeResourceDefinitions();
+    private static readonly Dictionary<string, FhirResourceDefinition> ResourceDefinitions = InitializeResourceDefinitions();
 
     /// <summary>
     /// Validates a FHIR R4 resource against its StructureDefinition.
@@ -654,7 +654,7 @@ public sealed class FhirR4Strategy : ProtocolStrategyBase
         RecordOperation();
         var result = new FhirValidationResult { ResourceType = resourceType };
 
-        if (!_resourceDefinitions.TryGetValue(resourceType, out var definition))
+        if (!ResourceDefinitions.TryGetValue(resourceType, out var definition))
         {
             result.Issues.Add(new FhirValidationIssue
             {

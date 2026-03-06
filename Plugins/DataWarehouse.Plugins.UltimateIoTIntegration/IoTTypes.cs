@@ -85,7 +85,7 @@ public enum CredentialType
 {
     SymmetricKey,
     X509Certificate,
-    TPMEndorsementKey,
+    TpmEndorsementKey,
     SasToken
 }
 

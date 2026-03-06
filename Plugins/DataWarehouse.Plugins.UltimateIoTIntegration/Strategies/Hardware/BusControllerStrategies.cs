@@ -139,7 +139,7 @@ public class GpioControllerStrategy : HardwareBusStrategyBase
 public class I2cControllerStrategy : HardwareBusStrategyBase
 {
     private bool _busInitialized;
-    private int _busFrequency = 100000; // 100 kHz standard mode
+    internal int BusFrequency { get; private set; } = 100000; // 100 kHz standard mode
 
     public override string StrategyId => "i2c-controller";
     public override string StrategyName => "I2C Controller";
@@ -150,7 +150,7 @@ public class I2cControllerStrategy : HardwareBusStrategyBase
     public override Task<bool> InitializeAsync(BusConfiguration config, CancellationToken ct = default)
     {
         if (config.BusFrequency > 0)
-            _busFrequency = config.BusFrequency;
+            BusFrequency = config.BusFrequency;
 
         // In production, would configure I2C controller registers:
         // - Set SCL/SDA pins
@@ -262,9 +262,9 @@ public class I2cControllerStrategy : HardwareBusStrategyBase
 public class SpiControllerStrategy : HardwareBusStrategyBase
 {
     private bool _busInitialized;
-    private SpiMode _mode = SpiMode.Mode0;
-    private int _clockFrequency = 1000000; // 1 MHz
-    private int _chipSelectPin = -1;
+    internal SpiMode ConfiguredMode { get; private set; } = SpiMode.Mode0;
+    internal int ClockFrequency { get; private set; } = 1000000; // 1 MHz
+    internal int ChipSelectPin { get; private set; } = -1;
 
     public override string StrategyId => "spi-controller";
     public override string StrategyName => "SPI Controller";
@@ -275,13 +275,13 @@ public class SpiControllerStrategy : HardwareBusStrategyBase
     public override Task<bool> InitializeAsync(BusConfiguration config, CancellationToken ct = default)
     {
         if (config.SpiMode.HasValue)
-            _mode = config.SpiMode.Value;
+            ConfiguredMode = config.SpiMode.Value;
 
         if (config.BusFrequency > 0)
-            _clockFrequency = config.BusFrequency;
+            ClockFrequency = config.BusFrequency;
 
         if (config.ChipSelectPin >= 0)
-            _chipSelectPin = config.ChipSelectPin;
+            ChipSelectPin = config.ChipSelectPin;
 
         // In production, would configure SPI controller registers:
         // - Set MOSI/MISO/SCK pins
@@ -335,7 +335,7 @@ public class SpiControllerStrategy : HardwareBusStrategyBase
     /// </summary>
     public Task SetModeAsync(SpiMode mode, CancellationToken ct = default)
     {
-        _mode = mode;
+        ConfiguredMode = mode;
 
         // In production, would update SPI control register:
         // Mode 0: CPOL=0, CPHA=0 (idle low, sample on leading edge)
