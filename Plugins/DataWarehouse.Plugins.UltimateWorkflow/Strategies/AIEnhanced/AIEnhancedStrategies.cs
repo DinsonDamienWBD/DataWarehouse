@@ -11,7 +11,7 @@ public sealed class AIOptimizedWorkflowStrategy : WorkflowStrategyBase
     {
         StrategyName = "AIOptimizedWorkflow",
         Description = "AI-enhanced workflow optimization with predictive scheduling and resource allocation",
-        Category = WorkflowCategory.AIEnhanced,
+        Category = WorkflowCategory.AiEnhanced,
         Capabilities = new(
             SupportsParallelExecution: true,
             SupportsDynamicDag: true,
@@ -114,7 +114,7 @@ public sealed class SelfLearningWorkflowStrategy : WorkflowStrategyBase
     {
         StrategyName = "SelfLearning",
         Description = "Self-learning workflow strategy that improves over time based on execution patterns",
-        Category = WorkflowCategory.AIEnhanced,
+        Category = WorkflowCategory.AiEnhanced,
         Capabilities = new(
             SupportsParallelExecution: true,
             SupportsDynamicDag: true,
@@ -214,7 +214,7 @@ public sealed class AnomalyDetectionWorkflowStrategy : WorkflowStrategyBase
     {
         StrategyName = "AnomalyDetection",
         Description = "Anomaly detection workflow strategy that identifies unusual execution patterns",
-        Category = WorkflowCategory.AIEnhanced,
+        Category = WorkflowCategory.AiEnhanced,
         Capabilities = new(
             SupportsParallelExecution: true,
             SupportsDynamicDag: false,
@@ -323,7 +323,7 @@ public sealed class PredictiveScalingStrategy : WorkflowStrategyBase
     {
         StrategyName = "PredictiveScaling",
         Description = "Predictive scaling workflow strategy that anticipates resource needs",
-        Category = WorkflowCategory.AIEnhanced,
+        Category = WorkflowCategory.AiEnhanced,
         Capabilities = new(
             SupportsParallelExecution: true,
             SupportsDynamicDag: true,
@@ -439,7 +439,7 @@ public sealed class IntelligentRetryStrategy : WorkflowStrategyBase
     {
         StrategyName = "IntelligentRetry",
         Description = "Intelligent retry strategy that learns from failure patterns to optimize retry behavior",
-        Category = WorkflowCategory.AIEnhanced,
+        Category = WorkflowCategory.AiEnhanced,
         Capabilities = new(
             SupportsParallelExecution: true,
             SupportsDynamicDag: false,

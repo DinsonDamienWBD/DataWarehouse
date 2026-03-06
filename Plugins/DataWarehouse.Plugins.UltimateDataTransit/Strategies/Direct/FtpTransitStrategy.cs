@@ -300,6 +300,13 @@ internal sealed class FtpTransitStrategy : DataTransitStrategyBase
         private readonly string _transferId;
         private readonly long _totalBytes;
         private readonly Action<long> _updateBytesRead;
+
+        /// <summary>Gets the progress reporter for transfer status updates.</summary>
+        internal IProgress<TransitProgress>? Progress => _progress;
+        /// <summary>Gets the unique transfer identifier.</summary>
+        internal string TransferId => _transferId;
+        /// <summary>Gets the total bytes expected in this transfer.</summary>
+        internal long TotalBytes => _totalBytes;
         private long _bytesRead;
 
         /// <summary>

@@ -99,7 +99,7 @@ internal sealed class CostAwareRouter
     /// <summary>
     /// Number of bytes in one gigabyte, used for cost calculations.
     /// </summary>
-    private const decimal BytesPerGB = 1_073_741_824m;
+    private const decimal BytesPerGb = 1_073_741_824m;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="CostAwareRouter"/> class.
@@ -257,8 +257,8 @@ internal sealed class CostAwareRouter
     /// <returns>The total cost in currency units.</returns>
     private static decimal ComputeRouteCost(TransitCostProfile profile, long sizeBytes)
     {
-        var dataSizeGB = sizeBytes / BytesPerGB;
-        return profile.FixedCostPerTransfer + (profile.CostPerGb * dataSizeGB);
+        var dataSizeGb = sizeBytes / BytesPerGb;
+        return profile.FixedCostPerTransfer + (profile.CostPerGb * dataSizeGb);
     }
 
     /// <summary>

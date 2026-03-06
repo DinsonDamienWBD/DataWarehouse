@@ -142,11 +142,12 @@ public sealed class UltimateDataIntegrationPlugin : OrchestrationPluginBase, IDi
                         RegisterOrchestrationStrategy(iStrategy);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-
-                // Skip strategies that fail to instantiate
-                System.Diagnostics.Debug.WriteLine("[Warning] caught exception in catch block");
+                // Skip strategies that fail to instantiate — log via Trace for Release builds
+                System.Diagnostics.Trace.TraceWarning(
+                    "[UltimateDataIntegration] Failed to instantiate strategy type {0}: {1}",
+                    type.FullName, ex.Message);
             }
         }
     }

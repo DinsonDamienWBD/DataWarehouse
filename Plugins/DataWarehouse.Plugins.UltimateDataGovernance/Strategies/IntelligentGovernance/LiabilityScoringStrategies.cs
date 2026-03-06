@@ -119,7 +119,7 @@ internal static class LiabilityScanConstants
 
 #endregion
 
-#region Strategy 1: PIILiabilityStrategy
+#region Strategy 1: PiiLiabilityStrategy
 
 /// <summary>
 /// Scores liability based on the presence of Personally Identifiable Information (PII).
@@ -127,7 +127,7 @@ internal static class LiabilityScanConstants
 /// email addresses, SSNs, phone numbers, credit card numbers (Luhn-validated),
 /// passport numbers, and dates of birth.
 /// </summary>
-public sealed class PIILiabilityStrategy : ConsciousnessStrategyBase
+public sealed class PiiLiabilityStrategy : ConsciousnessStrategyBase
 {
     public override string StrategyId => "liability-pii";
     public override string DisplayName => "PII Liability Scorer";
@@ -250,14 +250,14 @@ public sealed class PIILiabilityStrategy : ConsciousnessStrategyBase
 
 #endregion
 
-#region Strategy 2: PHILiabilityStrategy
+#region Strategy 2: PhiLiabilityStrategy
 
 /// <summary>
 /// Scores liability based on the presence of Protected Health Information (PHI).
 /// Scans for ICD codes, medication names (common drug suffixes), diagnosis keywords,
 /// and patient ID patterns. HIPAA-relevant data receives a minimum score of 80.
 /// </summary>
-public sealed class PHILiabilityStrategy : ConsciousnessStrategyBase
+public sealed class PhiLiabilityStrategy : ConsciousnessStrategyBase
 {
     public override string StrategyId => "liability-phi";
     public override string DisplayName => "PHI Liability Scorer";
@@ -373,14 +373,14 @@ public sealed class PHILiabilityStrategy : ConsciousnessStrategyBase
 
 #endregion
 
-#region Strategy 3: PCILiabilityStrategy
+#region Strategy 3: PciLiabilityStrategy
 
 /// <summary>
 /// Scores liability based on the presence of Payment Card Industry (PCI) data.
 /// Detects credit card numbers (with Luhn validation), CVV patterns, and expiry dates.
 /// Tokenized data receives a 60% reduction in liability score.
 /// </summary>
-public sealed class PCILiabilityStrategy : ConsciousnessStrategyBase
+public sealed class PciLiabilityStrategy : ConsciousnessStrategyBase
 {
     public override string StrategyId => "liability-pci";
     public override string DisplayName => "PCI Liability Scorer";
@@ -888,9 +888,9 @@ public sealed class CompositeLiabilityScoringStrategy : ConsciousnessStrategyBas
             [LiabilityDimension.BreachRisk] = 0.10
         };
 
-    private readonly PIILiabilityStrategy _piiStrategy = new();
-    private readonly PHILiabilityStrategy _phiStrategy = new();
-    private readonly PCILiabilityStrategy _pciStrategy = new();
+    private readonly PiiLiabilityStrategy _piiStrategy = new();
+    private readonly PhiLiabilityStrategy _phiStrategy = new();
+    private readonly PciLiabilityStrategy _pciStrategy = new();
     private readonly ClassificationLiabilityStrategy _classificationStrategy = new();
     private readonly RetentionLiabilityStrategy _retentionStrategy = new();
     private readonly RegulatoryExposureLiabilityStrategy _regulatoryStrategy = new();

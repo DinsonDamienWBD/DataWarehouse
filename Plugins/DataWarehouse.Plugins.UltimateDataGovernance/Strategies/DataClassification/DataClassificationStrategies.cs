@@ -80,7 +80,7 @@ public sealed class ClassificationReportingStrategy : DataGovernanceStrategyBase
     public override string[] Tags => ["classification", "reporting", "analytics"];
 }
 
-public sealed class PIIDetectionStrategy : DataGovernanceStrategyBase
+public sealed class PiiDetectionStrategy : DataGovernanceStrategyBase
 {
     public override string StrategyId => "pii-detection";
     public override string DisplayName => "PII Detection";
@@ -90,7 +90,7 @@ public sealed class PIIDetectionStrategy : DataGovernanceStrategyBase
     public override string[] Tags => ["classification", "pii", "detection"];
 }
 
-public sealed class PHIDetectionStrategy : DataGovernanceStrategyBase
+public sealed class PhiDetectionStrategy : DataGovernanceStrategyBase
 {
     public override string StrategyId => "phi-detection";
     public override string DisplayName => "PHI Detection";
@@ -100,7 +100,7 @@ public sealed class PHIDetectionStrategy : DataGovernanceStrategyBase
     public override string[] Tags => ["classification", "phi", "healthcare"];
 }
 
-public sealed class PCIDetectionStrategy : DataGovernanceStrategyBase
+public sealed class PciDetectionStrategy : DataGovernanceStrategyBase
 {
     public override string StrategyId => "pci-detection";
     public override string DisplayName => "PCI Detection";

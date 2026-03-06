@@ -371,7 +371,7 @@ public enum WorkflowCategory
     ErrorHandling,
     ResourceManagement,
     Distributed,
-    AIEnhanced
+    AiEnhanced
 }
 
 /// <summary>

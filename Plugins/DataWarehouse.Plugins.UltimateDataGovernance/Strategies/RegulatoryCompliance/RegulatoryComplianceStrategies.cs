@@ -1,6 +1,6 @@
 namespace DataWarehouse.Plugins.UltimateDataGovernance.Strategies.RegulatoryCompliance;
 
-public sealed class GDPRComplianceStrategy : DataGovernanceStrategyBase
+public sealed class GdprComplianceStrategy : DataGovernanceStrategyBase
 {
     public override string StrategyId => "gdpr-compliance";
     public override string DisplayName => "GDPR Compliance";
@@ -10,7 +10,7 @@ public sealed class GDPRComplianceStrategy : DataGovernanceStrategyBase
     public override string[] Tags => ["compliance", "gdpr", "privacy"];
 }
 
-public sealed class CCPAComplianceStrategy : DataGovernanceStrategyBase
+public sealed class CcpaComplianceStrategy : DataGovernanceStrategyBase
 {
     public override string StrategyId => "ccpa-compliance";
     public override string DisplayName => "CCPA Compliance";
@@ -20,7 +20,7 @@ public sealed class CCPAComplianceStrategy : DataGovernanceStrategyBase
     public override string[] Tags => ["compliance", "ccpa", "privacy"];
 }
 
-public sealed class HIPAAComplianceStrategy : DataGovernanceStrategyBase
+public sealed class HipaaComplianceStrategy : DataGovernanceStrategyBase
 {
     public override string StrategyId => "hipaa-compliance";
     public override string DisplayName => "HIPAA Compliance";
@@ -30,7 +30,7 @@ public sealed class HIPAAComplianceStrategy : DataGovernanceStrategyBase
     public override string[] Tags => ["compliance", "hipaa", "healthcare"];
 }
 
-public sealed class SOXComplianceStrategy : DataGovernanceStrategyBase
+public sealed class SoxComplianceStrategy : DataGovernanceStrategyBase
 {
     public override string StrategyId => "sox-compliance";
     public override string DisplayName => "SOX Compliance";
@@ -40,7 +40,7 @@ public sealed class SOXComplianceStrategy : DataGovernanceStrategyBase
     public override string[] Tags => ["compliance", "sox", "financial"];
 }
 
-public sealed class PCIDSSComplianceStrategy : DataGovernanceStrategyBase
+public sealed class PcidssComplianceStrategy : DataGovernanceStrategyBase
 {
     public override string StrategyId => "pci-dss-compliance";
     public override string DisplayName => "PCI-DSS Compliance";

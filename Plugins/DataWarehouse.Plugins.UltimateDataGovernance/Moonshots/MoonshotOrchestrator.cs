@@ -34,6 +34,8 @@ public sealed class MoonshotOrchestrator : IMoonshotOrchestrator
     public const string TopicPipelineCompleted = "moonshot.pipeline.completed";
 
     private readonly IMoonshotRegistry _registry;
+    /// <summary>Gets the moonshot registry for status lookups.</summary>
+    internal IMoonshotRegistry Registry => _registry;
     private readonly MoonshotConfiguration _configuration;
     private readonly ILogger<MoonshotOrchestrator> _logger;
     private readonly Dictionary<MoonshotId, IMoonshotPipelineStage> _stages = new();

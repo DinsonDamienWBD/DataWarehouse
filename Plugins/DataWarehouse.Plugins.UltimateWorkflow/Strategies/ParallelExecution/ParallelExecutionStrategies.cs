@@ -143,7 +143,7 @@ public sealed class WorkerPoolStrategy : WorkflowStrategyBase
                     var result = await ExecuteTaskAsync(task, context, cancellationToken);
                     context.TaskResults[task.TaskId] = result;
                     completed[task.TaskId] = result.Success;
-                    running.TryRemove(task.TaskId, out var _removed);
+                    running.TryRemove(task.TaskId, out var removed);
 
                     foreach (var next in workflow.Tasks.Where(t =>
                         t.Dependencies.Contains(task.TaskId) &&

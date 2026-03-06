@@ -690,7 +690,7 @@ public class ConcurrencyException : Exception
 
 #region Supporting Types
 
-public enum DatabaseType { PostgreSQL, MySQL, SQLServer, Oracle, MongoDB }
+public enum DatabaseType { PostgreSql, MySql, SqlServer, Oracle, MongoDb }
 public enum ConnectorStatus { Created, Running, Paused, Stopped, Failed }
 public enum CdcOperationType { Insert, Update, Delete, Truncate, SchemaChange }
 public enum OutboxEventStatus { Pending, Published, Failed }
