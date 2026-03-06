@@ -17,7 +17,7 @@ namespace DataWarehouse.Plugins.UltimateIntelligence.Strategies.Memory.Embedding
 /// - Input type optimization (query vs document)
 /// - Retry logic with exponential backoff
 /// </summary>
-public sealed class VoyageAIEmbeddingProvider : EmbeddingProviderBase
+public sealed class VoyageAiEmbeddingProvider : EmbeddingProviderBase
 {
     private const string DefaultApiBase = "https://api.voyageai.com/v1";
     private const string DefaultModel = "voyage-large-2";
@@ -141,7 +141,7 @@ public sealed class VoyageAIEmbeddingProvider : EmbeddingProviderBase
     /// </summary>
     /// <param name="config">Provider configuration with ApiKey required.</param>
     /// <param name="httpClient">Optional HTTP client.</param>
-    public VoyageAIEmbeddingProvider(EmbeddingProviderConfig config, HttpClient? httpClient = null)
+    public VoyageAiEmbeddingProvider(EmbeddingProviderConfig config, HttpClient? httpClient = null)
         : base(config, httpClient)
     {
         if (string.IsNullOrWhiteSpace(config.ApiKey))
@@ -249,7 +249,7 @@ public sealed class VoyageAIEmbeddingProvider : EmbeddingProviderBase
         }
         catch
         {
-            Debug.WriteLine($"Caught exception in VoyageAIEmbeddingProvider.cs");
+            Debug.WriteLine($"Caught exception in VoyageAiEmbeddingProvider.cs");
             return false;
         }
     }

@@ -69,7 +69,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
             "huggingface" or "hf" => new HuggingFaceEmbeddingProvider(config, _sharedHttpClient),
             "ollama" => new OllamaEmbeddingProvider(config, _sharedHttpClient),
             "onnx" => CreateOnnx(config),
-            "voyageai" or "voyage" => new VoyageAIEmbeddingProvider(config, _sharedHttpClient),
+            "voyageai" or "voyage" => new VoyageAiEmbeddingProvider(config, _sharedHttpClient),
             "jina" => new JinaEmbeddingProvider(config, _sharedHttpClient),
             _ => throw new ArgumentException($"Unknown provider: {providerId}")
         };
@@ -267,7 +267,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
     /// <param name="model">Model name (default: voyage-large-2).</param>
     /// <param name="inputType">Input type for optimization.</param>
     /// <returns>The created provider instance.</returns>
-    public VoyageAIEmbeddingProvider CreateVoyageAi(
+    public VoyageAiEmbeddingProvider CreateVoyageAi(
         string apiKey,
         string? model = null,
         VoyageInputType inputType = VoyageInputType.Document)
@@ -278,7 +278,7 @@ public sealed class EmbeddingProviderFactory : IDisposable
             Model = model,
             AdditionalConfig = new() { ["InputType"] = inputType.ToString() }
         };
-        return new VoyageAIEmbeddingProvider(config, _sharedHttpClient);
+        return new VoyageAiEmbeddingProvider(config, _sharedHttpClient);
     }
 
     /// <summary>

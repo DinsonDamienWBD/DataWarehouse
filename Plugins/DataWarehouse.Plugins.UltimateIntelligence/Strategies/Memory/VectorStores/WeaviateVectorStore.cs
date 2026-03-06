@@ -245,7 +245,7 @@ public sealed class WeaviateVectorStore : ProductionVectorStoreBase
             response.EnsureSuccessStatusCode();
 
             var jsonResponse = await response.Content.ReadAsStringAsync(token);
-            var result = JsonSerializer.Deserialize<WeaviateGraphQLResponse>(jsonResponse, JsonOptions);
+            var result = JsonSerializer.Deserialize<WeaviateGraphQlResponse>(jsonResponse, JsonOptions);
 
             var results = new List<VectorSearchResult>();
             var getNode = result?.Data?.Get;
@@ -485,7 +485,7 @@ public sealed class WeaviateVectorStore : ProductionVectorStoreBase
         public string? Tenant { get; set; }
     }
 
-    private sealed class WeaviateGraphQLResponse
+    private sealed class WeaviateGraphQlResponse
     {
         public WeaviateData? Data { get; set; }
     }

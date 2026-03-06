@@ -206,7 +206,7 @@ public sealed class WeaviateVectorStrategy : VectorStoreStrategyBase
             using var response = await _httpClient.SendAsync(request, ct);
             response.EnsureSuccessStatusCode();
 
-            var result = await response.Content.ReadFromJsonAsync<WeaviateGraphQLResponse>(cancellationToken: ct);
+            var result = await response.Content.ReadFromJsonAsync<WeaviateGraphQlResponse>(cancellationToken: ct);
             RecordSearch();
 
             var results = new List<VectorMatch>();
@@ -283,7 +283,8 @@ public sealed class WeaviateVectorStrategy : VectorStoreStrategyBase
 
     private void AddAuthHeader(HttpRequestMessage request)
     {
-        if (GetConfig("ApiKey") is string apiKey && !string.IsNullOrEmpty(apiKey))
+        var apiKey = GetConfig("ApiKey");
+        if (!string.IsNullOrEmpty(apiKey))
         {
             request.Headers.Add("Authorization", $"Bearer {apiKey}");
         }
@@ -297,7 +298,7 @@ public sealed class WeaviateVectorStrategy : VectorStoreStrategyBase
         public Dictionary<string, object>? Properties { get; set; }
     }
 
-    private sealed class WeaviateGraphQLResponse
+    private sealed class WeaviateGraphQlResponse
     {
         public WeaviateData? Data { get; set; }
     }

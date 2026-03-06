@@ -298,7 +298,7 @@ public sealed class VectorStoreFactory : IAsyncDisposable
     /// <summary>
     /// Creates an Azure AI Search vector store.
     /// </summary>
-    public Task<AzureAiSearchVectorStore> CreateAzureAISearchAsync(
+    public Task<AzureAiSearchVectorStore> CreateAzureAiSearchAsync(
         string endpoint,
         string apiKey,
         string indexName = "datawarehouse-vectors",

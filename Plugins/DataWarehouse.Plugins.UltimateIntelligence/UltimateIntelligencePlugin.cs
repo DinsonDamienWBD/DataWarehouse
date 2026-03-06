@@ -32,7 +32,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
     private readonly BoundedDictionary<IntelligenceStrategyCategory, BoundedDictionary<string, IIntelligenceStrategy>> _strategiesByCategory = new BoundedDictionary<IntelligenceStrategyCategory, BoundedDictionary<string, IIntelligenceStrategy>>(1000);
 
     // Active strategies by category
-    private IIntelligenceStrategy? _activeAIProvider;
+    private IIntelligenceStrategy? _activeAiProvider;
     private IIntelligenceStrategy? _activeVectorStore;
     private IIntelligenceStrategy? _activeKnowledgeGraph;
     private IIntelligenceStrategy? _activeFeature;
@@ -174,12 +174,12 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
     /// Sets the active AI provider strategy.
     /// </summary>
     /// <param name="strategyId">The strategy ID to activate.</param>
-    public void SetActiveAIProvider(string strategyId)
+    public void SetActiveAiProvider(string strategyId)
     {
         var strategy = GetStrategy(strategyId);
         if (strategy?.Category != IntelligenceStrategyCategory.AiProvider)
             throw new ArgumentException($"Strategy '{strategyId}' is not an AI provider");
-        _activeAIProvider = strategy;
+        _activeAiProvider = strategy;
     }
 
     /// <summary>
@@ -221,7 +221,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
     /// <summary>
     /// Gets the active AI provider.
     /// </summary>
-    public IAiProvider? GetActiveAIProvider() => _activeAIProvider as IAiProvider;
+    public IAiProvider? GetActiveAiProvider() => _activeAiProvider as IAiProvider;
 
     /// <summary>
     /// Gets the active vector store.
@@ -245,7 +245,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
     /// <param name="preferLowCost">Prefer lower cost providers.</param>
     /// <param name="preferLowLatency">Prefer lower latency providers.</param>
     /// <returns>The recommended strategy.</returns>
-    public IIntelligenceStrategy? SelectBestAIProvider(
+    public IIntelligenceStrategy? SelectBestAiProvider(
         IntelligenceCapabilities capabilities = IntelligenceCapabilities.AllAiProvider,
         bool preferLowCost = false,
         bool preferLowLatency = false)
@@ -291,7 +291,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
     {
         ArgumentNullException.ThrowIfNull(feature);
 
-        if (_activeAIProvider is IAiProvider aiProvider)
+        if (_activeAiProvider is IAiProvider aiProvider)
             feature.SetAiProvider(aiProvider);
 
         if (_activeVectorStore is IVectorStore vectorStore)
@@ -334,10 +334,10 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
                     RegisterStrategy(strategy);
                 }
             }
-            catch
+            catch (Exception ex)
             {
-                Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs");
-                // Strategy failed to instantiate, skip
+                Debug.WriteLine($"Strategy instantiation failed for {strategyType.Name}: {ex.Message}");
+                System.Diagnostics.Trace.TraceWarning($"[UltimateIntelligence] Failed to instantiate strategy {strategyType.Name}: {ex.Message}");
             }
         }
     }
@@ -517,7 +517,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
 
             case "intelligence.ultimate.select.provider":
                 if (message.Payload.TryGetValue("strategyId", out var providerObj) && providerObj is string providerId)
-                    SetActiveAIProvider(providerId);
+                    SetActiveAiProvider(providerId);
                 break;
 
             case "intelligence.ultimate.select.vector":
@@ -892,10 +892,43 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
         }
     }
 
-    private Task HandleValidateRegenerationAsync(PluginMessage message)
+    private async Task HandleValidateRegenerationAsync(PluginMessage message)
     {
-        // Validation logic would be implemented here
-        return Task.CompletedTask;
+        if (_tieredMemoryStrategy == null) return;
+
+        try
+        {
+            var contextEntryId = message.Payload.GetValueOrDefault("contextEntryId")?.ToString();
+            var expectedFormat = message.Payload.GetValueOrDefault("expectedFormat")?.ToString();
+
+            if (string.IsNullOrEmpty(contextEntryId) || string.IsNullOrEmpty(expectedFormat))
+                return;
+
+            var result = await _tieredMemoryStrategy.RegenerateDataAsync(contextEntryId, expectedFormat);
+
+            if (!string.IsNullOrEmpty(message.CorrelationId) && MessageBus != null)
+            {
+                var replyPayload = new Dictionary<string, object>
+                {
+                    ["contextEntryId"] = contextEntryId,
+                    ["expectedFormat"] = expectedFormat,
+                    ["isValid"] = result != null,
+                    ["validationTimestamp"] = DateTime.UtcNow
+                };
+                var reply = new PluginMessage
+                {
+                    Type = $"intelligence.memory.validate-regeneration.response.{message.CorrelationId}",
+                    SourcePluginId = Id,
+                    CorrelationId = message.CorrelationId,
+                    Payload = replyPayload
+                };
+                _ = MessageBus.PublishAsync(reply.Type, reply);
+            }
+        }
+        catch
+        {
+            Debug.WriteLine($"Caught exception in UltimateIntelligencePlugin.cs HandleValidateRegenerationAsync");
+        }
     }
 
     private async Task HandleFlushAsync(PluginMessage message)

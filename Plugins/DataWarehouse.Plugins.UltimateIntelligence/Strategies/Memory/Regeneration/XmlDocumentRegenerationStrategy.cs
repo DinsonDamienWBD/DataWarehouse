@@ -48,7 +48,7 @@ public sealed class XmlDocumentRegenerationStrategy : RegenerationStrategyBase
             }
 
             // Parse and repair XML
-            XDocument? doc = null;
+            XDocument? doc;
             try
             {
                 doc = XDocument.Parse(xmlContent);
@@ -218,7 +218,7 @@ public sealed class XmlDocumentRegenerationStrategy : RegenerationStrategyBase
             var xmlPart = xmlDeclMatch.Value;
             try
             {
-                XDocument.Parse(xmlPart);
+                _ = XDocument.Parse(xmlPart);
                 return xmlPart;
             }
             catch { /* Parsing failure — try other formats */ }
@@ -230,7 +230,7 @@ public sealed class XmlDocumentRegenerationStrategy : RegenerationStrategyBase
         {
             try
             {
-                XDocument.Parse(rootMatch.Value);
+                _ = XDocument.Parse(rootMatch.Value);
                 return rootMatch.Value;
             }
             catch { /* Parsing failure — try other formats */ }

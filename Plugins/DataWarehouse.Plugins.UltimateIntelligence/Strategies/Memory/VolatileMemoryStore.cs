@@ -332,7 +332,7 @@ public sealed class VolatileMemoryStore
                     {
                         // Keep the one with higher importance/access count
                         if (entries[i].ImportanceScore > entries[j].ImportanceScore ||
-                            (entries[i].ImportanceScore == entries[j].ImportanceScore &&
+                            (Math.Abs(entries[i].ImportanceScore - entries[j].ImportanceScore) < 1e-9 &&
                              entries[i].AccessCount >= entries[j].AccessCount))
                         {
                             // Merge j into i

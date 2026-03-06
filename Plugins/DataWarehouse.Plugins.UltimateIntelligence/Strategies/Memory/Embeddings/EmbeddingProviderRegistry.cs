@@ -335,8 +335,8 @@ public sealed class EmbeddingProviderRegistry : IDisposable
         _registrations["voyageai"] = new ProviderRegistration
         {
             ProviderId = "voyageai",
-            ProviderType = typeof(VoyageAIEmbeddingProvider),
-            Factory = config => new VoyageAIEmbeddingProvider(config)
+            ProviderType = typeof(VoyageAiEmbeddingProvider),
+            Factory = config => new VoyageAiEmbeddingProvider(config)
         };
 
         _registrations["jina"] = new ProviderRegistration
