@@ -822,7 +822,7 @@ Single source of truth: `Metadata/production-audit-2026-03-05/CONSOLIDATED-FINDI
 
 ### Full Audit (AUDT) — Phase 102
 
-- [ ] **AUDT-01**: Coyote concurrency testing finds 0 new bugs across all `DataWarehouse.Hardening.Tests`
+- [x] **AUDT-01**: Coyote concurrency testing finds 0 new bugs across all `DataWarehouse.Hardening.Tests`
 - [ ] **AUDT-02**: dotCover confirms hardening tests execute the vulnerable lines identified in CONSOLIDATED-FINDINGS.md
 - [ ] **AUDT-03**: Coverage report exported to `Metadata/dotcover-hardening-report/`; any gaps addressed with additional tests
 
