@@ -431,7 +431,7 @@ public enum MigrationStatus
 /// </summary>
 public sealed class MigrationOptions
 {
-    public int MaxIOPS { get; set; } = 10000;
+    public int MaxIops { get; set; } = 10000;
     public int MaxBandwidthMBps { get; set; } = 100;
     public bool VerifyAfterMigration { get; set; } = true;
     public bool CreateCheckpoints { get; set; } = true;

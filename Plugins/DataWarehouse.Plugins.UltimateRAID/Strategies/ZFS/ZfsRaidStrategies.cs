@@ -809,14 +809,77 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
             return checksum;
         }
 
-        private void SimulateWriteWithMetadata(DiskInfo disk, long offset, ReadOnlyMemory<byte> data, byte[] checksum) { }
-        private Task<byte[]> SimulateReadFromDisk(DiskInfo disk, long offset, int length, CancellationToken ct)
+        private void SimulateWriteWithMetadata(DiskInfo disk, long offset, ReadOnlyMemory<byte> data, byte[] checksum)
         {
-            var data = new byte[length];
-            new Random((int)offset).NextBytes(data);
-            return Task.FromResult(data);
+            if (string.IsNullOrWhiteSpace(disk.Location)) return;
+            var dataBytes = data.ToArray();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var fs = new System.IO.FileStream(
+                        disk.Location!, System.IO.FileMode.OpenOrCreate,
+                        System.IO.FileAccess.Write, System.IO.FileShare.Read,
+                        bufferSize: 65536, useAsync: true);
+                    fs.Seek(offset, System.IO.SeekOrigin.Begin);
+                    await fs.WriteAsync(dataBytes);
+                    if (checksum.Length >= 4)
+                        await fs.WriteAsync(checksum.AsMemory(0, 4));
+                    await fs.FlushAsync();
+                }
+                catch (Exception)
+                {
+                    // Best-effort metadata write; checksum loss is recoverable via scrub.
+                }
+            });
         }
-        private Task SimulateWriteToDisk(DiskInfo disk, long offset, byte[] data, CancellationToken ct) => Task.CompletedTask;
+
+        private async Task<byte[]> SimulateReadFromDisk(DiskInfo disk, long offset, int length, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location) || !System.IO.File.Exists(disk.Location))
+                return new byte[length];
+            try
+            {
+                using var fs = new System.IO.FileStream(
+                    disk.Location!, System.IO.FileMode.Open,
+                    System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite,
+                    bufferSize: 65536, useAsync: true);
+                if (offset >= fs.Length) return new byte[length];
+                var actualLength = (int)Math.Min(length, fs.Length - offset);
+                fs.Seek(offset, System.IO.SeekOrigin.Begin);
+                var buffer = new byte[actualLength];
+                var totalRead = 0;
+                while (totalRead < actualLength)
+                {
+                    var read = await fs.ReadAsync(buffer.AsMemory(totalRead), ct);
+                    if (read == 0) break;
+                    totalRead += read;
+                }
+                if (totalRead < length)
+                {
+                    var padded = new byte[length];
+                    Array.Copy(buffer, padded, totalRead);
+                    return padded;
+                }
+                return buffer;
+            }
+            catch (Exception)
+            {
+                return new byte[length];
+            }
+        }
+
+        private async Task SimulateWriteToDisk(DiskInfo disk, long offset, byte[] data, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location)) return;
+            using var fs = new System.IO.FileStream(
+                disk.Location!, System.IO.FileMode.OpenOrCreate,
+                System.IO.FileAccess.Write, System.IO.FileShare.Read,
+                bufferSize: 65536, useAsync: true);
+            fs.Seek(offset, System.IO.SeekOrigin.Begin);
+            await fs.WriteAsync(data, ct);
+            await fs.FlushAsync(ct);
+        }
     }
 
     /// <summary>
@@ -1191,13 +1254,76 @@ namespace DataWarehouse.Plugins.UltimateRAID.Strategies.ZFS
             return checksum;
         }
 
-        private void SimulateWriteWithMetadata(DiskInfo disk, long offset, ReadOnlyMemory<byte> data, byte[] checksum) { }
-        private Task<byte[]> SimulateReadFromDisk(DiskInfo disk, long offset, int length, CancellationToken ct)
+        private void SimulateWriteWithMetadata(DiskInfo disk, long offset, ReadOnlyMemory<byte> data, byte[] checksum)
         {
-            var data = new byte[length];
-            new Random((int)offset).NextBytes(data);
-            return Task.FromResult(data);
+            if (string.IsNullOrWhiteSpace(disk.Location)) return;
+            var dataBytes = data.ToArray();
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    using var fs = new System.IO.FileStream(
+                        disk.Location!, System.IO.FileMode.OpenOrCreate,
+                        System.IO.FileAccess.Write, System.IO.FileShare.Read,
+                        bufferSize: 65536, useAsync: true);
+                    fs.Seek(offset, System.IO.SeekOrigin.Begin);
+                    await fs.WriteAsync(dataBytes);
+                    if (checksum.Length >= 4)
+                        await fs.WriteAsync(checksum.AsMemory(0, 4));
+                    await fs.FlushAsync();
+                }
+                catch (Exception)
+                {
+                    // Best-effort metadata write; checksum loss is recoverable via scrub.
+                }
+            });
         }
-        private Task SimulateWriteToDisk(DiskInfo disk, long offset, byte[] data, CancellationToken ct) => Task.CompletedTask;
+
+        private async Task<byte[]> SimulateReadFromDisk(DiskInfo disk, long offset, int length, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location) || !System.IO.File.Exists(disk.Location))
+                return new byte[length];
+            try
+            {
+                using var fs = new System.IO.FileStream(
+                    disk.Location!, System.IO.FileMode.Open,
+                    System.IO.FileAccess.Read, System.IO.FileShare.ReadWrite,
+                    bufferSize: 65536, useAsync: true);
+                if (offset >= fs.Length) return new byte[length];
+                var actualLength = (int)Math.Min(length, fs.Length - offset);
+                fs.Seek(offset, System.IO.SeekOrigin.Begin);
+                var buffer = new byte[actualLength];
+                var totalRead = 0;
+                while (totalRead < actualLength)
+                {
+                    var read = await fs.ReadAsync(buffer.AsMemory(totalRead), ct);
+                    if (read == 0) break;
+                    totalRead += read;
+                }
+                if (totalRead < length)
+                {
+                    var padded = new byte[length];
+                    Array.Copy(buffer, padded, totalRead);
+                    return padded;
+                }
+                return buffer;
+            }
+            catch (Exception)
+            {
+                return new byte[length];
+            }
+        }
+
+        private async Task SimulateWriteToDisk(DiskInfo disk, long offset, byte[] data, CancellationToken ct)
+        {
+            if (string.IsNullOrWhiteSpace(disk.Location)) return;
+            using var fs = new System.IO.FileStream(
+                disk.Location!, System.IO.FileMode.OpenOrCreate,
+                System.IO.FileAccess.Write, System.IO.FileShare.Read,
+                bufferSize: 65536, useAsync: true);
+            fs.Seek(offset, System.IO.SeekOrigin.Begin);
+            await fs.WriteAsync(data, ct);
+            await fs.FlushAsync(ct);
+        }
     }
 }
