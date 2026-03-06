@@ -235,18 +235,18 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
 
             if (success)
             {
-                metrics.ConsecutiveFailures = 0;
+                Interlocked.Exchange(ref metrics.ConsecutiveFailures, 0);
                 if (metrics.CircuitState == CircuitState.HalfOpen)
                 {
                     metrics.CircuitState = CircuitState.Closed;
                     // Finding 1972: Increment on actual recovery, not on degradation detection.
-                    metrics.TotalHealedConnections++;
+                    Interlocked.Increment(ref metrics.TotalHealedConnections);
                 }
             }
             else
             {
-                metrics.ConsecutiveFailures++;
-                if (metrics.ConsecutiveFailures >= metrics.CircuitBreakerThreshold
+                var failures = Interlocked.Increment(ref metrics.ConsecutiveFailures);
+                if (failures >= metrics.CircuitBreakerThreshold
                     && metrics.CircuitState == CircuitState.Closed)
                 {
                     metrics.CircuitState = CircuitState.Open;
@@ -312,12 +312,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             public int CircuitBreakerThreshold { get; set; }
             public double AverageLatencyMs { get; set; }
             public double EmaLatencyMs { get; set; }
-            public int ConsecutiveFailures { get; set; }
+            // Finding 332: Use Interlocked-compatible fields for thread-safe cross-thread access
+            public long ConsecutiveFailures;
             public CircuitState CircuitState { get; set; }
             public DateTimeOffset CircuitOpenedAt { get; set; }
             public DateTimeOffset LastScaleEvent { get; set; }
             public bool EnablePredictiveScaling { get; set; }
-            public long TotalHealedConnections { get; set; }
+            public long TotalHealedConnections;
         }
     }
 }

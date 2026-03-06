@@ -135,7 +135,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             _states[connectionId] = state;
 
             // Start background monitoring loop
-            _ = Task.Run(() => MonitorAckRateLoopAsync(connectionId, client, state), CancellationToken.None);
+            // Finding 321: Store background task for observation
+            state.MonitorTask = Task.Run(async () => { try { await MonitorAckRateLoopAsync(connectionId, client, state); } catch (OperationCanceledException) { } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"PID monitor error: {ex.Message}"); } });
 
             var info = new Dictionary<string, object>
             {
@@ -398,6 +399,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             public CircularBuffer<double> RecentOutputs { get; set; } = new(50);
             public CircularBuffer<double> AckMeasurements { get; set; } = new(100);
             public CancellationTokenSource MonitorCts { get; set; } = new();
+            // Finding 321: Store monitor task for graceful shutdown
+            public Task? MonitorTask { get; set; }
         }
 
         /// <summary>

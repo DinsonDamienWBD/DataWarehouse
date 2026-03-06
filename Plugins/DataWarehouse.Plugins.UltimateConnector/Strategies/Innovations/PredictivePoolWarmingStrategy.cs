@@ -127,7 +127,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             _states[connectionId] = state;
 
             // Start background pool scaling loop
-            _ = Task.Run(() => PoolScalingLoopAsync(connectionId, client, state), CancellationToken.None);
+            // Finding 327: Store background task for observation
+            state.ScalingTask = Task.Run(async () => { try { await PoolScalingLoopAsync(connectionId, client, state); } catch (OperationCanceledException) { } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Pool scaling error: {ex.Message}"); } });
 
             var info = new Dictionary<string, object>
             {
@@ -404,6 +405,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             public int ActiveConnections;
             public DateTimeOffset LastCoolingCheck { get; set; }
             public CancellationTokenSource MonitorCts { get; set; } = new();
+            // Finding 327: Store scaling task for graceful shutdown
+            public Task? ScalingTask { get; set; }
 
             private int _currentPoolSize;
             private long _warmingEvents;

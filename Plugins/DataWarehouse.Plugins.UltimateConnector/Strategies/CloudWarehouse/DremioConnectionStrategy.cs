@@ -20,7 +20,10 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudWarehouse
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             var (host, port) = ParseHostPort(config.ConnectionString, 9047);
-            _httpClient = new HttpClient { BaseAddress = new Uri($"http://{host}:{port}"), Timeout = config.Timeout };
+            // Finding 258: Use https when SupportsSsl is advertised; fall back to http only if config opts out
+            var useSsl = config.Properties.TryGetValue("UseSsl", out var sslVal) ? Convert.ToBoolean(sslVal) : true;
+            var scheme = useSsl ? "https" : "http";
+            _httpClient = new HttpClient { BaseAddress = new Uri($"{scheme}://{host}:{port}"), Timeout = config.Timeout };
             if (config.AuthMethod == "basic" && !string.IsNullOrEmpty(config.AuthCredential))
             {
                 var authBytes = System.Text.Encoding.UTF8.GetBytes($"{(config.AuthSecondary ?? "admin").Trim()}:{config.AuthCredential.Trim()}");

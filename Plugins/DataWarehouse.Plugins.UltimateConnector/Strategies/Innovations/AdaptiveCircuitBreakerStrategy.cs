@@ -211,7 +211,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             }
 
             // Attempt the request
-            connState.TotalRequests++;
+            Interlocked.Increment(ref connState.TotalRequests);
             try
             {
                 using var response = await client.SendAsync(new HttpRequestMessage(HttpMethod.Head, "/"), ct);
@@ -237,6 +237,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                     return false;
                 }
             }
+            catch (OperationCanceledException) { throw; }
             catch
             {
                 RecordFailure(breaker, connState);
@@ -299,8 +300,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         /// </summary>
         private static void RecordSuccess(BreakerState breaker)
         {
-            breaker.SuccessCount++;
-            breaker.SuccessStreak++;
+            Interlocked.Increment(ref breaker.SuccessCount);
+            Interlocked.Increment(ref breaker.SuccessStreak);
             breaker.RecentResults.Add(true);
 
             if (breaker.State == CircuitState.Canary)
@@ -312,7 +313,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 if (breaker.CanaryPassRate >= 1.0)
                 {
                     breaker.State = CircuitState.Closed;
-                    breaker.FailureCount = 0;
+                    Interlocked.Exchange(ref breaker.FailureCount, 0);
                 }
             }
         }
@@ -323,8 +324,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         /// </summary>
         private static void RecordFailure(BreakerState breaker, BreakerConnectionState connState)
         {
-            breaker.FailureCount++;
-            breaker.SuccessStreak = 0;
+            Interlocked.Increment(ref breaker.FailureCount);
+            Interlocked.Exchange(ref breaker.SuccessStreak, 0);
             breaker.RecentResults.Add(false);
 
             if (breaker.State == CircuitState.Canary)
@@ -337,7 +338,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 {
                     breaker.State = CircuitState.Open;
                     breaker.OpenedAt = DateTimeOffset.UtcNow;
-                    connState.TotalTripped++;
+                    Interlocked.Increment(ref connState.TotalTripped);
                 }
             }
             else if (breaker.State == CircuitState.Closed)
@@ -347,11 +348,11 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 var recentSuccessRate = ComputeSuccessRate(breaker);
                 var adjustedThreshold = (int)(breaker.BaseFailureThreshold * (1.0 + recentSuccessRate));
 
-                if (breaker.FailureCount >= adjustedThreshold)
+                if (Interlocked.Read(ref breaker.FailureCount) >= adjustedThreshold)
                 {
                     breaker.State = CircuitState.Open;
                     breaker.OpenedAt = DateTimeOffset.UtcNow;
-                    connState.TotalTripped++;
+                    Interlocked.Increment(ref connState.TotalTripped);
                 }
             }
         }
@@ -363,7 +364,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         {
             breaker.State = CircuitState.Canary;
             breaker.CanaryPassRate = 0.01;
-            breaker.FailureCount = 0;
+            Interlocked.Exchange(ref breaker.FailureCount, 0);
         }
 
         /// <summary>
@@ -456,12 +457,13 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
         {
             public readonly object SyncRoot = new();
             public CircuitState State { get; set; }
-            public int FailureCount { get; set; }
-            public int SuccessCount { get; set; }
+            // Finding 300: Use Interlocked-compatible fields for thread-safe access
+            public long FailureCount;
+            public long SuccessCount;
             public double CanaryPassRate { get; set; }
             public int BaseFailureThreshold { get; set; }
             public double MinCanaryRate { get; set; }
-            public int SuccessStreak { get; set; }
+            public long SuccessStreak;
             public DateTimeOffset OpenedAt { get; set; }
             public TimeSpan OpenDuration { get; set; }
             public CircularBuffer<bool> RecentResults { get; set; } = new(100);
@@ -472,8 +474,9 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             public BreakerState Breaker { get; set; } = new();
             public DateTimeOffset? RateLimitResetAt { get; set; }
             public int? RateLimitRemaining { get; set; }
-            public long TotalRequests { get; set; }
-            public long TotalTripped { get; set; }
+            // Finding 300: Use Interlocked for thread-safe increment
+            public long TotalRequests;
+            public long TotalTripped;
         }
 
         /// <summary>

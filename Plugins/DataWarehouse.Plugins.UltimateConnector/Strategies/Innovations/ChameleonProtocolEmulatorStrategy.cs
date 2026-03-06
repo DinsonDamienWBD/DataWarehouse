@@ -90,7 +90,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             var actualPort = ((IPEndPoint)listener.LocalEndpoint).Port;
             var emulatorCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
 
-            _ = RunProtocolEmulatorAsync(listener, modernTarget, legacyProtocol, bufferSize, emulatorCts.Token);
+            // Finding 316: Store background task for observation on dispose
+            var emulatorTask = Task.Run(() => RunProtocolEmulatorAsync(listener, modernTarget, legacyProtocol, bufferSize, emulatorCts.Token));
 
             var verificationClient = new TcpClient();
             await verificationClient.ConnectAsync(listenAddress, actualPort, ct);
@@ -180,7 +181,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
                 try
                 {
                     var legacyClient = await listener.AcceptTcpClientAsync(ct);
-                    _ = HandleLegacyClientAsync(legacyClient, modernTarget, protocol, bufferSize, ct);
+                    // Finding 316: Log exceptions from client handling instead of fire-and-forget
+                    _ = Task.Run(async () => { try { await HandleLegacyClientAsync(legacyClient, modernTarget, protocol, bufferSize, ct); } catch (OperationCanceledException) { } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"Chameleon client handler error: {ex.Message}"); } });
                 }
                 catch (OperationCanceledException) { break; }
                 catch (ObjectDisposedException) { break; }

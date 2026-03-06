@@ -126,7 +126,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             _states[connectionId] = state;
 
             // Start passive monitoring loop
-            _ = Task.Run(() => PassiveMonitorLoopAsync(connectionId, client, state), CancellationToken.None);
+            // Finding 319: Store background task for observation
+            state.MonitorTask = Task.Run(async () => { try { await PassiveMonitorLoopAsync(connectionId, client, state); } catch (OperationCanceledException) { } catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"PassiveMonitor error: {ex.Message}"); } });
 
             var info = new Dictionary<string, object>
             {
@@ -447,6 +448,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.Innovations
             public bool IsDegraded { get; set; }
             public int ConsecutiveFailures { get; set; }
             public CancellationTokenSource MonitorCts { get; set; } = new();
+            // Finding 319: Store monitor task for graceful shutdown
+            public Task? MonitorTask { get; set; }
         }
     }
 }

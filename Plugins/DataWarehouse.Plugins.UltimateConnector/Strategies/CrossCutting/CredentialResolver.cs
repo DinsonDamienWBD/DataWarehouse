@@ -214,11 +214,12 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CrossCutting
         {
             var normalizedKey = credentialKey.Replace('.', '_').Replace('-', '_').ToUpperInvariant();
 
+            // Finding 279: Restrict to DW_CREDENTIAL_ and DATAWAREHOUSE_ namespaces only.
+            // Raw normalizedKey removed to prevent arbitrary env var exposure (PATH, HOME, AWS_SECRET_ACCESS_KEY).
             var candidates = new[]
             {
                 $"DW_CREDENTIAL_{normalizedKey}",
-                $"DATAWAREHOUSE_{normalizedKey}",
-                normalizedKey
+                $"DATAWAREHOUSE_{normalizedKey}"
             };
 
             foreach (var candidate in candidates)

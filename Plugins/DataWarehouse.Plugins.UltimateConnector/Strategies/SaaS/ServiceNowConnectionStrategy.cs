@@ -185,10 +185,8 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.SaaS
             var client = handle.GetConnection<HttpClient>();
             var json = JsonSerializer.Serialize(fields);
             using var request = new HttpRequestMessage(new HttpMethod("PATCH"),
-                $"/api/now/table/{tableName}/{sysId}")
-            {
-                Content = new StringContent(json, Encoding.UTF8, "application/json")
-            };
+                $"/api/now/table/{tableName}/{sysId}");
+            request.Content = new StringContent(json, Encoding.UTF8, "application/json");
 
             using var response = await client.SendAsync(request, ct);
             return new ServiceNowRecordResult

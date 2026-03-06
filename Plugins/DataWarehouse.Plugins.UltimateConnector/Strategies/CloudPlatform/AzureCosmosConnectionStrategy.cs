@@ -20,6 +20,7 @@ namespace DataWarehouse.Plugins.UltimateConnector.Strategies.CloudPlatform
         protected override async Task<IConnectionHandle> ConnectCoreAsync(ConnectionConfig config, CancellationToken ct)
         {
             var account = GetConfiguration<string>(config, "Account", string.Empty);
+            if (string.IsNullOrWhiteSpace(account)) throw new ArgumentException("Azure Cosmos DB account name is required.");
             var endpoint = $"https://{account}.documents.azure.com";
             var httpClient = new HttpClient { BaseAddress = new Uri(endpoint), Timeout = config.Timeout };
             return new DefaultConnectionHandle(httpClient, new Dictionary<string, object> { ["Account"] = account, ["Endpoint"] = endpoint });
