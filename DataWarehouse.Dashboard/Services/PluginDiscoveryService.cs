@@ -165,7 +165,7 @@ public class PluginDiscoveryService : IPluginDiscoveryService
     private readonly BoundedDictionary<string, PluginInfo> _plugins = new BoundedDictionary<string, PluginInfo>(1000);
     private readonly ILogger<PluginDiscoveryService> _logger;
     private readonly IKernelHostService? _kernelHost;
-    private readonly string _pluginsDirectory;
+    internal string PluginsDirectory { get; }
 
     public event EventHandler<PluginChangedEventArgs>? PluginsChanged;
 
@@ -176,7 +176,7 @@ public class PluginDiscoveryService : IPluginDiscoveryService
     {
         _logger = logger;
         _kernelHost = kernelHost;
-        _pluginsDirectory = configuration.GetValue<string>("PluginsDirectory")
+        PluginsDirectory = configuration.GetValue<string>("PluginsDirectory")
             ?? Path.Combine(AppContext.BaseDirectory, "Plugins");
 
         // Subscribe to kernel state changes

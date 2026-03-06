@@ -70,7 +70,7 @@ public class RaidConfiguration
     public int ActiveDisks { get; set; }
     public int SpareDisks { get; set; }
     public long TotalCapacityBytes { get; set; }
-    public int StripeSizeKB { get; set; } = 64;
+    public int StripeSizeKb { get; set; } = 64;
     public double RebuildProgress { get; set; }
 }
 
@@ -95,14 +95,14 @@ public class StorageManagementService : IStorageManagementService
 {
     private readonly BoundedDictionary<string, StoragePoolInfo> _pools = new BoundedDictionary<string, StoragePoolInfo>(1000);
     private readonly BoundedDictionary<string, RaidConfiguration> _raidConfigs = new BoundedDictionary<string, RaidConfiguration>(1000);
-    private readonly IPluginDiscoveryService _pluginService;
+    internal IPluginDiscoveryService PluginService { get; }
     private readonly ILogger<StorageManagementService> _logger;
 
     public event EventHandler<StorageChangedEventArgs>? StorageChanged;
 
     public StorageManagementService(IPluginDiscoveryService pluginService, ILogger<StorageManagementService> logger)
     {
-        _pluginService = pluginService;
+        PluginService = pluginService;
         _logger = logger;
         InitializeSamplePools();
     }
@@ -295,7 +295,7 @@ public class StorageManagementService : IStorageManagementService
             ActiveDisks = 4,
             SpareDisks = 0,
             TotalCapacityBytes = 10L * 1024 * 1024 * 1024 * 1024,
-            StripeSizeKB = 64
+            StripeSizeKb = 64
         };
 
         _raidConfigs["raid-cache"] = new RaidConfiguration
@@ -308,7 +308,7 @@ public class StorageManagementService : IStorageManagementService
             ActiveDisks = 2,
             SpareDisks = 0,
             TotalCapacityBytes = 1L * 1024 * 1024 * 1024 * 1024,
-            StripeSizeKB = 128
+            StripeSizeKb = 128
         };
     }
 }

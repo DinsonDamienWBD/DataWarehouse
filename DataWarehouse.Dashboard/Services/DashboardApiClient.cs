@@ -22,7 +22,7 @@ public sealed class DashboardApiClient : IDisposable
         DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
     };
 
-    private string? _bearerToken;
+    internal string? BearerToken { get; set; }
 
     public DashboardApiClient(
         HttpClient httpClient,
@@ -45,7 +45,7 @@ public sealed class DashboardApiClient : IDisposable
     /// </summary>
     public void SetBearerToken(string token)
     {
-        _bearerToken = token;
+        BearerToken = token;
         _httpClient.DefaultRequestHeaders.Authorization =
             new AuthenticationHeaderValue("Bearer", token);
     }
@@ -55,7 +55,7 @@ public sealed class DashboardApiClient : IDisposable
     /// </summary>
     public void ClearBearerToken()
     {
-        _bearerToken = null;
+        BearerToken = null;
         _httpClient.DefaultRequestHeaders.Authorization = null;
     }
 

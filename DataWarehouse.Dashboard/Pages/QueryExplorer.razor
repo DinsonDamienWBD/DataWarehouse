@@ -1,7 +1,7 @@
 @page "/query-explorer"
 @using DataWarehouse.Dashboard.Services
 @inject DashboardApiClient ApiClient
-@inject IJSRuntime JSRuntime
+@inject IJSRuntime JsRuntime
 @inject ILogger<QueryExplorer> Logger
 @implements IDisposable
 
@@ -318,7 +318,7 @@
     {
         try
         {
-            var json = await JSRuntime.InvokeAsync<string?>("localStorage.getItem", HistoryStorageKey);
+            var json = await JsRuntime.InvokeAsync<string?>("localStorage.getItem", HistoryStorageKey);
             if (!string.IsNullOrEmpty(json))
             {
                 var entries = System.Text.Json.JsonSerializer.Deserialize<List<QueryHistoryEntry>>(json);
@@ -337,7 +337,7 @@
         try
         {
             var json = System.Text.Json.JsonSerializer.Serialize(_queryHistory);
-            await JSRuntime.InvokeVoidAsync("localStorage.setItem", HistoryStorageKey, json);
+            await JsRuntime.InvokeVoidAsync("localStorage.setItem", HistoryStorageKey, json);
         }
         catch (Exception ex)
         {

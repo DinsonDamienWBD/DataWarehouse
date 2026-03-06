@@ -17,12 +17,12 @@ namespace DataWarehouse.Dashboard.Controllers;
 public class AuditController : ControllerBase
 {
     private readonly IAuditLogService _auditService;
-    private readonly ILogger<AuditController> _logger;
+    internal ILogger<AuditController> Logger { get; }
 
     public AuditController(IAuditLogService auditService, ILogger<AuditController> logger)
     {
         _auditService = auditService;
-        _logger = logger;
+        Logger = logger;
     }
 
     /// <summary>

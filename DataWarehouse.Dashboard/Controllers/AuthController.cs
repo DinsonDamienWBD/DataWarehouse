@@ -16,11 +16,11 @@ public class AuthController : ControllerBase
 {
     private readonly IJwtTokenService _tokenService;
     private readonly ILogger<AuthController> _logger;
-    private readonly IConfiguration _configuration;
+    internal IConfiguration Configuration { get; }
 
     // In-memory store for demo purposes. In production, use a database or distributed cache.
-    private static readonly BoundedDictionary<string, UserCredential> _users = new BoundedDictionary<string, UserCredential>(1000);
-    private static readonly BoundedDictionary<string, RefreshTokenInfo> _refreshTokens = new BoundedDictionary<string, RefreshTokenInfo>(1000);
+    private static readonly BoundedDictionary<string, UserCredential> Users = new BoundedDictionary<string, UserCredential>(1000);
+    private static readonly BoundedDictionary<string, RefreshTokenInfo> RefreshTokens = new BoundedDictionary<string, RefreshTokenInfo>(1000);
 
     static AuthController()
     {
@@ -35,7 +35,7 @@ public class AuthController : ControllerBase
     {
         _tokenService = tokenService ?? throw new ArgumentNullException(nameof(tokenService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        Configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
     }
 
     /// <summary>
@@ -56,7 +56,7 @@ public class AuthController : ControllerBase
         }
 
         // Validate credentials
-        if (!_users.TryGetValue(request.Username, out var user) ||
+        if (!Users.TryGetValue(request.Username, out var user) ||
             !VerifyPassword(request.Password, user.PasswordHash))
         {
             _logger.LogWarning("Failed login attempt for user '{Username}' from {IpAddress}",
@@ -76,7 +76,7 @@ public class AuthController : ControllerBase
         // Store refresh token
         if (tokenResult.RefreshToken != null)
         {
-            _refreshTokens[tokenResult.RefreshToken] = new RefreshTokenInfo
+            RefreshTokens[tokenResult.RefreshToken] = new RefreshTokenInfo
             {
                 UserId = user.UserId,
                 Username = user.Username,
@@ -125,7 +125,7 @@ public class AuthController : ControllerBase
             });
         }
 
-        if (!_refreshTokens.TryGetValue(request.RefreshToken, out var tokenInfo) ||
+        if (!RefreshTokens.TryGetValue(request.RefreshToken, out var tokenInfo) ||
             tokenInfo.IsRevoked ||
             tokenInfo.ExpiresAt < DateTime.UtcNow)
         {
@@ -140,7 +140,7 @@ public class AuthController : ControllerBase
         }
 
         // Get user
-        var user = _users.Values.FirstOrDefault(u => u.UserId == tokenInfo.UserId);
+        var user = Users.Values.FirstOrDefault(u => u.UserId == tokenInfo.UserId);
         if (user == null)
         {
             return Unauthorized(new ErrorResponse
@@ -159,7 +159,7 @@ public class AuthController : ControllerBase
         // Store new refresh token
         if (tokenResult.RefreshToken != null)
         {
-            _refreshTokens[tokenResult.RefreshToken] = new RefreshTokenInfo
+            RefreshTokens[tokenResult.RefreshToken] = new RefreshTokenInfo
             {
                 UserId = user.UserId,
                 Username = user.Username,
@@ -195,7 +195,7 @@ public class AuthController : ControllerBase
     public ActionResult Logout([FromBody] LogoutRequest? request)
     {
         if (!string.IsNullOrWhiteSpace(request?.RefreshToken) &&
-            _refreshTokens.TryGetValue(request.RefreshToken, out var tokenInfo))
+            RefreshTokens.TryGetValue(request.RefreshToken, out var tokenInfo))
         {
             tokenInfo.IsRevoked = true;
         }
@@ -242,7 +242,7 @@ public class AuthController : ControllerBase
     public ActionResult ChangePassword([FromBody] ChangePasswordRequest request)
     {
         var username = User.Identity?.Name;
-        if (username == null || !_users.TryGetValue(username, out var user))
+        if (username == null || !Users.TryGetValue(username, out var user))
         {
             return Unauthorized();
         }

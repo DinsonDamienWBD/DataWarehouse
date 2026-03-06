@@ -85,7 +85,7 @@ public sealed class RateLimitingMiddleware
     private readonly ILogger<RateLimitingMiddleware> _logger;
     private readonly RateLimitingOptions _options;
     private readonly BoundedDictionary<string, ClientRateLimiter> _limiters = new BoundedDictionary<string, ClientRateLimiter>(1000);
-    private readonly Timer _cleanupTimer;
+    internal Timer CleanupTimer { get; }
     private readonly HashSet<string> _whitelistedIPs;
 
     public RateLimitingMiddleware(
@@ -99,7 +99,7 @@ public sealed class RateLimitingMiddleware
         _whitelistedIPs = new HashSet<string>(_options.WhitelistedIPs, StringComparer.OrdinalIgnoreCase);
 
         // Cleanup expired limiters every 5 minutes
-        _cleanupTimer = new Timer(CleanupExpiredLimiters, null,
+        CleanupTimer = new Timer(CleanupExpiredLimiters, null,
             TimeSpan.FromMinutes(5), TimeSpan.FromMinutes(5));
     }
 
