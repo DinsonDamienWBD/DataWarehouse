@@ -802,7 +802,7 @@ public sealed class EphemeralEnvironmentStrategy : DeploymentStrategyBase
         var state = initialState;
         var namespace_ = GetNamespace(config);
         var envName = GetEnvName(config);
-        var ttl = GetTTL(config);
+        var ttl = GetTtl(config);
 
         // Create namespace
         state = state with { ProgressPercent = 10 };
@@ -818,7 +818,7 @@ public sealed class EphemeralEnvironmentStrategy : DeploymentStrategyBase
 
         // Set up TTL for auto-cleanup
         state = state with { ProgressPercent = 80 };
-        await ConfigureTTLAsync(namespace_, ttl, ct);
+        await ConfigureTtlAsync(namespace_, ttl, ct);
 
         // Track environment
         var env = new EphemeralEnv
@@ -887,12 +887,12 @@ public sealed class EphemeralEnvironmentStrategy : DeploymentStrategyBase
     /// <summary>
     /// Extends the TTL of an ephemeral environment.
     /// </summary>
-    public async Task ExtendTTLAsync(string deploymentId, TimeSpan extension, CancellationToken ct = default)
+    public async Task ExtendTtlAsync(string deploymentId, TimeSpan extension, CancellationToken ct = default)
     {
         if (_environments.TryGetValue(deploymentId, out var env))
         {
             env.ExpiresAt = env.ExpiresAt.Add(extension);
-            await UpdateTTLAnnotationAsync(env.Namespace, env.ExpiresAt, ct);
+            await UpdateTtlAnnotationAsync(env.Namespace, env.ExpiresAt, ct);
         }
     }
 
@@ -905,7 +905,7 @@ public sealed class EphemeralEnvironmentStrategy : DeploymentStrategyBase
     private static string GetEnvName(DeploymentConfig config)
         => config.StrategyConfig.TryGetValue("envName", out var en) && en is string ens ? ens : config.Environment;
 
-    private static TimeSpan GetTTL(DeploymentConfig config)
+    private static TimeSpan GetTtl(DeploymentConfig config)
     {
         if (config.StrategyConfig.TryGetValue("ttlHours", out var ttl) && ttl is int hours)
             return TimeSpan.FromHours(hours);
@@ -915,10 +915,10 @@ public sealed class EphemeralEnvironmentStrategy : DeploymentStrategyBase
     private Task CreateNamespaceAsync(string ns, CancellationToken ct) => Task.Delay(20, ct);
     private Task DeployStackAsync(string ns, DeploymentConfig config, CancellationToken ct) => Task.Delay(100, ct);
     private Task<string> ConfigureIngressAsync(string ns, string name, CancellationToken ct) => Task.FromResult($"https://{name}.preview.example.com");
-    private Task ConfigureTTLAsync(string ns, TimeSpan ttl, CancellationToken ct) => Task.Delay(20, ct);
+    private Task ConfigureTtlAsync(string ns, TimeSpan ttl, CancellationToken ct) => Task.Delay(20, ct);
     private Task RedeployStackAsync(string ns, string version, CancellationToken ct) => Task.Delay(80, ct);
     private Task DeleteNamespaceAsync(string ns, CancellationToken ct) => Task.Delay(50, ct);
-    private Task UpdateTTLAnnotationAsync(string ns, DateTimeOffset expiresAt, CancellationToken ct) => Task.Delay(10, ct);
+    private Task UpdateTtlAnnotationAsync(string ns, DateTimeOffset expiresAt, CancellationToken ct) => Task.Delay(10, ct);
 
     private sealed class EphemeralEnv
     {

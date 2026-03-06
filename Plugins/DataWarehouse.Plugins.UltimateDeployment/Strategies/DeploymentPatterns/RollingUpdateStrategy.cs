@@ -520,7 +520,7 @@ public sealed class RecreateStrategy : DeploymentStrategyBase
 /// <summary>
 /// A/B Testing deployment strategy for testing different versions with different user segments.
 /// </summary>
-public sealed class ABTestingStrategy : DeploymentStrategyBase
+public sealed class AbTestingStrategy : DeploymentStrategyBase
 {
     private readonly BoundedDictionary<string, long> _counters = new BoundedDictionary<string, long>(1000);
     private readonly BoundedDictionary<string, DeploymentState> _experimentStates = new BoundedDictionary<string, DeploymentState>(1000);
@@ -530,7 +530,7 @@ public sealed class ABTestingStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "A/B Testing",
-        DeploymentType = DeploymentType.ABTesting,
+        DeploymentType = DeploymentType.AbTesting,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = true,
         SupportsTrafficShifting = true,

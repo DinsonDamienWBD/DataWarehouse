@@ -267,7 +267,7 @@ public sealed class BlueGreenStrategy : DeploymentStrategyBase
     }
 
     // Shared HttpClient per instance: avoids socket exhaustion from per-call creation
-    private static readonly HttpClient _sharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
+    private static readonly HttpClient SharedHttpClient = new() { Timeout = TimeSpan.FromSeconds(30) };
 
     private async Task<HealthCheckResult[]> RunHealthChecksAsync(string environment, DeploymentConfig config, CancellationToken ct)
     {
@@ -288,7 +288,7 @@ public sealed class BlueGreenStrategy : DeploymentStrategyBase
                     cts.CancelAfter(timeout);
 
                     var sw = System.Diagnostics.Stopwatch.StartNew();
-                    using var response = await _sharedHttpClient.GetAsync(instanceUrl, cts.Token);
+                    using var response = await SharedHttpClient.GetAsync(instanceUrl, cts.Token);
                     sw.Stop();
 
                     results.Add(new HealthCheckResult

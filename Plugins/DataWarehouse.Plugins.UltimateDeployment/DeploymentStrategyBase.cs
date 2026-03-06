@@ -19,7 +19,7 @@ public enum DeploymentType
     /// <summary>Recreate/destroy and redeploy.</summary>
     Recreate = 3,
     /// <summary>A/B testing deployment.</summary>
-    ABTesting = 4,
+    AbTesting = 4,
     /// <summary>Shadow deployment (dark launch).</summary>
     Shadow = 5,
     /// <summary>Container orchestration deployment.</summary>
@@ -31,7 +31,7 @@ public enum DeploymentType
     /// <summary>Bare metal deployment.</summary>
     BareMetal = 9,
     /// <summary>CI/CD pipeline integration.</summary>
-    CICD = 10,
+    Cicd = 10,
     /// <summary>Feature flag controlled deployment.</summary>
     FeatureFlag = 11,
     /// <summary>Hot reload without downtime.</summary>

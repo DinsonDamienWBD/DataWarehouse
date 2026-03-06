@@ -319,14 +319,14 @@ public sealed class CsiControllerService
 /// </summary>
 public sealed class CsiNodeService
 {
-    private readonly string _driverName;
+    internal string DriverName { get; }
     private readonly string _nodeId;
     private readonly BoundedDictionary<string, StagedVolume> _stagedVolumes = new BoundedDictionary<string, StagedVolume>(1000);
     private readonly BoundedDictionary<string, PublishedVolume> _publishedVolumes = new BoundedDictionary<string, PublishedVolume>(1000);
 
     public CsiNodeService(string driverName, string? nodeId = null)
     {
-        _driverName = driverName;
+        DriverName = driverName;
         _nodeId = nodeId ?? Environment.MachineName;
     }
 

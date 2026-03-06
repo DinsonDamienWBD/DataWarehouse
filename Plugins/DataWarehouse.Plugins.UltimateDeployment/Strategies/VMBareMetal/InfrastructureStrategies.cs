@@ -379,7 +379,7 @@ public sealed class PuppetStrategy : DeploymentStrategyBase
 
         // Deploy r10k
         state = state with { ProgressPercent = 40 };
-        await DeployR10kAsync(environment, ct);
+        await DeployR10KAsync(environment, ct);
 
         // Trigger Puppet runs
         state = state with { ProgressPercent = 60 };
@@ -428,7 +428,7 @@ public sealed class PuppetStrategy : DeploymentStrategyBase
     private static string[] GetNodes(DeploymentConfig config) => config.StrategyConfig.TryGetValue("nodes", out var n) && n is string[] ns ? ns : new[] { "node1.example.com" };
 
     private Task UpdatePuppetCodeAsync(string env, DeploymentConfig config, CancellationToken ct) => Task.Delay(50, ct);
-    private Task DeployR10kAsync(string env, CancellationToken ct) => Task.Delay(50, ct);
+    private Task DeployR10KAsync(string env, CancellationToken ct) => Task.Delay(50, ct);
     private Task TriggerPuppetRunsAsync(string[] nodes, CancellationToken ct) => Task.Delay(100, ct);
     private Task WaitForConvergenceAsync(string[] nodes, CancellationToken ct) => Task.Delay(100, ct);
     private Task RevertPuppetCodeAsync(string env, string version, CancellationToken ct) => Task.Delay(50, ct);

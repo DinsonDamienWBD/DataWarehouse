@@ -8,7 +8,7 @@ public sealed class GitHubActionsStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "GitHub Actions",
-        DeploymentType = DeploymentType.CICD,
+        DeploymentType = DeploymentType.Cicd,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = false,
         SupportsTrafficShifting = false,
@@ -106,7 +106,7 @@ public sealed class GitLabCiStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "GitLab CI",
-        DeploymentType = DeploymentType.CICD,
+        DeploymentType = DeploymentType.Cicd,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = true,
         SupportsTrafficShifting = false,
@@ -188,7 +188,7 @@ public sealed class JenkinsStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "Jenkins",
-        DeploymentType = DeploymentType.CICD,
+        DeploymentType = DeploymentType.Cicd,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = false,
         SupportsTrafficShifting = false,
@@ -266,7 +266,7 @@ public sealed class AzureDevOpsStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "Azure DevOps",
-        DeploymentType = DeploymentType.CICD,
+        DeploymentType = DeploymentType.Cicd,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = true,
         SupportsTrafficShifting = false,
@@ -348,7 +348,7 @@ public sealed class CircleCiStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "CircleCI",
-        DeploymentType = DeploymentType.CICD,
+        DeploymentType = DeploymentType.Cicd,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = false,
         SupportsTrafficShifting = false,
@@ -416,7 +416,7 @@ public sealed class ArgoCdStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "ArgoCD",
-        DeploymentType = DeploymentType.CICD,
+        DeploymentType = DeploymentType.Cicd,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = true,
         SupportsTrafficShifting = true,
@@ -516,7 +516,7 @@ public sealed class FluxCdStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "FluxCD",
-        DeploymentType = DeploymentType.CICD,
+        DeploymentType = DeploymentType.Cicd,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = true,
         SupportsTrafficShifting = true,
@@ -603,7 +603,7 @@ public sealed class SpinnakerStrategy : DeploymentStrategyBase
     public override DeploymentCharacteristics Characteristics { get; } = new()
     {
         StrategyName = "Spinnaker",
-        DeploymentType = DeploymentType.CICD,
+        DeploymentType = DeploymentType.Cicd,
         SupportsZeroDowntime = true,
         SupportsInstantRollback = true,
         SupportsTrafficShifting = true,
