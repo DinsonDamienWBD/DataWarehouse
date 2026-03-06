@@ -38,29 +38,29 @@ public enum SwiftMessageCategory
 public enum SwiftMtType
 {
     /// <summary>MT103: Single Customer Credit Transfer.</summary>
-    MT103,
+    Mt103,
     /// <summary>MT202: General Financial Institution Transfer.</summary>
-    MT202,
+    Mt202,
     /// <summary>MT199: Free Format Message.</summary>
-    MT199,
+    Mt199,
     /// <summary>MT940: Customer Statement Message.</summary>
-    MT940,
+    Mt940,
     /// <summary>MT950: Statement Message.</summary>
-    MT950,
+    Mt950,
     /// <summary>MT300: Foreign Exchange Confirmation.</summary>
-    MT300,
+    Mt300,
     /// <summary>MT502: Order to Buy or Sell.</summary>
-    MT502,
+    Mt502,
     /// <summary>MT535: Statement of Holdings.</summary>
-    MT535,
+    Mt535,
     /// <summary>MT564: Corporate Action Notification.</summary>
-    MT564,
+    Mt564,
     /// <summary>MT700: Issue of a Documentary Credit.</summary>
-    MT700,
+    Mt700,
     /// <summary>MT760: Guarantee / Standby Letter of Credit.</summary>
-    MT760,
+    Mt760,
     /// <summary>MT799: Free Format Message (bank-to-bank).</summary>
-    MT799
+    Mt799
 }
 
 /// <summary>
@@ -270,7 +270,7 @@ internal sealed class SwiftStreamStrategy : StreamingDataStrategyBase
     /// <param name="chargesDetail">Charges: BEN (beneficiary), OUR (sender), SHA (shared).</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The constructed SWIFT message.</returns>
-    public Task<SwiftMessage> CreateMT103Async(
+    public Task<SwiftMessage> CreateMt103Async(
         string senderBic,
         string receiverBic,
         string currency,
@@ -314,7 +314,7 @@ internal sealed class SwiftStreamStrategy : StreamingDataStrategyBase
         var message = new SwiftMessage
         {
             TransactionReference = txRef,
-            MessageType = SwiftMtType.MT103,
+            MessageType = SwiftMtType.Mt103,
             Category = SwiftMessageCategory.CustomerPayments,
             SenderBic = senderBic,
             ReceiverBic = receiverBic,
@@ -331,7 +331,7 @@ internal sealed class SwiftStreamStrategy : StreamingDataStrategyBase
             ChargesDetail = chargesDetail,
             Fields = fields,
             ValidationStatus = SwiftValidationStatus.Valid,
-            RawMessage = BuildRawMessage(SwiftMtType.MT103, senderBic, receiverBic, fields)
+            RawMessage = BuildRawMessage(SwiftMtType.Mt103, senderBic, receiverBic, fields)
         };
 
         _messageStore[txRef] = message;
@@ -350,7 +350,7 @@ internal sealed class SwiftStreamStrategy : StreamingDataStrategyBase
     /// <param name="amount">Transfer amount.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The constructed SWIFT message.</returns>
-    public Task<SwiftMessage> CreateMT202Async(
+    public Task<SwiftMessage> CreateMt202Async(
         string senderBic,
         string receiverBic,
         string currency,
@@ -376,14 +376,14 @@ internal sealed class SwiftStreamStrategy : StreamingDataStrategyBase
         var message = new SwiftMessage
         {
             TransactionReference = txRef,
-            MessageType = SwiftMtType.MT202,
+            MessageType = SwiftMtType.Mt202,
             Category = SwiftMessageCategory.FinancialInstitutionTransfers,
             SenderBic = senderBic,
             ReceiverBic = receiverBic,
             Amount = new SwiftAmount { ValueDate = valueDate, Currency = currency, Amount = amount },
             Fields = fields,
             ValidationStatus = SwiftValidationStatus.Valid,
-            RawMessage = BuildRawMessage(SwiftMtType.MT202, senderBic, receiverBic, fields)
+            RawMessage = BuildRawMessage(SwiftMtType.Mt202, senderBic, receiverBic, fields)
         };
 
         _messageStore[txRef] = message;
@@ -418,7 +418,7 @@ internal sealed class SwiftStreamStrategy : StreamingDataStrategyBase
         // Message-type specific validation
         switch (message.MessageType)
         {
-            case SwiftMtType.MT103:
+            case SwiftMtType.Mt103:
                 if (message.Amount == null)
                     errors.Add("MT103 requires amount (tag 32A).");
                 if (string.IsNullOrEmpty(message.OrderingCustomer))
@@ -429,7 +429,7 @@ internal sealed class SwiftStreamStrategy : StreamingDataStrategyBase
                     message.ChargesDetail != "BEN" && message.ChargesDetail != "OUR" && message.ChargesDetail != "SHA")
                     errors.Add("Charges detail (tag 71A) must be BEN, OUR, or SHA.");
                 break;
-            case SwiftMtType.MT202:
+            case SwiftMtType.Mt202:
                 if (message.Amount == null)
                     errors.Add("MT202 requires amount (tag 32A).");
                 break;
@@ -564,18 +564,18 @@ internal sealed class SwiftStreamStrategy : StreamingDataStrategyBase
 
     private static string GetMtNumber(SwiftMtType mtType) => mtType switch
     {
-        SwiftMtType.MT103 => "103",
-        SwiftMtType.MT202 => "202",
-        SwiftMtType.MT199 => "199",
-        SwiftMtType.MT940 => "940",
-        SwiftMtType.MT950 => "950",
-        SwiftMtType.MT300 => "300",
-        SwiftMtType.MT502 => "502",
-        SwiftMtType.MT535 => "535",
-        SwiftMtType.MT564 => "564",
-        SwiftMtType.MT700 => "700",
-        SwiftMtType.MT760 => "760",
-        SwiftMtType.MT799 => "799",
+        SwiftMtType.Mt103 => "103",
+        SwiftMtType.Mt202 => "202",
+        SwiftMtType.Mt199 => "199",
+        SwiftMtType.Mt940 => "940",
+        SwiftMtType.Mt950 => "950",
+        SwiftMtType.Mt300 => "300",
+        SwiftMtType.Mt502 => "502",
+        SwiftMtType.Mt535 => "535",
+        SwiftMtType.Mt564 => "564",
+        SwiftMtType.Mt700 => "700",
+        SwiftMtType.Mt760 => "760",
+        SwiftMtType.Mt799 => "799",
         _ => "103"
     };
 }

@@ -23,7 +23,7 @@ public enum FixVersion
     /// <summary>FIX 4.4 (most widely used).</summary>
     Fix44,
     /// <summary>FIX 5.0 SP2 (latest).</summary>
-    Fix50SP2
+    Fix50Sp2
 }
 
 /// <summary>
@@ -715,7 +715,7 @@ internal sealed class FixStreamStrategy : StreamingDataStrategyBase
         FixVersion.Fix42 => "FIX.4.2",
         FixVersion.Fix43 => "FIX.4.3",
         FixVersion.Fix44 => "FIX.4.4",
-        FixVersion.Fix50SP2 => "FIXT.1.1",
+        FixVersion.Fix50Sp2 => "FIXT.1.1",
         _ => "FIX.4.4"
     };
 

@@ -15,25 +15,25 @@ namespace DataWarehouse.Plugins.UltimateStreamingData.Strategies.Healthcare;
 public enum Hl7MessageType
 {
     /// <summary>ADT - Admit/Discharge/Transfer.</summary>
-    ADT,
+    Adt,
     /// <summary>ORM - Order Message.</summary>
-    ORM,
+    Orm,
     /// <summary>ORU - Observation Result.</summary>
-    ORU,
+    Oru,
     /// <summary>SIU - Scheduling Information.</summary>
-    SIU,
+    Siu,
     /// <summary>DFT - Detail Financial Transaction.</summary>
-    DFT,
+    Dft,
     /// <summary>MDM - Medical Document Management.</summary>
-    MDM,
+    Mdm,
     /// <summary>MFN - Master Files Notification.</summary>
-    MFN,
+    Mfn,
     /// <summary>RDE - Pharmacy Dispense Encoding.</summary>
-    RDE,
+    Rde,
     /// <summary>BAR - Billing Account Record.</summary>
-    BAR,
+    Bar,
     /// <summary>VXU - Vaccination Update.</summary>
-    VXU
+    Vxu
 }
 
 /// <summary>
@@ -69,17 +69,17 @@ public enum Hl7TriggerEvent
 public enum Hl7AckCode
 {
     /// <summary>Application Accept (AA) - message processed successfully.</summary>
-    AA,
+    Aa,
     /// <summary>Application Error (AE) - error in message processing.</summary>
-    AE,
+    Ae,
     /// <summary>Application Reject (AR) - message rejected.</summary>
-    AR,
+    Ar,
     /// <summary>Commit Accept (CA) - message committed to safe storage.</summary>
-    CA,
+    Ca,
     /// <summary>Commit Error (CE) - error committing message.</summary>
-    CE,
+    Ce,
     /// <summary>Commit Reject (CR) - message commit rejected.</summary>
-    CR
+    Cr
 }
 
 /// <summary>
@@ -425,7 +425,7 @@ internal sealed class Hl7StreamStrategy : StreamingDataStrategyBase
     /// <param name="ackCode">Acknowledgment code (AA=accept, AE=error, AR=reject).</param>
     /// <param name="textMessage">Optional text message for the acknowledgment.</param>
     /// <returns>An HL7 acknowledgment with the raw ACK message.</returns>
-    public Hl7Acknowledgment GenerateAck(Hl7Message originalMessage, Hl7AckCode ackCode = Hl7AckCode.AA, string? textMessage = null)
+    public Hl7Acknowledgment GenerateAck(Hl7Message originalMessage, Hl7AckCode ackCode = Hl7AckCode.Aa, string? textMessage = null)
     {
         ArgumentNullException.ThrowIfNull(originalMessage);
 
@@ -476,7 +476,7 @@ internal sealed class Hl7StreamStrategy : StreamingDataStrategyBase
         }
 
         // Generate ACK response
-        var ack = GenerateAck(message, Hl7AckCode.AA, "Message accepted");
+        var ack = GenerateAck(message, Hl7AckCode.Aa, "Message accepted");
         RecordWrite(message.RawMessage?.Length ?? 0, 10.0);
         return Task.FromResult(ack);
     }
@@ -565,19 +565,19 @@ internal sealed class Hl7StreamStrategy : StreamingDataStrategyBase
         // Message-type specific validation
         switch (message.MessageType)
         {
-            case Hl7MessageType.ADT:
+            case Hl7MessageType.Adt:
                 if (!message.Segments.ContainsKey("PID"))
                     errors.Add("ADT messages require PID segment.");
                 if (!message.Segments.ContainsKey("PV1"))
                     errors.Add("ADT messages require PV1 segment.");
                 break;
-            case Hl7MessageType.ORU:
+            case Hl7MessageType.Oru:
                 if (!message.Segments.ContainsKey("PID"))
                     errors.Add("ORU messages require PID segment.");
                 if (!message.Segments.ContainsKey("OBR"))
                     errors.Add("ORU messages require OBR segment.");
                 break;
-            case Hl7MessageType.ORM:
+            case Hl7MessageType.Orm:
                 if (!message.Segments.ContainsKey("PID"))
                     errors.Add("ORM messages require PID segment.");
                 if (!message.Segments.ContainsKey("ORC"))
@@ -627,17 +627,17 @@ internal sealed class Hl7StreamStrategy : StreamingDataStrategyBase
 
     private static Hl7MessageType ParseMessageType(string type) => type.ToUpperInvariant() switch
     {
-        "ADT" => Hl7MessageType.ADT,
-        "ORM" => Hl7MessageType.ORM,
-        "ORU" => Hl7MessageType.ORU,
-        "SIU" => Hl7MessageType.SIU,
-        "DFT" => Hl7MessageType.DFT,
-        "MDM" => Hl7MessageType.MDM,
-        "MFN" => Hl7MessageType.MFN,
-        "RDE" => Hl7MessageType.RDE,
-        "BAR" => Hl7MessageType.BAR,
-        "VXU" => Hl7MessageType.VXU,
-        _ => Hl7MessageType.ADT
+        "ADT" => Hl7MessageType.Adt,
+        "ORM" => Hl7MessageType.Orm,
+        "ORU" => Hl7MessageType.Oru,
+        "SIU" => Hl7MessageType.Siu,
+        "DFT" => Hl7MessageType.Dft,
+        "MDM" => Hl7MessageType.Mdm,
+        "MFN" => Hl7MessageType.Mfn,
+        "RDE" => Hl7MessageType.Rde,
+        "BAR" => Hl7MessageType.Bar,
+        "VXU" => Hl7MessageType.Vxu,
+        _ => Hl7MessageType.Adt
     };
 
     private static Hl7TriggerEvent ParseTriggerEvent(string trigger) => trigger.ToUpperInvariant() switch

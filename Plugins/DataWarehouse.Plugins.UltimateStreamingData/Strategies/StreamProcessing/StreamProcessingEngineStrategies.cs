@@ -1084,7 +1084,7 @@ public sealed class KinesisStreamProcessingStrategy : StreamingDataStrategyBase
         var stream = new KinesisStream
         {
             StreamName = streamName,
-            StreamARN = $"arn:aws:kinesis:us-east-1:123456789012:stream/{streamName}",
+            StreamArn = $"arn:aws:kinesis:us-east-1:123456789012:stream/{streamName}",
             ShardCount = shardCount,
             Status = StreamStatus.Active,
             CreatedAt = DateTimeOffset.UtcNow
@@ -1210,7 +1210,7 @@ public sealed class KinesisStreamProcessingStrategy : StreamingDataStrategyBase
 public sealed record KinesisStream
 {
     public required string StreamName { get; init; }
-    public required string StreamARN { get; init; }
+    public required string StreamArn { get; init; }
     public int ShardCount { get; init; }
     public StreamStatus Status { get; init; }
     public DateTimeOffset CreatedAt { get; init; }

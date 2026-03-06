@@ -163,7 +163,7 @@ internal sealed class LoRaWanStreamStrategy : StreamingDataStrategyBase, IStream
         {
             DevEui = devEui,
             DeviceClass = LoRaWanDeviceClass.A,
-            ActivationMode = LoRaWanActivation.OTAA,
+            ActivationMode = LoRaWanActivation.Otaa,
             LastSeen = DateTime.UtcNow,
             FrameCounterUp = frameCounter
         });
@@ -486,8 +486,8 @@ internal sealed class LoRaWanStreamStrategy : StreamingDataStrategyBase, IStream
     private enum LoRaWanActivation
     {
         /// <summary>Over-The-Air Activation with join procedure</summary>
-        OTAA,
+        Otaa,
         /// <summary>Activation By Personalization with pre-provisioned keys</summary>
-        ABP
+        Abp
     }
 }

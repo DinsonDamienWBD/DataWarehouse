@@ -499,21 +499,21 @@ internal sealed class PredictiveScalingStream : StreamingDataStrategyBase
             if (values.Length < 2) return 0;
 
             // Simple linear regression: y = slope * x + intercept
-            double sumX = 0, sumY = 0, sumXY = 0, sumX2 = 0;
+            double sumX = 0, sumY = 0, sumXy = 0, sumX2 = 0;
             int n = values.Length;
 
             for (int i = 0; i < n; i++)
             {
                 sumX += i;
                 sumY += values[i];
-                sumXY += i * values[i];
+                sumXy += i * values[i];
                 sumX2 += i * i;
             }
 
             var denominator = (n * sumX2) - (sumX * sumX);
             if (Math.Abs(denominator) < 1e-10) return 0;
 
-            return ((n * sumXY) - (sumX * sumY)) / denominator;
+            return ((n * sumXy) - (sumX * sumY)) / denominator;
         }
     }
 }

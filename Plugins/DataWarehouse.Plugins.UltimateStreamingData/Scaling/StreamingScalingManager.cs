@@ -55,6 +55,8 @@ public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
 
     // ---- Dependencies ----
     private readonly StreamingStrategyRegistry _strategyRegistry;
+    /// <summary>Gets the strategy registry (exposed for diagnostics).</summary>
+    internal StreamingStrategyRegistry StrategyRegistry => _strategyRegistry;
     private readonly IMessageBus? _messageBus;
     private readonly IPersistentBackingStore? _backingStore;
 
