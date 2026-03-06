@@ -75,7 +75,7 @@ internal sealed class UnifiedApiStrategy : SdkInterface.InterfaceStrategyBase, I
 
         return detectedProtocol switch
         {
-            "graphql" => await HandleGraphQLRequest(request, cancellationToken),
+            "graphql" => await HandleGraphQlRequest(request, cancellationToken),
             "json-rpc" => await HandleJsonRpcRequest(request, cancellationToken),
             "grpc" => await HandleGrpcRequest(request, cancellationToken),
             "rest" => await HandleRestRequest(request, cancellationToken),
@@ -131,7 +131,7 @@ internal sealed class UnifiedApiStrategy : SdkInterface.InterfaceStrategyBase, I
     /// <summary>
     /// Handles GraphQL requests.
     /// </summary>
-    private Task<SdkInterface.InterfaceResponse> HandleGraphQLRequest(
+    private Task<SdkInterface.InterfaceResponse> HandleGraphQlRequest(
         SdkInterface.InterfaceRequest request,
         CancellationToken cancellationToken)
     {

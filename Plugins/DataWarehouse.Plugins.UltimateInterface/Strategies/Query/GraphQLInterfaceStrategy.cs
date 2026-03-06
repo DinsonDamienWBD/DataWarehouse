@@ -91,7 +91,7 @@ internal sealed class GraphQLInterfaceStrategy : SdkInterface.InterfaceStrategyB
             var operationType = DetermineOperationType(gqlRequest.Query);
 
             // Route via message bus for execution
-            var result = await ExecuteGraphQLQuery(gqlRequest, operationType, cancellationToken);
+            var result = await ExecuteGraphQlQuery(gqlRequest, operationType, cancellationToken);
 
             return CreateSuccessResponse(result);
         }
@@ -177,7 +177,7 @@ internal sealed class GraphQLInterfaceStrategy : SdkInterface.InterfaceStrategyB
         return "query";
     }
 
-    private async Task<object> ExecuteGraphQLQuery(
+    private async Task<object> ExecuteGraphQlQuery(
         GraphQLRequest request,
         string operationType,
         CancellationToken cancellationToken)

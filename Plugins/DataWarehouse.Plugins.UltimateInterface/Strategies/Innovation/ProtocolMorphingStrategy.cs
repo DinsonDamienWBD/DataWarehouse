@@ -83,9 +83,9 @@ internal sealed class ProtocolMorphingStrategy : SdkInterface.InterfaceStrategyB
 
         return (sourceProtocol, targetProtocol) switch
         {
-            ("rest", "graphql") => await TransformRestToGraphQL(request, cancellationToken),
+            ("rest", "graphql") => await TransformRestToGraphQl(request, cancellationToken),
             ("rest", "json-rpc") => await TransformRestToJsonRpc(request, cancellationToken),
-            ("graphql", "rest") => await TransformGraphQLToRest(request, cancellationToken),
+            ("graphql", "rest") => await TransformGraphQlToRest(request, cancellationToken),
             ("json-rpc", "rest") => await TransformJsonRpcToRest(request, cancellationToken),
             _ => SdkInterface.InterfaceResponse.BadRequest($"Transformation {sourceProtocol} → {targetProtocol} not supported")
         };
@@ -124,7 +124,7 @@ internal sealed class ProtocolMorphingStrategy : SdkInterface.InterfaceStrategyB
     /// <summary>
     /// Transforms REST request to GraphQL format.
     /// </summary>
-    private Task<SdkInterface.InterfaceResponse> TransformRestToGraphQL(
+    private Task<SdkInterface.InterfaceResponse> TransformRestToGraphQl(
         SdkInterface.InterfaceRequest request,
         CancellationToken cancellationToken)
     {
@@ -205,7 +205,7 @@ internal sealed class ProtocolMorphingStrategy : SdkInterface.InterfaceStrategyB
     /// <summary>
     /// Transforms GraphQL request to REST format.
     /// </summary>
-    private Task<SdkInterface.InterfaceResponse> TransformGraphQLToRest(
+    private Task<SdkInterface.InterfaceResponse> TransformGraphQlToRest(
         SdkInterface.InterfaceRequest request,
         CancellationToken cancellationToken)
     {

@@ -244,16 +244,16 @@ internal sealed class CostAwareApiStrategy : SdkInterface.InterfaceStrategyBase,
         // Ingress bandwidth cost
         if (request.Body.Length > 0)
         {
-            var ingressMB = request.Body.Length / (1024m * 1024m);
-            breakdown["bandwidth.ingress"] = ingressMB * CostFactors["bandwidth.ingress"];
+            var ingressMb = request.Body.Length / (1024m * 1024m);
+            breakdown["bandwidth.ingress"] = ingressMb * CostFactors["bandwidth.ingress"];
         }
 
         // Storage read cost (if querying data)
         if (request.Method == SdkInterface.HttpMethod.Get)
         {
             // Estimate read size based on path complexity
-            var estimatedReadMB = EstimateReadSize(request);
-            breakdown["storage.read"] = estimatedReadMB * CostFactors["storage.read"];
+            var estimatedReadMb = EstimateReadSize(request);
+            breakdown["storage.read"] = estimatedReadMb * CostFactors["storage.read"];
         }
 
         // Storage write cost (if writing data)
@@ -261,13 +261,13 @@ internal sealed class CostAwareApiStrategy : SdkInterface.InterfaceStrategyBase,
             request.Method == SdkInterface.HttpMethod.Put ||
             request.Method == SdkInterface.HttpMethod.Patch)
         {
-            var writeMB = Math.Max(request.Body.Length / (1024m * 1024m), 0.1m);
-            breakdown["storage.write"] = writeMB * CostFactors["storage.write"];
+            var writeMb = Math.Max(request.Body.Length / (1024m * 1024m), 0.1m);
+            breakdown["storage.write"] = writeMb * CostFactors["storage.write"];
         }
 
         // Egress bandwidth cost (estimate response size)
-        var estimatedEgressMB = EstimateResponseSize(request);
-        breakdown["bandwidth.egress"] = estimatedEgressMB * CostFactors["bandwidth.egress"];
+        var estimatedEgressMb = EstimateResponseSize(request);
+        breakdown["bandwidth.egress"] = estimatedEgressMb * CostFactors["bandwidth.egress"];
 
         return breakdown;
     }
