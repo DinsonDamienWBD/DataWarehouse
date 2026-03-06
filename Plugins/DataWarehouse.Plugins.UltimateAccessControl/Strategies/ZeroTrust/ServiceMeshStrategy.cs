@@ -102,19 +102,19 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.ZeroTrust
         /// <summary>
         /// Registers a service in the mesh.
         /// </summary>
-        public ServiceRegistration RegisterService(string serviceName, string namespace_, ServiceMeshType meshType)
+        public ServiceRegistration RegisterService(string serviceName, string @namespace, ServiceMeshType meshType)
         {
             var registration = new ServiceRegistration
             {
                 ServiceName = serviceName,
-                Namespace = namespace_,
+                Namespace = @namespace,
                 MeshType = meshType,
                 RegisteredAt = DateTime.UtcNow,
                 HasSidecar = true,
                 MtlsEnabled = _enforceMtls
             };
 
-            var key = $"{namespace_}/{serviceName}";
+            var key = $"{@namespace}/{serviceName}";
             _services[key] = registration;
             return registration;
         }

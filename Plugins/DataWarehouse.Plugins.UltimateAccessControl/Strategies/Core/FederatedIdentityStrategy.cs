@@ -229,9 +229,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 {
                     result = idp.Protocol switch
                     {
-                        FederationProtocol.OIDC => await ValidateOidcTokenAsync(token, idp, cancellationToken),
+                        FederationProtocol.Oidc => await ValidateOidcTokenAsync(token, idp, cancellationToken),
                         FederationProtocol.OAuth2 => await ValidateOAuth2TokenAsync(token, idp, cancellationToken),
-                        FederationProtocol.SAML2 => ValidateSamlToken(token, idp),
+                        FederationProtocol.Saml2 => ValidateSamlToken(token, idp),
                         FederationProtocol.WsFederation => ValidateWsFederationToken(token, idp),
                         _ => new TokenValidationResult
                         {
@@ -765,7 +765,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                 queryParams.Add($"post_logout_redirect_uri={Uri.EscapeDataString(returnUrl)}");
             }
 
-            if (idp.Protocol == FederationProtocol.OIDC)
+            if (idp.Protocol == FederationProtocol.Oidc)
             {
                 queryParams.Add($"client_id={idp.ClientId}");
             }
@@ -1154,7 +1154,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                     Name = config["Name"]?.ToString() ?? "Unknown IdP",
                     Protocol = config.TryGetValue("Protocol", out var protObj) &&
                               Enum.TryParse<FederationProtocol>(protObj?.ToString(), out var prot)
-                        ? prot : FederationProtocol.OIDC,
+                        ? prot : FederationProtocol.Oidc,
                     IsEnabled = !config.TryGetValue("IsEnabled", out var enabled) || enabled is true,
                     Issuer = config.TryGetValue("Issuer", out var iss) ? iss?.ToString() : null,
                     MetadataUrl = config.TryGetValue("MetadataUrl", out var meta) ? meta?.ToString() : null,
@@ -1201,9 +1201,9 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </summary>
     public enum FederationProtocol
     {
-        OIDC,
+        Oidc,
         OAuth2,
-        SAML2,
+        Saml2,
         WsFederation
     }
 

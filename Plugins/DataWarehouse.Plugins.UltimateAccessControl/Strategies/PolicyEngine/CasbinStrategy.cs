@@ -126,13 +126,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
         /// <summary>
         /// Adds a policy rule.
         /// </summary>
-        public void AddPolicy(string subject, string object_, string action)
+        public void AddPolicy(string subject, string @object, string action)
         {
-            var key = $"{subject}:{object_}:{action}";
+            var key = $"{subject}:{@object}:{action}";
             var policy = new CasbinPolicy
             {
                 Subject = subject,
-                Object = object_,
+                Object = @object,
                 Action = action,
                 CreatedAt = DateTime.UtcNow
             };
@@ -193,21 +193,21 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
         /// <summary>
         /// Checks if a policy rule exists for the request.
         /// </summary>
-        private bool EnforcePolicy(string subject, string object_, string action)
+        private bool EnforcePolicy(string subject, string @object, string action)
         {
             // Direct match
-            var directKey = $"{subject}:{object_}:{action}";
+            var directKey = $"{subject}:{@object}:{action}";
             if (_policies.ContainsKey(directKey))
                 return true;
 
             // Wildcard matches
             var wildcardKeys = new[]
             {
-                $"{subject}:{object_}:*",
+                $"{subject}:{@object}:*",
                 $"{subject}:*:{action}",
-                $"*:{object_}:{action}",
+                $"*:{@object}:{action}",
                 $"{subject}:*:*",
-                $"*:{object_}:*",
+                $"*:{@object}:*",
                 $"*:*:{action}",
                 "*:*:*"
             };
@@ -220,17 +220,17 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
         {
             IncrementCounter("casbin.evaluate");
             var subject = context.SubjectId;
-            var object_ = context.ResourceId;
+            var @object = context.ResourceId;
             var action = context.Action;
 
             // Check direct policy
-            if (EnforcePolicy(subject, object_, action))
+            if (EnforcePolicy(subject, @object, action))
             {
                 return Task.FromResult(new AccessDecision
                 {
                     IsGranted = true,
                     Reason = "Casbin policy allows access (direct)",
-                    ApplicablePolicies = new[] { $"Casbin.{subject}:{object_}:{action}" },
+                    ApplicablePolicies = new[] { $"Casbin.{subject}:{@object}:{action}" },
                     Metadata = new Dictionary<string, object>
                     {
                         ["ModelType"] = _modelType,
@@ -243,13 +243,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.PolicyEngine
             var roles = GetRolesForUser(subject);
             foreach (var role in roles)
             {
-                if (EnforcePolicy(role, object_, action))
+                if (EnforcePolicy(role, @object, action))
                 {
                     return Task.FromResult(new AccessDecision
                     {
                         IsGranted = true,
                         Reason = $"Casbin policy allows access (role: {role})",
-                        ApplicablePolicies = new[] { $"Casbin.{role}:{object_}:{action}" },
+                        ApplicablePolicies = new[] { $"Casbin.{role}:{@object}:{action}" },
                         Metadata = new Dictionary<string, object>
                         {
                             ["ModelType"] = _modelType,

@@ -174,18 +174,18 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessCont
             var n = events.Count;
             var sumX = 0.0;
             var sumY = 0.0;
-            var sumXY = 0.0;
+            var sumXy = 0.0;
             var sumX2 = 0.0;
 
             for (int i = 0; i < n; i++)
             {
                 sumX += i;
                 sumY += events[i].ThreatLevel;
-                sumXY += i * events[i].ThreatLevel;
+                sumXy += i * events[i].ThreatLevel;
                 sumX2 += i * i;
             }
 
-            var slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX + 0.001);
+            var slope = (n * sumXy - sumX * sumY) / (n * sumX2 - sumX * sumX + 0.001);
             return slope;
         }
 

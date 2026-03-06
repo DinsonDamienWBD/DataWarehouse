@@ -688,22 +688,20 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                 // -257 (0x390100) = RS256 (RSA PKCS#1 with SHA-256)
                 // -8 (0x27) = EdDSA (Ed25519)
 
-                bool isES256 = Array.IndexOf(publicKeyBytes, (byte)0x26) >= 0;
-                bool isRS256 = publicKeyBytes.Length > 3 &&
+                bool isEs256 = Array.IndexOf(publicKeyBytes, (byte)0x26) >= 0;
+                bool isRs256 = publicKeyBytes.Length > 3 &&
                                publicKeyBytes.Skip(0).Take(publicKeyBytes.Length - 2)
                                .Any(b => b == 0x39);
-                bool isEdDSA = Array.IndexOf(publicKeyBytes, (byte)0x27) >= 0;
+                bool isEdDsa = Array.IndexOf(publicKeyBytes, (byte)0x27) >= 0;
 
-                if (isES256)
+                if (isEs256)
                 {
                     // ES256: ECDSA P-256 signature verification
                     if (signature.Length < 64 || publicKeyBytes.Length < 64)
                         return false;
 
                     // Extract x,y coordinates from COSE key (skip CBOR overhead, take last 64 bytes as x||y)
-                    var keyData = publicKeyBytes.Length >= 77
-                        ? publicKeyBytes[^64..]  // Standard COSE EC2 key: skip header
-                        : publicKeyBytes[^64..]; // Raw coordinates
+                    var keyData = publicKeyBytes[^64..]; // Extract x||y coordinates from COSE key or raw format
 
                     using var ecdsa = System.Security.Cryptography.ECDsa.Create(
                         System.Security.Cryptography.ECCurve.NamedCurves.nistP256);
@@ -719,13 +717,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Identity
                     ecdsa.ImportParameters(pubKey);
                     return ecdsa.VerifyData(signedData, signature, System.Security.Cryptography.HashAlgorithmName.SHA256);
                 }
-                else if (isRS256)
+                else if (isRs256)
                 {
                     // RS256: RSA signature verification - requires extracting modulus/exponent from COSE key
                     // Without proper CBOR parser, fail-closed
                     return false;
                 }
-                else if (isEdDSA)
+                else if (isEdDsa)
                 {
                     // EdDSA: Ed25519 signature verification - requires Ed25519 library
                     // Without NSec or .NET 9+ EdDSA support, fail-closed

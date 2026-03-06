@@ -308,8 +308,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         public byte[] ExtractFromText(string text, bool decrypt = true)
         {
             // Find length marker
-            int markerStart = text.IndexOf("\u200B");
-            int markerEnd = text.LastIndexOf("\u200B");
+            int markerStart = text.IndexOf('\u200B');
+            int markerEnd = text.LastIndexOf('\u200B');
 
             if (markerStart < 0 || markerEnd <= markerStart)
             {

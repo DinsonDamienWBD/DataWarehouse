@@ -436,8 +436,8 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
         {
             return (data, new ImageMetadata
             {
-                Width = (int)Math.Sqrt(data.Length / 3),
-                Height = (int)Math.Sqrt(data.Length / 3),
+                Width = (int)Math.Sqrt((double)data.Length / 3),
+                Height = (int)Math.Sqrt((double)data.Length / 3),
                 BytesPerPixel = 3,
                 BitsPerPixel = 24,
                 HasAlpha = false,

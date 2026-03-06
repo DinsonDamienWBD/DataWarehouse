@@ -141,10 +141,10 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Clearance
 
                 return new ClearanceValidationResult
                 {
-                    IsValid = result?.is_valid ?? false,
-                    ClearanceLevel = result?.clearance_level,
+                    IsValid = result?.IsValid ?? false,
+                    ClearanceLevel = result?.ClearanceLevel,
                     Source = "external_api",
-                    Reason = result?.reason
+                    Reason = result?.Reason
                 };
             }
             catch (Exception ex)
@@ -179,9 +179,12 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Clearance
 
         private sealed class ValidationApiResponse
         {
-            public bool is_valid { get; set; }
-            public string? clearance_level { get; set; }
-            public string? reason { get; set; }
+            [System.Text.Json.Serialization.JsonPropertyName("is_valid")]
+            public bool IsValid { get; set; }
+            [System.Text.Json.Serialization.JsonPropertyName("clearance_level")]
+            public string? ClearanceLevel { get; set; }
+            [System.Text.Json.Serialization.JsonPropertyName("reason")]
+            public string? Reason { get; set; }
         }
     }
 }

@@ -481,7 +481,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
 
             switch (standard)
             {
-                case ComplianceStandard.SOX:
+                case ComplianceStandard.Sox:
                     // SOX focuses on financial data access controls
                     var financialAccess = logs.Where(e => e.ResourceId.Contains("financial", StringComparison.OrdinalIgnoreCase));
                     if (financialAccess.Any(e => !e.Decision))
@@ -497,7 +497,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                     }
                     break;
 
-                case ComplianceStandard.HIPAA:
+                case ComplianceStandard.Hipaa:
                     // HIPAA focuses on PHI access
                     var phiAccess = logs.Where(e =>
                         e.ResourceId.Contains("patient", StringComparison.OrdinalIgnoreCase) ||
@@ -517,7 +517,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                     }
                     break;
 
-                case ComplianceStandard.GDPR:
+                case ComplianceStandard.Gdpr:
                     // GDPR focuses on personal data
                     var piiAccess = logs.Where(e =>
                         e.ResourceId.Contains("personal", StringComparison.OrdinalIgnoreCase) ||
@@ -536,7 +536,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
                     }
                     break;
 
-                case ComplianceStandard.PCI_DSS:
+                case ComplianceStandard.PciDss:
                     // PCI-DSS focuses on cardholder data
                     var cardholderAccess = logs.Where(e =>
                         e.ResourceId.Contains("card", StringComparison.OrdinalIgnoreCase) ||
@@ -950,13 +950,13 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Core
     /// </summary>
     public enum ComplianceStandard
     {
-        SOX,
-        HIPAA,
-        GDPR,
-        PCI_DSS,
-        ISO27001,
-        NIST,
-        FedRAMP
+        Sox,
+        Hipaa,
+        Gdpr,
+        PciDss,
+        Iso27001,
+        Nist,
+        FedRamp
     }
 
     /// <summary>

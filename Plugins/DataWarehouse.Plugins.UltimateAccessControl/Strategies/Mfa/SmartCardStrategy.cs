@@ -502,12 +502,12 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
         /// <summary>
         /// Personal Identity Verification (PIV) card (FIPS 201).
         /// </summary>
-        PIV,
+        Piv,
 
         /// <summary>
         /// Common Access Card (US DoD).
         /// </summary>
-        CAC,
+        Cac,
 
         /// <summary>
         /// European Citizen Card.
@@ -517,7 +517,7 @@ protected override async Task<AccessDecision> EvaluateAccessCoreAsync(
         /// <summary>
         /// National ID card with certificate.
         /// </summary>
-        NationalID
+        NationalId
     }
 
     /// <summary>

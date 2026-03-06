@@ -229,6 +229,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
         private double _totalEvaluationTimeMs;
         private readonly DateTime _startTime = DateTime.UtcNow;
         private DateTime _lastEvaluationTime;
+        private readonly object _statsLock = new();
         protected Dictionary<string, object> Configuration { get; private set; } = new();
 
         public abstract override string StrategyId { get; }
@@ -262,7 +263,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
                 else
                     Interlocked.Increment(ref _deniedCount);
 
-                lock (this)
+                lock (_statsLock)
                 {
                     _totalEvaluationTimeMs += sw.Elapsed.TotalMilliseconds;
                     _lastEvaluationTime = DateTime.UtcNow;
@@ -299,7 +300,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl
             Interlocked.Exchange(ref _totalEvaluations, 0);
             Interlocked.Exchange(ref _grantedCount, 0);
             Interlocked.Exchange(ref _deniedCount, 0);
-            lock (this)
+            lock (_statsLock)
             {
                 _totalEvaluationTimeMs = 0;
             }

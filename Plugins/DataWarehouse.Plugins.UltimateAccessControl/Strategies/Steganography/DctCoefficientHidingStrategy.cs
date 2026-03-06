@@ -246,7 +246,7 @@ namespace DataWarehouse.Plugins.UltimateAccessControl.Strategies.Steganography
                 RawCapacityBits = rawCapacityBits,
                 UsableCapacityBits = usableBits,
                 UsableCapacityBytes = (int)(usableBits / 8),
-                EffectiveCapacityBytes = (int)((usableBits / 8) / efficiencyFactor),
+                EffectiveCapacityBytes = (int)((double)usableBits / 8 / efficiencyFactor),
                 BlockCount = structure.BlockCount,
                 UsableCoefficientsPerBlock = structure.UsableCoefficientsPerBlock,
                 EstimatedQuality = structure.EstimatedQuality
