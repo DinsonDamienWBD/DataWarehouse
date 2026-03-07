@@ -10,12 +10,12 @@ Every feature listed in the task tracker is fully production-ready — no placeh
 
 ## Current State
 
-**v6.0 Intelligent Policy Engine & Composable VDE — SHIPPED (2026-03-03)**
+**v7.0 Military-Grade Production Readiness — SHIPPED (2026-03-07)**
 
-- 2,891 commits | 3,787 .cs files | 52 plugins | 3,036 strategies
+- ~3,057 commits | 3,787 .cs files | 52 plugins | 3,036 strategies
 - Build: 0 errors, 0 warnings
-- 6 milestones shipped (v1.0 through v6.0) across 95 phases, 662+ plans
-- v6.0: 29 phases, 230 plans, 2,654 files changed (+264,989 / -24,669 lines)
+- 7 milestones shipped (v1.0 through v7.0) across 111 phases, 730+ plans
+- v7.0: 16 phases, 68 plans, 4 stages (Component Hardening → Audit → System Validation → Chaos Engineering → CI/CD)
 
 See `.planning/MILESTONES.md` for full accomplishment list.
 
@@ -85,31 +85,31 @@ See `.planning/MILESTONES.md` for full accomplishment list.
 - ✓ Production audit: 4,656 findings all fixed, plugin consolidation to 52 — v6.0
 - ✓ E2E testing: 34 tests covering raw devices to federation at GB/TB/PB scales — v6.0
 
-### Active (v7.0)
+### Validated (v7.0)
 
-- [ ] Fix all 4,444 remaining audit findings (1,751 P1 + 1,863 P2 + 830 LOW) — sequential top-to-bottom
-- [ ] Contract test generation for all 3,036 strategies against their base class contracts
-- [ ] Integration path tests — message bus, pipeline, VDE decorator chain, federation
-- [ ] Companion project tests — CLI, GUI, Dashboard, Launcher, Shared
-- [ ] Negative/adversarial tests and fuzz harnesses
-- [ ] Performance baselines with regression gates (real DW benchmarks, not generic .NET)
-- [ ] Cross-cutting hostile runtime analysis — thread safety, CancellationToken, config validation, memory leaks
-- [ ] Fix all findings from hostile analysis
+- ✓ TDD per finding across all 11,128 audit findings (SDK, Kernel, Core Infrastructure, all 52 plugins)
+- ✓ Coyote concurrency testing (0 new bugs found)
+- ✓ dotCover coverage verification, dotTrace performance profiling (no lock contention)
+- ✓ dotMemory memory profiling (no LOH regression)
+- ✓ Plugin fault injection, torn-write recovery, resource exhaustion chaos testing
+- ✓ Message bus disruption, federation partition, malicious payload resilience
+- ✓ Clock skew (±24hr) verified resilient
+- ✓ CI/CD fortress: GitHub Actions with Coyote/BenchmarkDotNet/Stryker gates
 
-### Active (v7.1)
+**Known gaps (deferred to v8.0 Step 0):**
+- MUTN-02: Surviving mutants not documented (no runtime test project for Stryker)
+- SOAK-01: Full 52-plugin kernel boot + 100GB VDE streaming not executed (Skip-annotated)
+- SOAK-04: Gen2 collection monotonic growth not verified in extended soak (only 2-min run)
 
-- [ ] CLI sync to v6.0 architecture (missing: PolicyEngine, Federation, Authority, Shards, DeviceRAID, AIAdvisor)
-- [ ] GUI sync to v6.0 architecture (missing: PolicyEngine, AuthorityChain, ShardLifecycle, AIAdvisor)
-- [ ] Dashboard sync to v6.0 architecture (missing: Policy, Federation, Authority, Shards, RAID, AI, VDE controllers)
-- [ ] Launcher sync to v6.0 architecture (federation-aware topology, policy-based startup, CRDT sync)
-- [ ] Shared library alignment with current SDK contracts
+### Active (v8.0)
+
+See `.planning/v8.0-PLAN.md` for full plan (31 phases, ~190-230 plans).
 
 ### Out of Scope
 
-- v8.0+ reserved features: SDUP (Semantic Dedup), ZKPA (zk-SNARK Compliance), Ghost Enclaves
-- New plugins beyond what exists in current 52-plugin set
-- New SDK features or architectural changes (v7.0 is hardening only)
-- UI/UX redesign (v7.1 syncs existing architecture, not new design)
+- SDUP (Semantic Dedup), ZKPA (zk-SNARK Compliance), Ghost Enclaves
+- New plugins beyond current 52-plugin set
+- External certification processes (SOC2 Type II, FedRAMP, ISO 27001)
 
 ## Constraints
 
@@ -144,31 +144,24 @@ See `.planning/MILESTONES.md` for full accomplishment list.
 - **v4.5** (2026-02-19): Certification Authority — NOT CERTIFIED (50 pentest findings, security 38/100)
 - **v5.0** (2026-02-22): Differentiators & Security Wiring — 16 phases, ~146 plans, certified conditional (92/100 security)
 - **v6.0** (2026-03-03): Intelligent Policy Engine & Composable VDE — 29 phases, 230 plans, 8 days
+- **v7.0** (2026-03-07): Military-Grade Production Readiness — 16 phases, 68 plans, 4 stages
 
 See `.planning/MILESTONES.md` for full history.
 
-## Current Milestone: v7.0 Production Hardening, Full Test Coverage & Hostile Analysis
+## Current Milestone: v8.0 Ultimate Production Readiness
 
-**Goal:** Fix every known audit finding, build comprehensive test coverage (~50,000+ tests), perform hostile runtime analysis, and fix all findings — achieving true production readiness with zero known issues.
+**Goal:** Close every remaining gap, flesh out all companion apps, achieve 100% test coverage — DataWarehouse becomes production-ready for ALL customer tiers (startup to hyperscale to military), excluding only external certification processes.
 
-**Target features:**
-- Sequential top-to-bottom fix of all 4,444 audit findings with explicit disposition ledger
-- Auto-generated contract tests for 3,036 strategies (base class contract compliance)
-- Integration tests for message bus, pipeline, VDE chain, federation
-- Companion project test coverage (CLI, GUI, Dashboard, Launcher, Shared — currently 0%)
-- Adversarial/fuzz testing (corrupt data, resource exhaustion, concurrency stress)
-- Real DataWarehouse performance benchmarks replacing generic .NET benchmarks
-- Cross-cutting hostile analysis: thread safety, CancellationToken, config validation, memory leaks, deadlocks
-- All hostile analysis findings fixed with failing-test-first methodology
+**Plan:** `.planning/v8.0-PLAN.md` (31 phases, ~190-230 plans, 7 stages + Step 0)
 
 **Key reference:**
-- Audit findings: `Metadata/SDK-AUDIT-FINDINGS.md` (6,900 lines, 4,647 findings, 203 P0 fixed)
-- Fix tracking: `Metadata/audit-fix-ledger-*.md` (created during execution)
+- v8.0 plan: `.planning/v8.0-PLAN.md`
+- Audit findings: `Metadata/production-audit-2026-03-05/CONSOLIDATED-FINDINGS.md`
 
-**Design documents (from v6.0):**
+**Design documents:**
 - `.planning/v6.0-DESIGN-DISCUSSION.md` — 41 architectural decisions
 - `.planning/v6.0-VDE-FORMAT-v2.0-SPEC.md` — VDE v2.1 format specification
 - `.planning/ADAPTIVE-SCALING-ANALYSIS.md` — 97 features x 6 scale levels
 
 ---
-*Last updated: 2026-03-03 after v7.0 milestone start*
+*Last updated: 2026-03-08 after v7.0 milestone close*
