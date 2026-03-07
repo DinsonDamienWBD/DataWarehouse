@@ -2605,3 +2605,71 @@ Plans:
 ## Milestone: v7.0 Military-Grade Production Readiness (Shipped: 2026-03-07) — [archived](milestones/v7.0-ROADMAP.md)
 
 > 16 phases (96-111) | 68 plans | 4 stages | 11,128 findings | Known gaps: MUTN-02, SOAK-01, SOAK-04 (deferred to v8.0 Step 0)
+
+---
+
+## Milestone: v8.0 Ultimate Production Readiness
+
+> 31 phases (111.5, 112-141) | ~135 plans | 7 stages + Step 0 | 45 requirements
+> Goal: Close every remaining gap, flesh out all companion apps, achieve 100% test coverage
+
+**Full plan:** `.planning/v8.0-PLAN.md`
+
+### Step 0: v7.0 Gap Closure (Phase 111.5)
+
+- [ ] **Phase 111.5: Close Deferred v7.0 Requirements** — 5 plans | GAP-01, GAP-02, GAP-03, GAP-04
+  - Runtime test project for Stryker (MUTN-02)
+  - VDE streaming soak test (SOAK-01)
+  - Extended 10-minute soak test (SOAK-04)
+  - SharpFuzz VDE corruption harness (FUZZ-01)
+
+### Stage 1: Storage & I/O Foundation (Phases 112-117)
+
+- [ ] **Phase 112: SPDK Full Implementation** — 8 plans | SIO-01
+- [ ] **Phase 113: BlockDeviceFactory Cascade Wiring** — 4 plans | SIO-02
+- [ ] **Phase 114: S3 Epoch-Flush Block Device** — 5 plans | SIO-03
+- [ ] **Phase 115: WAL Group Commit Optimization** — 3 plans | SIO-04
+- [ ] **Phase 116: Live Filesystem Resize** — 4 plans | SIO-05
+- [ ] **Phase 117: Kernel Bypass Networking (DPDK/RDMA)** — 5 plans | SIO-06
+
+### Stage 2: Cryptographic & Security Hardening (Phases 118-122)
+
+- [ ] **Phase 118: FIPS 140-2/3 Enforcement Mode** — 4 plans | SEC-01
+- [ ] **Phase 119: NSA CNSA 2.0 Enforcement** — 3 plans | SEC-02
+- [ ] **Phase 120: Multi-Level Security (MLS)** — 4 plans | SEC-03
+- [ ] **Phase 121: Secure Erase & Data Remanence** — 3 plans | SEC-04
+- [ ] **Phase 122: TEMPEST Countermeasures** — 2 plans | SEC-05
+
+### Stage 3: Scaling & Performance (Phases 123-129)
+
+- [ ] **Phase 123: Cloud Provider Full Implementation** — 4 plans | PER-01
+- [ ] **Phase 124: HA Clustering Out-of-Box** — 4 plans | PER-02
+- [ ] **Phase 125: Deterministic Latency & NUMA Pinning** — 3 plans | PER-03
+- [ ] **Phase 126: Microsecond-Level Benchmarks** — 3 plans | PER-04
+- [ ] **Phase 127: Petabyte-Scale Validation** — 3 plans | PER-05
+- [ ] **Phase 128: Erasure Coding at VDE Level** — 3 plans | PER-06
+- [ ] **Phase 129: BoundedDictionary Migration** — 4 plans | PER-07
+
+### Stage 4: Advanced Capabilities (Phases 130-135)
+
+- [ ] **Phase 130: HDF5/NetCDF Scientific Format Support** — 3 plans | ADV-01
+- [ ] **Phase 131: GPU-Accelerated Analytics** — 3 plans | ADV-02
+- [ ] **Phase 132: Formal Verification Documentation** — 2 plans | ADV-03
+- [ ] **Phase 133: Multi-Process Architecture** — 3 plans | ADV-04
+- [ ] **Phase 134: Custom Memory Allocator** — 3 plans | ADV-05
+- [ ] **Phase 135: Remaining TODO Cleanup** — 2 plans | ADV-06
+
+### Stage 5: Companion Apps (Phases 136-138)
+
+- [ ] **Phase 136: CLI & GUI — 100% Production Ready** — 12 plans | APP-01, APP-02, APP-03
+- [ ] **Phase 137: Dashboard — 100% Production Ready** — 6 plans | APP-04
+- [ ] **Phase 138: Launcher & Benchmarks — 100% Production Ready** — 5 plans | APP-05, APP-06
+
+### Stage 6: Test Coverage (Phases 139-140)
+
+- [ ] **Phase 139: 100% Test Coverage** — 10 plans | TST-01, TST-02, TST-03, TST-04, TST-05
+- [ ] **Phase 140: Full Hardening** — 4 plans | TST-06, TST-07, TST-08
+
+### Stage 7: Penetration Testing (Phase 141)
+
+- [ ] **Phase 141: Penetration Testing** — 4 plans | PEN-01, PEN-02, PEN-03, PEN-04, PEN-05
