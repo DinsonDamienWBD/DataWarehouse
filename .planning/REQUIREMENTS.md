@@ -846,7 +846,7 @@ Single source of truth: `Metadata/production-audit-2026-03-05/CONSOLIDATED-FINDI
 ### Chaos Engineering (CHAOS) — Phases 107-110
 
 - [x] **CHAOS-01**: Plugin fault injection (fatal exceptions mid-operation) → Kernel isolates faulted plugin, other plugins continue
-- [ ] **CHAOS-02**: Concurrent plugin load/unload during active I/O → no torn state, no orphaned subscriptions
+- [x] **CHAOS-02**: Concurrent plugin load/unload during active I/O → no torn state, no orphaned subscriptions
 - [ ] **CHAOS-03**: Torn-write recovery via Coyote-controlled crash mid-VDE chain → WAL/RAID parity rebuilds correctly
 - [ ] **CHAOS-04**: Resource exhaustion (ThreadPool, MemoryPool, disk-full) → graceful degradation, no hangs or corruption
 - [ ] **CHAOS-05**: Message bus disruption (loss, duplication, reorder) → idempotency verified, no data corruption
