@@ -2632,6 +2632,16 @@ Plans:
 ### Stage 1: Storage & I/O Foundation (Phases 112-117)
 
 - [ ] **Phase 112: SPDK Full Implementation** — 8 plans | SIO-01
+  Goal: SPDK block device with zero-copy DMA, queue-per-thread, vfio-pci auto-detection
+  Plans:
+  - [ ] 112-01-PLAN.md — SpdkNativeBindings ZNS + Identify + flush extensions
+  - [ ] 112-02-PLAN.md — SpdkDmaAllocator IMemoryAllocator conformance + buffer pool
+  - [ ] 112-03-PLAN.md — SpdkBlockDevice queue-per-thread + zero-copy + NVMe flush
+  - [ ] 112-04-PLAN.md — BlockDeviceFactory SPDK cascade integration
+  - [ ] 112-05-PLAN.md — NvmeNamespaceProbe capability discovery
+  - [ ] 112-06-PLAN.md — ZnsSpdkBlockDevice zone management integration
+  - [ ] 112-07-PLAN.md — SPDK + CompoundBlockDevice RAID adapter
+  - [ ] 112-08-PLAN.md — SPDK E2E test with QEMU NVMe emulation
 - [ ] **Phase 113: BlockDeviceFactory Cascade Wiring** — 4 plans | SIO-02
   Plans:
   - [ ] 113-01-PLAN.md — IoUringBlockDevice relocation to IO/Linux namespace
@@ -2659,6 +2669,12 @@ Plans:
   - [ ] 116-03-PLAN.md — IResizableBlockDevice adapters (FileBlockDevice + RawPartitionBlockDevice)
   - [ ] 116-04-PLAN.md — CLI/GUI integration (dw volume resize --grow/--shrink)
 - [ ] **Phase 117: Kernel Bypass Networking (DPDK/RDMA)** — 5 plans | SIO-06
+  Plans:
+  - [ ] 117-01-PLAN.md — IKernelBypassTransport interface + platform detection + base class
+  - [ ] 117-02-PLAN.md — RdmaTransport (Linux ibverbs P/Invoke, RC QP)
+  - [ ] 117-03-PLAN.md — DpdkNetworkTransport + TcpFallbackTransport
+  - [ ] 117-04-PLAN.md — FabricLinkManager (transport selection, heartbeat, reconnect)
+  - [ ] 117-05-PLAN.md — NetworkMessageBusBridge + KernelBypassPlugin entry point
 
 ### Stage 2: Cryptographic & Security Hardening (Phases 118-122)
 
