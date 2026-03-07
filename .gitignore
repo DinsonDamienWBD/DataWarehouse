@@ -362,3 +362,7 @@ MigrationBackup/
 # Fody - auto-generated XML schema
 FodyWeavers.xsd.planning/STATE.md
 /.claude/Ziliz Voyage MCP.txt
+
+# Large binaries from pentest tools
+Metadata/Nuclei-report/
+.idea/
