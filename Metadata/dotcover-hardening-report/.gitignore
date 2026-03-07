@@ -1,0 +1,21 @@
+# Exclude large generated files from git
+# Per-class HTML reports (8,794 files, ~2.9GB total)
+DataWarehouse.*.html
+dw_*.html
+
+# Coverlet raw XML data (113MB)
+coverlet-results/
+
+# dotCover logs
+dotcover.log
+dotcover.err.log
+
+# dotCover snapshot (binary)
+*.dcvr
+
+# ReportGenerator CSS/JS assets
+*.css
+*.js
+*.svg
+
+# Keep: index.html, coverage-analysis.md, .gitignore
