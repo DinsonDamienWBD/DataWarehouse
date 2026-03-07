@@ -1135,6 +1135,7 @@ public sealed record DegradationDirective
 public sealed class StreamingScalingManager : IScalableSubsystem, IDisposable
 {
 }
+    internal StreamingStrategyRegistry StrategyRegistry;;
     public StreamingScalingManager(StreamingStrategyRegistry strategyRegistry, ScalabilityConfig? scalabilityConfig, StreamingBackpressureHandler backpressureHandler, IMessageBus? messageBus = null, IPersistentBackingStore? backingStore = null);
     public IReadOnlyDictionary<string, object> GetScalingMetrics();
     public async Task ReconfigureLimitsAsync(ScalingLimits limits, CancellationToken ct = default);
@@ -1962,8 +1963,8 @@ internal sealed class SwiftStreamStrategy : StreamingDataStrategyBase
     public override StreamingDataCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<SwiftMessage> CreateMT103Async(string senderBic, string receiverBic, string currency, decimal amount, string orderingCustomer, string beneficiaryCustomer, string? remittanceInfo = null, string chargesDetail = "SHA", CancellationToken ct = default);
-    public Task<SwiftMessage> CreateMT202Async(string senderBic, string receiverBic, string currency, decimal amount, CancellationToken ct = default);
+    public Task<SwiftMessage> CreateMt103Async(string senderBic, string receiverBic, string currency, decimal amount, string orderingCustomer, string beneficiaryCustomer, string? remittanceInfo = null, string chargesDetail = "SHA", CancellationToken ct = default);
+    public Task<SwiftMessage> CreateMt202Async(string senderBic, string receiverBic, string currency, decimal amount, CancellationToken ct = default);
     public IReadOnlyList<string> ValidateMessage(SwiftMessage message);
     public IReadOnlyList<SwiftMessage> DrainOutbound(string senderBic, int maxCount = 50);
     public Task<SwiftDeliveryNotification> RecordDeliveryAsync(string txRef, SwiftDeliveryStatus status, string? ackRef = null, CancellationToken ct = default);
@@ -4494,7 +4495,7 @@ public sealed record KinesisStream
 {
 }
     public required string StreamName { get; init; }
-    public required string StreamARN { get; init; }
+    public required string StreamArn { get; init; }
     public int ShardCount { get; init; }
     public StreamStatus Status { get; init; }
     public DateTimeOffset CreatedAt { get; init; }
@@ -5433,7 +5434,7 @@ internal sealed class Hl7StreamStrategy : StreamingDataStrategyBase
     public Hl7Message ParseMessage(string rawMessage);
     public byte[] WrapInMllp(string hl7Message);
     public string UnwrapFromMllp(byte[] mllpData);
-    public Hl7Acknowledgment GenerateAck(Hl7Message originalMessage, Hl7AckCode ackCode = Hl7AckCode.AA, string? textMessage = null);
+    public Hl7Acknowledgment GenerateAck(Hl7Message originalMessage, Hl7AckCode ackCode = Hl7AckCode.Aa, string? textMessage = null);
     public Task<Hl7Acknowledgment> SendMessageAsync(string connectionId, Hl7Message message, CancellationToken ct = default);
     public string? ExtractPatientId(Hl7Message message);
     public (string? FamilyName, string? GivenName)? ExtractPatientName(Hl7Message message);

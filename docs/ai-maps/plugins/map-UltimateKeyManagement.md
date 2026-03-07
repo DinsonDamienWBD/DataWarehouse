@@ -4247,7 +4247,7 @@ public class KeyEscrowDeployment : ContractDeploymentMessage
 ```
 ```csharp
 [FunctionOutput]
-public class KeyInfoOutputDTO : IFunctionOutputDTO
+public class KeyInfoOutputDto : IFunctionOutputDTO
 {
 }
     [Parameter("address", "owner", 1)]
@@ -4266,7 +4266,7 @@ public BigInteger DepositTime { get; set; }
 ```
 ```csharp
 [FunctionOutput]
-public class ApprovalStatusOutputDTO : IFunctionOutputDTO
+public class ApprovalStatusOutputDto : IFunctionOutputDTO
 {
 }
     [Parameter("bool", "approved", 1)]
@@ -4750,7 +4750,7 @@ public sealed class WindowsCredManagerStrategy : KeyStoreStrategyBase
 ```
 ```csharp
 [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
-private struct CREDENTIAL
+private struct Credential
 {
 }
     public uint Flags;
@@ -6349,7 +6349,7 @@ public sealed class GarbledCircuit
     public byte[] CircuitHash { get; private set; };
     public GarbledCircuit(GarbledOperation operation, int inputBitsA, int inputBitsB);
     public byte[][] GetInputLabelsA(bool[] inputBits);
-    public (byte[][] labels0, byte[][] labels1) GetInputLabelsForOT();
+    public (byte[][] labels0, byte[][] labels1) GetInputLabelsForOt();
     public byte[] Serialize();
     public Dictionary<string, bool> GetOutputDecodingTable();
     public byte[][] Evaluate(byte[][] inputLabelsA, byte[][] inputLabelsB);
@@ -6374,7 +6374,7 @@ public sealed class ObliviousTransfer
     public OtReceiverResponse ReceiverChoose(byte[] senderA, bool choiceBit);
     public OtSenderMessages SenderEncrypt(OtSenderSetup setup, byte[] receiverB, byte[] message0, byte[] message1);
     public byte[] ReceiverDecrypt(OtReceiverResponse response, OtSenderMessages messages, bool choiceBit);
-    public async Task<byte[][]> BatchOTAsync(byte[][] messages0, byte[][] messages1, bool[] choices, Func<byte[], Task<byte[]>> sendAndReceive);
+    public async Task<byte[][]> BatchOtAsync(byte[][] messages0, byte[][] messages1, bool[] choices, Func<byte[], Task<byte[]>> sendAndReceive);
 }
 ```
 ```csharp

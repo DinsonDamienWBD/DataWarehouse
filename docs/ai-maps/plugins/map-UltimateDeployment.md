@@ -844,7 +844,7 @@ public sealed class EphemeralEnvironmentStrategy : DeploymentStrategyBase
     protected override Task<HealthCheckResult[]> HealthCheckCoreAsync(string deploymentId, DeploymentState currentState, CancellationToken ct);
     protected override Task<DeploymentState> GetStateCoreAsync(string deploymentId, CancellationToken ct);;
     public async Task DestroyEnvironmentAsync(string deploymentId, CancellationToken ct = default);
-    public async Task ExtendTTLAsync(string deploymentId, TimeSpan extension, CancellationToken ct = default);
+    public async Task ExtendTtlAsync(string deploymentId, TimeSpan extension, CancellationToken ct = default);
 }
 ```
 ```csharp
@@ -1356,7 +1356,7 @@ public sealed class RecreateStrategy : DeploymentStrategyBase
 }
 ```
 ```csharp
-public sealed class ABTestingStrategy : DeploymentStrategyBase
+public sealed class AbTestingStrategy : DeploymentStrategyBase
 {
 }
     public override DeploymentCharacteristics Characteristics { get; };
@@ -1560,6 +1560,7 @@ public sealed class CsiControllerService
 public sealed class CsiNodeService
 {
 }
+    internal string DriverName { get; }
     public CsiNodeService(string driverName, string? nodeId = null);
     public CsiNodeStageResult NodeStageVolume(string volumeId, string stagingTargetPath, CsiVolumeCapability capability, Dictionary<string, string>? publishContext = null);
     public bool NodeUnstageVolume(string volumeId, string stagingTargetPath);

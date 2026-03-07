@@ -2167,7 +2167,7 @@ public sealed class IoTTriggerStrategy : ServerlessStrategyBase
 }
 ```
 ```csharp
-public sealed class GraphQLSubscriptionTriggerStrategy : ServerlessStrategyBase
+public sealed class GraphQlSubscriptionTriggerStrategy : ServerlessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -2176,7 +2176,7 @@ public sealed class GraphQLSubscriptionTriggerStrategy : ServerlessStrategyBase
     public override ServerlessStrategyCapabilities Capabilities;;
     public override string SemanticDescription;;
     public override string[] Tags;;
-    public Task<GraphQLTriggerResult> CreateTriggerAsync(GraphQLTriggerConfig config, CancellationToken ct = default);
+    public Task<GraphQlTriggerResult> CreateTriggerAsync(GraphQlTriggerConfig config, CancellationToken ct = default);
 }
 ```
 ```csharp
@@ -2380,7 +2380,7 @@ public sealed record IoTTriggerResult
 }
 ```
 ```csharp
-public sealed record GraphQLTriggerConfig
+public sealed record GraphQlTriggerConfig
 {
 }
     public required string TriggerId { get; init; }
@@ -2389,7 +2389,7 @@ public sealed record GraphQLTriggerConfig
 }
 ```
 ```csharp
-public sealed record GraphQLTriggerResult
+public sealed record GraphQlTriggerResult
 {
 }
     public bool Success { get; init; }

@@ -73,7 +73,7 @@ public sealed class OpenApiDocStrategy : DocGenStrategyBase
 }
 ```
 ```csharp
-public sealed class GraphQLSchemaDocStrategy : DocGenStrategyBase
+public sealed class GraphQlSchemaDocStrategy : DocGenStrategyBase
 {
 }
     public override DocGenCharacteristics Characteristics { get; };
@@ -137,7 +137,7 @@ public sealed class InteractiveDocStrategy : DocGenStrategyBase
 }
 ```
 ```csharp
-public sealed class AIEnhancedDocStrategy : DocGenStrategyBase
+public sealed class AiEnhancedDocStrategy : DocGenStrategyBase
 {
 }
     public override DocGenCharacteristics Characteristics { get; };

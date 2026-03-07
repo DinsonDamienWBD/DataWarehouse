@@ -290,6 +290,7 @@ public static class ReplicationTopics
 public sealed class StorageIntegrationFeature : IDisposable
 {
 }
+    internal ReplicationStrategyRegistry Registry { get; }
     public StorageIntegrationFeature(ReplicationStrategyRegistry registry, IMessageBus messageBus);
     public long TotalStorageReads;;
     public long TotalStorageWrites;;
@@ -374,6 +375,7 @@ public sealed class ConsistencyCheckResult
 public sealed class ReplicationLagMonitoringFeature : IDisposable
 {
 }
+    internal ReplicationStrategyRegistry Registry { get; }
     public ReplicationLagMonitoringFeature(ReplicationStrategyRegistry registry, IMessageBus messageBus, long warningThresholdMs = 1000, long criticalThresholdMs = 5000, long emergencyThresholdMs = 30000, int maxHistorySamples = 1000);
     public long TotalMeasurements;;
     public long WarningAlerts;;
@@ -417,6 +419,7 @@ public sealed class LagSample
 public sealed class SmartConflictResolutionFeature : IDisposable
 {
 }
+    internal ReplicationStrategyRegistry Registry { get; }
     public SmartConflictResolutionFeature(ReplicationStrategyRegistry registry, IMessageBus messageBus, TimeSpan? intelligenceTimeout = null);
     public long TotalConflictsProcessed;;
     public long SemanticResolutions;;
@@ -546,6 +549,7 @@ public sealed class PredictionRecord
 public sealed class GeoWormReplicationFeature : IDisposable
 {
 }
+    internal ReplicationStrategyRegistry Registry { get; }
     public GeoWormReplicationFeature(ReplicationStrategyRegistry registry, IMessageBus messageBus, TimeSpan? operationTimeout = null);
     public long TotalWormReplications;;
     public long ComplianceModeWrites;;
@@ -644,6 +648,7 @@ public sealed class GeofenceCheckResult
 public sealed class PartialReplicationFeature : IDisposable
 {
 }
+    internal ReplicationStrategyRegistry Registry { get; }
     public PartialReplicationFeature(ReplicationStrategyRegistry registry, IMessageBus messageBus);
     public long TotalEvaluated;;
     public long TotalIncluded;;
@@ -697,6 +702,7 @@ public sealed class FilterSubscription
 public sealed class GeoDistributedShardingFeature : IDisposable
 {
 }
+    internal ReplicationStrategyRegistry Registry { get; }
     public GeoDistributedShardingFeature(ReplicationStrategyRegistry registry, IMessageBus messageBus, int defaultDataShards = 4, int defaultParityShards = 2);
     public long TotalShardOperations;;
     public long TotalShardsCreated;;
@@ -869,6 +875,8 @@ public sealed class CrossCloudReplicationRecord
 public sealed class GlobalTransactionCoordinationFeature : IDisposable
 {
 }
+    internal ReplicationStrategyRegistry Registry { get; }
+    internal TimeSpan CommitTimeout { get; }
     public GlobalTransactionCoordinationFeature(ReplicationStrategyRegistry registry, IMessageBus messageBus, TimeSpan? prepareTimeout = null, TimeSpan? commitTimeout = null);
     public long TotalTransactions;;
     public long CommittedTransactions;;
@@ -922,6 +930,7 @@ public sealed class TransactionLog
 public sealed class BandwidthAwareSchedulingFeature : IDisposable
 {
 }
+    internal ReplicationStrategyRegistry Registry { get; }
     public BandwidthAwareSchedulingFeature(ReplicationStrategyRegistry registry, IMessageBus messageBus, double highUtilizationThreshold = 0.7, double lowUtilizationThreshold = 0.3, long largeTransferThresholdBytes = 10 * 1024 * 1024);
     public long TotalScheduled;;
     public long TotalDeferred;;
@@ -974,6 +983,7 @@ public sealed class SchedulingDecision
 public sealed class RaidIntegrationFeature : IDisposable
 {
 }
+    internal ReplicationStrategyRegistry Registry { get; }
     public RaidIntegrationFeature(ReplicationStrategyRegistry registry, IMessageBus messageBus);
     public long TotalParityChecks;;
     public long ParityChecksPassed;;
@@ -1037,6 +1047,7 @@ public sealed class RebuildResult
 public sealed class PriorityBasedQueueFeature : IDisposable
 {
 }
+    internal ReplicationStrategyRegistry Registry { get; }
     public PriorityBasedQueueFeature(ReplicationStrategyRegistry registry, IMessageBus messageBus, TimeSpan? starvationThreshold = null, int maxQueueDepth = 10000);
     public long TotalEnqueued;;
     public long TotalDequeued;;
@@ -1178,6 +1189,7 @@ public sealed class DRSite
 public sealed class AsyncDRStrategy : EnhancedReplicationStrategyBase
 {
 }
+    internal string? PrimarySiteId { get; private set; }
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
     public override ConsistencyModel ConsistencyModel;;
@@ -1212,6 +1224,7 @@ public sealed class SyncDRStrategy : EnhancedReplicationStrategyBase
 public sealed class ZeroRPOStrategy : EnhancedReplicationStrategyBase
 {
 }
+    internal string? ZeroPrimarySiteId { get; private set; }
     public sealed record LogEntry(long Lsn, string Key, byte[] Data, DateTimeOffset Timestamp);;
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
@@ -1230,6 +1243,7 @@ public sealed class ZeroRPOStrategy : EnhancedReplicationStrategyBase
 public sealed class ActivePassiveStrategy : EnhancedReplicationStrategyBase
 {
 }
+    internal int HealthCheckIntervalMs { get; private set; };
     public sealed record FailoverEvent(string FromSite, string ToSite, DateTimeOffset Timestamp, FailoverStatus Status, string? Reason);;
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
@@ -1252,6 +1266,7 @@ public sealed class ActivePassiveStrategy : EnhancedReplicationStrategyBase
 public sealed class FailoverDRStrategy : EnhancedReplicationStrategyBase
 {
 }
+    internal DateTimeOffset? FailoverStartTime { get; private set; }
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
     public override ConsistencyModel ConsistencyModel;;
@@ -1340,6 +1355,7 @@ public sealed class ChainTopologyStrategy : EnhancedReplicationStrategyBase
 public sealed class TreeTopologyStrategy : EnhancedReplicationStrategyBase
 {
 }
+    internal string? RootNodeId { get; private set; }
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
     public override ConsistencyModel ConsistencyModel;;
@@ -1924,6 +1940,7 @@ public sealed class CompressionReplicationStrategy : EnhancedReplicationStrategy
 public sealed class EncryptionReplicationStrategy : EnhancedReplicationStrategyBase
 {
 }
+    internal EncryptionAlgorithm ConfiguredAlgorithm { get; set; };
     public enum EncryptionAlgorithm;
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
@@ -2516,6 +2533,7 @@ public sealed class ComplianceViolation
 public sealed class LatencyOptimizedReplicationStrategy : EnhancedReplicationStrategyBase
 {
 }
+    internal double SlaTargetMs { get; private set; };
     public sealed class LatencyMeasurement;
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
@@ -2563,6 +2581,7 @@ public sealed class CloudProvider
 public sealed class AwsReplicationStrategy : EnhancedReplicationStrategyBase
 {
 }
+    internal bool EnableIntelligentTiering { get; private set; };
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
     public override ConsistencyModel ConsistencyModel;;
@@ -2579,6 +2598,7 @@ public sealed class AwsReplicationStrategy : EnhancedReplicationStrategyBase
 public sealed class AzureReplicationStrategy : EnhancedReplicationStrategyBase
 {
 }
+    internal string? WriteRegion { get; private set; }
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
     public override ConsistencyModel ConsistencyModel;;
@@ -2595,6 +2615,7 @@ public sealed class AzureReplicationStrategy : EnhancedReplicationStrategyBase
 public sealed class GcpReplicationStrategy : EnhancedReplicationStrategyBase
 {
 }
+    internal string? LeaderRegion { get; private set; }
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
     public override ConsistencyModel ConsistencyModel;;
@@ -2856,6 +2877,7 @@ public sealed class CdcEvent
 public sealed class KafkaConnectCdcStrategy : EnhancedReplicationStrategyBase
 {
 }
+    internal string? BootstrapServers { get; private set; }
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;
     public override ConsistencyModel ConsistencyModel;;
@@ -2908,6 +2930,7 @@ public sealed class ConnectorConfig
 public sealed class MaxwellCdcStrategy : EnhancedReplicationStrategyBase
 {
 }
+    internal bool BootstrapEnabled { get; private set; };
     public sealed class MaxwellEvent;
     public override ReplicationCharacteristics Characteristics { get; };
     public override ReplicationCapabilities Capabilities;;

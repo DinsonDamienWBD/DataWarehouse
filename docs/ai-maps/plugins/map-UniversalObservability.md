@@ -340,6 +340,7 @@ public sealed class NagiosStrategy : ObservabilityStrategyBase
 public sealed class IcingaStrategy : ObservabilityStrategyBase
 {
 }
+    internal bool Password;;
     public override string StrategyId;;
     public override string Name;;
     public IcingaStrategy() : base(new ObservabilityCapabilities(SupportsMetrics: true, SupportsTracing: false, SupportsLogging: false, SupportsDistributedTracing: false, SupportsAlerting: true, SupportedExporters: new[] { "Icinga", "Graphite", "InfluxDB" }));
@@ -859,6 +860,7 @@ public sealed class AmplitudeStrategy : ObservabilityStrategyBase
 public sealed class SessionTrackingService
 {
 }
+    internal int MaxSessionsPerUser;;
     public SessionTrackingService(TimeSpan? sessionTimeout = null, int maxSessionsPerUser = 10);
     public UserSession StartOrResumeSession(string userId, string? deviceId = null, Dictionary<string, object>? properties = null);
     public void RecordEvent(string sessionId, string eventName, Dictionary<string, object>? eventData = null);
@@ -1081,6 +1083,7 @@ public sealed class AppDynamicsStrategy : ObservabilityStrategyBase
 public sealed class DynatraceStrategy : ObservabilityStrategyBase
 {
 }
+    internal string EntityId;;
     public override string StrategyId;;
     public override string Name;;
     public DynatraceStrategy() : base(new ObservabilityCapabilities(SupportsMetrics: true, SupportsTracing: true, SupportsLogging: true, SupportsDistributedTracing: true, SupportsAlerting: true, SupportedExporters: new[] { "Dynatrace", "OneAgent", "ActiveGate" }));
@@ -1517,6 +1520,7 @@ public sealed class SplunkStrategy : ObservabilityStrategyBase
 public sealed class ElasticsearchStrategy : ObservabilityStrategyBase
 {
 }
+    internal string ApiKey;;
     public override string StrategyId;;
     public override string Name;;
     public ElasticsearchStrategy() : base(new ObservabilityCapabilities(SupportsMetrics: false, SupportsTracing: false, SupportsLogging: true, SupportsDistributedTracing: false, SupportsAlerting: true, SupportedExporters: new[] { "Elasticsearch", "Logstash", "Kibana" }));

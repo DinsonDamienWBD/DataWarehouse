@@ -1,10 +1,6 @@
 # Plugin: UniversalFabric
 > **CORE DEPENDENCY:** All plugins rely on the SDK. Resolve base classes in `../map-core.md`.
 > **MESSAGE BUS CONTRACTS:** Look for `IEvent`, `IMessage`, or publish/subscribe signatures below.
-> **NAMING CLARIFICATION (Phase 94):** UniversalFabric is the **physical storage I/O routing**
-> plugin. It routes storage operations to backend strategies via placement rules and provides an
-> S3-compatible server. Do NOT confuse with UltimateDataFabric (merged into UltimateDataManagement),
-> which is a **logical data virtualization** layer for unified views across heterogeneous data sources.
 
 
 ## Project: DataWarehouse.Plugins.UniversalFabric

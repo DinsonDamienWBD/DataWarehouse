@@ -782,7 +782,7 @@ internal sealed class OnStorageZstdStrategy : StorageProcessingStrategyBase
     public override StorageProcessingCapabilities Capabilities;;
     public override Task<ProcessingResult> ProcessAsync(ProcessingQuery query, CancellationToken ct = default);
     public override async IAsyncEnumerable<ProcessingResult> QueryAsync(ProcessingQuery query, [EnumeratorCancellation] CancellationToken ct = default);
-    public override async Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
+    public override Task<AggregationResult> AggregateAsync(ProcessingQuery query, AggregationType aggregationType, CancellationToken ct = default);
 }
 ```
 

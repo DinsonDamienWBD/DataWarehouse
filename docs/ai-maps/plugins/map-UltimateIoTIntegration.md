@@ -1129,6 +1129,7 @@ public sealed class OfflineSyncStrategy : EdgeIntegrationStrategyBase
     public override string StrategyName;;
     public override string Description;;
     public override string[] Tags;;
+    internal DateTimeOffset LastSyncTime { get; private set; };
     public void RecordOfflineOperation(string key, OfflineOperationType type, byte[]? data = null);
     public async Task<OfflineSyncResult> ReplaySyncAsync(Func<OfflineOperation, Task<bool>> applyFunc, CancellationToken ct = default);
     public void SetOnlineStatus(bool isOnline);;
@@ -2403,9 +2404,9 @@ public sealed class DicomPresentationContext
 public static class DicomTransferSyntax
 {
 }
-    public const string ImplicitVRLittleEndian = "1.2.840.10008.1.2";
-    public const string ExplicitVRLittleEndian = "1.2.840.10008.1.2.1";
-    public const string ExplicitVRBigEndian = "1.2.840.10008.1.2.2";
+    public const string ImplicitVrLittleEndian = "1.2.840.10008.1.2";
+    public const string ExplicitVrLittleEndian = "1.2.840.10008.1.2.1";
+    public const string ExplicitVrBigEndian = "1.2.840.10008.1.2.2";
     public const string Jpeg2000Lossless = "1.2.840.10008.1.2.4.90";
     public const string Jpeg2000 = "1.2.840.10008.1.2.4.91";
 }
@@ -2424,8 +2425,8 @@ public sealed class DicomSopClass
     public static readonly DicomSopClass DxImageStorage = new("1.2.840.10008.5.1.4.1.1.1.1", "Digital X-Ray Image Storage");
     public static readonly DicomSopClass NmImageStorage = new("1.2.840.10008.5.1.4.1.1.20", "Nuclear Medicine Image Storage");
     public static readonly DicomSopClass PetImageStorage = new("1.2.840.10008.5.1.4.1.1.128", "PET Image Storage");
-    public static readonly DicomSopClass PatientRootQR = new("1.2.840.10008.5.1.4.1.2.1.1", "Patient Root Query/Retrieve - FIND");
-    public static readonly DicomSopClass StudyRootQR = new("1.2.840.10008.5.1.4.1.2.2.1", "Study Root Query/Retrieve - FIND");
+    public static readonly DicomSopClass PatientRootQr = new("1.2.840.10008.5.1.4.1.2.1.1", "Patient Root Query/Retrieve - FIND");
+    public static readonly DicomSopClass StudyRootQr = new("1.2.840.10008.5.1.4.1.2.2.1", "Study Root Query/Retrieve - FIND");
 }
 ```
 ```csharp
@@ -2774,6 +2775,7 @@ public class GpioControllerStrategy : HardwareBusStrategyBase
 public class I2cControllerStrategy : HardwareBusStrategyBase
 {
 }
+    internal int BusFrequency { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override string BusType;;
@@ -2790,6 +2792,9 @@ public class I2cControllerStrategy : HardwareBusStrategyBase
 public class SpiControllerStrategy : HardwareBusStrategyBase
 {
 }
+    internal SpiMode ConfiguredMode { get; private set; };
+    internal int ClockFrequency { get; private set; };
+    internal int ChipSelectPin { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override string BusType;;

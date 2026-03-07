@@ -459,8 +459,8 @@ public sealed class FormatOptions
 public sealed class ResultFormatter
 {
 }
-    public string FormatForAI(KnowledgeQueryResponse response, FormatOptions options);
-    public string FormatForAI(CommandResult result, FormatOptions options);
+    public string FormatForAi(KnowledgeQueryResponse response, FormatOptions options);
+    public string FormatForAi(CommandResult result, FormatOptions options);
 }
 ```
 ```csharp
@@ -506,15 +506,15 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
     public IReadOnlyCollection<IIntelligenceStrategy> GetStrategiesByCategory(IntelligenceStrategyCategory category);
     public IReadOnlyCollection<string> GetRegisteredStrategyIds();;
     public IEnumerable<IIntelligenceStrategy> GetStrategiesByCapabilities(IntelligenceCapabilities capabilities);
-    public void SetActiveAIProvider(string strategyId);
+    public void SetActiveAiProvider(string strategyId);
     public void SetActiveVectorStore(string strategyId);
     public void SetActiveKnowledgeGraph(string strategyId);
     public void SetActiveFeature(string strategyId);
-    public IAIProvider? GetActiveAIProvider();;
+    public IAiProvider? GetActiveAiProvider();;
     public IVectorStore? GetActiveVectorStore();;
     public IKnowledgeGraph? GetActiveKnowledgeGraph();;
     public FeatureStrategyBase? GetActiveFeature();;
-    public IIntelligenceStrategy? SelectBestAIProvider(IntelligenceCapabilities capabilities = IntelligenceCapabilities.AllAIProvider, bool preferLowCost = false, bool preferLowLatency = false);
+    public IIntelligenceStrategy? SelectBestAiProvider(IntelligenceCapabilities capabilities = IntelligenceCapabilities.AllAiProvider, bool preferLowCost = false, bool preferLowLatency = false);
     public IIntelligenceStrategy? SelectBestVectorStore(bool preferLowCost = false, bool requireLocal = false);
     public void ConfigureFeature(FeatureStrategyBase feature);
     public override Task<Stream> OnWriteAsync(Stream input, IKernelContext context, Dictionary<string, object> args, CancellationToken ct = default);
@@ -525,9 +525,9 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
     {
         var capabilities = new List<RegisteredCapability>();
         // Main plugin capabilities
-        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.ai", DisplayName = $"{Name} - AI Services", Description = "Unified AI provider access with multiple backends", Category = SDK.Contracts.CapabilityCategory.AI, PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "ai", "intelligence", "ml", "llm" } });
-        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.vector", DisplayName = $"{Name} - Vector Operations", Description = "Vector storage and similarity search", Category = SDK.Contracts.CapabilityCategory.AI, SubCategory = "Vector", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "vector", "embeddings", "similarity", "search" } });
-        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.graph", DisplayName = $"{Name} - Knowledge Graph", Description = "Knowledge graph operations and traversal", Category = SDK.Contracts.CapabilityCategory.AI, SubCategory = "Graph", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "graph", "knowledge", "relationships", "traversal" } });
+        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.ai", DisplayName = $"{Name} - AI Services", Description = "Unified AI provider access with multiple backends", Category = SDK.Contracts.CapabilityCategory.Ai, PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "ai", "intelligence", "ml", "llm" } });
+        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.vector", DisplayName = $"{Name} - Vector Operations", Description = "Vector storage and similarity search", Category = SDK.Contracts.CapabilityCategory.Ai, SubCategory = "Vector", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "vector", "embeddings", "similarity", "search" } });
+        capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.graph", DisplayName = $"{Name} - Knowledge Graph", Description = "Knowledge graph operations and traversal", Category = SDK.Contracts.CapabilityCategory.Ai, SubCategory = "Graph", PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = new[] { "graph", "knowledge", "relationships", "traversal" } });
         // Add capabilities for each strategy
         foreach (var strategy in _allStrategies.Values)
         {
@@ -539,7 +539,7 @@ public sealed class UltimateIntelligencePlugin : DataWarehouse.SDK.Contracts.Hie
                 strategy.Category.ToString().ToLowerInvariant()
             };
             tags.AddRange(info.Tags);
-            capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.strategy.{strategy.StrategyId}", DisplayName = $"{strategy.StrategyName}", Description = info.Description, Category = SDK.Contracts.CapabilityCategory.AI, SubCategory = strategy.Category.ToString(), PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = tags.ToArray(), Priority = info.CostTier <= 2 ? 70 : 50, Metadata = new Dictionary<string, object> { ["strategyId"] = strategy.StrategyId, ["category"] = strategy.Category.ToString(), ["provider"] = info.ProviderName, ["capabilities"] = info.Capabilities.ToString(), ["costTier"] = info.CostTier, ["latencyTier"] = info.LatencyTier, ["requiresNetwork"] = info.RequiresNetworkAccess, ["supportsOffline"] = info.SupportsOfflineMode }, SemanticDescription = $"Use {info.ProviderName} for {info.Description}" });
+            capabilities.Add(new RegisteredCapability { CapabilityId = $"{Id}.strategy.{strategy.StrategyId}", DisplayName = $"{strategy.StrategyName}", Description = info.Description, Category = SDK.Contracts.CapabilityCategory.Ai, SubCategory = strategy.Category.ToString(), PluginId = Id, PluginName = Name, PluginVersion = Version, Tags = tags.ToArray(), Priority = info.CostTier <= 2 ? 70 : 50, Metadata = new Dictionary<string, object> { ["strategyId"] = strategy.StrategyId, ["category"] = strategy.Category.ToString(), ["provider"] = info.ProviderName, ["capabilities"] = info.Capabilities.ToString(), ["costTier"] = info.CostTier, ["latencyTier"] = info.LatencyTier, ["requiresNetwork"] = info.RequiresNetworkAccess, ["supportsOffline"] = info.SupportsOfflineMode }, SemanticDescription = $"Use {info.ProviderName} for {info.Description}" });
         }
 
         return capabilities;
@@ -1627,15 +1627,15 @@ public abstract class IntelligenceStrategyBase : StrategyBase, IIntelligenceStra
 }
 ```
 ```csharp
-public abstract class AIProviderStrategyBase : IntelligenceStrategyBase, IAIProvider
+public abstract class AiProviderStrategyBase : IntelligenceStrategyBase, IAiProvider
 {
 }
     public override IntelligenceStrategyCategory Category;;
     public abstract string ProviderId { get; }
     public abstract string DisplayName { get; }
-    public abstract AICapabilities Capabilities { get; }
-    public abstract Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);;
-    public abstract IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, CancellationToken ct = default);;
+    public abstract AiCapabilities Capabilities { get; }
+    public abstract Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);;
+    public abstract IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, CancellationToken ct = default);;
     public abstract Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);;
     public virtual async Task<float[][]> GetEmbeddingsBatchAsync(string[] texts, CancellationToken ct = default);
 }
@@ -1676,10 +1676,10 @@ public abstract class FeatureStrategyBase : IntelligenceStrategyBase
 {
 }
     public override IntelligenceStrategyCategory Category;;
-    protected IAIProvider? AIProvider { get; private set; }
+    protected IAiProvider? AiProvider { get; private set; }
     protected IVectorStore? VectorStore { get; private set; }
     protected IKnowledgeGraph? KnowledgeGraph { get; private set; }
-    public void SetAIProvider(IAIProvider provider);
+    public void SetAiProvider(IAiProvider provider);
     public void SetVectorStore(IVectorStore store);
     public void SetKnowledgeGraph(IKnowledgeGraph graph);
 }
@@ -2251,7 +2251,9 @@ public sealed record FunctionCall
 public sealed class ChatCapabilityHandler : IDisposable
 {
 }
-    public ChatCapabilityHandler(Func<string, IAIProvider?> providerResolver, ChatConfig? config = null);
+    internal readonly FunctionCallingHandler FunctionHandler;
+    internal readonly VisionHandler VisionHandler;
+    public ChatCapabilityHandler(Func<string, IAiProvider?> providerResolver, ChatConfig? config = null);
     public async Task<ChatResponse> HandleChatAsync(ChatRequest request, string? providerName = null, CancellationToken ct = default);
     public async Task<CompletionResponse> HandleCompleteAsync(CompletionRequest request, string? providerName = null, CancellationToken ct = default);
     public async Task<EmbeddingResponse> HandleEmbedAsync(EmbeddingRequest request, string? providerName = null, CancellationToken ct = default);
@@ -2319,8 +2321,8 @@ public sealed class VisionHandler
 public sealed class StreamingHandler
 {
 }
-    public async IAsyncEnumerable<string> StreamAsync(IAIProvider provider, string prompt, string? systemMessage, string model, [EnumeratorCancellation] CancellationToken ct = default);
-    public string FormatSSE(string chunk, string eventType = "message");
+    public async IAsyncEnumerable<string> StreamAsync(IAiProvider provider, string prompt, string? systemMessage, string model, [EnumeratorCancellation] CancellationToken ct = default);
+    public string FormatSse(string chunk, string eventType = "message");
 }
 ```
 ```csharp
@@ -2332,7 +2334,7 @@ public sealed class ChatConfig
     public int DefaultMaxTokens { get; init; };
     public double DefaultTemperature { get; init; };
     public int MaxHistoryTokens { get; init; };
-    public TimeSpan ConversationTTL { get; init; };
+    public TimeSpan ConversationTtl { get; init; };
     public int MaxConversations { get; init; };
 }
 ```
@@ -2825,7 +2827,7 @@ public sealed record RuleOperationResponse
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/NLP/NaturalLanguageProcessing.cs
 ```csharp
-public static class NLPTopics
+public static class NlpTopics
 {
 }
     public const string ParseQuery = "intelligence.nlp.parse-query";
@@ -2899,7 +2901,7 @@ public sealed class QueryParser
 }
 ```
 ```csharp
-private sealed class AIParseResult
+private sealed class AiParseResult
 {
 }
     public IReadOnlyList<ExtractedEntity> Entities { get; set; };
@@ -2915,7 +2917,7 @@ public sealed class QueryParserOptions
     public bool FilterStopWords { get; set; };
     public int MinKeywordLength { get; set; };
     public int MaxKeywords { get; set; };
-    public bool EnableAIParsing { get; set; };
+    public bool EnableAiParsing { get; set; };
 }
 ```
 ```csharp
@@ -2960,7 +2962,7 @@ public sealed class ConversationContext
 public sealed class IntentDetectorOptions
 {
 }
-    public bool EnableAIDetection { get; set; };
+    public bool EnableAiDetection { get; set; };
     public double ClarificationThreshold { get; set; };
 }
 ```
@@ -2976,7 +2978,7 @@ public sealed class EntityExtractor
 public sealed class EntityExtractorOptions
 {
 }
-    public bool EnableAIExtraction { get; set; };
+    public bool EnableAiExtraction { get; set; };
     public Dictionary<EntityType, string> CustomPatterns { get; set; };
 }
 ```
@@ -3018,7 +3020,7 @@ public sealed class GeneratedResponse
 public sealed class ResponseGeneratorOptions
 {
 }
-    public bool EnableAIGeneration { get; set; };
+    public bool EnableAiGeneration { get; set; };
     public string NoResultsMessage { get; set; };
     public int MaxResponseLength { get; set; };
 }
@@ -3085,8 +3087,8 @@ public sealed class SemanticIndexer
 public sealed class IndexStats
 {
 }
-    internal long _totalChunks;
-    internal long _totalDocuments;
+    internal long TotalChunksField;
+    internal long TotalDocumentsField;
     public required string Domain { get; init; }
     public long TotalChunks;;
     public long TotalDocuments;;
@@ -3105,6 +3107,7 @@ public sealed class SemanticIndexerOptions
 public sealed class SemanticSearch
 {
 }
+    internal SemanticSearchOptions Options { get; }
     public SemanticSearch(UnifiedVectorStore vectorStore, QueryParser? queryParser = null, SemanticSearchOptions? options = null);
     public async Task<SemanticSearchResults> SearchAsync(string query, SearchOptions? options = null, CancellationToken ct = default);
 }
@@ -3154,6 +3157,8 @@ public sealed class SemanticSearchOptions
 public sealed class UnifiedKnowledgeGraph : IAsyncDisposable
 {
 }
+    internal UnifiedKnowledgeGraphOptions GraphOptions { get; }
+    internal Func<string, string, CancellationToken, Task<string?>>? MessageBusPublisher { get; }
     public UnifiedKnowledgeGraph(UnifiedKnowledgeGraphOptions? options = null, Func<string, string, CancellationToken, Task<string?>>? messageBusPublisher = null);
     public async Task AddNodeAsync(KnowledgeNode node, CancellationToken ct = default);
     public async Task AddEdgeAsync(KnowledgeEdge edge, CancellationToken ct = default);
@@ -3229,7 +3234,7 @@ public sealed class DiscoveredRelationship
 public sealed class RelationshipDiscoveryOptions
 {
 }
-    public bool EnableAIDiscovery { get; set; };
+    public bool EnableAiDiscovery { get; set; };
     public double MinConfidence { get; set; };
 }
 ```
@@ -3566,7 +3571,7 @@ public sealed record ChangeValidationResult
 public sealed class ImpactAnalyzer
 {
 }
-    public ImpactAnalyzer(IAIProvider? aiProvider = null);
+    public ImpactAnalyzer(IAiProvider? aiProvider = null);
     public async Task<ImpactAnalysisResult> AnalyzeAsync(StateFork fork, Dictionary<string, object> originalState, CancellationToken ct = default);
 }
 ```
@@ -3588,7 +3593,7 @@ public sealed class SimulationEngine : FeatureStrategyBase
     public async Task<bool> RollbackAsync(string sessionId, CancellationToken ct = default);
     public async Task TerminateSessionAsync(string sessionId, CancellationToken ct = default);
     public StateComparison CompareStates(Dictionary<string, object> original, Dictionary<string, object> modified);
-    public void SetAIProviderForAnalysis(IAIProvider provider);
+    public void SetAiProviderForAnalysis(IAiProvider provider);
 }
 ```
 
@@ -3626,13 +3631,13 @@ public sealed class ChannelRegistry : IAsyncDisposable
 }
 ```
 ```csharp
-public sealed class CLIChannel : IntelligenceChannelBase
+public sealed class CliChannel : IntelligenceChannelBase
 {
 }
     public override ChannelType Type;;
     public string ChannelId { get; }
-    public CLIChannel(string channelId, TextReader input, TextWriter output, TextWriter? errorOutput = null, CLIChannelOptions? options = null) : base(options?.QueueCapacity ?? 1000);
-    public CLIChannel(string channelId, CLIChannelOptions? options = null) : this(channelId, Console.In, Console.Out, Console.Error, options);
+    public CliChannel(string channelId, TextReader input, TextWriter output, TextWriter? errorOutput = null, CliChannelOptions? options = null) : base(options?.QueueCapacity ?? 1000);
+    public CliChannel(string channelId, CliChannelOptions? options = null) : this(channelId, Console.In, Console.Out, Console.Error, options);
     protected override Task ConnectCoreAsync(CancellationToken ct);
     protected override async Task DisconnectCoreAsync(CancellationToken ct);
     protected override async Task TransmitMessageAsync(ChannelMessage message, CancellationToken ct);
@@ -3642,7 +3647,7 @@ public sealed class CLIChannel : IntelligenceChannelBase
 }
 ```
 ```csharp
-public sealed class CLIChannelOptions
+public sealed class CliChannelOptions
 {
 }
     public bool InteractiveMode { get; set; };
@@ -3654,13 +3659,13 @@ public sealed class CLIChannelOptions
 }
 ```
 ```csharp
-public sealed class RESTChannel : IntelligenceChannelBase
+public sealed class RestChannel : IntelligenceChannelBase
 {
 }
     public override ChannelType Type;;
     public string ChannelId { get; }
     public Uri BaseUrl;;
-    public RESTChannel(string channelId, RESTChannelOptions options, HttpClient? httpClient = null) : base(options?.QueueCapacity ?? 1000);
+    public RestChannel(string channelId, RestChannelOptions options, HttpClient? httpClient = null) : base(options?.QueueCapacity ?? 1000);
     protected override Task ConnectCoreAsync(CancellationToken ct);
     protected override Task DisconnectCoreAsync(CancellationToken ct);
     protected override Task TransmitMessageAsync(ChannelMessage message, CancellationToken ct);
@@ -3683,7 +3688,7 @@ private sealed class PendingRequest
 }
 ```
 ```csharp
-public sealed class RESTChannelOptions
+public sealed class RestChannelOptions
 {
 }
     public required Uri BaseUrl { get; set; }
@@ -3696,14 +3701,14 @@ public sealed class RESTChannelOptions
 }
 ```
 ```csharp
-public sealed class GRPCChannel : IntelligenceChannelBase
+public sealed class GrpcChannel : IntelligenceChannelBase
 {
 }
     public override ChannelType Type;;
     public string ChannelId { get; }
     public string Endpoint;;
-    public GRPCChannel(string channelId, GRPCChannelOptions options, IGRPCClientAdapter? clientAdapter = null) : base(options?.QueueCapacity ?? 1000);
-    public void SetClientAdapter(IGRPCClientAdapter adapter);
+    public GrpcChannel(string channelId, GrpcChannelOptions options, IGrpcClientAdapter? clientAdapter = null) : base(options?.QueueCapacity ?? 1000);
+    public void SetClientAdapter(IGrpcClientAdapter adapter);
     protected override async Task ConnectCoreAsync(CancellationToken ct);
     protected override async Task DisconnectCoreAsync(CancellationToken ct);
     protected override async Task TransmitMessageAsync(ChannelMessage message, CancellationToken ct);
@@ -3713,7 +3718,7 @@ public sealed class GRPCChannel : IntelligenceChannelBase
 }
 ```
 ```csharp
-private sealed class GRPCCallState
+private sealed class GrpcCallState
 {
 }
     public required string CallId { get; init; }
@@ -3722,7 +3727,7 @@ private sealed class GRPCCallState
 }
 ```
 ```csharp
-public sealed class GRPCChannelOptions
+public sealed class GrpcChannelOptions
 {
 }
     public required string Endpoint { get; set; }
@@ -3736,7 +3741,7 @@ public sealed class GRPCChannelOptions
 }
 ```
 ```csharp
-public interface IGRPCClientAdapter
+public interface IGrpcClientAdapter
 {
 }
     Task ConnectAsync(string endpoint, CancellationToken ct = default);;
@@ -3944,7 +3949,7 @@ public sealed class ConversationMemory
 public sealed class StreamingSupport
 {
 }
-    public StreamingSupport(IAIProvider aiProvider);
+    public StreamingSupport(IAiProvider aiProvider);
     public async IAsyncEnumerable<StreamChunk> StreamResponseAsync(string prompt, string? systemPrompt = null, [EnumeratorCancellation] CancellationToken ct = default);
     public void CancelStream(string streamId);
     public int ActiveStreamCount;;
@@ -3968,7 +3973,7 @@ public sealed class ChatHandler : FeatureStrategyBase
     public override string StrategyId;;
     public override string StrategyName;;
     public override IntelligenceStrategyInfo Info;;
-    public void Initialize(IAIProvider provider);
+    public void Initialize(IAiProvider provider);
     public async Task<ChatSession> StartSessionAsync(string? systemPrompt = null, CancellationToken ct = default);
     public async Task<ChatMessage> SendMessageAsync(string sessionId, string message, CancellationToken ct = default);
     public async IAsyncEnumerable<StreamChunk> StreamMessageAsync(string sessionId, string message, [EnumeratorCancellation] CancellationToken ct = default);
@@ -4160,7 +4165,7 @@ public sealed class ReportDefinition
     public string? CustomCron { get; init; }
     public string Format { get; init; };
     public List<ReportDataSource> DataSources { get; init; };
-    public bool IncludeAISummary { get; init; };
+    public bool IncludeAiSummary { get; init; };
     public string? ScheduledTaskId { get; set; }
     public DateTime? LastGenerated { get; set; }
     public int GenerationCount { get; set; }
@@ -4312,7 +4317,7 @@ public sealed class InteractionModeCoordinator : FeatureStrategyBase
     public override string StrategyId;;
     public override string StrategyName;;
     public override IntelligenceStrategyInfo Info;;
-    public void Initialize(IAIProvider aiProvider);
+    public void Initialize(IAiProvider aiProvider);
     public void StartBackgroundModes();
     public async Task StopBackgroundModesAsync();
     public new ModeStatistics GetStatistics();
@@ -4348,11 +4353,11 @@ public sealed class IntelligenceScalingMigration : IDisposable
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/EdgeNative/AutoMLEngine.cs
 ```csharp
-public sealed class AutoMLEngine
+public sealed class AutoMlEngine
 {
 }
-    public AutoMLEngine(IMessageBus? messageBus = null);
-    public async Task<string> RunAutoMLPipelineAsync(string dataSource, string targetColumn, string modelType = "auto", CancellationToken ct = default);
+    public AutoMlEngine(IMessageBus? messageBus = null);
+    public async Task<string> RunAutoMlPipelineAsync(string dataSource, string targetColumn, string modelType = "auto", CancellationToken ct = default);
     public SchemaExtractionService SchemaExtractor;;
     public AgentCodeRequest CodeGenerator;;
     public JitTrainingPipeline TrainingPipeline;;
@@ -4467,15 +4472,15 @@ public sealed class SystemMetrics
     public double CpuUsagePercent { get; init; }
     public double TemperatureCelsius { get; init; }
     public double BatteryPercent { get; init; }
-    public long AvailableMemoryMB { get; init; }
+    public long AvailableMemoryMb { get; init; }
 }
 ```
 ```csharp
-public sealed class AutoMLException : Exception
+public sealed class AutoMlException : Exception
 {
 }
-    public AutoMLException(string message) : base(message);
-    public AutoMLException(string message, Exception innerException) : base(message, innerException);
+    public AutoMlException(string message) : base(message);
+    public AutoMlException(string message, Exception innerException) : base(message, innerException);
 }
 ```
 ```csharp
@@ -5612,19 +5617,19 @@ internal sealed record AuthenticationEntry
 }
 ```
 ```csharp
-public sealed class KnowledgeACL
+public sealed class KnowledgeAcl
 {
 }
     public AccessPolicy DefaultPolicy { get; set; };
-    public void SetInstanceACL(string instanceId, InstanceACL acl);
-    public void SetDomainACL(string domain, DomainACL acl);
+    public void SetInstanceAcl(string instanceId, InstanceAcl acl);
+    public void SetDomainAcl(string domain, DomainAcl acl);
     public AccessCheckResult CheckAccess(string instanceId, string domain, KnowledgeOperation operation);
-    public InstanceACL? GetInstanceACL(string instanceId);
-    public DomainACL? GetDomainACL(string domain);
+    public InstanceAcl? GetInstanceAcl(string instanceId);
+    public DomainAcl? GetDomainAcl(string domain);
 }
 ```
 ```csharp
-public sealed record InstanceACL
+public sealed record InstanceAcl
 {
 }
     public required string InstanceId { get; init; }
@@ -5636,7 +5641,7 @@ public sealed record InstanceACL
 }
 ```
 ```csharp
-public sealed record DomainACL
+public sealed record DomainAcl
 {
 }
     public required string Domain { get; init; }
@@ -5984,7 +5989,7 @@ public sealed record TrainingSchedule
     public DateTimeOffset ScheduledTime { get; init; }
     public int MaxDurationMinutes { get; init; };
     public double MaxCpuUsage { get; init; };
-    public long MaxMemoryMB { get; init; };
+    public long MaxMemoryMb { get; init; };
     public bool IsRecurring { get; init; }
     public int? RecurrenceIntervalHours { get; init; }
     public bool IsActive { get; init; };
@@ -6312,7 +6317,7 @@ public sealed class DiscoveredCapabilities
 public abstract class DomainModelStrategyBase : StrategyBase, IDomainModelStrategy
 {
 }
-    protected IMessageBus? _messageBus;
+    protected new IMessageBus? MessageBus;
     public abstract string Domain { get; }
     public abstract string ModelId { get; }
     public override string StrategyId;;
@@ -6759,7 +6764,7 @@ public sealed record TierConfig
     public bool Enabled { get; init; };
     public MemoryPersistence Persistence { get; init; };
     public long MaxCapacityBytes { get; init; };
-    public TimeSpan? TTL { get; init; }
+    public TimeSpan? Ttl { get; init; }
 }
 ```
 ```csharp
@@ -6827,7 +6832,7 @@ public sealed record EncodedContext
 }
 ```
 ```csharp
-public interface IAIContextEncoder
+public interface IAiContextEncoder
 {
 }
     Task<EncodedContext> EncodeAsync(string content, CancellationToken ct = default);;
@@ -6852,7 +6857,7 @@ public interface IContextRegenerator
 }
 ```
 ```csharp
-public sealed class AIContextRegenerator : IContextRegenerator
+public sealed class AiContextRegenerator : IContextRegenerator
 {
 }
     public async Task<RegenerationResult> RegenerateAsync(byte[] aiContext, string expectedFormat, CancellationToken ct = default);
@@ -6911,9 +6916,9 @@ public sealed record MemoryStatistics
 public abstract class LongTermMemoryStrategyBase : IntelligenceStrategyBase
 {
 }
-    protected long _totalMemoriesStored;
-    protected long _totalMemoriesRetrieved;
-    protected long _totalConsolidations;
+    protected long TotalMemoriesStored;
+    protected long TotalMemoriesRetrieved;
+    protected long TotalConsolidations;
     public override IntelligenceStrategyCategory Category;;
     public abstract Task<string> StoreMemoryAsync(string content, Dictionary<string, object>? metadata = null, CancellationToken ct = default);;
     public abstract Task<IEnumerable<RetrievedMemory>> RetrieveMemoriesAsync(string query, int topK = 10, float minRelevance = 0.0f, CancellationToken ct = default);;
@@ -7144,7 +7149,7 @@ public sealed record TierConfigPayload
     public bool? Enabled { get; init; }
     public MemoryPersistence? Persistence { get; init; }
     public long? MaxCapacityBytes { get; init; }
-    public int? TTLSeconds { get; init; }
+    public int? TtlSeconds { get; init; }
 }
 ```
 ```csharp
@@ -7224,7 +7229,7 @@ public sealed record RegenerateResponse
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Memory/AIContextEncoder.cs
 ```csharp
-public sealed class SemanticVectorEncoder : IAIContextEncoder
+public sealed class SemanticVectorEncoder : IAiContextEncoder
 {
 }
     public SemanticVectorEncoder(int vectorDimensions = 384);
@@ -7288,17 +7293,17 @@ internal sealed class RelationshipEncoder
 }
 ```
 ```csharp
-public sealed class DifferentialContextEncoder : IAIContextEncoder
+public sealed class DifferentialContextEncoder : IAiContextEncoder
 {
 }
-    public DifferentialContextEncoder(IAIContextEncoder? baseEncoder = null);
+    public DifferentialContextEncoder(IAiContextEncoder? baseEncoder = null);
     public async Task<EncodedContext> EncodeAsync(string content, CancellationToken ct = default);
     public async Task<string> DecodeAsync(EncodedContext encoded, CancellationToken ct = default);
     public double GetCompressionRatio();
 }
 ```
 ```csharp
-public sealed class AdaptiveContextEncoder : IAIContextEncoder
+public sealed class AdaptiveContextEncoder : IAiContextEncoder
 {
 }
     public AdaptiveContextEncoder();
@@ -7556,10 +7561,10 @@ public record RegenerationPassResult
 }
 ```
 ```csharp
-public sealed class AIAdvancedContextRegenerator : IAdvancedContextRegenerator
+public sealed class AiAdvancedContextRegenerator : IAdvancedContextRegenerator
 {
 }
-    public AIAdvancedContextRegenerator();
+    public AiAdvancedContextRegenerator();
     public void RegisterStrategy(RegenerationStrategy strategy);
     public async Task<AdvancedRegenerationResult> RegenerateAsync(byte[] aiContext, string expectedFormat, CancellationToken ct = default);
     public async Task<double> ValidateAccuracyAsync(string regenerated, string originalHash, CancellationToken ct = default);
@@ -8927,19 +8932,19 @@ public sealed record LegalAnalysis
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Providers/OpenAiProviderStrategy.cs
 ```csharp
-public sealed class OpenAiProviderStrategy : AIProviderStrategyBase
+public sealed class OpenAiProviderStrategy : AiProviderStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string ProviderId;;
     public override string DisplayName;;
-    public override AICapabilities Capabilities;;
+    public override AiCapabilities Capabilities;;
     public override IntelligenceStrategyInfo Info;;
     public OpenAiProviderStrategy() : this(SharedHttpClient);
     public OpenAiProviderStrategy(HttpClient httpClient);
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default);
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [EnumeratorCancellation] CancellationToken ct = default);
     public override async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
 }
 ```
@@ -9022,19 +9027,19 @@ private sealed class OpenAiEmbeddingData
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Providers/OllamaProviderStrategy.cs
 ```csharp
-public sealed class OllamaProviderStrategy : AIProviderStrategyBase
+public sealed class OllamaProviderStrategy : AiProviderStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string ProviderId;;
     public override string DisplayName;;
-    public override AICapabilities Capabilities;;
+    public override AiCapabilities Capabilities;;
     public override IntelligenceStrategyInfo Info;;
     public OllamaProviderStrategy() : this(SharedHttpClient);
     public OllamaProviderStrategy(HttpClient httpClient);
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default);
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [EnumeratorCancellation] CancellationToken ct = default);
     public override async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
 }
 ```
@@ -9073,19 +9078,19 @@ private sealed class OllamaEmbeddingResponse
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Providers/AwsBedrockProviderStrategy.cs
 ```csharp
-public sealed class AwsBedrockProviderStrategy : AIProviderStrategyBase
+public sealed class AwsBedrockProviderStrategy : AiProviderStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string ProviderId;;
     public override string DisplayName;;
-    public override AICapabilities Capabilities;;
+    public override AiCapabilities Capabilities;;
     public override IntelligenceStrategyInfo Info;;
     public AwsBedrockProviderStrategy() : this(SharedHttpClient);
     public AwsBedrockProviderStrategy(HttpClient httpClient);
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default);
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [EnumeratorCancellation] CancellationToken ct = default);
     public override async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
 }
 ```
@@ -9147,19 +9152,19 @@ private sealed class BedrockEmbeddingResponse
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Providers/EmbeddingProviders.cs
 ```csharp
-public sealed class CohereEmbeddingProvider : AIProviderStrategyBase
+public sealed class CohereEmbeddingProvider : AiProviderStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string ProviderId;;
     public override string DisplayName;;
-    public override AICapabilities Capabilities;;
+    public override AiCapabilities Capabilities;;
     public override IntelligenceStrategyInfo Info;;
     public CohereEmbeddingProvider() : this(SharedHttpClient);
     public CohereEmbeddingProvider(HttpClient httpClient);
-    public override Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);;
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);;
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default);
     public override async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
     public override async Task<float[][]> GetEmbeddingsBatchAsync(string[] texts, CancellationToken ct = default);
 }
@@ -9172,19 +9177,19 @@ private sealed class CohereEmbedResponse
 }
 ```
 ```csharp
-public sealed class HuggingFaceEmbeddingProvider : AIProviderStrategyBase
+public sealed class HuggingFaceEmbeddingProvider : AiProviderStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string ProviderId;;
     public override string DisplayName;;
-    public override AICapabilities Capabilities;;
+    public override AiCapabilities Capabilities;;
     public override IntelligenceStrategyInfo Info;;
     public HuggingFaceEmbeddingProvider() : this(SharedHttpClient);
     public HuggingFaceEmbeddingProvider(HttpClient httpClient);
-    public override Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);;
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default);
+    public override Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);;
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default);
     public override async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
 }
 ```
@@ -9196,7 +9201,7 @@ public sealed class UnifiedEmbeddingProvider : IntelligenceStrategyBase
     public override string StrategyName;;
     public override IntelligenceStrategyCategory Category;;
     public override IntelligenceStrategyInfo Info;;
-    public void RegisterProvider(AIProviderStrategyBase provider);
+    public void RegisterProvider(AiProviderStrategyBase provider);
     public async Task<float[]> GenerateEmbeddingAsync(string text, CancellationToken ct = default);
     public async Task<float[][]> GenerateEmbeddingsBatchAsync(string[] texts, CancellationToken ct = default);
 }
@@ -9204,19 +9209,19 @@ public sealed class UnifiedEmbeddingProvider : IntelligenceStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Providers/HuggingFaceProviderStrategy.cs
 ```csharp
-public sealed class HuggingFaceProviderStrategy : AIProviderStrategyBase
+public sealed class HuggingFaceProviderStrategy : AiProviderStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string ProviderId;;
     public override string DisplayName;;
-    public override AICapabilities Capabilities;;
+    public override AiCapabilities Capabilities;;
     public override IntelligenceStrategyInfo Info;;
     public HuggingFaceProviderStrategy() : this(SharedHttpClient);
     public HuggingFaceProviderStrategy(HttpClient httpClient);
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default);
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [EnumeratorCancellation] CancellationToken ct = default);
     public override async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
 }
 ```
@@ -9245,19 +9250,19 @@ private sealed class HuggingFaceToken
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Providers/AdditionalProviders.cs
 ```csharp
-public sealed class GeminiProviderStrategy : AIProviderStrategyBase
+public sealed class GeminiProviderStrategy : AiProviderStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string ProviderId;;
     public override string DisplayName;;
-    public override AICapabilities Capabilities;;
+    public override AiCapabilities Capabilities;;
     public override IntelligenceStrategyInfo Info;;
     public GeminiProviderStrategy() : this(SharedHttpClient);
     public GeminiProviderStrategy(HttpClient httpClient);
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default);
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [EnumeratorCancellation] CancellationToken ct = default);
     public override async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
 }
 ```
@@ -9315,19 +9320,19 @@ private sealed class GeminiEmbedding
 }
 ```
 ```csharp
-public sealed class MistralProviderStrategy : AIProviderStrategyBase
+public sealed class MistralProviderStrategy : AiProviderStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string ProviderId;;
     public override string DisplayName;;
-    public override AICapabilities Capabilities;;
+    public override AiCapabilities Capabilities;;
     public override IntelligenceStrategyInfo Info;;
     public MistralProviderStrategy() : this(SharedHttpClient);
     public MistralProviderStrategy(HttpClient httpClient);
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default);
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [EnumeratorCancellation] CancellationToken ct = default);
     public override async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
 }
 ```
@@ -9415,19 +9420,19 @@ private sealed class MistralEmbeddingData
 }
 ```
 ```csharp
-public sealed class CohereProviderStrategy : AIProviderStrategyBase
+public sealed class CohereProviderStrategy : AiProviderStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string ProviderId;;
     public override string DisplayName;;
-    public override AICapabilities Capabilities;;
+    public override AiCapabilities Capabilities;;
     public override IntelligenceStrategyInfo Info;;
     public CohereProviderStrategy() : this(SharedHttpClient);
     public CohereProviderStrategy(HttpClient httpClient);
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default);
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [EnumeratorCancellation] CancellationToken ct = default);
     public override async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
 }
 ```
@@ -9472,19 +9477,19 @@ private sealed class CohereEmbeddingResponse
 }
 ```
 ```csharp
-public sealed class PerplexityProviderStrategy : AIProviderStrategyBase
+public sealed class PerplexityProviderStrategy : AiProviderStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string ProviderId;;
     public override string DisplayName;;
-    public override AICapabilities Capabilities;;
+    public override AiCapabilities Capabilities;;
     public override IntelligenceStrategyInfo Info;;
     public PerplexityProviderStrategy() : this(SharedHttpClient);
     public PerplexityProviderStrategy(HttpClient httpClient);
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default);
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [EnumeratorCancellation] CancellationToken ct = default);
     public override Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
 }
 ```
@@ -9543,19 +9548,19 @@ private sealed class PerplexityStreamDelta
 }
 ```
 ```csharp
-public sealed class GroqProviderStrategy : AIProviderStrategyBase
+public sealed class GroqProviderStrategy : AiProviderStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string ProviderId;;
     public override string DisplayName;;
-    public override AICapabilities Capabilities;;
+    public override AiCapabilities Capabilities;;
     public override IntelligenceStrategyInfo Info;;
     public GroqProviderStrategy() : this(SharedHttpClient);
     public GroqProviderStrategy(HttpClient httpClient);
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default);
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [EnumeratorCancellation] CancellationToken ct = default);
     public override Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
 }
 ```
@@ -9629,19 +9634,19 @@ private sealed class GroqStreamDelta
 }
 ```
 ```csharp
-public sealed class TogetherProviderStrategy : AIProviderStrategyBase
+public sealed class TogetherProviderStrategy : AiProviderStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string ProviderId;;
     public override string DisplayName;;
-    public override AICapabilities Capabilities;;
+    public override AiCapabilities Capabilities;;
     public override IntelligenceStrategyInfo Info;;
     public TogetherProviderStrategy() : this(SharedHttpClient);
     public TogetherProviderStrategy(HttpClient httpClient);
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default);
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [EnumeratorCancellation] CancellationToken ct = default);
     public override async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
 }
 ```
@@ -9715,19 +9720,19 @@ private sealed class TogetherEmbeddingData
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Providers/ClaudeProviderStrategy.cs
 ```csharp
-public sealed class ClaudeProviderStrategy : AIProviderStrategyBase
+public sealed class ClaudeProviderStrategy : AiProviderStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string ProviderId;;
     public override string DisplayName;;
-    public override AICapabilities Capabilities;;
+    public override AiCapabilities Capabilities;;
     public override IntelligenceStrategyInfo Info;;
     public ClaudeProviderStrategy() : this(SharedHttpClient);
     public ClaudeProviderStrategy(HttpClient httpClient);
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default);
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [EnumeratorCancellation] CancellationToken ct = default);
     public override Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
 }
 ```
@@ -9777,19 +9782,19 @@ private sealed class ClaudeStreamDelta
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Providers/AzureOpenAiProviderStrategy.cs
 ```csharp
-public sealed class AzureOpenAiProviderStrategy : AIProviderStrategyBase
+public sealed class AzureOpenAiProviderStrategy : AiProviderStrategyBase
 {
 }
     public override string StrategyId;;
     public override string StrategyName;;
     public override string ProviderId;;
     public override string DisplayName;;
-    public override AICapabilities Capabilities;;
+    public override AiCapabilities Capabilities;;
     public override IntelligenceStrategyInfo Info;;
     public AzureOpenAiProviderStrategy() : this(SharedHttpClient);
     public AzureOpenAiProviderStrategy(HttpClient httpClient);
-    public override async Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);
-    public override async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [EnumeratorCancellation] CancellationToken ct = default);
+    public override async Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);
+    public override async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [EnumeratorCancellation] CancellationToken ct = default);
     public override async Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);
 }
 ```
@@ -10811,7 +10816,7 @@ public sealed class HybridSearchStrategy : FeatureStrategyBase
     public override string StrategyId;;
     public override string StrategyName;;
     public override IntelligenceStrategyInfo Info;;
-    public void ConfigureStrategies(IAIProvider? aiProvider, IVectorStore? vectorStore);
+    public void ConfigureStrategies(IAiProvider? aiProvider, IVectorStore? vectorStore);
     public async Task IndexDocumentAsync(string documentId, string content, Dictionary<string, object>? metadata = null, CancellationToken ct = default);
     public async Task<IEnumerable<HybridSearchResult>> SearchAsync(string query, int? topK = null, Dictionary<string, object>? filter = null, CancellationToken ct = default);
 }
@@ -12071,8 +12076,8 @@ public sealed class InferenceOptimizationStrategy : IntelligenceStrategyBase
     public override IntelligenceStrategyCategory Category;;
     public override IntelligenceStrategyInfo Info;;
     public InferenceOptimizationStrategy();
-    public AIResponse? GetCachedResponse(string promptHash);
-    public void CacheResponse(string promptHash, AIResponse response, int? ttlSeconds = null);
+    public AiResponse? GetCachedResponse(string promptHash);
+    public void CacheResponse(string promptHash, AiResponse response, int? ttlSeconds = null);
     public bool CheckTokenBudget(int estimatedTokens);
     public void ConsumeTokens(int tokens);
     public void ResetTokenBudget();
@@ -12084,7 +12089,7 @@ public sealed class InferenceOptimizationStrategy : IntelligenceStrategyBase
 private sealed class CachedResponse
 {
 }
-    public required AIResponse Response { get; init; }
+    public required AiResponse Response { get; init; }
     public DateTime CachedAt { get; init; }
     public DateTime ExpiresAt { get; init; }
 }
@@ -12093,8 +12098,8 @@ private sealed class CachedResponse
 private sealed class PendingRequest
 {
 }
-    public required AIRequest Request { get; init; }
-    public required TaskCompletionSource<AIResponse> Completion { get; init; }
+    public required AiRequest Request { get; init; }
+    public required TaskCompletionSource<AiResponse> Completion { get; init; }
 }
 ```
 ```csharp
@@ -12435,13 +12440,13 @@ public sealed record AgentState
 public abstract class AgentStrategyBase : FeatureStrategyBase
 {
 }
-    protected readonly BoundedDictionary<string, ToolDefinition> _tools = new BoundedDictionary<string, ToolDefinition>(1000);
-    protected readonly ConcurrentQueue<AgentAction> _executionHistory = new();
-    protected AgentState _currentState = new AgentState
+    protected readonly BoundedDictionary<string, ToolDefinition> Tools = new BoundedDictionary<string, ToolDefinition>(1000);
+    protected readonly ConcurrentQueue<AgentAction> ExecutionHistory = new();
+    protected AgentState CurrentState = new AgentState
 {
     IsRunning = false
 };
-    protected CancellationTokenSource? _executionCts;
+    protected CancellationTokenSource? ExecutionCts;
     public override IntelligenceStrategyCategory Category;;
     public abstract Task<AgentExecutionResult> ExecuteTaskAsync(string task, AgentContext context, CancellationToken ct = default);;
     public virtual Task RegisterToolAsync(ToolDefinition tool);
@@ -12627,7 +12632,7 @@ private sealed class WeaviateObject
 }
 ```
 ```csharp
-private sealed class WeaviateGraphQLResponse
+private sealed class WeaviateGraphQlResponse
 {
 }
     public WeaviateData? Data { get; set; }
@@ -14329,7 +14334,7 @@ public abstract class ContextIndexBase : IContextIndex
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Memory/Indexing/AINavigator.cs
 ```csharp
-public interface IAINavigator
+public interface IAiNavigator
 {
 }
     Task<NavigationResult> NavigateAsync(string question, NavigationOptions? options = null, CancellationToken ct = default);;
@@ -14341,12 +14346,12 @@ public interface IAINavigator
 }
 ```
 ```csharp
-public sealed class AINavigator : IAINavigator
+public sealed class AiNavigator : IAiNavigator
 {
 #endregion
 }
-    public AINavigator(CompositeContextIndex compositeIndex);
-    public AINavigator(IndexManager manager) : this(manager.CompositeIndex);
+    public AiNavigator(CompositeContextIndex compositeIndex);
+    public AiNavigator(IndexManager manager) : this(manager.CompositeIndex);
     public async Task<NavigationResult> NavigateAsync(string question, NavigationOptions? options = null, CancellationToken ct = default);
     public async Task<NavigationResult> DrillDownAsync(string currentPath, string focusQuery, CancellationToken ct = default);
     public async Task<NavigationResult> ZoomOutAsync(string currentPath, int levels = 1, CancellationToken ct = default);
@@ -14533,8 +14538,8 @@ public sealed record RedisPersistenceConfig : PersistenceBackendConfig
     public int Database { get; init; }
     public bool EnableCluster { get; init; }
     public string KeyPrefix { get; init; };
-    public TimeSpan? DefaultTTL { get; init; }
-    public Dictionary<MemoryTier, TimeSpan> TierTTL { get; init; };
+    public TimeSpan? DefaultTtl { get; init; }
+    public Dictionary<MemoryTier, TimeSpan> TierTtl { get; init; };
     public int ConnectionPoolSize { get; init; };
     public bool EnablePipelining { get; init; };
     public bool EnableStreams { get; init; };
@@ -14799,7 +14804,7 @@ public sealed record TieredPersistenceManagerConfig
     public string? FallbackBackendId { get; init; }
     public bool EnableFailover { get; init; };
     public int HealthCheckIntervalSeconds { get; init; };
-    public bool EnableWAL { get; init; };
+    public bool EnableWal { get; init; };
     public string? WalPath { get; init; }
 }
 ```
@@ -15247,6 +15252,7 @@ public abstract record PersistenceBackendConfig
 public sealed class PersistenceCircuitBreaker
 {
 }
+    internal DateTimeOffset LastFailure { get; private set; }
     public CircuitBreakerState State
 {
     get
@@ -15353,7 +15359,7 @@ public sealed record RocksDbPersistenceConfig : PersistenceBackendConfig
     public long MaxBytesForLevelBase { get; init; };
     public bool EnableBloomFilters { get; init; };
     public int BloomFilterBitsPerKey { get; init; };
-    public bool EnableWAL { get; init; };
+    public bool EnableWal { get; init; };
     public string? WalPath { get; init; }
     public bool EnableBackgroundCompaction { get; init; };
     public int MaxBackgroundCompactions { get; init; };
@@ -15510,8 +15516,8 @@ public sealed record CassandraPersistenceConfig : PersistenceBackendConfig
     public string ReplicationStrategy { get; init; };
     public CassandraConsistency ReadConsistency { get; init; };
     public CassandraConsistency WriteConsistency { get; init; };
-    public int DefaultTTLSeconds { get; init; }
-    public Dictionary<MemoryTier, int> TierTTLSeconds { get; init; };
+    public int DefaultTtlSeconds { get; init; }
+    public Dictionary<MemoryTier, int> TierTtlSeconds { get; init; };
     public bool EnableSpeculativeExecution { get; init; };
     public int MaxConcurrentRequests { get; init; };
     public int CoreConnectionsPerHost { get; init; };
@@ -16880,9 +16886,87 @@ public int InputTokens { get; set; }
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Memory/Embeddings/VoyageAiEmbeddingProvider.cs
+```csharp
+public sealed class VoyageAiEmbeddingProvider : EmbeddingProviderBase
+{
+}
+    public override string ProviderId;;
+    public override string DisplayName;;
+    public override int VectorDimensions;;
+    public override int MaxTokens;;
+    public override bool SupportsMultipleTexts;;
+    public override IReadOnlyList<EmbeddingModelInfo> AvailableModels;;
+    public override string CurrentModel
+{
+    get => _currentModel;
+    set
+    {
+        if (!Models.Any(m => m.ModelId == value))
+            throw new ArgumentException($"Unknown model: {value}");
+        _currentModel = value;
+    }
+}
+    public VoyageInputType InputType { get => _inputType; set => _inputType = value; }
+    public bool Truncation { get => _truncation; set => _truncation = value; }
+    public VoyageAiEmbeddingProvider(EmbeddingProviderConfig config, HttpClient? httpClient = null) : base(config, httpClient);
+    protected override async Task<float[]> GetEmbeddingCoreAsync(string text, CancellationToken ct);
+    protected override async Task<float[][]> GetEmbeddingsBatchCoreAsync(string[] texts, CancellationToken ct);
+    public override async Task<bool> ValidateConnectionAsync(CancellationToken ct = default);
+}
+```
+```csharp
+private sealed class VoyageEmbeddingRequest
+{
+}
+    [JsonPropertyName("input")]
+public List<string> Input { get; set; };
+    [JsonPropertyName("model")]
+public string Model { get; set; };
+    [JsonPropertyName("input_type")]
+public string? InputType { get; set; }
+    [JsonPropertyName("truncation")]
+public bool? Truncation { get; set; }
+}
+```
+```csharp
+private sealed class VoyageEmbeddingResponse
+{
+}
+    [JsonPropertyName("object")]
+public string Object { get; set; };
+    [JsonPropertyName("data")]
+public List<VoyageEmbeddingData> Data { get; set; };
+    [JsonPropertyName("model")]
+public string Model { get; set; };
+    [JsonPropertyName("usage")]
+public VoyageUsage? Usage { get; set; }
+}
+```
+```csharp
+private sealed class VoyageEmbeddingData
+{
+}
+    [JsonPropertyName("object")]
+public string Object { get; set; };
+    [JsonPropertyName("embedding")]
+public float[] Embedding { get; set; };
+    [JsonPropertyName("index")]
+public int Index { get; set; }
+}
+```
+```csharp
+private sealed class VoyageUsage
+{
+}
+    [JsonPropertyName("total_tokens")]
+public int TotalTokens { get; set; }
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Memory/Embeddings/ONNXEmbeddingProvider.cs
 ```csharp
-public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
+public sealed class OnnxEmbeddingProvider : EmbeddingProviderBase
 {
 }
     public override string ProviderId;;
@@ -16895,18 +16979,18 @@ public sealed class ONNXEmbeddingProvider : EmbeddingProviderBase
     public bool UseGpu;;
     public int GpuDeviceId;;
     public PoolingStrategy PoolingStrategy;;
-    public ONNXEmbeddingProvider(EmbeddingProviderConfig config, string modelPath, string? tokenizerPath = null, HttpClient? httpClient = null) : base(config, httpClient);
+    public OnnxEmbeddingProvider(EmbeddingProviderConfig config, string modelPath, string? tokenizerPath = null, HttpClient? httpClient = null) : base(config, httpClient);
     public async Task LoadModelAsync(CancellationToken ct = default);
     protected override async Task<float[]> GetEmbeddingCoreAsync(string text, CancellationToken ct);
     protected override async Task<float[][]> GetEmbeddingsBatchCoreAsync(string[] texts, CancellationToken ct);
     public override async Task<bool> ValidateConnectionAsync(CancellationToken ct = default);
     public long GetModelFileSize();
-    public ONNXModelInfo GetModelInfo();
+    public OnnxModelInfo GetModelInfo();
     protected override void Dispose(bool disposing);
 }
 ```
 ```csharp
-public sealed record ONNXModelInfo
+public sealed record OnnxModelInfo
 {
 }
     public string ModelPath { get; init; };
@@ -16997,7 +17081,7 @@ public string ModifiedAt { get; set; };
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Memory/Embeddings/OpenAIEmbeddingProvider.cs
 ```csharp
-public sealed class OpenAIEmbeddingProvider : EmbeddingProviderBase
+public sealed class OpenAiEmbeddingProvider : EmbeddingProviderBase
 {
 }
     public override string ProviderId;;
@@ -17034,14 +17118,14 @@ public sealed class OpenAIEmbeddingProvider : EmbeddingProviderBase
         _dimensionsOverride = value;
     }
 }
-    public OpenAIEmbeddingProvider(EmbeddingProviderConfig config, HttpClient? httpClient = null) : base(config, httpClient);
+    public OpenAiEmbeddingProvider(EmbeddingProviderConfig config, HttpClient? httpClient = null) : base(config, httpClient);
     protected override async Task<float[]> GetEmbeddingCoreAsync(string text, CancellationToken ct);
     protected override async Task<float[][]> GetEmbeddingsBatchCoreAsync(string[] texts, CancellationToken ct);
     public override async Task<bool> ValidateConnectionAsync(CancellationToken ct = default);
 }
 ```
 ```csharp
-private sealed class OpenAIEmbeddingRequest
+private sealed class OpenAiEmbeddingRequest
 {
 }
     public string[] Input { get; set; };
@@ -17051,17 +17135,17 @@ private sealed class OpenAIEmbeddingRequest
 }
 ```
 ```csharp
-private sealed class OpenAIEmbeddingResponse
+private sealed class OpenAiEmbeddingResponse
 {
 }
     [JsonPropertyName("data")]
-public List<OpenAIEmbeddingData> Data { get; set; };
+public List<OpenAiEmbeddingData> Data { get; set; };
     [JsonPropertyName("usage")]
-public OpenAIUsage? Usage { get; set; }
+public OpenAiUsage? Usage { get; set; }
 }
 ```
 ```csharp
-private sealed class OpenAIEmbeddingData
+private sealed class OpenAiEmbeddingData
 {
 }
     [JsonPropertyName("embedding")]
@@ -17071,7 +17155,7 @@ public int Index { get; set; }
 }
 ```
 ```csharp
-private sealed class OpenAIUsage
+private sealed class OpenAiUsage
 {
 }
     [JsonPropertyName("prompt_tokens")]
@@ -17219,84 +17303,6 @@ public abstract class EmbeddingProviderBase : IEmbeddingProviderExtended
     protected void RecordCacheMiss();
     public void Dispose();
     protected virtual void Dispose(bool disposing);
-}
-```
-
-### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Memory/Embeddings/VoyageAIEmbeddingProvider.cs
-```csharp
-public sealed class VoyageAIEmbeddingProvider : EmbeddingProviderBase
-{
-}
-    public override string ProviderId;;
-    public override string DisplayName;;
-    public override int VectorDimensions;;
-    public override int MaxTokens;;
-    public override bool SupportsMultipleTexts;;
-    public override IReadOnlyList<EmbeddingModelInfo> AvailableModels;;
-    public override string CurrentModel
-{
-    get => _currentModel;
-    set
-    {
-        if (!Models.Any(m => m.ModelId == value))
-            throw new ArgumentException($"Unknown model: {value}");
-        _currentModel = value;
-    }
-}
-    public VoyageInputType InputType { get => _inputType; set => _inputType = value; }
-    public bool Truncation { get => _truncation; set => _truncation = value; }
-    public VoyageAIEmbeddingProvider(EmbeddingProviderConfig config, HttpClient? httpClient = null) : base(config, httpClient);
-    protected override async Task<float[]> GetEmbeddingCoreAsync(string text, CancellationToken ct);
-    protected override async Task<float[][]> GetEmbeddingsBatchCoreAsync(string[] texts, CancellationToken ct);
-    public override async Task<bool> ValidateConnectionAsync(CancellationToken ct = default);
-}
-```
-```csharp
-private sealed class VoyageEmbeddingRequest
-{
-}
-    [JsonPropertyName("input")]
-public List<string> Input { get; set; };
-    [JsonPropertyName("model")]
-public string Model { get; set; };
-    [JsonPropertyName("input_type")]
-public string? InputType { get; set; }
-    [JsonPropertyName("truncation")]
-public bool? Truncation { get; set; }
-}
-```
-```csharp
-private sealed class VoyageEmbeddingResponse
-{
-}
-    [JsonPropertyName("object")]
-public string Object { get; set; };
-    [JsonPropertyName("data")]
-public List<VoyageEmbeddingData> Data { get; set; };
-    [JsonPropertyName("model")]
-public string Model { get; set; };
-    [JsonPropertyName("usage")]
-public VoyageUsage? Usage { get; set; }
-}
-```
-```csharp
-private sealed class VoyageEmbeddingData
-{
-}
-    [JsonPropertyName("object")]
-public string Object { get; set; };
-    [JsonPropertyName("embedding")]
-public float[] Embedding { get; set; };
-    [JsonPropertyName("index")]
-public int Index { get; set; }
-}
-```
-```csharp
-private sealed class VoyageUsage
-{
-}
-    [JsonPropertyName("total_tokens")]
-public int TotalTokens { get; set; }
 }
 ```
 
@@ -17451,7 +17457,7 @@ public bool UseCache { get; set; };
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Memory/Embeddings/AzureOpenAIEmbeddingProvider.cs
 ```csharp
-public sealed class AzureOpenAIEmbeddingProvider : EmbeddingProviderBase
+public sealed class AzureOpenAiEmbeddingProvider : EmbeddingProviderBase
 {
 }
     public override string ProviderId;;
@@ -17489,8 +17495,8 @@ public sealed class AzureOpenAIEmbeddingProvider : EmbeddingProviderBase
     }
 }
     public string DeploymentName;;
-    public AzureOpenAIEmbeddingProvider(EmbeddingProviderConfig config, string deploymentName, HttpClient? httpClient = null) : base(config, httpClient);
-    public AzureOpenAIEmbeddingProvider(EmbeddingProviderConfig config, string deploymentName, Func<CancellationToken, Task<string>> tokenProvider, HttpClient? httpClient = null) : base(config, httpClient);
+    public AzureOpenAiEmbeddingProvider(EmbeddingProviderConfig config, string deploymentName, HttpClient? httpClient = null) : base(config, httpClient);
+    public AzureOpenAiEmbeddingProvider(EmbeddingProviderConfig config, string deploymentName, Func<CancellationToken, Task<string>> tokenProvider, HttpClient? httpClient = null) : base(config, httpClient);
     protected override async Task<float[]> GetEmbeddingCoreAsync(string text, CancellationToken ct);
     protected override async Task<float[][]> GetEmbeddingsBatchCoreAsync(string[] texts, CancellationToken ct);
     public override async Task<bool> ValidateConnectionAsync(CancellationToken ct = default);
@@ -17695,13 +17701,13 @@ public sealed class EmbeddingProviderFactory : IDisposable
     public IEmbeddingProvider CreateByProviderId(string providerId, EmbeddingProviderConfig config);
     public IEmbeddingProvider CreateFromJson(string jsonConfig);
     public IEmbeddingProvider CreateFromDictionary(IDictionary<string, object> config);
-    public OpenAIEmbeddingProvider CreateOpenAI(string apiKey, string? model = null, string? organization = null);
-    public AzureOpenAIEmbeddingProvider CreateAzureOpenAI(string endpoint, string apiKey, string deploymentName, string? model = null);
+    public OpenAiEmbeddingProvider CreateOpenAi(string apiKey, string? model = null, string? organization = null);
+    public AzureOpenAiEmbeddingProvider CreateAzureOpenAi(string endpoint, string apiKey, string deploymentName, string? model = null);
     public CohereEmbeddingProvider CreateCohere(string apiKey, string? model = null, CohereInputType inputType = CohereInputType.SearchDocument);
     public HuggingFaceEmbeddingProvider CreateHuggingFace(string apiToken, string? model = null);
     public OllamaEmbeddingProvider CreateOllama(string? endpoint = null, string? model = null);
-    public ONNXEmbeddingProvider CreateOnnx(string modelPath, string? tokenizerPath = null, bool useGpu = false);
-    public VoyageAIEmbeddingProvider CreateVoyageAI(string apiKey, string? model = null, VoyageInputType inputType = VoyageInputType.Document);
+    public OnnxEmbeddingProvider CreateOnnx(string modelPath, string? tokenizerPath = null, bool useGpu = false);
+    public VoyageAiEmbeddingProvider CreateVoyageAi(string apiKey, string? model = null, VoyageInputType inputType = VoyageInputType.Document);
     public JinaEmbeddingProvider CreateJina(string apiKey, string? model = null, JinaTaskType taskType = JinaTaskType.Retrieval);
     public async Task<IEmbeddingProvider> CreateAndValidateAsync(string providerId, EmbeddingProviderConfig config, CancellationToken ct = default);
     public void Dispose();
@@ -17881,7 +17887,7 @@ public sealed class VectorStoreFactory : IAsyncDisposable
     public Task<RedisVectorStore> CreateRedisAsync(string connectionString = "localhost:6379", string indexName = "datawarehouse_idx", string? restApiEndpoint = null, RedisIndexAlgorithm algorithm = RedisIndexAlgorithm.Hnsw, CancellationToken ct = default);
     public Task<PgVectorStore> CreatePgVectorAsync(string connectionString, string tableName = "vector_embeddings", PgVectorIndexType indexType = PgVectorIndexType.Hnsw, CancellationToken ct = default);
     public Task<ElasticsearchVectorStore> CreateElasticsearchAsync(string host = "http://localhost:9200", string indexName = "datawarehouse-vectors", string? username = null, string? password = null, string? apiKey = null, ElasticsearchKnnType knnType = ElasticsearchKnnType.Approximate, CancellationToken ct = default);
-    public Task<AzureAISearchVectorStore> CreateAzureAISearchAsync(string endpoint, string apiKey, string indexName = "datawarehouse-vectors", bool useSemanticRanking = false, CancellationToken ct = default);
+    public Task<AzureAiSearchVectorStore> CreateAzureAiSearchAsync(string endpoint, string apiKey, string indexName = "datawarehouse-vectors", bool useSemanticRanking = false, CancellationToken ct = default);
     public Task<HybridVectorStore> CreateHybridAsync(IProductionVectorStore primaryStore, IProductionVectorStore? secondaryStore = null, HybridVectorStoreOptions? options = null, CancellationToken ct = default);
     public async Task<IEnumerable<IProductionVectorStore>> CreateFromConfigurationsAsync(IEnumerable<VectorStoreConfiguration> configs, bool validateHealth = true, CancellationToken ct = default);
     public IProductionVectorStore? GetInstance(string instanceName);
@@ -17936,7 +17942,7 @@ private sealed class WeaviateObject
 }
 ```
 ```csharp
-private sealed class WeaviateGraphQLResponse
+private sealed class WeaviateGraphQlResponse
 {
 }
     public WeaviateData? Data { get; set; }
@@ -18252,7 +18258,7 @@ private sealed class PineconeNamespaceStats
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateIntelligence/Strategies/Memory/VectorStores/AzureAISearchVectorStore.cs
 ```csharp
-public sealed class AzureAISearchOptions : VectorStoreOptions
+public sealed class AzureAiSearchOptions : VectorStoreOptions
 {
 }
     public required string Endpoint { get; init; }
@@ -18268,14 +18274,14 @@ public sealed class AzureAISearchOptions : VectorStoreOptions
 }
 ```
 ```csharp
-public sealed class AzureAISearchVectorStore : ProductionVectorStoreBase
+public sealed class AzureAiSearchVectorStore : ProductionVectorStoreBase
 {
 #endregion
 }
     public override string StoreId;;
     public override string DisplayName;;
     public override int VectorDimensions;;
-    public AzureAISearchVectorStore(AzureAISearchOptions options, HttpClient? httpClient = null) : base(httpClient, options);
+    public AzureAiSearchVectorStore(AzureAiSearchOptions options, HttpClient? httpClient = null) : base(httpClient, options);
     public override async Task UpsertAsync(string id, float[] vector, Dictionary<string, object>? metadata = null, CancellationToken ct = default);
     public override async Task UpsertBatchAsync(IEnumerable<VectorRecord> records, CancellationToken ct = default);
     public override async Task<VectorRecord?> GetAsync(string id, CancellationToken ct = default);

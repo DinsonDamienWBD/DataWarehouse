@@ -143,6 +143,18 @@ public abstract class DataCatalogStrategyBase : StrategyBase, IDataCatalogStrate
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Delegation/MessageBusDelegationHelper.cs
+```csharp
+internal sealed class MessageBusDelegationHelper : IDisposable
+{
+}
+    public MessageBusDelegationHelper(string pluginName, Func<IMessageBus?> messageBusAccessor, string targetTopic, CircuitBreakerOptions? options = null, TimeSpan? delegationTimeout = null);
+    public async Task<MessageResponse> DelegateAsync(string topic, PluginMessage message, CancellationToken ct = default);
+    public CircuitBreakerStatistics GetStatistics();;
+    public void Dispose();
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataCatalog/Scaling/CatalogScalingManager.cs
 ```csharp
 [SdkCompatibility("6.0.0", Notes = "Phase 88-08: Paginated result for catalog and lineage queries")]

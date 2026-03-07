@@ -119,7 +119,7 @@ public sealed class UltimateStoragePlugin : DataWarehouse.SDK.Contracts.Hierarch
     public async Task<Stream> OnReadAsync(Stream stored, IKernelContext context, Dictionary<string, object> args);
     protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct);
     protected override async Task OnStartCoreAsync(CancellationToken ct);
-    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct);
+    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct = default);
     public override async Task<StorageObjectMetadata> StoreAsync(string key, Stream data, IDictionary<string, string>? metadata = null, CancellationToken ct = default);
     public override async Task<Stream> RetrieveAsync(string key, CancellationToken ct = default);
     public override async Task DeleteAsync(string key, CancellationToken ct = default);
@@ -152,8 +152,8 @@ public abstract class UltimateStorageStrategyBase : StorageStrategyBase
     protected IReadOnlyDictionary<string, object> GetAllConfiguration();
     public async Task InitializeAsync(IDictionary<string, object>? configuration = null, CancellationToken ct = default);
     protected virtual Task InitializeCoreAsync(CancellationToken ct);
-    public new virtual void Dispose();
-    public new async ValueTask DisposeAsync();
+    protected override void Dispose(bool disposing);
+    protected override async ValueTask DisposeAsyncCore();
     protected virtual ValueTask DisposeCoreAsync();
     protected void EnsureInitialized();
     public long TotalBytesStored;;
@@ -358,7 +358,9 @@ public sealed class MigrationValidationResult
     public bool IsValid { get; set; }
     public string StrategyId { get; set; };
     public List<string> Errors { get; set; };
+    public bool HasErrors;;
     public List<string> Warnings { get; set; };
+    public bool HasWarnings;;
 }
 ```
 ```csharp
@@ -382,6 +384,7 @@ public sealed class MigrationStep
     public double EstimatedDurationMinutes { get; set; }
     public bool RequiresManualIntervention { get; set; }
     public List<string> Recommendations { get; set; };
+    public bool HasRecommendations;;
 }
 ```
 ```csharp
@@ -672,6 +675,7 @@ public sealed record ErasureRepairMetrics
 public sealed class GeoDistributionManager
 {
 }
+    internal TimeSpan HealthCheckInterval;;
     public GeoDistributionManager(TimeSpan? healthCheckInterval = null);
     public void RegisterNode(string nodeId, string region, string datacenter, GeoNodeRole role = GeoNodeRole.Active);
     public HealthCheckResult PerformHealthCheck(string nodeId, bool isReachable, double latencyMs);
@@ -1149,7 +1153,9 @@ public sealed class FanOutWriteResult
     public int FailureCount;
     public ConcurrentBag<string> SuccessfulBackends { get; };
     public ConcurrentBag<string> FailedBackends { get; };
+    public bool HasFailures;;
     public ConcurrentDictionary<string, string> Errors { get; };
+    public bool HasErrors;;
     public bool IsSuccess { get; set; }
 }
 ```
@@ -1289,12 +1295,12 @@ public sealed class BackendCostConfig
 {
 }
     public string BackendId { get; set; };
-    public decimal CostPerGBMonthly { get; init; }
+    public decimal CostPerGbMonthly { get; init; }
     public decimal CostPerWriteOperation { get; init; }
     public decimal CostPerReadOperation { get; init; }
     public decimal CostPerDeleteOperation { get; init; }
     public decimal CostPerListOperation { get; init; }
-    public decimal CostPerGBEgress { get; init; }
+    public decimal CostPerGbEgress { get; init; }
 }
 ```
 ```csharp
@@ -1645,6 +1651,7 @@ public class KubernetesCsiStorageStrategy : UltimateStorageStrategyBase
     public override StorageTier Tier;;
     public override bool IsProductionReady;;
     public override StorageCapabilities Capabilities;;
+    internal string SocketPath;;
     protected override Task InitializeCoreAsync(CancellationToken ct);
     protected override async Task<StorageObjectMetadata> StoreAsyncCore(string key, Stream data, IDictionary<string, string>? metadata, CancellationToken ct);
     protected override Task<Stream> RetrieveAsyncCore(string key, CancellationToken ct);
@@ -1905,6 +1912,8 @@ public class SiaStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal int UploadChunkSize;;
+    internal int MaxConcurrentUploads;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -1963,7 +1972,7 @@ public string? Version { get; set; }
     [JsonPropertyName("commit")]
 public string? Commit { get; set; }
     [JsonPropertyName("os")]
-public string? OS { get; set; }
+public string? Os { get; set; }
     [JsonPropertyName("buildTime")]
 public string? BuildTime { get; set; }
     [JsonPropertyName("network")]
@@ -2071,6 +2080,7 @@ public class StorjStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool UseSignatureV4;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -2122,6 +2132,7 @@ public class ArweaveStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal string ContentType;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -2253,6 +2264,8 @@ public class SwarmStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool UseManifests;;
+    internal bool UseSingleOwnerChunks;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -2538,6 +2551,7 @@ public class NvmeDiskStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal int AlignmentSize;;
     public NvmeDiskStrategy();
     public override string StrategyId;;
     public override string Name;;
@@ -2649,6 +2663,10 @@ public class ScmStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableMemoryMapping;;
+    internal TieringPolicy TieringPolicyValue;;
+    internal DateTime LastWearLevelingCheck;;
+    internal WearLevelingInfo? CachedWearInfo;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -2710,6 +2728,8 @@ public class PmemStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool UseNonTemporalStores;;
+    internal int AlignmentBytes;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -2737,7 +2757,7 @@ public class PmemDeviceInfo
     public PmemHealthState HealthState { get; set; }
     public int WearLevelPercent { get; set; }
     public int TemperatureCelsius { get; set; }
-    public bool SupportsDAX { get; set; }
+    public bool SupportsDax { get; set; }
     public string NamespaceId { get; set; };
     public string RegionId { get; set; };
     public int InterleaveSets { get; set; }
@@ -2774,6 +2794,7 @@ public class WebDavStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool UseHttps;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -2844,6 +2865,9 @@ public class SftpStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal int MaxPacketSize;;
+    internal bool EnableCompression;;
+    internal bool PreserveTimestamps;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -2949,7 +2973,7 @@ private class BlockMapping
 {
 }
     public string Key { get; set; };
-    public long StartLBA { get; set; }
+    public long StartLba { get; set; }
     public int BlockCount { get; set; }
     public long Size { get; set; }
     public DateTime Created { get; set; }
@@ -2964,6 +2988,8 @@ public class NfsStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal string Username;;
+    internal string? KerberosRealm;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -3028,6 +3054,11 @@ public class NvmeOfStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableMultipath;;
+    internal string AuthenticationProtocol;;
+    internal string BasePath;;
+    internal bool UseInBandAuth;;
+    internal int TimeoutSeconds;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -3066,6 +3097,7 @@ public class SmbStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal int TimeoutSeconds;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -3089,6 +3121,7 @@ public class FcStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal IReadOnlyDictionary<string, MultipathState> MultipathStates;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -3155,6 +3188,7 @@ public class FtpStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool UseCompression;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -3423,6 +3457,7 @@ public class TikvStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal TimeSpan TransactionTimeout;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -3467,6 +3502,7 @@ public class GrpcStorageStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal string LoadBalancingPolicy;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -3717,6 +3753,7 @@ public class FoundationDbStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal TimeSpan TransactionTimeout;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -3785,6 +3822,7 @@ public class MemcachedStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal string IndexKeyPrefix;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -4033,6 +4071,7 @@ public class WasabiStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableVersioning;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -4104,6 +4143,8 @@ public class ScalewayObjectStorageStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableCors;;
+    internal bool EnableVersioning;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -4144,6 +4185,8 @@ public class VultrObjectStorageStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableCors;;
+    internal bool EnableVersioning;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -4183,6 +4226,7 @@ public class LinodeObjectStorageStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableCors;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -4302,6 +4346,7 @@ public class OvhObjectStorageStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableCors;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -4339,6 +4384,8 @@ public class GlusterFsStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal int ArbiterCount;;
+    internal int FileLockCount;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -4492,6 +4539,22 @@ public class MooseFsStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal string MasterHost;;
+    internal int MasterPort;;
+    internal bool UseErasureCoding;;
+    internal string EcGoal;;
+    internal int MaxSnapshots;;
+    internal int SnapshotRetentionDays;;
+    internal IReadOnlyDictionary<string, string> StorageClassLabels;;
+    internal bool EnableChunkServerAffinity;;
+    internal IReadOnlyList<string> PreferredChunkServers;;
+    internal bool UseReadAhead;;
+    internal int ReadAheadSizeKb;;
+    internal bool UseWriteCache;;
+    internal int WriteCacheSizeKb;;
+    internal string SessionId;;
+    internal DateTime SessionStartTime;;
+    internal IReadOnlyDictionary<string, (SemaphoreSlim Semaphore, int RefCount)> FileLocks;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -4610,6 +4673,8 @@ public class LustreStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal IReadOnlyList<string> AvailableOstPools;;
+    internal int FidCacheCount;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -4721,6 +4786,7 @@ public class SeaweedFsStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableGzip;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -4898,6 +4964,9 @@ public class GpfsStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal string? ManagementApiUser;;
+    internal bool UseManagementApi;;
+    internal int FileLockCount;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -5090,6 +5159,19 @@ public class WekaIoStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal string? S3AccessKey;;
+    internal string? S3SecretKey;;
+    internal string? S3Bucket;;
+    internal string? SnapshotSchedule;;
+    internal string? CloudTierTarget;;
+    internal string? TieringPolicy;;
+    internal string ProtectionScheme;;
+    internal string? EncryptionKeyId;;
+    internal string? OrganizationId;;
+    internal string? ClusterId;;
+    internal bool EnableQuotas;;
+    internal long? DirectoryQuotaBytes;;
+    internal int StripeWidth;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -5140,6 +5222,13 @@ public class NetAppOntapStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal string? SnapshotPolicy;;
+    internal bool EnableDeduplication;;
+    internal bool EnableCompaction;;
+    internal string? FabricPoolTier;;
+    internal string? SnapLockType;;
+    internal string? QosPolicy;;
+    internal string ApiVersion;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -5180,6 +5269,13 @@ public class PureStorageStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal string? SnapshotPolicy;;
+    internal int? LifecycleTransitionDays;;
+    internal bool EnableQuotas;;
+    internal long? HardQuotaBytes;;
+    internal bool EnableDeduplication;;
+    internal string? NfsExportRules;;
+    internal string? SmbShareRules;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -5236,6 +5332,16 @@ public class VastDataStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool UseNfsProtocol;;
+    internal string? NfsExportPath;;
+    internal string? ProtectionPolicyId;;
+    internal bool EnableQos;;
+    internal string? QosPolicyId;;
+    internal long QosBandwidthLimitMbps;;
+    internal long QosIopsLimit;;
+    internal bool EnableDeduplication;;
+    internal bool EnableSimilarityBasedReduction;;
+    internal string EncryptionMode;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -5263,7 +5369,7 @@ public record VastAnalytics
     public long WriteOps { get; init; }
     public long ReadBytesPerSecond { get; init; }
     public long WriteBytesPerSecond { get; init; }
-    public double Latency95thPercentileMs { get; init; }
+    public double Latency95ThPercentileMs { get; init; }
     public double DeduplicationRatio { get; init; }
     public double CompressionRatio { get; init; }
 }
@@ -5572,6 +5678,7 @@ public class GraphQlConnectorStrategy : UltimateStorageStrategyBase
 public class RestApiConnectorStrategy : UltimateStorageStrategyBase
 {
 }
+    internal int MaxRetriesConfig;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -5619,6 +5726,7 @@ public class JdbcConnectorStrategy : UltimateStorageStrategyBase
 public class GrpcConnectorStrategy : UltimateStorageStrategyBase
 {
 }
+    internal string? AuthToken;;
     public override string StrategyId;;
     public override string Name;;
     public override bool IsProductionReady;;
@@ -5644,6 +5752,7 @@ public class OdbcConnectorStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal int BatchSize;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -5695,6 +5804,7 @@ public class GcsStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableRequesterPays;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -5733,6 +5843,7 @@ public class OracleObjectStorageStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableVersioning;;
     public override string StrategyId;;
     public override string Name;;
     public override SDK.Contracts.Storage.StorageTier Tier;;
@@ -5762,6 +5873,7 @@ public class IbmCosStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableAsperaSupport;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -5793,6 +5905,7 @@ public class S3Strategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableVersioning;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -5810,7 +5923,7 @@ public class S3Strategy : UltimateStorageStrategyBase
     public async Task CopyObjectAsync(string sourceKey, string destinationKey, CancellationToken ct = default);
     public async Task ChangeStorageClassAsync(string key, string storageClass, CancellationToken ct = default);
     protected override int GetMaxKeyLength();;
-    protected override async Task ShutdownAsyncCore(CancellationToken ct = default);
+    protected override async Task ShutdownAsyncCore(CancellationToken ct);
     protected override async ValueTask DisposeCoreAsync();
 }
 ```
@@ -5829,6 +5942,7 @@ public class MinioStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal long MultipartThresholdBytes;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -5861,6 +5975,8 @@ public class AzureBlobStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableSoftDelete;;
+    internal int SoftDeleteRetentionDays;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -5936,6 +6052,8 @@ public class TapeLibraryStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableHardwareCompression;;
+    internal int MaxConcurrentDrives;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -6081,6 +6199,7 @@ public class GcsArchiveStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal int TimeoutSeconds;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -6138,6 +6257,10 @@ public class OdaStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool UseScsiCommands;;
+    internal int MaxConcurrentDrives;;
+    internal TimeSpan WriteVerificationTimeout;;
+    internal int MaxRetryAttempts;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -6379,7 +6502,7 @@ public sealed class ZeroGravityStorageStrategy : UltimateStorageStrategyBase
     protected override Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct);
     protected override Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct);
     protected override Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct);
-    protected override async Task ShutdownAsyncCore(CancellationToken ct = default);
+    protected override async Task ShutdownAsyncCore(CancellationToken ct);
     protected override async ValueTask DisposeCoreAsync();
 }
 ```
@@ -6484,6 +6607,7 @@ private class LegacyRecord
 public class QuantumTunnelingStrategy : UltimateStorageStrategyBase
 {
 }
+    internal bool EnableCompression;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -6622,11 +6746,11 @@ private class AzureAdapter : FileSystemAdapter
 }
 ```
 ```csharp
-private class GCSAdapter : FileSystemAdapter
+private class GcsAdapter : FileSystemAdapter
 {
 // Production: implement actual GCS SDK calls
 }
-    public GCSAdapter(string basePath, string name) : base(basePath, name);
+    public GcsAdapter(string basePath, string name) : base(basePath, name);
 }
 ```
 ```csharp
@@ -6745,6 +6869,7 @@ private class TimeCapsuleMetadata
     public string VdfProof { get; set; };
     public int VdfIterations { get; set; }
     public List<AccessAttempt> AccessAttempts { get; set; };
+    internal int AccessAttemptCount;;
     public List<string> EmergencyOverrideKeys { get; set; };
 }
 ```
@@ -6762,8 +6887,9 @@ private class AccessAttempt
 ```csharp
 public class InfiniteStorageStrategy : UltimateStorageStrategyBase
 {
-#endregion
 }
+    internal bool EnableAutoRebalancing;;
+    internal Timer? HealthCheckTimer;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -6777,6 +6903,7 @@ public class InfiniteStorageStrategy : UltimateStorageStrategyBase
     protected override async Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct);
     protected override async Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct);
     protected override async Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct);
+    protected override async ValueTask DisposeCoreAsync();
 }
 ```
 ```csharp
@@ -6807,6 +6934,9 @@ public class SelfReplicatingStorageStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableErasureCoding;;
+    internal int ErasureDataShards;;
+    internal int ErasureParityShards;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -7039,8 +7169,8 @@ public record BloomFilterAccuracy
     public int TruePositives { get; init; }
     public int FalsePositives { get; init; }
     public int TrueNegatives { get; init; }
-    public double ActualFPR { get; init; }
-    public double ConfiguredFPR { get; init; }
+    public double ActualFpr { get; init; }
+    public double ConfiguredFpr { get; init; }
 }
 ```
 ```csharp
@@ -7079,6 +7209,7 @@ public class ZeroLatencyStorageStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal int PrefetchQueueSize;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -7140,6 +7271,7 @@ public class GeoSovereignStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnforceGdpr;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -7276,11 +7408,11 @@ private class AzureProtocolAdapter : NativeProtocolAdapter
 }
 ```
 ```csharp
-private class GCSProtocolAdapter : NativeProtocolAdapter
+private class GcsProtocolAdapter : NativeProtocolAdapter
 {
 // Production: Implement GCS-specific protocol translation
 }
-    public GCSProtocolAdapter(string basePath) : base(Path.Combine(basePath, "gcs"));
+    public GcsProtocolAdapter(string basePath) : base(Path.Combine(basePath, "gcs"));
 }
 ```
 
@@ -7290,6 +7422,7 @@ public class SatelliteStorageStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableDopplerCompensation;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -7428,6 +7561,9 @@ private class BlockInfo
 public class SemanticOrganizationStrategy : UltimateStorageStrategyBase
 {
 }
+    internal bool EnableAutoTagging;;
+    internal bool EnableClustering;;
+    internal double SimilarityThreshold;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -7522,7 +7658,6 @@ public class ProjectAwareStorageStrategy : UltimateStorageStrategyBase
 ```csharp
 public class CostPredictiveStorageStrategy : UltimateStorageStrategyBase
 {
-#endregion
 }
     public override string StrategyId;;
     public override string Name;;
@@ -7537,6 +7672,7 @@ public class CostPredictiveStorageStrategy : UltimateStorageStrategyBase
     protected override async Task<StorageObjectMetadata> GetMetadataAsyncCore(string key, CancellationToken ct);
     protected override async Task<StorageHealthInfo> GetHealthAsyncCore(CancellationToken ct);
     protected override async Task<long?> GetAvailableCapacityAsyncCore(CancellationToken ct);
+    protected override async ValueTask DisposeCoreAsync();
 }
 ```
 ```csharp
@@ -7568,6 +7704,7 @@ private class DailyCostMetrics
 public class SatelliteLinkStrategy : UltimateStorageStrategyBase
 {
 }
+    internal int DownloadQueueCount;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -7636,6 +7773,8 @@ public class SelfHealingStorageStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableProactiveReplication;;
+    internal double CorruptionThreshold;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -7711,6 +7850,7 @@ public class InfiniteDeduplicationStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableCrosstenantDedup;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -7767,6 +7907,8 @@ private class TenantInfo
 public class EdgeCascadeStrategy : UltimateStorageStrategyBase
 {
 }
+    internal long EdgeCacheMaxBytes;;
+    internal bool EnableCacheWarming;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -7924,6 +8066,8 @@ public class PredictiveCompressionStrategy : UltimateStorageStrategyBase
 {
 #endregion
 }
+    internal bool EnableParallelCompression;;
+    internal int ParallelChunkSize;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -7981,6 +8125,8 @@ private class ObjectMetadata
 public class TeleportStorageStrategy : UltimateStorageStrategyBase
 {
 }
+    internal bool EnablePredictiveReplication;;
+    internal bool EnableLatencyRouting;;
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;

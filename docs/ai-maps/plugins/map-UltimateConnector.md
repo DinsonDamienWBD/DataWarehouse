@@ -1198,8 +1198,8 @@ public class IpfsConnectionStrategy : BlockchainConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);;
-    public override Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);;
+    public override async Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);
+    public override async Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);
 }
 ```
 
@@ -1218,8 +1218,8 @@ public class CosmosChainConnectionStrategy : BlockchainConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);;
-    public override Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);;
+    public override async Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);
+    public override async Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);
 }
 ```
 
@@ -1238,8 +1238,8 @@ public class SolanaConnectionStrategy : BlockchainConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);;
-    public override Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);;
+    public override async Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);
+    public override async Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);
 }
 ```
 
@@ -1258,8 +1258,8 @@ public class AvalancheConnectionStrategy : BlockchainConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);;
-    public override Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);;
+    public override async Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);
+    public override async Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);
 }
 ```
 
@@ -1278,8 +1278,8 @@ public class EthereumConnectionStrategy : BlockchainConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);;
-    public override Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);;
+    public override async Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);
+    public override async Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);
 }
 ```
 
@@ -1298,8 +1298,8 @@ public class TheGraphConnectionStrategy : BlockchainConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);;
-    public override Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);;
+    public override async Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);
+    public override async Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);
 }
 ```
 
@@ -1318,8 +1318,8 @@ public class HyperledgerFabricConnectionStrategy : BlockchainConnectionStrategyB
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);;
-    public override Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);;
+    public override async Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);
+    public override async Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);
 }
 ```
 
@@ -1338,8 +1338,8 @@ public class PolygonConnectionStrategy : BlockchainConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);;
-    public override Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);;
+    public override async Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);
+    public override async Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);
 }
 ```
 
@@ -1358,8 +1358,8 @@ public class ArweaveConnectionStrategy : BlockchainConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    public override Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);;
-    public override Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);;
+    public override async Task<string> GetBlockAsync(IConnectionHandle handle, string blockIdentifier, CancellationToken ct = default);
+    public override async Task<string> SubmitTransactionAsync(IConnectionHandle handle, string signedTransaction, CancellationToken ct = default);
 }
 ```
 
@@ -2409,6 +2409,7 @@ private class FingerprintState
     public bool IsDegraded { get; set; }
     public int ConsecutiveFailures { get; set; }
     public CancellationTokenSource MonitorCts { get; set; };
+    public Task? MonitorTask { get; set; }
 }
 ```
 
@@ -2525,12 +2526,12 @@ private class PoolMetrics
     public int CircuitBreakerThreshold { get; set; }
     public double AverageLatencyMs { get; set; }
     public double EmaLatencyMs { get; set; }
-    public int ConsecutiveFailures { get; set; }
+    public long ConsecutiveFailures;
     public CircuitState CircuitState { get; set; }
     public DateTimeOffset CircuitOpenedAt { get; set; }
     public DateTimeOffset LastScaleEvent { get; set; }
     public bool EnablePredictiveScaling { get; set; }
-    public long TotalHealedConnections { get; set; }
+    public long TotalHealedConnections;
 }
 ```
 
@@ -2634,12 +2635,12 @@ private class BreakerState
 }
     public readonly object SyncRoot = new();
     public CircuitState State { get; set; }
-    public int FailureCount { get; set; }
-    public int SuccessCount { get; set; }
+    public long FailureCount;
+    public long SuccessCount;
     public double CanaryPassRate { get; set; }
     public int BaseFailureThreshold { get; set; }
     public double MinCanaryRate { get; set; }
-    public int SuccessStreak { get; set; }
+    public long SuccessStreak;
     public DateTimeOffset OpenedAt { get; set; }
     public TimeSpan OpenDuration { get; set; }
     public CircularBuffer<bool> RecentResults { get; set; };
@@ -2652,8 +2653,8 @@ private class BreakerConnectionState
     public BreakerState Breaker { get; set; };
     public DateTimeOffset? RateLimitResetAt { get; set; }
     public int? RateLimitRemaining { get; set; }
-    public long TotalRequests { get; set; }
-    public long TotalTripped { get; set; }
+    public long TotalRequests;
+    public long TotalTripped;
 }
 ```
 ```csharp
@@ -2761,6 +2762,7 @@ private class PidConnectionState
     public CircularBuffer<double> RecentOutputs { get; set; };
     public CircularBuffer<double> AckMeasurements { get; set; };
     public CancellationTokenSource MonitorCts { get; set; };
+    public Task? MonitorTask { get; set; }
 }
 ```
 ```csharp
@@ -3067,6 +3069,7 @@ private class PoolWarmingState
     public int ActiveConnections;
     public DateTimeOffset LastCoolingCheck { get; set; }
     public CancellationTokenSource MonitorCts { get; set; };
+    public Task? ScalingTask { get; set; }
     public int CurrentPoolSize
 {
     get
@@ -6654,7 +6657,7 @@ public class GcpDataflowConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -6696,7 +6699,7 @@ public sealed class AwsSnsConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -6738,7 +6741,7 @@ public class AzureCosmosConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -6759,7 +6762,7 @@ public class CloudflareR2ConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -6801,7 +6804,7 @@ public class GcpBigtableConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -6822,7 +6825,7 @@ public sealed class AzureEventHubConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -6916,7 +6919,7 @@ public class GcpFirestoreConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -6958,7 +6961,7 @@ public class AzureDataLakeConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -6979,7 +6982,7 @@ public class BackblazeB2ConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -7021,7 +7024,7 @@ public sealed class AzureServiceBusConnectionStrategy : SaaSConnectionStrategyBa
     protected override Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -7063,7 +7066,7 @@ public class AzureFunctionsConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```
@@ -7084,7 +7087,7 @@ public class DigitalOceanSpacesConnectionStrategy : SaaSConnectionStrategyBase
     protected override async Task<bool> TestCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override Task DisconnectCoreAsync(IConnectionHandle handle, CancellationToken ct);
     protected override async Task<ConnectionHealth> GetHealthCoreAsync(IConnectionHandle handle, CancellationToken ct);
-    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);;
+    protected override Task<(string Token, DateTimeOffset Expiry)> AuthenticateAsync(IConnectionHandle handle, CancellationToken ct = default);
     protected override Task<(string Token, DateTimeOffset Expiry)> RefreshTokenAsync(IConnectionHandle handle, string currentToken, CancellationToken ct = default);;
 }
 ```

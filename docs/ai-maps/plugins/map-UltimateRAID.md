@@ -128,23 +128,23 @@ public sealed class VirtualDisk
     public required long CapacityBytes { get; init; }
     public DiskHealthStatus HealthStatus { get; set; };
     public SmartAttributes? SmartData { get; set; }
-    public required IDiskIO DiskIO { get; init; }
+    public required IDiskIo DiskIo { get; init; }
     public bool SupportsTrim { get; init; };
     public Dictionary<string, string>? Metadata { get; init; }
 }
 ```
 ```csharp
-public interface IDiskIO
+public interface IDiskIo
 {
 }
     Task<byte[]> ReadAsync(long offset, int length, CancellationToken ct = default);;
     Task WriteAsync(long offset, byte[] data, CancellationToken ct = default);;
     Task FlushAsync(CancellationToken ct = default);;
-    DiskIOStatistics GetStatistics();;
+    DiskIoStatistics GetStatistics();;
 }
 ```
 ```csharp
-public sealed class DiskIOStatistics
+public sealed class DiskIoStatistics
 {
 }
     public long TotalReads { get; set; }
@@ -178,7 +178,7 @@ public sealed class RaidVerificationResult
     public long TotalBlocks { get; set; }
     public long VerifiedBlocks { get; set; }
     public long ErrorCount { get; set; }
-    public List<string> Errors { get; set; };
+    public List<string> Errors { get; init; };
     public TimeSpan Duration { get; set; }
 }
 ```
@@ -192,7 +192,7 @@ public sealed class RaidScrubResult
     public long ErrorsDetected { get; set; }
     public long ErrorsCorrected { get; set; }
     public long ErrorsUncorrectable { get; set; }
-    public List<string> Details { get; set; };
+    public List<string> Details { get; init; };
     public TimeSpan Duration { get; set; }
 }
 ```
@@ -454,7 +454,7 @@ public sealed class MigrationState
 public sealed class MigrationOptions
 {
 }
-    public int MaxIOPS { get; set; };
+    public int MaxIops { get; set; };
     public int MaxBandwidthMBps { get; set; };
     public bool VerifyAfterMigration { get; set; };
     public bool CreateCheckpoints { get; set; };
@@ -473,7 +473,7 @@ public sealed class BadBlockRemapping
     public long? GetRemappedAddress(string diskId, long logicalBlockAddress);
     public RemappingStatistics GetStatistics(string diskId);
     public IReadOnlyList<RemappingStatistics> GetAllStatistics();
-    public async Task<ScanResult> ScanForBadBlocksAsync(string diskId, long startLBA, long endLBA, IProgress<double>? progress = null, CancellationToken cancellationToken = default);
+    public async Task<ScanResult> ScanForBadBlocksAsync(string diskId, long startLba, long endLba, IProgress<double>? progress = null, CancellationToken cancellationToken = default);
     public void ClearRemappingTable(string diskId);
     public BadBlockMapExport ExportBadBlockMap(string diskId);
     public void ImportBadBlockMap(BadBlockMapExport export);
@@ -483,6 +483,7 @@ public sealed class BadBlockRemapping
 public sealed class DiskBadBlockMap
 {
 }
+    internal string DiskId;;
     public DiskBadBlockMap(string diskId);
     public bool IsBlockRemapped(long lba);;
     public long GetRemappedAddress(long lba);;
@@ -506,7 +507,7 @@ public sealed class RemappingStatistics
 public sealed class BadBlockInfo
 {
 }
-    public long LBA { get; set; }
+    public long Lba { get; set; }
     public BadBlockType Type { get; set; }
     public DateTime DetectedTime { get; set; };
 }
@@ -516,10 +517,10 @@ public sealed class ScanResult
 {
 }
     public string DiskId { get; set; };
-    public long StartLBA { get; set; }
-    public long EndLBA { get; set; }
+    public long StartLba { get; set; }
+    public long EndLba { get; set; }
     public long TotalBlocksScanned { get; set; }
-    public List<BadBlockInfo> BadBlocks { get; set; };
+    public List<BadBlockInfo> BadBlocks { get; init; };
     public DateTime ScanCompleted { get; set; }
 }
 ```
@@ -527,8 +528,8 @@ public sealed class ScanResult
 public sealed class BadBlockMapEntry
 {
 }
-    public long OriginalLBA { get; set; }
-    public long RemappedLBA { get; set; }
+    public long OriginalLba { get; set; }
+    public long RemappedLba { get; set; }
     public BadBlockType BlockType { get; set; }
 }
 ```
@@ -547,6 +548,7 @@ public sealed class BadBlockMapExport
 public sealed class GeoRaid
 {
 }
+    internal IReadOnlyDictionary<string, byte[]?> ParityRing;;
     public DataWarehouse.SDK.Contracts.IMessageBus? MessageBus { get; set; }
     public void ConfigureCrossDatacenterParity(string arrayId, IEnumerable<DatacenterConfig> datacenters, ParityDistributionStrategy strategy = ParityDistributionStrategy.DistributedParity);
     public void DefineFailureDomain(string domainId, string name, GeographicLocation location, IEnumerable<string> datacenterIds, FailureDomainType domainType = FailureDomainType.Region);
@@ -571,7 +573,7 @@ public sealed class DatacenterConfig
     public DateTime LastHeartbeat { get; set; };
     public bool HoldsData { get; set; }
     public bool HoldsParity { get; set; }
-    public List<GeoDiskInfo> Disks { get; set; };
+    public List<GeoDiskInfo> Disks { get; init; };
 }
 ```
 ```csharp
@@ -622,7 +624,7 @@ public sealed class StripeAllocation
 }
     public long BlockIndex { get; set; }
     public List<DiskAssignment> DataDiskAssignments { get; set; };
-    public List<DiskAssignment> ParityDiskAssignments { get; set; };
+    public List<DiskAssignment> ParityDiskAssignments { get; init; };
     public int EstimatedWriteLatencyMs { get; set; }
     public int EstimatedReadLatencyMs { get; set; }
 }
@@ -672,7 +674,7 @@ public sealed class GeoRaidStatus
     public int HealthyDatacenters { get; set; }
     public int PendingSyncs { get; set; }
     public ParityDistributionStrategy ParityStrategy { get; set; }
-    public List<DatacenterStatus> DatacenterStatuses { get; set; };
+    public List<DatacenterStatus> DatacenterStatuses { get; init; };
 }
 ```
 ```csharp
@@ -704,6 +706,8 @@ public sealed class RaidDeduplication
 public sealed class DedupIndex
 {
 }
+    internal string ArrayId;;
+    internal IReadOnlyCollection<long> FreedAddresses;;
     public string? DevicePath { get; set; }
     public DedupIndex(string arrayId);
     public int Count;;
@@ -797,7 +801,7 @@ public sealed class DedupAwareParity
     public List<byte[]> ParityBlocks { get; set; };
     public long ParityBytesCalculated { get; set; }
     public double ParityOptimizationRatio { get; set; }
-    public List<DedupParityReference> DuplicateReferences { get; set; };
+    public List<DedupParityReference> DuplicateReferences { get; init; };
 }
 ```
 ```csharp
@@ -1022,6 +1026,7 @@ public sealed class WriteBackCache
 public sealed class IoScheduler
 {
 }
+    internal SchedulerConfig Config;;
     public IoScheduler(SchedulerConfig? config = null);
     public async Task<ScheduleResult> ScheduleAsync(IoRequest request, CancellationToken cancellationToken);
     public async Task<IoResult> ExecuteReadAsync(IoRequest request, CancellationToken cancellationToken);
@@ -1657,7 +1662,7 @@ public sealed class IntegrityChain
     public string ChainId { get; set; };
     public string ArrayId { get; set; };
     public DateTime CreatedTime { get; set; }
-    public List<ChainLink> Links { get; set; };
+    public List<ChainLink> Links { get; init; };
     public byte[] RootHash { get; set; };
 }
 ```
@@ -1678,10 +1683,10 @@ public sealed class QuantumSafeIntegrity
 {
 }
     public DataWarehouse.SDK.Contracts.IMessageBus? MessageBus { get; set; }
-    public QuantumSafeIntegrity(HashAlgorithmType defaultAlgorithm = HashAlgorithmType.SHA3_256);
+    public QuantumSafeIntegrity(HashAlgorithmType defaultAlgorithm = HashAlgorithmType.Sha3256);
     public QuantumSafeChecksum CalculateChecksum(byte[] data, HashAlgorithmType algorithm = HashAlgorithmType.Default);
     public bool VerifyChecksum(byte[] data, QuantumSafeChecksum checksum);
-    public MerkleTree BuildMerkleTree(string arrayId, IEnumerable<byte[]> dataBlocks, HashAlgorithmType algorithm = HashAlgorithmType.SHA3_256);
+    public MerkleTree BuildMerkleTree(string arrayId, IEnumerable<byte[]> dataBlocks, HashAlgorithmType algorithm = HashAlgorithmType.Sha3256);
     public MerkleProofResult VerifyWithMerkleProof(string arrayId, int blockIndex, byte[] blockData);
     public void UpdateMerkleTree(string arrayId, int blockIndex, byte[] newBlockData);
     public BlockchainAttestation CreateAttestation(string arrayId, byte[] dataHash, BlockchainNetwork network = BlockchainNetwork.Ethereum, AttestationOptions? options = null);
@@ -2272,6 +2277,7 @@ public sealed class NaturalLanguageCommandHandler
 public sealed class RecommendationGenerator
 {
 }
+    internal bool IsIntelligenceAvailable;;
     public RecommendationGenerator(bool isIntelligenceAvailable = false);
     public List<RaidRecommendation> GenerateRecommendations(RaidSystemStatus status);
 }
@@ -2471,7 +2477,7 @@ public sealed class NlCommandResult
 public sealed class RaidSystemStatus
 {
 }
-    public List<RaidArrayStatus> Arrays { get; set; };
+    public List<RaidArrayStatus> Arrays { get; init; };
     public double AverageReadThroughputMBps { get; set; }
     public double AverageWriteThroughputMBps { get; set; }
 }
@@ -2673,6 +2679,7 @@ public sealed class SpanBigStrategy : SdkRaidStrategyBase
 public sealed class MaidStrategy : SdkRaidStrategyBase
 {
 }
+    internal TimeSpan SpinDownDelay;;
     public MaidStrategy(int chunkSize = 64 * 1024, int spinDownMinutes = 10);
     public override RaidLevel Level;;
     public override RaidCapabilities Capabilities;;
@@ -2778,7 +2785,7 @@ public class Raid5EStrategy : SdkRaidStrategyBase
 }
 ```
 ```csharp
-public class Raid5EEStrategy : SdkRaidStrategyBase
+public class Raid5EeStrategy : SdkRaidStrategyBase
 {
 }
     public override RaidLevel Level;;
@@ -3012,6 +3019,7 @@ public sealed class LdpcStrategy : SdkRaidStrategyBase
 public sealed class FountainCodesStrategy : SdkRaidStrategyBase
 {
 }
+    internal Random Random;;
     public FountainCodesStrategy(int chunkSize = 64 * 1024, int sourceSymbols = 10, int encodedSymbols = 15, double overheadFactor = 1.05);
     public override RaidLevel Level;;
     public override RaidCapabilities Capabilities;;
@@ -3029,6 +3037,248 @@ private sealed class EncodedSymbol
     public byte[] Data { get; set; };
     public int Degree { get; set; }
     public List<int> Neighbors { get; set; };
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/DeviceLevel/DeviceLevelRaidStrategies.cs
+```csharp
+public abstract class DeviceLevelRaidStrategyBase : IDeviceRaidStrategy
+{
+}
+    public abstract DeviceLayoutType Layout { get; }
+    public abstract string StrategyName { get; }
+    public abstract int MinimumDeviceCount { get; }
+    public abstract int FaultTolerance { get; }
+    protected virtual int ParityDeviceCount;;
+    protected virtual int MirrorCount;;
+    public Task<CompoundBlockDevice> CreateCompoundDeviceAsync(IReadOnlyList<IPhysicalBlockDevice> devices, DeviceRaidConfiguration config, CancellationToken ct = default);
+    public async Task RebuildDeviceAsync(CompoundBlockDevice compound, int failedDeviceIndex, IPhysicalBlockDevice replacement, CancellationToken ct = default, IProgress<double>? progress = null);
+    public DeviceRaidHealth GetHealth(CompoundBlockDevice compound);
+    protected virtual CompoundDeviceConfiguration BuildCompoundConfiguration(DeviceRaidConfiguration config);
+    protected abstract Task RebuildCoreAsync(CompoundBlockDevice compound, int failedDeviceIndex, IPhysicalBlockDevice replacement, CancellationToken ct, IProgress<double>? progress);;
+    protected virtual ArrayState DetermineArrayState(int online, int offline, int total);
+    protected static async Task CopyBlocksFromDeviceAsync(IPhysicalBlockDevice source, IPhysicalBlockDevice destination, long blockCount, int blockSize, CancellationToken ct, IProgress<double>? progress);
+    protected static async Task ReconstructViaXorAsync(IReadOnlyList<IPhysicalBlockDevice> devices, int failedDeviceIndex, IPhysicalBlockDevice replacement, long blockCount, int blockSize, CancellationToken ct, IProgress<double>? progress);
+}
+```
+```csharp
+public sealed class DeviceRaid0Strategy : DeviceLevelRaidStrategyBase
+{
+}
+    public override DeviceLayoutType Layout;;
+    public override string StrategyName;;
+    public override int MinimumDeviceCount;;
+    public override int FaultTolerance;;
+    protected override Task RebuildCoreAsync(CompoundBlockDevice compound, int failedDeviceIndex, IPhysicalBlockDevice replacement, CancellationToken ct, IProgress<double>? progress);
+    protected override ArrayState DetermineArrayState(int online, int offline, int total);
+}
+```
+```csharp
+public sealed class DeviceRaid1Strategy : DeviceLevelRaidStrategyBase
+{
+}
+    public override DeviceLayoutType Layout;;
+    public override string StrategyName;;
+    public override int MinimumDeviceCount;;
+    public override int FaultTolerance;;
+    protected override CompoundDeviceConfiguration BuildCompoundConfiguration(DeviceRaidConfiguration config);
+    protected override async Task RebuildCoreAsync(CompoundBlockDevice compound, int failedDeviceIndex, IPhysicalBlockDevice replacement, CancellationToken ct, IProgress<double>? progress);
+    protected override ArrayState DetermineArrayState(int online, int offline, int total);
+}
+```
+```csharp
+public sealed class DeviceRaid5Strategy : DeviceLevelRaidStrategyBase
+{
+}
+    public override DeviceLayoutType Layout;;
+    public override string StrategyName;;
+    public override int MinimumDeviceCount;;
+    public override int FaultTolerance;;
+    protected override int ParityDeviceCount;;
+    protected override CompoundDeviceConfiguration BuildCompoundConfiguration(DeviceRaidConfiguration config);
+    protected override async Task RebuildCoreAsync(CompoundBlockDevice compound, int failedDeviceIndex, IPhysicalBlockDevice replacement, CancellationToken ct, IProgress<double>? progress);
+}
+```
+```csharp
+public sealed class DeviceRaid6Strategy : DeviceLevelRaidStrategyBase
+{
+}
+    public override DeviceLayoutType Layout;;
+    public override string StrategyName;;
+    public override int MinimumDeviceCount;;
+    public override int FaultTolerance;;
+    protected override int ParityDeviceCount;;
+    protected override CompoundDeviceConfiguration BuildCompoundConfiguration(DeviceRaidConfiguration config);
+    protected override async Task RebuildCoreAsync(CompoundBlockDevice compound, int failedDeviceIndex, IPhysicalBlockDevice replacement, CancellationToken ct, IProgress<double>? progress);
+}
+```
+```csharp
+public sealed class DeviceRaid10Strategy : DeviceLevelRaidStrategyBase
+{
+}
+    public override DeviceLayoutType Layout;;
+    public override string StrategyName;;
+    public override int MinimumDeviceCount;;
+    public override int FaultTolerance;;
+    protected override int MirrorCount;;
+    protected override CompoundDeviceConfiguration BuildCompoundConfiguration(DeviceRaidConfiguration config);
+    protected override async Task RebuildCoreAsync(CompoundBlockDevice compound, int failedDeviceIndex, IPhysicalBlockDevice replacement, CancellationToken ct, IProgress<double>? progress);
+    protected override ArrayState DetermineArrayState(int online, int offline, int total);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/DeviceLevel/DeviceErasureCodingStrategies.cs
+```csharp
+internal static class GaloisField
+{
+}
+    internal static readonly byte[] ExpTable = new byte[512];
+    internal static readonly byte[] LogTable = new byte[256];
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+public static byte Multiply(byte a, byte b);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+public static byte Divide(byte a, byte b);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+public static byte Inverse(byte a);
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+public static byte Power(byte a, int n);
+}
+```
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 91: Device erasure coding (CBDV-03)")]
+public sealed class DeviceReedSolomonStrategy : RaidStrategyBase, IDeviceErasureCodingStrategy
+{
+#endregion
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override int RaidLevel;;
+    public override string Category;;
+    public override int MinimumDisks;;
+    public override int FaultTolerance;;
+    public override double StorageEfficiency;;
+    public override double ReadPerformanceMultiplier;;
+    public override double WritePerformanceMultiplier;;
+    public ErasureCodingScheme Scheme;;
+    public int MaxTolerableFailures;;
+    public DeviceReedSolomonStrategy(int dataDevices, int parityDevices);
+    public static DeviceReedSolomonStrategy Create8Plus3();;
+    public static DeviceReedSolomonStrategy Create16Plus4();;
+    public Task<CompoundBlockDevice> CreateCompoundDeviceAsync(ErasureCodingConfiguration config, CancellationToken ct = default);
+    public Task<ErasureCodingHealth> CheckHealthAsync(ErasureCodingConfiguration config, CancellationToken ct = default);
+    public async Task RebuildDeviceAsync(int failedDeviceIndex, IPhysicalBlockDevice replacement, ErasureCodingConfiguration config, IProgress<double>? progress = null, CancellationToken ct = default);
+    public async Task EncodeStripeAsync(ReadOnlyMemory<byte> data, IReadOnlyList<IPhysicalBlockDevice> devices, long stripeOffset, CancellationToken ct = default);
+    public async Task<ReadOnlyMemory<byte>> DecodeStripeAsync(IReadOnlyList<IPhysicalBlockDevice> devices, bool[] deviceAvailable, long stripeOffset, int dataLength, CancellationToken ct = default);
+    public override Task WriteAsync(long logicalBlockAddress, byte[] data, CancellationToken ct = default);
+    public override Task<byte[]> ReadAsync(long logicalBlockAddress, int length, CancellationToken ct = default);
+    public override Task RebuildAsync(int failedDiskIndex, IProgress<double>? progress = null, CancellationToken ct = default);
+}
+```
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 91: Device erasure coding (CBDV-03)")]
+public sealed class DeviceFountainCodeStrategy : RaidStrategyBase, IDeviceErasureCodingStrategy
+{
+#endregion
+}
+    public override string StrategyId;;
+    public override string StrategyName;;
+    public override int RaidLevel;;
+    public override string Category;;
+    public override int MinimumDisks;;
+    public override int FaultTolerance;;
+    public override double StorageEfficiency;;
+    public override double ReadPerformanceMultiplier;;
+    public override double WritePerformanceMultiplier;;
+    public ErasureCodingScheme Scheme;;
+    public int MaxTolerableFailures;;
+    public DeviceFountainCodeStrategy(int dataDevices, double redundancyFactor = 1.5);
+    public Task<CompoundBlockDevice> CreateCompoundDeviceAsync(ErasureCodingConfiguration config, CancellationToken ct = default);
+    public Task<ErasureCodingHealth> CheckHealthAsync(ErasureCodingConfiguration config, CancellationToken ct = default);
+    public async Task RebuildDeviceAsync(int failedDeviceIndex, IPhysicalBlockDevice replacement, ErasureCodingConfiguration config, IProgress<double>? progress = null, CancellationToken ct = default);
+    public async Task EncodeStripeAsync(ReadOnlyMemory<byte> data, IReadOnlyList<IPhysicalBlockDevice> devices, long stripeOffset, CancellationToken ct = default);
+    public async Task<ReadOnlyMemory<byte>> DecodeStripeAsync(IReadOnlyList<IPhysicalBlockDevice> devices, bool[] deviceAvailable, long stripeOffset, int dataLength, CancellationToken ct = default);
+    public override Task WriteAsync(long logicalBlockAddress, byte[] data, CancellationToken ct = default);
+    public override Task<byte[]> ReadAsync(long logicalBlockAddress, int length, CancellationToken ct = default);
+    public override Task RebuildAsync(int failedDiskIndex, IProgress<double>? progress = null, CancellationToken ct = default);
+}
+```
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 91: Device erasure coding (CBDV-03)")]
+public static class DeviceErasureCodingRegistry
+{
+}
+    public static void Register(IDeviceErasureCodingStrategy strategy);
+    public static IDeviceErasureCodingStrategy? Get(string strategyId);
+    public static IReadOnlyCollection<IDeviceErasureCodingStrategy> GetAll();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/DeviceLevel/DeviceLevelHotSpareIntegration.cs
+```csharp
+internal sealed class DeviceLevelHotSpareIntegration
+{
+}
+    public TimeSpan HealthCheckInterval { get; set; };
+    public event Action<DeviceRaidHealth>? OnHealthChanged;
+    public event Action<int>? OnDeviceFailureDetected;
+    public event Action<int>? OnAutoRebuildStarted;
+    public async Task MonitorDevicesAsync(CompoundBlockDevice compound, IDeviceRaidStrategy strategy, HotSpareManager spareManager, CancellationToken ct);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/DeviceLevel/DeviceLevelRaidAdapter.cs
+```csharp
+public sealed class DeviceLevelRaidAdapter
+{
+}
+    public DeviceLevelRaidAdapter(ILogger? logger = null);
+    public async Task<CompoundBlockDevice> CreateRaidArrayAsync(IReadOnlyList<IPhysicalBlockDevice> devices, IDeviceRaidStrategy strategy, DeviceRaidConfiguration config, CancellationToken ct = default);
+    public CompoundBlockDevice CreateRaidArray(IReadOnlyList<IPhysicalBlockDevice> devices, IDeviceRaidStrategy strategy, DeviceRaidConfiguration config);
+    public static IDeviceRaidStrategy GetStrategy(DeviceLayoutType layout);
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/DeviceLevel/InMemoryPhysicalBlockDevice.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 91: Test helper (CBDV-05)")]
+public sealed class InMemoryPhysicalBlockDevice : IPhysicalBlockDevice
+{
+}
+    public InMemoryPhysicalBlockDevice(string deviceId, int blockSize, long blockCount);
+    public string DeviceId;;
+    public int BlockSize;;
+    public long BlockCount;;
+    public bool IsOnline;;
+    public PhysicalDeviceInfo DeviceInfo;;
+    public long PhysicalSectorSize;;
+    public long LogicalSectorSize;;
+    public void SetOnline(bool online);;
+    public int StoredBlockCount;;
+    public Task ReadBlockAsync(long blockNumber, Memory<byte> buffer, CancellationToken ct = default);
+    public Task WriteBlockAsync(long blockNumber, ReadOnlyMemory<byte> data, CancellationToken ct = default);
+    public Task FlushAsync(CancellationToken ct = default);
+    public Task TrimAsync(long blockNumber, int blockCount, CancellationToken ct = default);
+    public Task<int> ReadScatterAsync(IReadOnlyList<(long blockNumber, Memory<byte> buffer)> operations, CancellationToken ct = default);
+    public Task<int> WriteGatherAsync(IReadOnlyList<(long blockNumber, ReadOnlyMemory<byte> data)> operations, CancellationToken ct = default);
+    public Task<PhysicalDeviceHealth> GetHealthAsync(CancellationToken ct = default);
+    public ValueTask DisposeAsync();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateRAID/Strategies/DeviceLevel/DualRaidIntegrationTests.cs
+```csharp
+[SdkCompatibility("6.0.0", Notes = "Phase 91: Dual RAID integration tests (CBDV-05)")]
+public sealed class DualRaidIntegrationTests
+{
+}
+    public async Task<(bool passed, string message)> TestVdeTransparencyAsync();
+    public async Task<(bool passed, string message)> TestRaid5SingleFailureAsync();
+    public async Task<(bool passed, string message)> TestRaid6DoubleFailureAsync();
+    public async Task<(bool passed, string message)> TestRaid10MirrorFailoverAsync();
+    public async Task<(bool passed, string message)> TestHotSpareFailoverAsync();
+    public async Task<(bool passed, string message)> TestDualRaidAsync();
+    public async Task<(bool passed, string message)> TestReedSolomon8Plus3Async();
+    public async Task<IReadOnlyList<(string testName, bool passed, string message)>> RunAllTestsAsync(CancellationToken ct = default);
 }
 ```
 

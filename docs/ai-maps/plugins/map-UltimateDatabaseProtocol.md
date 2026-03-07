@@ -251,12 +251,12 @@ public abstract class DatabaseProtocolStrategyBase : StrategyBase, IDatabaseProt
     protected async Task SendAsync(ReadOnlyMemory<byte> data, CancellationToken ct);
     protected async Task<int> ReceiveAsync(byte[] buffer, int offset, int count, CancellationToken ct);
     protected async Task<byte[]> ReceiveExactAsync(int count, CancellationToken ct);
-    protected static void WriteInt32BE(Span<byte> buffer, int value);
-    protected static int ReadInt32BE(ReadOnlySpan<byte> buffer);
-    protected static void WriteInt32LE(Span<byte> buffer, int value);
-    protected static int ReadInt32LE(ReadOnlySpan<byte> buffer);
-    protected static void WriteInt16BE(Span<byte> buffer, short value);
-    protected static short ReadInt16BE(ReadOnlySpan<byte> buffer);
+    protected static void WriteInt32Be(Span<byte> buffer, int value);
+    protected static int ReadInt32Be(ReadOnlySpan<byte> buffer);
+    protected static void WriteInt32Le(Span<byte> buffer, int value);
+    protected static int ReadInt32Le(ReadOnlySpan<byte> buffer);
+    protected static void WriteInt16Be(Span<byte> buffer, short value);
+    protected static short ReadInt16Be(ReadOnlySpan<byte> buffer);
     protected static int WriteNullTerminatedString(Span<byte> buffer, string value);
     protected static string ReadNullTerminatedString(ReadOnlySpan<byte> buffer, out int bytesRead);
     public virtual ProtocolStatistics GetStatistics();
@@ -417,7 +417,7 @@ internal sealed class BrotliCompressionProvider : ICompressionProvider
 }
 ```
 ```csharp
-internal sealed class LZ4CompressionProvider : ICompressionProvider
+internal sealed class Lz4CompressionProvider : ICompressionProvider
 {
 }
     public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level);;
@@ -447,7 +447,7 @@ internal sealed class SnappyCompressionProvider : ICompressionProvider
 }
 ```
 ```csharp
-internal sealed class LZOCompressionProvider : ICompressionProvider
+internal sealed class LzoCompressionProvider : ICompressionProvider
 {
 }
     public byte[] Compress(ReadOnlySpan<byte> data, CompressionLevel level);;
@@ -665,6 +665,7 @@ private sealed class AmqpFrame
 public sealed class NatsProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string ServerInfo { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -684,6 +685,7 @@ public sealed class NatsProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class PulsarProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string PulsarNamespace { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -705,6 +707,9 @@ public sealed class PulsarProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class MySqlProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal uint ServerCapabilities { get; private set; }
+    internal string ServerVersion { get; private set; };
+    internal uint ConnectionId { get; private set; }
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -754,6 +759,8 @@ public sealed class PostgreSqlWireVerification
 public sealed class PostgreSqlSqlEngineIntegration : IDataSourceProvider
 {
 }
+    internal long TransactionId { get; private set; }
+    internal List<string> TransactionLog { get; };
     public char TransactionStatus;;
     public PostgreSqlSqlEngineIntegration(IDataSourceProvider vdeDataSource, PostgreSqlCatalogProvider catalogProvider);
     public async Task<PostgreSqlQueryResult> ExecuteSimpleQueryAsync(string sql, CancellationToken ct);
@@ -817,6 +824,7 @@ public sealed class PostgreSqlCatalogProvider
 public sealed class OracleTnsProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal byte[] SessionKey { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -871,6 +879,8 @@ private sealed class DrdaObject
 public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal int NegotiatedMinorVersion { get; private set; }
+    internal List<string> UnrecognizedParameters { get; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -896,6 +906,11 @@ public sealed class PostgreSqlProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class TdsProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string ServerVersion { get; private set; };
+    internal string InstanceName { get; private set; };
+    internal bool EncryptionRequired { get; private set; }
+    internal byte[] ServerNonce { get; private set; };
+    internal System.Collections.Concurrent.ConcurrentDictionary<string, string> EnvChanges { get; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -933,6 +948,7 @@ public sealed class ArangoDbProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class JanusGraphProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string GraphName { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -952,6 +968,7 @@ public sealed class JanusGraphProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class TigerGraphProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string GraphName { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1028,6 +1045,7 @@ private sealed class GremlinResult
 public sealed class NeptuneGremlinProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string Region { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1050,6 +1068,8 @@ public sealed class Neo4jBoltProtocolStrategy : DatabaseProtocolStrategyBase
 {
 #endregion
 }
+    internal string ServerAgent { get; private set; };
+    internal string Neo4jConnectionId { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1214,6 +1234,9 @@ public sealed class BigQueryProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class RedshiftProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal int ProcessId { get; private set; }
+    internal int SecretKey { get; private set; }
+    internal string ServerVersion { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1271,6 +1294,8 @@ public sealed class SynapseProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class ElasticsearchProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string ClusterName { get; private set; };
+    internal string ClusterVersion { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1301,6 +1326,7 @@ private sealed class ElasticsearchOperation
 public sealed class OpenSearchProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string ClusterVersion { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1381,6 +1407,8 @@ public sealed class TypesenseProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class ClickHouseProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string ServerVersion { get; private set; };
+    internal string ServerTimezone { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1399,6 +1427,7 @@ public sealed class ClickHouseProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class HBaseProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string Namespace { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1418,6 +1447,7 @@ public sealed class HBaseProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class CouchbaseProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string Bucket { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1494,6 +1524,7 @@ public sealed class CassandraCqlProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class RedisRespProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string ServerVersion { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1523,6 +1554,9 @@ private sealed class RedisException : Exception
 public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal int MaxWireVersion { get; private set; }
+    internal int MinWireVersion { get; private set; }
+    internal string[]? CompressionMethods { get; private set; }
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1540,6 +1574,7 @@ public sealed class MongoDbWireProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class MemcachedProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string ServerVersion { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1574,6 +1609,7 @@ private sealed class BinaryResponse
 public sealed class InfluxDbLineProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string Bucket { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1728,6 +1764,7 @@ public sealed class RocksDbProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string DatabaseType { get; private set; };
     public override bool IsProductionReady;;
     public override string StrategyId;;
     public override string StrategyName;;
@@ -1750,6 +1787,7 @@ public sealed class BerkeleyDbProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class AdoNetProviderStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string ServerVersion { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1827,6 +1865,9 @@ public sealed class OdbcDriverProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class CockroachDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal int ProcessId { get; private set; }
+    internal int SecretKey { get; private set; }
+    internal string ServerVersion { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1846,6 +1887,9 @@ public sealed class CockroachDbProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class TiDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal uint ConnectionId { get; private set; }
+    internal string ServerVersion { get; private set; };
+    internal uint ServerCapabilities { get; private set; }
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1864,6 +1908,9 @@ public sealed class TiDbProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class YugabyteDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal int ProcessId { get; private set; }
+    internal int SecretKey { get; private set; }
+    internal string ServerVersion { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;
@@ -1882,6 +1929,7 @@ public sealed class YugabyteDbProtocolStrategy : DatabaseProtocolStrategyBase
 public sealed class VoltDbProtocolStrategy : DatabaseProtocolStrategyBase
 {
 }
+    internal string ServerVersion { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override ProtocolInfo ProtocolInfo;;

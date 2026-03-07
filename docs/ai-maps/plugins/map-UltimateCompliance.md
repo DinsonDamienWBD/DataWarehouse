@@ -5135,6 +5135,7 @@ public sealed record AnonymizationAuditEntry
 public sealed class DataRetentionPolicyStrategy : ComplianceStrategyBase
 {
 }
+    internal TimeSpan DefaultRetention { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
@@ -5873,6 +5874,7 @@ public sealed record PseudonymizationAuditEntry
 public sealed class PrivacyImpactAssessmentStrategy : ComplianceStrategyBase
 {
 }
+    internal bool AutoTriggerDpia { get; private set; };
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
@@ -6858,7 +6860,7 @@ public sealed class SovereigntyRoutingStrategy : ComplianceStrategyBase
     public override string StrategyId;;
     public override string StrategyName;;
     public override string Framework;;
-    public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
+    public override async Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
     public void SetSovereigntyMesh(ISovereigntyMesh mesh);
     public async Task<RoutingDecision> CheckRoutingAsync(string objectId, string intendedDestination, IReadOnlyDictionary<string, object> objectTags, CancellationToken ct);
     public string MapStorageBackendToJurisdiction(string backendId);

@@ -343,7 +343,7 @@ public sealed class NumericProfile
     public double Kurtosis { get; init; }
     public double Q1 { get; init; }
     public double Q3 { get; init; }
-    public double IQR { get; init; }
+    public double Iqr { get; init; }
     public double Sum { get; init; }
     public int ZeroCount { get; init; }
     public int NegativeCount { get; init; }
@@ -546,7 +546,7 @@ public sealed class StandardizedValue
 {
 }
     public object? OriginalValue { get; init; }
-    public object? StandardizedValue_ { get; init; }
+    public object? Result { get; init; }
     public required string StandardType { get; init; }
 }
 ```
@@ -1148,6 +1148,6 @@ public sealed class FieldStatistics
     public double Median { get; init; }
     public double Q1 { get; init; }
     public double Q3 { get; init; }
-    public double IQR { get; init; }
+    public double Iqr { get; init; }
 }
 ```

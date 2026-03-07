@@ -1789,6 +1789,8 @@ public sealed class AnsStrategy : CompressionStrategyBase
 {
 #endregion
 }
+    internal int ConfiguredTableLogSize;;
+    internal int ConfiguredPrecision;;
     public AnsStrategy() : this(CompressionLevel.Default, tableLogSize: 11, precision: 11);
     public AnsStrategy(CompressionLevel level, int tableLogSize = 11, int precision = 11) : base(level);
     public override CompressionCharacteristics Characteristics { get; };

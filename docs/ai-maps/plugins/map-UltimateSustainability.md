@@ -11,6 +11,7 @@ public sealed class UltimateSustainabilityPlugin : InfrastructurePluginBase
 {
 #endregion
 }
+    internal ISustainabilityStrategy? ActiveStrategy { get; private set; }
     public override string Id;;
     public override string Name;;
     public override string Version;;
@@ -558,7 +559,7 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
     public double DefaultHardLimitPercent { get; set; };
     public int MinDelayMs { get; set; };
     public int MaxDelayMs { get; set; };
-    public double DefaultCarbonIntensityGCO2ePerKwh { get; set; };
+    public double DefaultCarbonIntensityGco2EPerKwh { get; set; };
     public int ThrottleCountForRecommendation { get; set; };
     public override string StrategyId;;
     public override string DisplayName;;
@@ -571,9 +572,9 @@ public sealed class CarbonBudgetEnforcementStrategy : SustainabilityStrategyBase
     protected override async Task InitializeCoreAsync(CancellationToken ct);
     protected override async Task DisposeCoreAsync();
     public async Task<SDK.Contracts.Carbon.CarbonBudget> GetBudgetAsync(string tenantId, CancellationToken ct = default);
-    public async Task SetBudgetAsync(string tenantId, double budgetGramsCO2e, CarbonBudgetPeriod period, CancellationToken ct = default);
-    public async Task<bool> CanProceedAsync(string tenantId, double estimatedCarbonGramsCO2e, CancellationToken ct = default);
-    public async Task RecordUsageAsync(string tenantId, double carbonGramsCO2e, string operationType, CancellationToken ct = default);
+    public async Task SetBudgetAsync(string tenantId, double budgetGramsCo2E, CarbonBudgetPeriod period, CancellationToken ct = default);
+    public async Task<bool> CanProceedAsync(string tenantId, double estimatedCarbonGramsCo2E, CancellationToken ct = default);
+    public async Task RecordUsageAsync(string tenantId, double carbonGramsCo2E, string operationType, CancellationToken ct = default);
     public async Task<CarbonThrottleDecision> EvaluateThrottleAsync(string tenantId, CancellationToken ct = default);
     internal void TrackThrottleEvent(string tenantId);
 }
@@ -619,7 +620,7 @@ public sealed class CarbonBudgetStore : IDisposable, IAsyncDisposable
     public int Count;;
     public Task<SDK.Contracts.Carbon.CarbonBudget?> GetAsync(string tenantId);
     public Task SetAsync(string tenantId, SDK.Contracts.Carbon.CarbonBudget budget);
-    public Task<bool> RecordUsageAsync(string tenantId, double carbonGramsCO2e);
+    public Task<bool> RecordUsageAsync(string tenantId, double carbonGramsCo2E);
     public Task ResetExpiredBudgetsAsync();
     public async Task LoadAsync(CancellationToken ct = default);
     public async Task SaveAsync(CancellationToken ct = default);
@@ -637,8 +638,8 @@ private sealed class MutableBudgetEntry
     public readonly object Lock = new();
     public string TenantId { get; set; };
     public CarbonBudgetPeriod BudgetPeriod { get; set; }
-    public double BudgetGramsCO2e { get; set; }
-    public double UsedGramsCO2e { get; set; }
+    public double BudgetGramsCo2E { get; set; }
+    public double UsedGramsCo2E { get; set; }
     public double ThrottleThresholdPercent { get; set; };
     public double HardLimitPercent { get; set; };
     public DateTimeOffset PeriodStart { get; set; }
@@ -655,8 +656,8 @@ private sealed class StoredBudgetEntry
 }
     public string TenantId { get; set; };
     public CarbonBudgetPeriod BudgetPeriod { get; set; }
-    public double BudgetGramsCO2e { get; set; }
-    public double UsedGramsCO2e { get; set; }
+    public double BudgetGramsCo2E { get; set; }
+    public double UsedGramsCo2E { get; set; }
     public double ThrottleThresholdPercent { get; set; };
     public double HardLimitPercent { get; set; };
     public DateTimeOffset PeriodStart { get; set; }
@@ -780,7 +781,7 @@ private sealed class GreenScorePersisted
     public string BackendId { get; set; };
     public string Region { get; set; };
     public double RenewablePercentage { get; set; }
-    public double CarbonIntensityGCO2ePerKwh { get; set; }
+    public double CarbonIntensityGco2EPerKwh { get; set; }
     public double PowerUsageEffectiveness { get; set; }
     public double? WaterUsageEffectiveness { get; set; }
     public double Score { get; set; }
@@ -961,7 +962,7 @@ public sealed class GhgProtocolReportingStrategy : SustainabilityStrategyBase
     public Task<IReadOnlyList<GhgReportEntry>> GenerateScope3ReportAsync(DateTimeOffset from, DateTimeOffset to, string? tenantId = null, CancellationToken ct = default);
     public async Task<GhgFullReport> GenerateFullReportAsync(DateTimeOffset from, DateTimeOffset to, string organizationName, string? tenantId = null, CancellationToken ct = default);
     public void RecordMeasurement(EnergyMeasurementRecord record);
-    public void UpdateRegionCarbonIntensity(string region, double intensityGCO2ePerKwh);
+    public void UpdateRegionCarbonIntensity(string region, double intensityGco2EPerKwh);
     public int MeasurementCount;;
 }
 ```
@@ -996,11 +997,11 @@ public sealed record TimeSeriesPoint
 public sealed record EmissionsByOperationType
 {
 }
-    public double ReadGramsCO2e { get; init; }
-    public double WriteGramsCO2e { get; init; }
-    public double DeleteGramsCO2e { get; init; }
-    public double ListGramsCO2e { get; init; }
-    public double TotalGramsCO2e;;
+    public double ReadGramsCo2E { get; init; }
+    public double WriteGramsCo2E { get; init; }
+    public double DeleteGramsCo2E { get; init; }
+    public double ListGramsCo2E { get; init; }
+    public double TotalGramsCo2E;;
 }
 ```
 ```csharp
@@ -1008,7 +1009,7 @@ public sealed record TenantCarbonUsage
 {
 }
     public required string TenantId { get; init; }
-    public required double TotalEmissionsGramsCO2e { get; init; }
+    public required double TotalEmissionsGramsCo2E { get; init; }
     public required double TotalEnergyWh { get; init; }
     public required long OperationCount { get; init; }
 }
@@ -1031,11 +1032,11 @@ public sealed class CarbonDashboardDataStrategy : SustainabilityStrategyBase
     public IReadOnlyList<TimeSeriesPoint> GetGreenScoreTrend(TimeSpan period);
     public EmissionsByOperationType GetEmissionsByOperationType(DateTimeOffset from, DateTimeOffset to);
     public IReadOnlyList<TenantCarbonUsage> GetTopEmittingTenants(int topN, DateTimeOffset from, DateTimeOffset to);
-    public void RecordCarbonIntensity(string region, double intensityGCO2ePerKwh);
+    public void RecordCarbonIntensity(string region, double intensityGco2EPerKwh);
     public void RecordBudgetUtilization(string tenantId, double usagePercent);
     public void RecordGreenScore(double averageScore);
-    public void RecordOperationEmission(string operationType, double emissionsGramsCO2e);
-    public void RecordTenantEmission(string tenantId, double emissionsGramsCO2e, double energyWh);
+    public void RecordOperationEmission(string operationType, double emissionsGramsCo2E);
+    public void RecordTenantEmission(string tenantId, double emissionsGramsCo2E, double energyWh);
 }
 ```
 ```csharp
@@ -1431,7 +1432,7 @@ public sealed record RegionSelectionResult
     public double CarbonIntensity { get; init; }
     public int LatencyMs { get; init; }
     public double CostMultiplier { get; init; }
-    public double CarbonSavedGCO2ePerKwh { get; init; }
+    public double CarbonSavedGco2EPerKwh { get; init; }
     public List<string>? AlternativeRegions { get; init; }
 }
 ```
@@ -1589,6 +1590,7 @@ public sealed record MigrationEvent
 public sealed class DemandResponseStrategy : SustainabilityStrategyBase
 {
 }
+    internal List<DemandResponseEvent> EventHistory { get; };
     public override string StrategyId;;
     public override string DisplayName;;
     public override SustainabilityCategory Category;;
@@ -2355,7 +2357,7 @@ public sealed class PowerSource
     public required string SourceId { get; init; }
     public required PowerSourceType Type { get; init; }
     public required double MaxPowerWatts { get; init; }
-    public double CarbonIntensityGCO2ePerKwh { get; set; }
+    public double CarbonIntensityGco2EPerKwh { get; set; }
     public double CostPerKwh { get; set; }
     public bool IsAvailable { get; set; }
     public double CurrentPowerWatts { get; set; }
@@ -3362,9 +3364,9 @@ public sealed class CarbonIntensityTrackingStrategy : SustainabilityStrategyBase
     public string? ApiKey { get; set; }
     protected override async Task InitializeCoreAsync(CancellationToken ct);
     protected override Task DisposeCoreAsync();
-    public void RecordIntensity(double intensityGCO2ePerKwh, DateTimeOffset? timestamp = null);
+    public void RecordIntensity(double intensityGco2EPerKwh, DateTimeOffset? timestamp = null);
     public IReadOnlyList<CarbonIntensityDataPoint> GetHistory(TimeSpan? duration = null);
-    public LowCarbonWindow? FindNextLowCarbonWindow(TimeSpan lookahead, double thresholdGCO2ePerKwh);
+    public LowCarbonWindow? FindNextLowCarbonWindow(TimeSpan lookahead, double thresholdGco2EPerKwh);
     public CarbonEmission CalculateEmissions(double energyWh);
 }
 ```
@@ -3658,8 +3660,8 @@ public sealed record EmissionsSummary
     public required double TotalScope2Grams { get; init; }
     public required double TotalScope3Grams { get; init; }
     public required double TotalEmissionsGrams { get; init; }
-    public required double TotalKgCO2e { get; init; }
-    public required double TotalTonsCO2e { get; init; }
+    public required double TotalKgCo2E { get; init; }
+    public required double TotalTonsCo2E { get; init; }
 }
 ```
 
@@ -3812,12 +3814,12 @@ public sealed record SustainabilityReport
     public required double TotalEnergyConsumedWh { get; init; }
     public required double TotalEnergyConsumedKwh { get; init; }
     public required double TotalEmissionsGrams { get; init; }
-    public required double TotalEmissionsKgCO2e { get; init; }
-    public required double TotalEmissionsTonsCO2e { get; init; }
+    public required double TotalEmissionsKgCo2E { get; init; }
+    public required double TotalEmissionsTonsCo2E { get; init; }
     public required double EnergySavedWh { get; init; }
     public required double EnergySavedKwh { get; init; }
     public required double CarbonAvoidedGrams { get; init; }
-    public required double CarbonAvoidedKgCO2e { get; init; }
+    public required double CarbonAvoidedKgCo2E { get; init; }
     public required double CostSavingsUsd { get; init; }
     public required double EfficiencyRatio { get; init; }
     public required double CarbonReductionPercent { get; init; }

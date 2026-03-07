@@ -360,8 +360,8 @@ public sealed class LoadBalancerEndpoint
 public abstract class LoadBalancingStrategyBase : ResilienceStrategyBase
 {
 }
-    protected readonly List<LoadBalancerEndpoint> _endpoints = new();
-    protected readonly object _endpointsLock = new();
+    protected readonly List<LoadBalancerEndpoint> Endpoints = new();
+    protected readonly object EndpointsLock = new();
     public override string Category;;
     public virtual void AddEndpoint(LoadBalancerEndpoint endpoint);
     public virtual bool RemoveEndpoint(string endpointId);
@@ -687,10 +687,10 @@ public sealed class ChaosNetworkPartitionException : Exception
 }
 ```
 ```csharp
-public sealed class IOException : Exception
+public sealed class ChaosIoException : Exception
 {
 }
-    public IOException(string message) : base(message);
+    public ChaosIoException(string message) : base(message);
 }
 ```
 ```csharp
@@ -1051,6 +1051,10 @@ public sealed class AdaptiveRetryStrategy : ResilienceStrategyBase
 public sealed class RaftConsensusStrategy : ResilienceStrategyBase
 {
 }
+    internal string? VotedFor { get; set; }
+    internal List<(long term, object command)> LogEntries { get; };
+    internal string NodeId { get; }
+    internal TimeSpan HeartbeatInterval { get; }
     public RaftConsensusStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], clusterNodes: new List<string>(), electionTimeout: TimeSpan.FromMilliseconds(Random.Shared.Next(150, 300)), heartbeatInterval: TimeSpan.FromMilliseconds(50));
     public RaftConsensusStrategy(string nodeId, List<string> clusterNodes, TimeSpan electionTimeout, TimeSpan heartbeatInterval);
     public override string StrategyId;;
@@ -1073,6 +1077,8 @@ public sealed class RaftConsensusStrategy : ResilienceStrategyBase
 public sealed class PaxosConsensusStrategy : ResilienceStrategyBase
 {
 }
+    internal string NodeId { get; }
+    internal int QuorumSize { get; }
     public PaxosConsensusStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], quorumSize: 3);
     public PaxosConsensusStrategy(string nodeId, int quorumSize);
     public override string StrategyId;;
@@ -1088,6 +1094,9 @@ public sealed class PaxosConsensusStrategy : ResilienceStrategyBase
 public sealed class PbftConsensusStrategy : ResilienceStrategyBase
 {
 }
+    internal string NodeId { get; }
+    internal int TotalNodes { get; }
+    internal int FaultyNodes { get; }
     public PbftConsensusStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], totalNodes: 4, faultyNodes: 1);
     public PbftConsensusStrategy(string nodeId, int totalNodes, int faultyNodes);
     public override string StrategyId;;
@@ -1103,6 +1112,8 @@ public sealed class PbftConsensusStrategy : ResilienceStrategyBase
 public sealed class ZabConsensusStrategy : ResilienceStrategyBase
 {
 }
+    internal string NodeId { get; }
+    internal int QuorumSize { get; }
     public ZabConsensusStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], quorumSize: 3);
     public ZabConsensusStrategy(string nodeId, int quorumSize);
     public override string StrategyId;;
@@ -1121,6 +1132,8 @@ public sealed class ZabConsensusStrategy : ResilienceStrategyBase
 public sealed class ViewstampedReplicationStrategy : ResilienceStrategyBase
 {
 }
+    internal string NodeId { get; }
+    internal int ReplicaCount { get; }
     public ViewstampedReplicationStrategy() : this(nodeId: Guid.NewGuid().ToString("N")[..8], replicaCount: 3);
     public ViewstampedReplicationStrategy(string nodeId, int replicaCount);
     public override string StrategyId;;
@@ -1165,6 +1178,7 @@ public sealed class DisasterRecoveryResult
 public sealed class GeoReplicationFailoverStrategy : ResilienceStrategyBase
 {
 }
+    internal TimeSpan HealthCheckInterval { get; }
     public GeoReplicationFailoverStrategy() : this(healthCheckInterval: TimeSpan.FromSeconds(30), failureThreshold: 3);
     public GeoReplicationFailoverStrategy(TimeSpan healthCheckInterval, int failureThreshold);
     public override string StrategyId;;
@@ -1206,6 +1220,7 @@ public sealed class PointInTimeRecoveryStrategy : ResilienceStrategyBase
 public sealed class MultiRegionDisasterRecoveryStrategy : ResilienceStrategyBase
 {
 }
+    internal TimeSpan SyncInterval { get; }
     public MultiRegionDisasterRecoveryStrategy() : this(activeActive: false, syncInterval: TimeSpan.FromSeconds(10));
     public MultiRegionDisasterRecoveryStrategy(bool activeActive, TimeSpan syncInterval);
     public override string StrategyId;;
@@ -1258,6 +1273,7 @@ public sealed class StateCheckpointStrategy : ResilienceStrategyBase
 public sealed class DataCenterFailoverStrategy : ResilienceStrategyBase
 {
 }
+    internal TimeSpan FailoverTimeout { get; }
     public DataCenterFailoverStrategy() : this(failoverTimeout: TimeSpan.FromMinutes(5));
     public DataCenterFailoverStrategy(TimeSpan failoverTimeout);
     public override string StrategyId;;
@@ -1391,6 +1407,7 @@ public sealed class PriorityBulkheadStrategy : ResilienceStrategyBase
 public sealed class AdaptiveBulkheadStrategy : ResilienceStrategyBase
 {
 }
+    internal int BaseCapacity { get; }
     public AdaptiveBulkheadStrategy() : this(minCapacity: 5, maxCapacity: 50, baseCapacity: 20, targetLatency: TimeSpan.FromMilliseconds(500), adaptationInterval: TimeSpan.FromSeconds(10));
     public AdaptiveBulkheadStrategy(int minCapacity, int maxCapacity, int baseCapacity, TimeSpan targetLatency, TimeSpan adaptationInterval);
     public override string StrategyId;;
@@ -1425,6 +1442,7 @@ public sealed class BulkheadRejectedException : Exception
 public sealed class StandardCircuitBreakerStrategy : ResilienceStrategyBase
 {
 }
+    internal DateTimeOffset LastFailureTime { get; set; };
     public StandardCircuitBreakerStrategy() : this(failureThreshold: 5, openDuration: TimeSpan.FromSeconds(30), halfOpenSuccessThreshold: 2);
     public StandardCircuitBreakerStrategy(int failureThreshold, TimeSpan openDuration, int halfOpenSuccessThreshold);
     public override string StrategyId;;
@@ -1507,6 +1525,7 @@ public sealed class TimeBasedCircuitBreakerStrategy : ResilienceStrategyBase
 public sealed class GradualRecoveryCircuitBreakerStrategy : ResilienceStrategyBase
 {
 }
+    internal int HalfOpenAttempts { get; set; }
     public GradualRecoveryCircuitBreakerStrategy() : this(failureThreshold: 5, openDuration: TimeSpan.FromSeconds(30), initialPermitRate: 0.1, permitRateIncrement: 0.1, successesPerIncrement: 3);
     public GradualRecoveryCircuitBreakerStrategy(int failureThreshold, TimeSpan openDuration, double initialPermitRate, double permitRateIncrement, int successesPerIncrement);
     public override string StrategyId;;
@@ -1560,6 +1579,7 @@ public sealed class HealthCheckResult
 public sealed class LivenessHealthCheckStrategy : ResilienceStrategyBase
 {
 }
+    internal HealthCheckResult? LastResultValue { get; set; }
     public LivenessHealthCheckStrategy();
     public override string StrategyId;;
     public override string StrategyName;;
@@ -1576,6 +1596,7 @@ public sealed class LivenessHealthCheckStrategy : ResilienceStrategyBase
 public sealed class ReadinessHealthCheckStrategy : ResilienceStrategyBase
 {
 }
+    internal HealthCheckResult? LastResultValue { get; set; }
     public ReadinessHealthCheckStrategy();
     public override string StrategyId;;
     public override string StrategyName;;
@@ -1593,6 +1614,7 @@ public sealed class ReadinessHealthCheckStrategy : ResilienceStrategyBase
 public sealed class StartupProbeHealthCheckStrategy : ResilienceStrategyBase
 {
 }
+    internal HealthCheckResult? LastResultValue { get; set; }
     public StartupProbeHealthCheckStrategy() : this(startupCheck: _ => Task.FromResult(true), timeout: TimeSpan.FromMinutes(5), checkInterval: TimeSpan.FromSeconds(10), maxAttempts: 30);
     public StartupProbeHealthCheckStrategy(Func<CancellationToken, Task<bool>> startupCheck, TimeSpan timeout, TimeSpan checkInterval, int maxAttempts);
     public override string StrategyId;;
@@ -1610,6 +1632,7 @@ public sealed class StartupProbeHealthCheckStrategy : ResilienceStrategyBase
 public sealed class DeepHealthCheckStrategy : ResilienceStrategyBase
 {
 }
+    internal HealthCheckResult? LastResultValue { get; set; }
     public DeepHealthCheckStrategy() : this(cacheValidity: TimeSpan.FromSeconds(30));
     public DeepHealthCheckStrategy(TimeSpan cacheValidity);
     public override string StrategyId;;
@@ -1666,6 +1689,7 @@ public sealed class ImmuneAutoRemediationStrategy : ChaosVaccinationStrategyBase
 public sealed class BlastRadiusGuardStrategy : ChaosVaccinationStrategyBase
 {
 }
+    internal string[] TargetPlugins { get; }
     public override string Name;;
     public BlastRadiusGuardStrategy(string[] targetPlugins, int maxDurationMs = 120_000);
     public override async Task<T> ExecuteAsync<T>(Func<CancellationToken, Task<T>> operation, CancellationToken ct = default);

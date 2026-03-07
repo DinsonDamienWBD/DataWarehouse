@@ -32,16 +32,16 @@ public sealed class SemanticSyncPlugin : OrchestrationPluginBase
 ```
 ```csharp
 [SdkCompatibility("5.0.0", Notes = "Phase 60: Null AI provider for graceful degradation")]
-internal sealed class NullAIProvider : IAIProvider
+internal sealed class NullAiProvider : IAiProvider
 {
 }
-    public static readonly NullAIProvider Instance = new();
+    public static readonly NullAiProvider Instance = new();
     public string ProviderId;;
     public string DisplayName;;
     public bool IsAvailable;;
-    public AICapabilities Capabilities;;
-    public Task<AIResponse> CompleteAsync(AIRequest request, CancellationToken ct = default);;
-    public async IAsyncEnumerable<AIStreamChunk> CompleteStreamingAsync(AIRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default);
+    public AiCapabilities Capabilities;;
+    public Task<AiResponse> CompleteAsync(AiRequest request, CancellationToken ct = default);;
+    public async IAsyncEnumerable<AiStreamChunk> CompleteStreamingAsync(AiRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken ct = default);
     public Task<float[]> GetEmbeddingsAsync(string text, CancellationToken ct = default);;
     public Task<float[][]> GetEmbeddingsBatchAsync(string[] texts, CancellationToken ct = default);;
 }
@@ -124,7 +124,7 @@ internal sealed class LocalModelManager : IDisposable
 public sealed class EdgeInferenceCoordinator : SemanticSyncStrategyBase
 {
 }
-    internal EdgeInferenceCoordinator(LocalModelManager modelManager, ISemanticClassifier? cloudClassifier = null, IAIProvider? aiProvider = null);
+    internal EdgeInferenceCoordinator(LocalModelManager modelManager, ISemanticClassifier? cloudClassifier = null, IAiProvider? aiProvider = null);
     public override string StrategyId;;
     public override string Name;;
     public override string Description;;
@@ -198,7 +198,7 @@ internal sealed class ConflictClassificationEngine
 internal sealed class EmbeddingSimilarityDetector
 {
 }
-    public EmbeddingSimilarityDetector(IAIProvider? aiProvider = null);
+    public EmbeddingSimilarityDetector(IAiProvider? aiProvider = null);
     public double? LastSimilarityScore { get => _lastSimilarityScore is double d ? d : null; private set => _lastSimilarityScore = value.HasValue ? (object)value.Value : null; }
     public async Task<SemanticConflict?> DetectAsync(string dataId, ReadOnlyMemory<byte> localData, ReadOnlyMemory<byte> remoteData, CancellationToken ct = default);
 }
@@ -229,7 +229,7 @@ public sealed class SemanticMergeResolver : SemanticSyncStrategyBase, ISemanticC
 public sealed class EmbeddingClassifier : SemanticSyncStrategyBase, ISemanticClassifier
 {
 }
-    public EmbeddingClassifier(IAIProvider aiProvider);
+    public EmbeddingClassifier(IAiProvider aiProvider);
     public override string StrategyId;;
     public override string Name;;
     public override string Description;;
@@ -305,7 +305,7 @@ public sealed class BandwidthAwareSummaryRouter : SemanticSyncStrategyBase, ISum
 internal sealed class SummaryGenerator
 {
 }
-    public SummaryGenerator(IAIProvider? aiProvider = null);
+    public SummaryGenerator(IAiProvider? aiProvider = null);
     public async Task<DataSummary> GenerateAsync(string dataId, ReadOnlyMemory<byte> rawData, SyncFidelity targetFidelity, CancellationToken ct = default);
     public async Task<ReadOnlyMemory<byte>> ReconstructAsync(DataSummary summary, CancellationToken ct = default);
 }

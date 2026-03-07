@@ -367,6 +367,9 @@ internal sealed class FtpTransitStrategy : DataTransitStrategyBase
 private sealed class FtpHashingStream : Stream
 {
 }
+    internal IProgress<TransitProgress>? Progress;;
+    internal string TransferId;;
+    internal long TotalBytes;;
     public FtpHashingStream(Stream inner, IncrementalHash hash, IProgress<TransitProgress>? progress, string transferId, long totalBytes, Action<long> updateBytesRead);
     public override bool CanRead;;
     public override bool CanSeek;;

@@ -587,6 +587,7 @@ private sealed class SqlServerTransaction : IDatabaseTransaction
 public sealed class MySqlStorageStrategy : DatabaseStorageStrategyBase
 {
 }
+    internal string DatabaseName { get; private set; };
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -735,7 +736,7 @@ public static class GraphVisualizationExport
 }
     public static string ExportToD3Json(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, D3ExportOptions? options = null);
     public static string ExportToCytoscapeJson(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, CytoscapeExportOptions? options = null);
-    public static string ExportToGraphML(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, GraphMLExportOptions? options = null);
+    public static string ExportToGraphMl(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, GraphMlExportOptions? options = null);
     public static string ExportToDot(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, DotExportOptions? options = null);
     public static string ExportToGexf(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, GexfExportOptions? options = null);
     public static string ExportToJgf(IEnumerable<GraphVisualizationNode> nodes, IEnumerable<GraphVisualizationEdge> edges, JgfExportOptions? options = null);
@@ -791,7 +792,7 @@ public sealed class CytoscapeExportOptions
 }
 ```
 ```csharp
-public sealed class GraphMLExportOptions
+public sealed class GraphMlExportOptions
 {
 }
     public string GraphId { get; set; };
@@ -1421,6 +1422,7 @@ public sealed class GraphAnalyticsRegistry
 public sealed class JanusGraphStorageStrategy : DatabaseStorageStrategyBase
 {
 }
+    internal GraphTraversalSource? TraversalSource { get; private set; }
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -2127,6 +2129,7 @@ public sealed class RedisStorageStrategy : DatabaseStorageStrategyBase
 private sealed class RedisTransaction : IDatabaseTransaction
 {
 }
+    internal IDatabase Database { get; }
     public string TransactionId { get; };
     public System.Data.IsolationLevel IsolationLevel;;
     public RedisTransaction(IDatabase database);
@@ -2181,6 +2184,8 @@ private sealed class MetadataDocument
 private sealed class RocksDbTransaction : IDatabaseTransaction
 {
 }
+    internal ColumnFamilyHandle DataHandle { get; }
+    internal ColumnFamilyHandle MetadataHandle { get; }
     public string TransactionId { get; };
     public System.Data.IsolationLevel IsolationLevel;;
     public RocksDbTransaction(RocksDb db, ColumnFamilyHandle dataHandle, ColumnFamilyHandle metadataHandle);
@@ -2526,6 +2531,7 @@ public DateTime ModifiedAt { get; set; }
 private sealed class CosmosTransaction : IDatabaseTransaction
 {
 }
+    internal Container TransactionContainer { get; }
     public string TransactionId { get; };
     public System.Data.IsolationLevel IsolationLevel;;
     public CosmosTransaction(Container container);
@@ -2858,6 +2864,7 @@ private sealed class DuckDbTransaction : IDatabaseTransaction
 public sealed class DerbyStorageStrategy : DatabaseStorageStrategyBase
 {
 }
+    internal string DatabasePath { get; private set; };
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -2946,6 +2953,7 @@ private sealed class LiteDbTransaction : IDatabaseTransaction
 public sealed class H2StorageStrategy : DatabaseStorageStrategyBase
 {
 }
+    internal string DatabasePath { get; private set; };
     public override string StrategyId;;
     public override bool IsProductionReady;;
     public override string Name;;
@@ -2974,6 +2982,7 @@ public sealed class H2StorageStrategy : DatabaseStorageStrategyBase
 public sealed class HsqlDbStorageStrategy : DatabaseStorageStrategyBase
 {
 }
+    internal string DatabasePath { get; private set; };
     public override string StrategyId;;
     public override string Name;;
     public override StorageTier Tier;;
@@ -3062,7 +3071,7 @@ private sealed class HBaseRowResponse
 private sealed class HBaseRow
 {
 }
-    public string key { get; set; };
+    public string Key { get; set; };
     public HBaseCell[]? Cell { get; set; }
 }
 ```
@@ -3070,9 +3079,9 @@ private sealed class HBaseRow
 private sealed class HBaseCell
 {
 }
-    public string column { get; set; };
-    public long timestamp { get; set; }
-    public string value { get; set; };
+    public string Column { get; set; };
+    public long Timestamp { get; set; }
+    public string Value { get; set; };
 }
 ```
 

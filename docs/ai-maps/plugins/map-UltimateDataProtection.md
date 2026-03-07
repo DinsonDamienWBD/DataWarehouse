@@ -1074,7 +1074,7 @@ public sealed record IntelligenceConfig
     public bool EnableAnomalyDetection { get; init; };
     public bool EnablePredictions { get; init; };
     public bool EnableRecommendations { get; init; };
-    public string AIProviderTopic { get; init; };
+    public string AiProviderTopic { get; init; };
     public double AnomalyThreshold { get; init; };
     public double BackupSizeDeviationThreshold { get; init; };
     public double BackupDurationDeviationThreshold { get; init; };
@@ -1087,7 +1087,7 @@ public sealed record IntelligenceConfig
     public double FailurePredictionThreshold { get; init; };
     public bool EnableIntelligentScheduling { get; init; };
     public TimeSpan ModelUpdateInterval { get; init; };
-    public TimeSpan AIRequestTimeout { get; init; };
+    public TimeSpan AiRequestTimeout { get; init; };
     public bool EnableTelemetry { get; init; };
     public IEnumerable<string> Validate();
 }
@@ -1102,8 +1102,8 @@ public sealed record EncryptionSettings
     public string? MasterKeyRef { get; init; }
     public bool EnableKeyRotation { get; init; };
     public TimeSpan KeyRotationInterval { get; init; };
-    public bool UseHSM { get; init; };
-    public string? HSMProvider { get; init; }
+    public bool UseHsm { get; init; };
+    public string? HsmProvider { get; init; }
 }
 ```
 
@@ -1399,7 +1399,7 @@ public sealed class EtcdBackupStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class PVCBackupStrategy : DataProtectionStrategyBase
+public sealed class PvcBackupStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1433,7 +1433,7 @@ public sealed class HelmBackupStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class CRDBackupStrategy : DataProtectionStrategyBase
+public sealed class CrdBackupStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1452,7 +1452,7 @@ public sealed class CRDBackupStrategy : DataProtectionStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataProtection/Strategies/DR/DisasterRecoveryStrategies.cs
 ```csharp
-public sealed class ActivePassiveDRStrategy : DataProtectionStrategyBase
+public sealed class ActivePassiveDrStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1468,7 +1468,7 @@ public sealed class ActivePassiveDRStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class ActiveActiveDRStrategy : DataProtectionStrategyBase
+public sealed class ActiveActiveDrStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1484,7 +1484,7 @@ public sealed class ActiveActiveDRStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class PilotLightDRStrategy : DataProtectionStrategyBase
+public sealed class PilotLightDrStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1500,7 +1500,7 @@ public sealed class PilotLightDRStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class WarmStandbyDRStrategy : DataProtectionStrategyBase
+public sealed class WarmStandbyDrStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1516,7 +1516,7 @@ public sealed class WarmStandbyDRStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class CrossRegionDRStrategy : DataProtectionStrategyBase
+public sealed class CrossRegionDrStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -2126,7 +2126,7 @@ private class EncryptedChunk
 {
 }
     public string FilePath { get; set; };
-    public byte[] IV { get; set; };
+    public byte[] Iv { get; set; };
     public byte[] CiphertextHash { get; set; };
     public long Size { get; set; }
 }
@@ -3187,7 +3187,7 @@ public class QuantumKey
 public class ChannelQuality
 {
 }
-    public double QBER { get; set; }
+    public double Qber { get; set; }
     public double KeyRate { get; set; }
     public double ChannelLoss { get; set; }
 }
@@ -5940,7 +5940,7 @@ public sealed class MySqlBackupStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class OracleRMANBackupStrategy : DataProtectionStrategyBase
+public sealed class OracleRmanBackupStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -5956,7 +5956,7 @@ public sealed class OracleRMANBackupStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class MongoDBBackupStrategy : DataProtectionStrategyBase
+public sealed class MongoDbBackupStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6024,7 +6024,7 @@ public sealed class RedirectOnWriteSnapshotStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class VSSSnapshotStrategy : DataProtectionStrategyBase
+public sealed class VssSnapshotStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6041,7 +6041,7 @@ public sealed class VSSSnapshotStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class LVMSnapshotStrategy : DataProtectionStrategyBase
+public sealed class LvmSnapshotStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6058,7 +6058,7 @@ public sealed class LVMSnapshotStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class ZFSSnapshotStrategy : DataProtectionStrategyBase
+public sealed class ZfsSnapshotStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6126,7 +6126,7 @@ public sealed class AzureBlobBackupStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class GCSBackupStrategy : DataProtectionStrategyBase
+public sealed class GcsBackupStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6274,7 +6274,7 @@ public sealed class ColdStorageArchiveStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class WORMArchiveStrategy : DataProtectionStrategyBase
+public sealed class WormArchiveStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6324,7 +6324,7 @@ public sealed class TieredArchiveStrategy : DataProtectionStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataProtection/Strategies/CDP/ContinuousProtectionStrategies.cs
 ```csharp
-public sealed class JournalCDPStrategy : DataProtectionStrategyBase
+public sealed class JournalCdpStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6340,7 +6340,7 @@ public sealed class JournalCDPStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class ReplicationCDPStrategy : DataProtectionStrategyBase
+public sealed class ReplicationCdpStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6356,7 +6356,7 @@ public sealed class ReplicationCDPStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class SnapshotCDPStrategy : DataProtectionStrategyBase
+public sealed class SnapshotCdpStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;
@@ -6372,7 +6372,7 @@ public sealed class SnapshotCDPStrategy : DataProtectionStrategyBase
 }
 ```
 ```csharp
-public sealed class HybridCDPStrategy : DataProtectionStrategyBase
+public sealed class HybridCdpStrategy : DataProtectionStrategyBase
 {
 }
     public override string StrategyId;;

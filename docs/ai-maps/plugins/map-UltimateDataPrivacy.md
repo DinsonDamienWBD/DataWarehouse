@@ -235,7 +235,7 @@ public sealed class ConfidentialComputingStrategy : DataPrivacyStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataPrivacy/Strategies/PrivacyCompliance/PrivacyComplianceStrategies.cs
 ```csharp
-public sealed class GDPRRightToErasureStrategy : DataPrivacyStrategyBase
+public sealed class GdprRightToErasureStrategy : DataPrivacyStrategyBase
 {
 }
     public override string StrategyId;;
@@ -247,7 +247,7 @@ public sealed class GDPRRightToErasureStrategy : DataPrivacyStrategyBase
 }
 ```
 ```csharp
-public sealed class GDPRRightToAccessStrategy : DataPrivacyStrategyBase
+public sealed class GdprRightToAccessStrategy : DataPrivacyStrategyBase
 {
 }
     public override string StrategyId;;
@@ -259,7 +259,7 @@ public sealed class GDPRRightToAccessStrategy : DataPrivacyStrategyBase
 }
 ```
 ```csharp
-public sealed class GDPRDataPortabilityStrategy : DataPrivacyStrategyBase
+public sealed class GdprDataPortabilityStrategy : DataPrivacyStrategyBase
 {
 }
     public override string StrategyId;;
@@ -271,7 +271,7 @@ public sealed class GDPRDataPortabilityStrategy : DataPrivacyStrategyBase
 }
 ```
 ```csharp
-public sealed class CCPAOptOutStrategy : DataPrivacyStrategyBase
+public sealed class CcpaOptOutStrategy : DataPrivacyStrategyBase
 {
 }
     public override string StrategyId;;
@@ -467,7 +467,7 @@ public sealed class FormatPreservingTokenizationStrategy : DataPrivacyStrategyBa
 }
 ```
 ```csharp
-public sealed class PCICompliantTokenizationStrategy : DataPrivacyStrategyBase
+public sealed class PciCompliantTokenizationStrategy : DataPrivacyStrategyBase
 {
 }
     public override string StrategyId;;
@@ -945,7 +945,7 @@ public sealed class GlobalDifferentialPrivacyStrategy : DataPrivacyStrategyBase
 }
 ```
 ```csharp
-public sealed class ApproximateDPStrategy : DataPrivacyStrategyBase
+public sealed class ApproximateDpStrategy : DataPrivacyStrategyBase
 {
 }
     public override string StrategyId;;

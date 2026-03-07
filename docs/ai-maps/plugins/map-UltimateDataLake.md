@@ -63,6 +63,18 @@ public sealed class UltimateDataLakePlugin : DataManagementPluginBase, IDisposab
 }
 ```
 
+### File: Plugins/DataWarehouse.Plugins.UltimateDataLake/Delegation/MessageBusDelegationHelper.cs
+```csharp
+internal sealed class MessageBusDelegationHelper : IDisposable
+{
+}
+    public MessageBusDelegationHelper(string pluginName, Func<IMessageBus?> messageBusAccessor, string targetTopic, CircuitBreakerOptions? options = null, TimeSpan? delegationTimeout = null);
+    public async Task<MessageResponse> DelegateAsync(string topic, PluginMessage message, CancellationToken ct = default);
+    public CircuitBreakerStatistics GetStatistics();;
+    public void Dispose();
+}
+```
+
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataLake/Strategies/Zones/DataLakeZoneStrategies.cs
 ```csharp
 public sealed class MedallionArchitectureStrategy : DataLakeStrategyBase

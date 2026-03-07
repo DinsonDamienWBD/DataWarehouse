@@ -62,7 +62,7 @@ public sealed class UltimateDataManagementPlugin : DataManagementPluginBase, IDi
     public override async Task OnMessageAsync(PluginMessage message);
     protected override async Task OnStartWithIntelligenceAsync(CancellationToken ct);
     protected override async Task OnStartCoreAsync(CancellationToken ct);
-    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct);
+    protected override async Task OnBeforeStatePersistAsync(CancellationToken ct = default);
     protected override void Dispose(bool disposing);
 }
 ```
@@ -300,7 +300,7 @@ public sealed class VectorStoreDestination : WriteDestinationPluginBase
 public sealed class CacheDestination : WriteDestinationPluginBase
 {
 }
-    public CacheDestination(ICachingStrategy cacheStrategy, TimeSpan? defaultTTL = null);
+    public CacheDestination(ICachingStrategy cacheStrategy, TimeSpan? defaultTtl = null);
     public override string Id;;
     public override string Name;;
     public override string Version;;
@@ -536,6 +536,18 @@ public sealed class Builder
     public Builder Lock();
     public Builder AllowOverride();
     public CustomFanOutStrategy Build();
+}
+```
+
+### File: Plugins/DataWarehouse.Plugins.UltimateDataManagement/Delegation/MessageBusDelegationHelper.cs
+```csharp
+internal sealed class MessageBusDelegationHelper : IDisposable
+{
+}
+    public MessageBusDelegationHelper(string pluginName, Func<IMessageBus?> messageBusAccessor, string targetTopic, CircuitBreakerOptions? options = null, TimeSpan? delegationTimeout = null);
+    public async Task<MessageResponse> DelegateAsync(string topic, PluginMessage message, CancellationToken ct = default);
+    public CircuitBreakerStatistics GetStatistics();;
+    public void Dispose();
 }
 ```
 
@@ -860,6 +872,7 @@ public sealed class FileLevelDeduplicationStrategy : DeduplicationStrategyBase
 public sealed class PostProcessDeduplicationStrategy : DeduplicationStrategyBase
 {
 }
+    internal TimeSpan BatchInterval;;
     public PostProcessDeduplicationStrategy() : this(100, TimeSpan.FromSeconds(30));
     public PostProcessDeduplicationStrategy(int batchSize, TimeSpan batchInterval);
     public override string StrategyId;;
@@ -1165,7 +1178,7 @@ public sealed class WriteBehindConfig
 {
 }
     public long CacheMaxSize { get; init; };
-    public TimeSpan DefaultTTL { get; init; };
+    public TimeSpan DefaultTtl { get; init; };
     public int MaxQueueSize { get; init; };
     public int FlushBatchSize { get; init; };
     public TimeSpan FlushInterval { get; init; };
@@ -1367,7 +1380,7 @@ private sealed class CacheEntry
 public sealed class ReadThroughCacheConfig
 {
 }
-    public TimeSpan DefaultTTL { get; init; };
+    public TimeSpan DefaultTtl { get; init; };
     public long MaxCacheSize { get; init; };
     public bool EnableWriteThrough { get; init; }
     public bool RefreshOnAccess { get; init; };
@@ -1440,6 +1453,7 @@ internal sealed class AccessPatternRecord
 public sealed class PredictiveCacheStrategy : CachingStrategyBase
 {
 }
+    internal IntelligenceCapabilities IntelligenceCapabilitiesField;;
     public PredictiveCacheStrategy() : this(256 * 1024 * 1024, 10000, 0.3);
     public PredictiveCacheStrategy(long maxSizeBytes, int maxHistorySize, double prefetchThreshold);
     public override string StrategyId;;
@@ -1487,8 +1501,8 @@ public sealed class HybridCacheConfig
     public long L2MaxSize { get; init; };
     public int L1ThresholdSize { get; init; };
     public int PromotionThreshold { get; init; };
-    public TimeSpan L1DefaultTTL { get; init; };
-    public TimeSpan L2DefaultTTL { get; init; };
+    public TimeSpan L1DefaultTtl { get; init; };
+    public TimeSpan L2DefaultTtl { get; init; };
 }
 ```
 ```csharp
@@ -1552,7 +1566,7 @@ public sealed class GeoDistributedCacheConfig
 }
     public required string LocalRegionId { get; init; }
     public long MaxLocalCacheSize { get; init; };
-    public TimeSpan DefaultTTL { get; init; };
+    public TimeSpan DefaultTtl { get; init; };
     public bool ReplicateWrites { get; init; };
     public bool PreferLocal { get; init; };
     public TimeSpan HealthCheckInterval { get; init; };
@@ -1629,7 +1643,7 @@ public sealed class WriteThruCacheStrategy : CachingStrategyBase
 {
 }
     public WriteThruCacheStrategy() : this(new InMemoryBackingStore());
-    public WriteThruCacheStrategy(ICacheBackingStore backingStore, long cacheMaxSize = 128 * 1024 * 1024, TimeSpan? defaultTTL = null);
+    public WriteThruCacheStrategy(ICacheBackingStore backingStore, long cacheMaxSize = 128 * 1024 * 1024, TimeSpan? defaultTtl = null);
     public override string StrategyId;;
     public override string DisplayName;;
     public override DataManagementCapabilities Capabilities { get; };
@@ -2550,6 +2564,7 @@ public sealed class TimePartition
 public sealed class TimeShardingStrategy : ShardingStrategyBase
 {
 }
+    internal string TimestampKeyPattern;;
     public TimeShardingStrategy() : this(TimePartitionGranularity.Day);
     public TimeShardingStrategy(TimePartitionGranularity granularity, int rollingPartitionCount = 30, int archiveAfterDays = 90, int cacheMaxSize = 100000);
     public override string StrategyId;;
@@ -4849,7 +4864,7 @@ public sealed class UnifiedAccessStrategy : DataManagementStrategyBase
 }
 ```
 ```csharp
-public sealed class AIEnhancedFabricStrategy : DataManagementStrategyBase
+public sealed class AiEnhancedFabricStrategy : DataManagementStrategyBase
 {
 }
     public override string StrategyId;;
@@ -5288,6 +5303,7 @@ public sealed class PolicyAuditEntry
 public sealed class SmartRetentionStrategy : RetentionStrategyBase
 {
 }
+    internal TimeSpan PredictionCacheTtl;;
     public SmartRetentionStrategy() : this(0.7, 0.3, null);
     public SmartRetentionStrategy(double retainThreshold, double deleteThreshold, Func<ObjectFeatures, CancellationToken, Task<double>>? mlPredictor);
     public override string StrategyId;;
@@ -6200,12 +6216,12 @@ public sealed class CarbonIntensity
 public sealed class CarbonFootprint
 {
 }
-    public double GramsCO2e { get; init; }
+    public double GramsCo2E { get; init; }
     public double EnergyKwh { get; init; }
     public string? Region { get; init; }
     public double CarbonIntensityUsed { get; init; }
     public double RenewableOffsetGrams { get; init; }
-    public double NetGramsCO2e;;
+    public double NetGramsCo2E;;
 }
 ```
 ```csharp
@@ -6311,6 +6327,7 @@ public sealed class OrganizableContent
 public sealed class SelfOrganizingDataStrategy : AiEnhancedStrategyBase
 {
 }
+    internal TimeSpan CacheTtl;;
     public SelfOrganizingDataStrategy() : this(GetDefaultCategories(), TimeSpan.FromHours(24));
     public SelfOrganizingDataStrategy(string[] categories, TimeSpan cacheTtl);
     public override string StrategyId;;
@@ -6336,12 +6353,12 @@ public sealed class StoragePricing
 }
     public required string TierId { get; init; }
     public required string Name { get; init; }
-    public required decimal StorageCostPerGBMonth { get; init; }
+    public required decimal StorageCostPerGbMonth { get; init; }
     public decimal ReadCostPer10K { get; init; }
     public decimal WriteCostPer10K { get; init; }
-    public decimal RetrievalCostPerGB { get; init; }
+    public decimal RetrievalCostPerGb { get; init; }
     public int MinStorageDays { get; init; }
-    public decimal EarlyDeletionCostPerGB { get; init; }
+    public decimal EarlyDeletionCostPerGb { get; init; }
     public double TypicalLatencyMs { get; init; }
 }
 ```
@@ -6549,7 +6566,7 @@ public abstract class AiEnhancedStrategyBase : DataManagementStrategyBase, IAiEn
     protected async Task<float[][]?> RequestEmbeddingsAsync(string[] texts, IntelligenceContext? context = null, CancellationToken ct = default);
     protected async Task<(string Category, double Confidence)[]?> RequestClassificationAsync(string text, string[] categories, bool multiLabel = false, IntelligenceContext? context = null, CancellationToken ct = default);
     protected async Task<(object? Prediction, double Confidence, Dictionary<string, object> Metadata)?> RequestPredictionAsync(string predictionType, Dictionary<string, object> inputData, IntelligenceContext? context = null, CancellationToken ct = default);
-    protected async Task<(bool ContainsPII, (string Type, string Value, double Confidence)[] Items)?> RequestPIIDetectionAsync(string text, IntelligenceContext? context = null, CancellationToken ct = default);
+    protected async Task<(bool ContainsPii, (string Type, string Value, double Confidence)[] Items)?> RequestPiiDetectionAsync(string text, IntelligenceContext? context = null, CancellationToken ct = default);
     protected async Task<(string Text, string Type, double Confidence)[]?> RequestEntityExtractionAsync(string text, string[]? entityTypes = null, IntelligenceContext? context = null, CancellationToken ct = default);
     protected async Task<string?> RequestCompletionAsync(string prompt, string? systemMessage = null, IntelligenceContext? context = null, CancellationToken ct = default);
     protected async Task<double?> RequestSimilarityScoreAsync(float[] embedding1, float[] embedding2, CancellationToken ct = default);
@@ -6565,8 +6582,8 @@ public sealed class ComplianceAnalysis
     public required string ObjectId { get; init; }
     public SensitivityLevel SensitivityLevel { get; init; }
     public IReadOnlyList<ComplianceFramework> ApplicableFrameworks { get; init; };
-    public bool ContainsPII { get; init; }
-    public IReadOnlyList<string> PIITypes { get; init; };
+    public bool ContainsPii { get; init; }
+    public IReadOnlyList<string> PiiTypes { get; init; };
     public TimeSpan? RequiredRetention { get; init; }
     public string? DisposalMethod { get; init; }
     public IReadOnlyList<string> RequiredControls { get; init; };
@@ -6659,6 +6676,7 @@ public sealed class AccessPattern
 public sealed class AiDataOrchestratorStrategy : AiEnhancedStrategyBase
 {
 }
+    internal DateTime LastBatchAnalysis;;
     public AiDataOrchestratorStrategy() : this(TimeSpan.FromDays(7));
     public AiDataOrchestratorStrategy(TimeSpan observationWindow);
     public override string StrategyId;;

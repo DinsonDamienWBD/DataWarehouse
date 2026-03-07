@@ -92,6 +92,7 @@ private new sealed class DefaultSecurityContext : ISecurityContext
 public sealed class MigrationWorker : IDisposable
 {
 }
+    internal Task? ProcessingTask;;
     public string? LastFailureMessage;;
     public MigrationWorker(MigrationPlan plan, DoubleEncryptionService doubleEncryptionService, IMessageBus messageBus, MigrationOptions options);
     public Task StartAsync(CancellationToken ct = default);
@@ -204,7 +205,7 @@ public sealed class TransitPolicyProvider : ITransitPolicyProvider
 }
 ```
 ```csharp
-public sealed record EndpointCapabilities(string EndpointType, string OperatingSystem, bool HasAesNi, bool HasAvx2, List<string> SupportedCiphers, string PreferredCipher, int MaxThroughputMBps, bool IsBatteryPowered, int? MemoryConstrainedMB)
+public sealed record EndpointCapabilities(string EndpointType, string OperatingSystem, bool HasAesNi, bool HasAvx2, List<string> SupportedCiphers, string PreferredCipher, int MaxThroughputMBps, bool IsBatteryPowered, int? MemoryConstrainedMb)
 {
 }
     public bool CanUseEfficiently(string cipherName);
@@ -1125,6 +1126,7 @@ public sealed class ElGamalStrategy : EncryptionStrategyBase
 public sealed class GoldwasserMicaliStrategy : EncryptionStrategyBase
 {
 }
+    internal BigInteger? QFactor;;
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
@@ -1275,6 +1277,7 @@ public sealed class EssivStrategy : EncryptionStrategyBase
 public sealed class RsaOaepStrategy : EncryptionStrategyBase
 {
 }
+    internal SecureRandom SecureRandomInstance;;
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;
@@ -1290,6 +1293,7 @@ public sealed class RsaOaepStrategy : EncryptionStrategyBase
 public sealed class RsaPkcs1Strategy : EncryptionStrategyBase
 {
 }
+    internal SecureRandom SecureRandomInstance;;
     public override CipherInfo CipherInfo;;
     public override string StrategyId;;
     public override string StrategyName;;

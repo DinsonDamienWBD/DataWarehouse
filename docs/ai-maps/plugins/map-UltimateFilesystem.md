@@ -531,12 +531,12 @@ internal static class SuperblockReader
 }
     public static byte[]? ReadBytes(string path, long offset, int length);
     public static string? ResolveDevicePath(string path);
-    public static ushort ReadUInt16LE(byte[] data, int offset);;
-    public static uint ReadUInt32LE(byte[] data, int offset);;
-    public static ulong ReadUInt64LE(byte[] data, int offset);;
-    public static uint ReadUInt32BE(byte[] data, int offset);;
-    public static ulong ReadUInt64BE(byte[] data, int offset);;
-    public static ushort ReadUInt16BE(byte[] data, int offset);;
+    public static ushort ReadUInt16Le(byte[] data, int offset);;
+    public static uint ReadUInt32Le(byte[] data, int offset);;
+    public static ulong ReadUInt64Le(byte[] data, int offset);;
+    public static uint ReadUInt32Be(byte[] data, int offset);;
+    public static ulong ReadUInt64Be(byte[] data, int offset);;
+    public static ushort ReadUInt16Be(byte[] data, int offset);;
     public static string ReadString(byte[] data, int offset, int maxLength);
     public static Guid ReadUuid(byte[] data, int offset);
     public static DateTime? FromUnixTime(uint timestamp);
@@ -1024,6 +1024,7 @@ public sealed record EncryptionMetrics
 public sealed class DistributedHaFilesystemManager
 {
 }
+    internal string? VotedForInCurrentTerm { get; private set; }
     public void RegisterNode(string nodeId, long capacityBytes, string region);
     public LeaderElectionResult ElectLeader(string candidateId, long candidateTerm = 0, long candidateLastLogIndex = 0, long candidateLastLogTerm = 0);
     public void UpdateNodeLogState(string nodeId, long lastLogIndex, long lastLogTerm);
@@ -1284,7 +1285,7 @@ public sealed class ExFatOperations : FilesystemOperationsBase
 }
 ```
 ```csharp
-public sealed class F2fsOperations : FilesystemOperationsBase
+public sealed class F2FsOperations : FilesystemOperationsBase
 {
 }
     protected override string FilesystemType;;
@@ -1578,6 +1579,7 @@ public sealed class DeviceJournal : IAsyncDisposable
 public sealed class HotSwapManager : IAsyncDisposable
 {
 }
+    internal DeviceJournal Journal { get; }
     public Action<PhysicalDeviceInfo>? OnNewDeviceAvailable { get; set; }
     public Action<Guid, string>? OnRebuildRequired { get; set; }
     public Action<string, DeviceStatus>? OnDeviceDegraded { get; set; }

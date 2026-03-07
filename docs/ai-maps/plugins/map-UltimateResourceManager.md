@@ -98,7 +98,7 @@ public sealed record ResourceStrategyCapabilities
 }
     public required bool SupportsCpu { get; init; }
     public required bool SupportsMemory { get; init; }
-    public required bool SupportsIO { get; init; }
+    public required bool SupportsIo { get; init; }
     public required bool SupportsGpu { get; init; }
     public required bool SupportsNetwork { get; init; }
     public required bool SupportsQuotas { get; init; }

@@ -427,6 +427,7 @@ public sealed class MoonshotOrchestrator : IMoonshotOrchestrator
 }
     public const string TopicStageCompleted = "moonshot.pipeline.stage.completed";
     public const string TopicPipelineCompleted = "moonshot.pipeline.completed";
+    internal IMoonshotRegistry Registry;;
     public MoonshotOrchestrator(IMoonshotRegistry registry, MoonshotConfiguration configuration, ILogger<MoonshotOrchestrator> logger);
     public void RegisterStage(IMoonshotPipelineStage stage);
     public IReadOnlyList<MoonshotId> GetRegisteredStages();
@@ -708,7 +709,7 @@ public sealed class ClassificationReportingStrategy : DataGovernanceStrategyBase
 }
 ```
 ```csharp
-public sealed class PIIDetectionStrategy : DataGovernanceStrategyBase
+public sealed class PiiDetectionStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -720,7 +721,7 @@ public sealed class PIIDetectionStrategy : DataGovernanceStrategyBase
 }
 ```
 ```csharp
-public sealed class PHIDetectionStrategy : DataGovernanceStrategyBase
+public sealed class PhiDetectionStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -732,7 +733,7 @@ public sealed class PHIDetectionStrategy : DataGovernanceStrategyBase
 }
 ```
 ```csharp
-public sealed class PCIDetectionStrategy : DataGovernanceStrategyBase
+public sealed class PciDetectionStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1003,7 +1004,7 @@ internal static class LiabilityScanConstants
 }
 ```
 ```csharp
-public sealed class PIILiabilityStrategy : ConsciousnessStrategyBase
+public sealed class PiiLiabilityStrategy : ConsciousnessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1016,7 +1017,7 @@ public sealed class PIILiabilityStrategy : ConsciousnessStrategyBase
 }
 ```
 ```csharp
-public sealed class PHILiabilityStrategy : ConsciousnessStrategyBase
+public sealed class PhiLiabilityStrategy : ConsciousnessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1029,7 +1030,7 @@ public sealed class PHILiabilityStrategy : ConsciousnessStrategyBase
 }
 ```
 ```csharp
-public sealed class PCILiabilityStrategy : ConsciousnessStrategyBase
+public sealed class PciLiabilityStrategy : ConsciousnessStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1981,7 +1982,7 @@ public sealed class RetentionExceptionStrategy : DataGovernanceStrategyBase
 
 ### File: Plugins/DataWarehouse.Plugins.UltimateDataGovernance/Strategies/RegulatoryCompliance/RegulatoryComplianceStrategies.cs
 ```csharp
-public sealed class GDPRComplianceStrategy : DataGovernanceStrategyBase
+public sealed class GdprComplianceStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -1993,7 +1994,7 @@ public sealed class GDPRComplianceStrategy : DataGovernanceStrategyBase
 }
 ```
 ```csharp
-public sealed class CCPAComplianceStrategy : DataGovernanceStrategyBase
+public sealed class CcpaComplianceStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -2005,7 +2006,7 @@ public sealed class CCPAComplianceStrategy : DataGovernanceStrategyBase
 }
 ```
 ```csharp
-public sealed class HIPAAComplianceStrategy : DataGovernanceStrategyBase
+public sealed class HipaaComplianceStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -2017,7 +2018,7 @@ public sealed class HIPAAComplianceStrategy : DataGovernanceStrategyBase
 }
 ```
 ```csharp
-public sealed class SOXComplianceStrategy : DataGovernanceStrategyBase
+public sealed class SoxComplianceStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;
@@ -2029,7 +2030,7 @@ public sealed class SOXComplianceStrategy : DataGovernanceStrategyBase
 }
 ```
 ```csharp
-public sealed class PCIDSSComplianceStrategy : DataGovernanceStrategyBase
+public sealed class PcidssComplianceStrategy : DataGovernanceStrategyBase
 {
 }
     public override string StrategyId;;

@@ -2868,6 +2868,7 @@ public sealed class HierarchyVerificationStrategy : AccessControlStrategyBase
 public sealed class ZeroTrustStrategy : AccessControlStrategyBase
 {
 }
+    internal TimeSpan LockoutDuration;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override AccessControlCapabilities Capabilities { get; };
@@ -4209,9 +4210,12 @@ private sealed class ClearanceValidationResult
 private sealed class ValidationApiResponse
 {
 }
-    public bool is_valid { get; set; }
-    public string? clearance_level { get; set; }
-    public string? reason { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("is_valid")]
+public bool IsValid { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("clearance_level")]
+public string? ClearanceLevel { get; set; }
+    [System.Text.Json.Serialization.JsonPropertyName("reason")]
+public string? Reason { get; set; }
 }
 ```
 
@@ -5442,6 +5446,7 @@ public record QualityImpactAnalysis
 public sealed class VideoFrameEmbeddingStrategy : AccessControlStrategyBase
 {
 }
+    internal bool UseSceneChangeDetection;;
     public override string StrategyId;;
     public override string StrategyName;;
     public override AccessControlCapabilities Capabilities { get; };
@@ -6486,7 +6491,7 @@ public sealed class ServiceMeshStrategy : AccessControlStrategyBase
     public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public ServiceRegistration RegisterService(string serviceName, string namespace_, ServiceMeshType meshType);
+    public ServiceRegistration RegisterService(string serviceName, string @namespace, ServiceMeshType meshType);
     public ServicePolicy AddPolicy(string policyName, string sourceService, string sourceNamespace, string targetService, string targetNamespace, string[] allowedMethods);
     protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
@@ -7071,9 +7076,9 @@ public sealed class ZanzibarStrategy : AccessControlStrategyBase
     public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public void WriteTuple(string user, string relation, string object_);
-    public void DeleteTuple(string user, string relation, string object_);
-    public List<string> Expand(string relation, string object_);
+    public void WriteTuple(string user, string relation, string @object);
+    public void DeleteTuple(string user, string relation, string @object);
+    public List<string> Expand(string relation, string @object);
     public List<RelationshipTuple> Read(string user);
     protected override async Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
@@ -7250,7 +7255,7 @@ public sealed class CasbinStrategy : AccessControlStrategyBase
     public override Task InitializeAsync(Dictionary<string, object> configuration, CancellationToken cancellationToken = default);
     protected override Task InitializeAsyncCore(CancellationToken cancellationToken);
     protected override Task ShutdownAsyncCore(CancellationToken cancellationToken);
-    public void AddPolicy(string subject, string object_, string action);
+    public void AddPolicy(string subject, string @object, string action);
     public void AddRoleForUser(string userId, string role);
     protected override Task<AccessDecision> EvaluateAccessCoreAsync(AccessContext context, CancellationToken cancellationToken);
 }
