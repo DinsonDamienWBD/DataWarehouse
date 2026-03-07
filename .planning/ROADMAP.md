@@ -3144,7 +3144,7 @@ Plans:
 | 100 | 10/10 | Complete    | 2026-03-06 | Not started | - |
 | 101 | 1 | Hardening: Medium+Small+Companions (3,557 findings) | 0/TBD | Not started | - |
 | 102 | 2/2 | Complete   | 2026-03-07 | Not started | - |
-| 103 | 1 | Profile: dotTrace + dotMemory | 0/TBD | Not started | - |
+| 103 | 1/2 | In Progress|  | Not started | - |
 | 104 | 1 | Mutation Testing: Stryker 95%+ | 0/TBD | Not started | - |
 | 105 | 2 | Integration Profiling: 100GB payload | 0/TBD | Not started | - |
 | 106 | 2 | Soak Test: continuous load + GC | 0/TBD | Not started | - |

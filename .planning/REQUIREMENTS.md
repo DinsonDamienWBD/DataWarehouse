@@ -829,7 +829,7 @@ Single source of truth: `Metadata/production-audit-2026-03-05/CONSOLIDATED-FINDI
 ### Profiling (PROF) — Phase 103
 
 - [ ] **PROF-01**: dotTrace shows no new hot-path lock contention introduced by hardening fixes
-- [ ] **PROF-02**: dotMemory shows no new large object heap allocations on formerly zero-allocation paths; no GC pressure regression
+- [x] **PROF-02**: dotMemory shows no new large object heap allocations on formerly zero-allocation paths; no GC pressure regression
 
 ### Mutation Testing (MUTN) — Phase 104
 
