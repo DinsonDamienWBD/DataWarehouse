@@ -856,7 +856,7 @@ Single source of truth: `Metadata/production-audit-2026-03-05/CONSOLIDATED-FINDI
 
 ### CI/CD Fortress (CICD) — Phase 111
 
-- [ ] **CICD-01**: `.github/workflows/audit.yml` updated with all hardened gates
+- [x] **CICD-01**: `.github/workflows/audit.yml` updated with all hardened gates
 - [ ] **CICD-02**: Coyote: 1,000 iterations per PR; any non-deterministic failure blocks merge
 - [ ] **CICD-03**: BenchmarkDotNet: Gen2 heap allocation on zero-allocation path blocks merge
 - [ ] **CICD-04**: Stryker: mutation score drop below v7.0 baseline blocks merge
