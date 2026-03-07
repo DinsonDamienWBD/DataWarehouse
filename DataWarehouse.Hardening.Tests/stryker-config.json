@@ -1,0 +1,22 @@
+{
+  "stryker-config": {
+    "project": "DataWarehouse.SDK.csproj",
+    "reporters": ["html", "json", "markdown"],
+    "verbosity": "info",
+    "concurrency": 4,
+    "thresholds": {
+      "high": 95,
+      "low": 80,
+      "break": 0
+    },
+    "mutate": [
+      "!**/obj/**",
+      "!**/bin/**"
+    ],
+    "ignore-mutations": [],
+    "additional-timeout": 30000,
+    "coverage-analysis": "perTest",
+    "break-on-initial-test-failure": false,
+    "disable-bail": false
+  }
+}
