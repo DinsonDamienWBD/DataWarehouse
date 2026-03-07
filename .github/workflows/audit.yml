@@ -102,7 +102,7 @@ jobs:
         path: |
           **/bin/Release/
           !**/obj/
-        retention-days: 1
+        retention-days: 30
 
   # ──────────────────────────────────────────────────────────────
   # Stage 2a: Coyote Concurrency Testing (1000 iterations)
