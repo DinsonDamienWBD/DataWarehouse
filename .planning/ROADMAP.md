@@ -3146,7 +3146,7 @@ Plans:
 | 103 | 2/2 | Complete   | 2026-03-07 | Not started | - |
 | 104 | 1 | Mutation Testing: Stryker 95%+ | 0/TBD | Not started | - |
 | 105 | 2 | Integration Profiling: 100GB payload | 0/TBD | Not started | - |
-| 106 | 2 | Soak Test: continuous load + GC | 0/TBD | Not started | - |
+| 106 | 1/2 | In Progress|  | Not started | - |
 | 107 | 3 | Chaos: Plugin Faults + Lifecycle | 0/2 | Planned | - |
 | 108 | 3 | Chaos: Torn-Write + Exhaustion | 0/2 | Planned | - |
 | 109 | 3 | Chaos: Message Bus + Federation | 0/2 | Planned | - |
