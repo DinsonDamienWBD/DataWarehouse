@@ -852,7 +852,7 @@ Single source of truth: `Metadata/production-audit-2026-03-05/CONSOLIDATED-FINDI
 - [x] **CHAOS-05**: Message bus disruption (loss, duplication, reorder) → idempotency verified, no data corruption
 - [x] **CHAOS-06**: Federation network partition mid-replication → CRDT convergence after partition heals
 - [x] **CHAOS-07**: Malicious payloads (zip bombs, malformed IVs, path traversal) → instant rejection without OOM/hang
-- [ ] **CHAOS-08**: Clock skew (±24hr TimeProvider manipulation) → no auth bypass, no stale cache, no policy errors
+- [x] **CHAOS-08**: Clock skew (±24hr TimeProvider manipulation) → no auth bypass, no stale cache, no policy errors
 
 ### CI/CD Fortress (CICD) — Phase 111
 
