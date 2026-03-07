@@ -849,7 +849,7 @@ Single source of truth: `Metadata/production-audit-2026-03-05/CONSOLIDATED-FINDI
 - [x] **CHAOS-02**: Concurrent plugin load/unload during active I/O → no torn state, no orphaned subscriptions
 - [x] **CHAOS-03**: Torn-write recovery via Coyote-controlled crash mid-VDE chain → WAL/RAID parity rebuilds correctly
 - [x] **CHAOS-04**: Resource exhaustion (ThreadPool, MemoryPool, disk-full) → graceful degradation, no hangs or corruption
-- [ ] **CHAOS-05**: Message bus disruption (loss, duplication, reorder) → idempotency verified, no data corruption
+- [x] **CHAOS-05**: Message bus disruption (loss, duplication, reorder) → idempotency verified, no data corruption
 - [ ] **CHAOS-06**: Federation network partition mid-replication → CRDT convergence after partition heals
 - [ ] **CHAOS-07**: Malicious payloads (zip bombs, malformed IVs, path traversal) → instant rejection without OOM/hang
 - [ ] **CHAOS-08**: Clock skew (±24hr TimeProvider manipulation) → no auth bypass, no stale cache, no policy errors

@@ -3148,6 +3148,6 @@ Plans:
 | 106 | 1/2 | In Progress|  | Not started | - |
 | 107 | 3 | Chaos: Plugin Faults + Lifecycle | 0/2 | Planned | - |
 | 108 | 2/2 | Complete    | 2026-03-07 | Planned | - |
-| 109 | 3 | Chaos: Message Bus + Federation | 0/2 | Planned | - |
+| 109 | 1/2 | In Progress|  | Planned | - |
 | 110 | 3 | Chaos: Malicious Payloads + Clock | 0/2 | Planned | - |
 | 111 | 4 | CI/CD Fortress | 0/3 | Planned | - |
