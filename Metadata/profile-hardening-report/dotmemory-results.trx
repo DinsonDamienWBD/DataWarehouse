@@ -1,0 +1,70 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<TestRun id="4879743f-ba1a-4c33-b956-509a9cd72603" name="ddamien@ASTOK-F5WVV44 2026-03-07 10:41:41" runUser="WMAD\ddamien" xmlns="http://microsoft.com/schemas/VisualStudio/TeamTest/2010">
+  <Times creation="2026-03-07T10:41:41.1752733+09:00" queuing="2026-03-07T10:41:41.1752740+09:00" start="2026-03-07T10:41:37.8917612+09:00" finish="2026-03-07T10:41:41.1925569+09:00" />
+  <TestSettings name="default" id="2b0a6a60-7bd4-4ff8-99b4-71b0114e42a3">
+    <Deployment runDeploymentRoot="ddamien_ASTOK-F5WVV44_2026-03-07_10_41_41" />
+  </TestSettings>
+  <Results>
+    <UnitTestResult executionId="0d17c0b7-0a3d-4877-b114-587fc22568b0" testId="59423b12-9435-b261-17b8-288013af1e6b" testName="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests.Test_NoNewLOHAllocations_OnZeroAllocPaths" computerName="ASTOK-F5WVV44" duration="00:00:00.2449643" startTime="2026-03-07T10:41:40.0858844+09:00" endTime="2026-03-07T10:41:40.3401927+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="0d17c0b7-0a3d-4877-b114-587fc22568b0" />
+    <UnitTestResult executionId="2116b0a8-6631-49df-bd67-c41620b8e106" testId="32e2fdde-3be8-d8cc-7481-f28f06e1c398" testName="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests.Test_GCPressure_AllocationRateStable" computerName="ASTOK-F5WVV44" duration="00:00:00.0586548" startTime="2026-03-07T10:41:40.7580738+09:00" endTime="2026-03-07T10:41:40.7755959+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="2116b0a8-6631-49df-bd67-c41620b8e106" />
+    <UnitTestResult executionId="3043044e-0b4f-4217-b456-dbb2448ec8e5" testId="413a6226-dc71-37ea-233e-96f9f7db351d" testName="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests.Test_GCPressure_NoRegression" computerName="ASTOK-F5WVV44" duration="00:00:00.0393058" startTime="2026-03-07T10:41:40.7757971+09:00" endTime="2026-03-07T10:41:40.8151609+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="3043044e-0b4f-4217-b456-dbb2448ec8e5" />
+    <UnitTestResult executionId="f56e051b-b423-4732-931e-b89bacc92c27" testId="c44680ba-2269-5966-3c42-e1ae5a331cd1" testName="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests.Test_WorkingSetBounded" computerName="ASTOK-F5WVV44" duration="00:00:00.2635871" startTime="2026-03-07T10:41:40.3652210+09:00" endTime="2026-03-07T10:41:40.6045877+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="f56e051b-b423-4732-931e-b89bacc92c27" />
+    <UnitTestResult executionId="18d462db-bee7-4247-a7e5-39b1b7108a2c" testId="a8b8edef-1b5e-9ebd-b436-9d810e82d61e" testName="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests.Test_HeapSegments_NoExcessiveFragmentation" computerName="ASTOK-F5WVV44" duration="00:00:00.0340158" startTime="2026-03-07T10:41:40.7170411+09:00" endTime="2026-03-07T10:41:40.7171849+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="18d462db-bee7-4247-a7e5-39b1b7108a2c" />
+    <UnitTestResult executionId="4aacf403-87db-4d7c-a369-d2583fe902bf" testId="d988d7bf-72d9-c9c6-7620-f0a0b2d5934d" testName="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests.Test_LOHDetection_CalibrationCheck" computerName="ASTOK-F5WVV44" duration="00:00:00.0779088" startTime="2026-03-07T10:41:40.7577658+09:00" endTime="2026-03-07T10:41:40.7578882+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="4aacf403-87db-4d7c-a369-d2583fe902bf" />
+    <UnitTestResult executionId="25537d4d-36d5-4108-8108-762b53babca3" testId="fe45cec4-9657-db53-9149-702283ac5995" testName="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests.Test_WorkingSet_RecoveryAfterBurst" computerName="ASTOK-F5WVV44" duration="00:00:00.1969955" startTime="2026-03-07T10:41:40.8154909+09:00" endTime="2026-03-07T10:41:41.0188555+09:00" testType="13cdc9d9-ddb5-4fa4-a97d-d965ccfc6d4b" outcome="Passed" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" relativeResultsDirectory="25537d4d-36d5-4108-8108-762b53babca3" />
+  </Results>
+  <TestDefinitions>
+    <UnitTest name="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests.Test_NoNewLOHAllocations_OnZeroAllocPaths" storage="c:\temp\datawarehouse\datawarehouse\datawarehouse.hardening.tests\bin\debug\net10.0\datawarehouse.hardening.tests.dll" id="59423b12-9435-b261-17b8-288013af1e6b">
+      <Execution id="0d17c0b7-0a3d-4877-b114-587fc22568b0" />
+      <TestMethod codeBase="C:\Temp\DataWarehouse\DataWarehouse\DataWarehouse.Hardening.Tests\bin\Debug\net10.0\DataWarehouse.Hardening.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests" name="Test_NoNewLOHAllocations_OnZeroAllocPaths" />
+    </UnitTest>
+    <UnitTest name="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests.Test_LOHDetection_CalibrationCheck" storage="c:\temp\datawarehouse\datawarehouse\datawarehouse.hardening.tests\bin\debug\net10.0\datawarehouse.hardening.tests.dll" id="d988d7bf-72d9-c9c6-7620-f0a0b2d5934d">
+      <Execution id="4aacf403-87db-4d7c-a369-d2583fe902bf" />
+      <TestMethod codeBase="C:\Temp\DataWarehouse\DataWarehouse\DataWarehouse.Hardening.Tests\bin\Debug\net10.0\DataWarehouse.Hardening.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests" name="Test_LOHDetection_CalibrationCheck" />
+    </UnitTest>
+    <UnitTest name="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests.Test_GCPressure_AllocationRateStable" storage="c:\temp\datawarehouse\datawarehouse\datawarehouse.hardening.tests\bin\debug\net10.0\datawarehouse.hardening.tests.dll" id="32e2fdde-3be8-d8cc-7481-f28f06e1c398">
+      <Execution id="2116b0a8-6631-49df-bd67-c41620b8e106" />
+      <TestMethod codeBase="C:\Temp\DataWarehouse\DataWarehouse\DataWarehouse.Hardening.Tests\bin\Debug\net10.0\DataWarehouse.Hardening.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests" name="Test_GCPressure_AllocationRateStable" />
+    </UnitTest>
+    <UnitTest name="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests.Test_GCPressure_NoRegression" storage="c:\temp\datawarehouse\datawarehouse\datawarehouse.hardening.tests\bin\debug\net10.0\datawarehouse.hardening.tests.dll" id="413a6226-dc71-37ea-233e-96f9f7db351d">
+      <Execution id="3043044e-0b4f-4217-b456-dbb2448ec8e5" />
+      <TestMethod codeBase="C:\Temp\DataWarehouse\DataWarehouse\DataWarehouse.Hardening.Tests\bin\Debug\net10.0\DataWarehouse.Hardening.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests" name="Test_GCPressure_NoRegression" />
+    </UnitTest>
+    <UnitTest name="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests.Test_HeapSegments_NoExcessiveFragmentation" storage="c:\temp\datawarehouse\datawarehouse\datawarehouse.hardening.tests\bin\debug\net10.0\datawarehouse.hardening.tests.dll" id="a8b8edef-1b5e-9ebd-b436-9d810e82d61e">
+      <Execution id="18d462db-bee7-4247-a7e5-39b1b7108a2c" />
+      <TestMethod codeBase="C:\Temp\DataWarehouse\DataWarehouse\DataWarehouse.Hardening.Tests\bin\Debug\net10.0\DataWarehouse.Hardening.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests" name="Test_HeapSegments_NoExcessiveFragmentation" />
+    </UnitTest>
+    <UnitTest name="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests.Test_WorkingSetBounded" storage="c:\temp\datawarehouse\datawarehouse\datawarehouse.hardening.tests\bin\debug\net10.0\datawarehouse.hardening.tests.dll" id="c44680ba-2269-5966-3c42-e1ae5a331cd1">
+      <Execution id="f56e051b-b423-4732-931e-b89bacc92c27" />
+      <TestMethod codeBase="C:\Temp\DataWarehouse\DataWarehouse\DataWarehouse.Hardening.Tests\bin\Debug\net10.0\DataWarehouse.Hardening.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests" name="Test_WorkingSetBounded" />
+    </UnitTest>
+    <UnitTest name="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests.Test_WorkingSet_RecoveryAfterBurst" storage="c:\temp\datawarehouse\datawarehouse\datawarehouse.hardening.tests\bin\debug\net10.0\datawarehouse.hardening.tests.dll" id="fe45cec4-9657-db53-9149-702283ac5995">
+      <Execution id="25537d4d-36d5-4108-8108-762b53babca3" />
+      <TestMethod codeBase="C:\Temp\DataWarehouse\DataWarehouse\DataWarehouse.Hardening.Tests\bin\Debug\net10.0\DataWarehouse.Hardening.Tests.dll" adapterTypeName="executor://xunit/VsTestRunner3/netcore/" className="DataWarehouse.Hardening.Tests.Profiling.DotMemoryAllocationTests" name="Test_WorkingSet_RecoveryAfterBurst" />
+    </UnitTest>
+  </TestDefinitions>
+  <TestEntries>
+    <TestEntry testId="59423b12-9435-b261-17b8-288013af1e6b" executionId="0d17c0b7-0a3d-4877-b114-587fc22568b0" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="32e2fdde-3be8-d8cc-7481-f28f06e1c398" executionId="2116b0a8-6631-49df-bd67-c41620b8e106" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="413a6226-dc71-37ea-233e-96f9f7db351d" executionId="3043044e-0b4f-4217-b456-dbb2448ec8e5" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="c44680ba-2269-5966-3c42-e1ae5a331cd1" executionId="f56e051b-b423-4732-931e-b89bacc92c27" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="a8b8edef-1b5e-9ebd-b436-9d810e82d61e" executionId="18d462db-bee7-4247-a7e5-39b1b7108a2c" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="d988d7bf-72d9-c9c6-7620-f0a0b2d5934d" executionId="4aacf403-87db-4d7c-a369-d2583fe902bf" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestEntry testId="fe45cec4-9657-db53-9149-702283ac5995" executionId="25537d4d-36d5-4108-8108-762b53babca3" testListId="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+  </TestEntries>
+  <TestLists>
+    <TestList name="Results Not in a List" id="8c84fa94-04c1-424b-9868-57a2d4851a1d" />
+    <TestList name="All Loaded Results" id="19431567-8539-422a-85d7-44ee4e166bda" />
+  </TestLists>
+  <ResultSummary outcome="Completed">
+    <Counters total="7" executed="7" passed="7" failed="0" error="0" timeout="0" aborted="0" inconclusive="0" passedButRunAborted="0" notRunnable="0" notExecuted="0" disconnected="0" warning="0" completed="0" inProgress="0" pending="0" />
+    <Output>
+      <StdOut>[xUnit.net 00:00:00.00] xUnit.net VSTest Adapter v3.1.4+50e68bbb8b (64-bit .NET 10.0.2)&#xD;
+[xUnit.net 00:00:00.37]   Discovering: DataWarehouse.Hardening.Tests&#xD;
+[xUnit.net 00:00:01.13]   Discovered:  DataWarehouse.Hardening.Tests&#xD;
+[xUnit.net 00:00:01.17]   Starting:    DataWarehouse.Hardening.Tests&#xD;
+[xUnit.net 00:00:02.16]   Finished:    DataWarehouse.Hardening.Tests&#xD;
+</StdOut>
+    </Output>
+  </ResultSummary>
+</TestRun>
