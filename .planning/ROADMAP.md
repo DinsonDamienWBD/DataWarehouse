@@ -2639,6 +2639,13 @@ Plans:
   - [ ] 113-03-PLAN.md — KqueueBlockDevice TryCreate factory method
   - [ ] 113-04-PLAN.md — Factory cascade wiring (all implementations connected)
 - [ ] **Phase 114: S3 Epoch-Flush Block Device** — 5 plans | SIO-03
+  Goal: S3 epoch-flush block device enables cloud-native VDE storage with multi-provider abstraction
+  Plans:
+  - [ ] 114-01-PLAN.md — S3EpochFlushBlockDevice core (IBlockDevice + ARC cache + local WAL)
+  - [ ] 114-02-PLAN.md — Epoch object format + manifest + serializer
+  - [ ] 114-03-PLAN.md — Multi-provider IObjectStorageClient (AWS S3, Azure Blob, GCS, InMemory)
+  - [ ] 114-04-PLAN.md — Recovery engine + S3BlockDeviceFactory
+  - [ ] 114-05-PLAN.md — Cost optimization (tiering, read-ahead) + BlockDeviceFactory wiring
 - [ ] **Phase 115: WAL Group Commit Optimization** — 3 plans | SIO-04
   Plans:
   - [ ] 115-01-PLAN.md — GroupCommitAccumulator core
