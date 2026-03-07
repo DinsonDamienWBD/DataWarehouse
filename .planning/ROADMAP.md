@@ -2622,6 +2622,12 @@ Plans:
   - VDE streaming soak test (SOAK-01)
   - Extended 10-minute soak test (SOAK-04)
   - SharpFuzz VDE corruption harness (FUZZ-01)
+  Plans:
+  - [ ] 111.5-01-PLAN.md — Runtime unit test project for Stryker
+  - [ ] 111.5-02-PLAN.md — Stryker mutation run + survivor documentation
+  - [ ] 111.5-03-PLAN.md — VDE 1GB streaming soak test
+  - [ ] 111.5-04-PLAN.md — Extended 10-minute soak test
+  - [ ] 111.5-05-PLAN.md — SharpFuzz VDE corruption harness
 
 ### Stage 1: Storage & I/O Foundation (Phases 112-117)
 
@@ -2629,6 +2635,10 @@ Plans:
 - [ ] **Phase 113: BlockDeviceFactory Cascade Wiring** — 4 plans | SIO-02
 - [ ] **Phase 114: S3 Epoch-Flush Block Device** — 5 plans | SIO-03
 - [ ] **Phase 115: WAL Group Commit Optimization** — 3 plans | SIO-04
+  Plans:
+  - [ ] 115-01-PLAN.md — GroupCommitAccumulator core
+  - [ ] 115-02-PLAN.md — Pipeline integration with WalBlockWriterStage
+  - [ ] 115-03-PLAN.md — Adaptive group sizing with backpressure
 - [ ] **Phase 116: Live Filesystem Resize** — 4 plans | SIO-05
 - [ ] **Phase 117: Kernel Bypass Networking (DPDK/RDMA)** — 5 plans | SIO-06
 
