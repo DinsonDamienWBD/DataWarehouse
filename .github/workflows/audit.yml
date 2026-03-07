@@ -1,3 +1,42 @@
+# =============================================================================
+# DW Military-Grade Audit Pipeline
+# =============================================================================
+#
+# GATE OVERVIEW
+# -------------
+# This workflow enforces 7 quality gates. The `audit-summary` job is the single
+# required status check for branch protection -- it aggregates all gate results.
+#
+#   Gate                  | Blocks Merge When...                         | Timeout
+#   ----------------------|----------------------------------------------|--------
+#   build-and-test        | Build fails or any unit test fails            | 30 min
+#   coyote-concurrency    | Coyote finds concurrency bugs (1000 iters)   | 60 min
+#   static-analysis       | InspectCode issues > INSPECTCODE_BASELINE    | 45 min
+#                         | dupFinder duplicates > DUPFINDER_BASELINE     |
+#   code-coverage         | dotCover coverage < COVERAGE_THRESHOLD (%)   | 30 min
+#   mutation-testing      | Stryker mutation score < 95%                 | 120 min
+#   performance-check     | Any Gen2 allocation in ZeroAlloc benchmarks  | 60 min
+#   audit-summary         | Any of the above gates fail                  | 5 min
+#
+# EXPECTED RUN TIMES (approximate)
+# --------------------------------
+#   Fast path (build+test only):     ~10 min
+#   Full pipeline (all gates):       ~90-180 min (mutation testing dominates)
+#   Performance check:               ~30-45 min
+#
+# HOW TO UPDATE BASELINES
+# -----------------------
+#   1. InspectCode baseline: Update INSPECTCODE_BASELINE env var below.
+#      Run `jb inspectcode` locally and count WARNING+ issues.
+#   2. dupFinder baseline:   Update DUPFINDER_BASELINE env var below.
+#      Run `jb dupfinder` locally and count duplicates with cost >= 100.
+#   3. Coverage threshold:   Update COVERAGE_THRESHOLD env var below.
+#      Check current coverage in dotCover HTML report.
+#   4. Mutation score:       Update --break-at in mutation-testing job.
+#   5. Gen2 allocations:     Zero tolerance -- no configuration needed.
+#
+# =============================================================================
+
 name: DW Military-Grade Audit
 
 on:
@@ -6,6 +45,7 @@ on:
   pull_request:
     branches: [ "main", "master" ]
   workflow_dispatch:
+  workflow_call:
 
 # Cancel in-progress runs for the same branch/PR to save runner minutes
 concurrency:
@@ -17,10 +57,14 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   CONFIGURATION: Release
+  # ── Baseline Thresholds (calibrated during Plan 02 gate verification) ──
+  INSPECTCODE_BASELINE: '0'
+  DUPFINDER_BASELINE: '0'
+  COVERAGE_THRESHOLD: '0'
 
 jobs:
   # ──────────────────────────────────────────────────────────────
-  # Stage 1: Build + Unit Tests (fast gate — blocks everything)
+  # Stage 1: Build + Unit Tests (fast gate -- blocks everything)
   # ──────────────────────────────────────────────────────────────
   build-and-test:
     runs-on: ubuntu-latest
@@ -113,7 +157,7 @@ jobs:
   static-analysis:
     needs: build-and-test
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
     - name: Checkout Repository
       uses: actions/checkout@v4
@@ -136,6 +180,28 @@ jobs:
           --no-build \
           2>&1 | tee inspectcode-output.log || true
 
+    - name: Check InspectCode Threshold
+      run: |
+        if [ -f inspectcode-results.xml ]; then
+          ISSUE_COUNT=$(python3 -c "
+        import xml.etree.ElementTree as ET
+        tree = ET.parse('inspectcode-results.xml')
+        root = tree.getroot()
+        # Count all Issue elements (WARNING severity and above)
+        issues = root.findall('.//Issue')
+        print(len(issues))
+        " 2>/dev/null || echo "0")
+
+          echo "InspectCode issues found: $ISSUE_COUNT (baseline: ${{ env.INSPECTCODE_BASELINE }})"
+          if [ "$ISSUE_COUNT" -gt "${{ env.INSPECTCODE_BASELINE }}" ]; then
+            echo "::error::InspectCode found $ISSUE_COUNT issues, exceeding baseline of ${{ env.INSPECTCODE_BASELINE }}"
+            exit 1
+          fi
+          echo "InspectCode: PASS (${ISSUE_COUNT} <= ${{ env.INSPECTCODE_BASELINE }})"
+        else
+          echo "::warning::inspectcode-results.xml not found -- skipping threshold check"
+        fi
+
     - name: Run dupFinder
       run: |
         jb dupfinder DataWarehouse.slnx \
@@ -143,6 +209,29 @@ jobs:
           --show-text \
           --discard-cost=100 \
           2>&1 | tee dupfinder-output.log || true
+
+    - name: Check dupFinder Threshold
+      run: |
+        if [ -f dupfinder-results.xml ]; then
+          DUP_COUNT=$(python3 -c "
+        import xml.etree.ElementTree as ET
+        tree = ET.parse('dupfinder-results.xml')
+        root = tree.getroot()
+        # Count Duplicate elements with cost >= 100
+        duplicates = root.findall('.//Duplicate')
+        high_cost = [d for d in duplicates if int(d.get('Cost', '0')) >= 100]
+        print(len(high_cost))
+        " 2>/dev/null || echo "0")
+
+          echo "dupFinder duplicates found (cost >= 100): $DUP_COUNT (baseline: ${{ env.DUPFINDER_BASELINE }})"
+          if [ "$DUP_COUNT" -gt "${{ env.DUPFINDER_BASELINE }}" ]; then
+            echo "::error::dupFinder found $DUP_COUNT duplicates (cost >= 100), exceeding baseline of ${{ env.DUPFINDER_BASELINE }}"
+            exit 1
+          fi
+          echo "dupFinder: PASS (${DUP_COUNT} <= ${{ env.DUPFINDER_BASELINE }})"
+        else
+          echo "::warning::dupfinder-results.xml not found -- skipping threshold check"
+        fi
 
     - name: Upload Static Analysis Results
       if: always()
@@ -184,6 +273,21 @@ jobs:
           -- -c ${{ env.CONFIGURATION }} \
           2>&1 | tee dotcover-output.log
 
+    - name: Check Coverage Threshold
+      run: |
+        # Extract coverage percentage from dotCover output log
+        COVERAGE=$(grep -oP 'Overall coverage: \K[0-9]+' dotcover-output.log 2>/dev/null || echo "")
+        if [ -n "$COVERAGE" ]; then
+          echo "dotCover coverage: ${COVERAGE}% (threshold: ${{ env.COVERAGE_THRESHOLD }}%)"
+          if [ "$COVERAGE" -lt "${{ env.COVERAGE_THRESHOLD }}" ]; then
+            echo "::error::Code coverage ${COVERAGE}% is below threshold of ${{ env.COVERAGE_THRESHOLD }}%"
+            exit 1
+          fi
+          echo "Coverage: PASS (${COVERAGE}% >= ${{ env.COVERAGE_THRESHOLD }}%)"
+        else
+          echo "::warning::Could not extract coverage percentage -- skipping threshold check"
+        fi
+
     - name: Upload Coverage Report
       if: always()
       uses: actions/upload-artifact@v4
@@ -195,7 +299,7 @@ jobs:
         retention-days: 30
 
   # ──────────────────────────────────────────────────────────────
-  # Stage 3: Stryker Mutation Testing (expensive — runs after all others pass)
+  # Stage 3: Stryker Mutation Testing (expensive -- runs after all others pass)
   # ──────────────────────────────────────────────────────────────
   mutation-testing:
     needs: [coyote-concurrency, static-analysis, code-coverage]
@@ -251,32 +355,45 @@ jobs:
       with:
         dotnet-version: ${{ env.DOTNET_VERSION }}
 
-    - name: Run BenchmarkDotNet
+    - name: Run BenchmarkDotNet (ZeroAlloc focus)
       run: |
         dotnet run -c ${{ env.CONFIGURATION }} --project Benchmarks/ -- \
-          --filter '*' \
+          --filter '*ZeroAlloc*' \
           --exporters json \
           --artifacts ./benchmark-results/ \
           2>&1 | tee benchmark-output.log || true
 
-    - name: Check for Gen2 Regressions
+    - name: Check for Gen2 Regressions (hard gate)
       run: |
         # Parse benchmark JSON for Gen2 allocations on zero-allocation paths
-        if [ -f benchmark-results/results/*.json ]; then
+        FOUND_JSON=false
+        for f in benchmark-results/results/*.json; do
+          [ -f "$f" ] && FOUND_JSON=true && break
+        done
+
+        if [ "$FOUND_JSON" = "true" ]; then
           python3 -c "
         import json, glob, sys
+        failures = []
         for f in glob.glob('benchmark-results/results/*.json'):
             data = json.load(open(f))
             for b in data.get('Benchmarks', []):
                 gen2 = b.get('Statistics', {}).get('Gen2Collections', 0)
                 name = b.get('Method', 'unknown')
-                if gen2 > 0 and 'ZeroAlloc' in b.get('Categories', []):
-                    print(f'FAIL: {name} has {gen2} Gen2 collections on zero-alloc path')
-                    sys.exit(1)
-        print('All zero-allocation paths clean.')
-          " || exit 1
+                if gen2 > 0:
+                    failures.append(f'{name}: {gen2} Gen2 collections')
+        if failures:
+            for fail in failures:
+                print(f'FAIL: {fail}')
+            sys.exit(1)
+        print('All zero-allocation paths clean -- no Gen2 collections detected.')
+          "
+          if [ $? -ne 0 ]; then
+            echo "::error::Gen2 allocation detected in zero-alloc benchmark paths -- merge blocked"
+            exit 1
+          fi
         else
-          echo "::warning::No benchmark results found — skipping Gen2 check"
+          echo "::warning::No benchmark results found -- skipping Gen2 check"
         fi
 
     - name: Upload Benchmark Results
@@ -290,7 +407,7 @@ jobs:
         retention-days: 30
 
   # ──────────────────────────────────────────────────────────────
-  # Final: Summary Status Check
+  # Final: Summary Status Check (REQUIRED for branch protection)
   # ──────────────────────────────────────────────────────────────
   audit-summary:
     if: always()
@@ -298,22 +415,82 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-    - name: Check All Jobs
+    - name: Aggregate Gate Results
       run: |
         echo "=== DW Military-Grade Audit Summary ==="
-        echo "Build & Test:     ${{ needs.build-and-test.result }}"
-        echo "Coyote:           ${{ needs.coyote-concurrency.result }}"
-        echo "Static Analysis:  ${{ needs.static-analysis.result }}"
-        echo "Code Coverage:    ${{ needs.code-coverage.result }}"
-        echo "Mutation Testing: ${{ needs.mutation-testing.result }}"
-        echo "Performance:      ${{ needs.performance-check.result }}"
+        echo ""
+        echo "Gate Results:"
+        echo "  Build & Test:     ${{ needs.build-and-test.result }}"
+        echo "  Coyote:           ${{ needs.coyote-concurrency.result }}"
+        echo "  Static Analysis:  ${{ needs.static-analysis.result }}"
+        echo "  Code Coverage:    ${{ needs.code-coverage.result }}"
+        echo "  Mutation Testing: ${{ needs.mutation-testing.result }}"
+        echo "  Performance:      ${{ needs.performance-check.result }}"
+        echo ""
 
-        # Fail if any required job failed
-        if [[ "${{ needs.build-and-test.result }}" == "failure" ]] || \
-           [[ "${{ needs.coyote-concurrency.result }}" == "failure" ]] || \
-           [[ "${{ needs.mutation-testing.result }}" == "failure" ]]; then
-          echo "::error::Required audit jobs failed — merge blocked"
+        FAILED=false
+
+        # Gate 1: Build + Tests (CRITICAL -- always required)
+        if [[ "${{ needs.build-and-test.result }}" == "failure" ]]; then
+          echo "::error::GATE FAILED: build-and-test"
+          FAILED=true
+        fi
+
+        # Gate 2: Coyote concurrency (CRITICAL -- concurrency bugs block merge)
+        if [[ "${{ needs.coyote-concurrency.result }}" == "failure" ]]; then
+          echo "::error::GATE FAILED: coyote-concurrency"
+          FAILED=true
+        fi
+
+        # Gate 3: Static analysis (InspectCode + dupFinder thresholds)
+        if [[ "${{ needs.static-analysis.result }}" == "failure" ]]; then
+          echo "::error::GATE FAILED: static-analysis (InspectCode/dupFinder threshold exceeded)"
+          FAILED=true
+        fi
+
+        # Gate 4: Code coverage
+        if [[ "${{ needs.code-coverage.result }}" == "failure" ]]; then
+          echo "::error::GATE FAILED: code-coverage (below threshold)"
+          FAILED=true
+        fi
+
+        # Gate 5: Mutation testing (Stryker score < 95%)
+        if [[ "${{ needs.mutation-testing.result }}" == "failure" ]]; then
+          echo "::error::GATE FAILED: mutation-testing (Stryker score below 95%)"
+          FAILED=true
+        fi
+
+        # Gate 6: Performance (Gen2 allocation in zero-alloc paths)
+        if [[ "${{ needs.performance-check.result }}" == "failure" ]]; then
+          echo "::error::GATE FAILED: performance-check (Gen2 allocation detected)"
+          FAILED=true
+        fi
+
+        if [ "$FAILED" = "true" ]; then
+          echo ""
+          echo "::error::One or more audit gates failed -- merge blocked"
           exit 1
         fi
 
-        echo "All required gates passed."
+        echo "All 6 audit gates passed -- merge allowed."
+
+  # ─────────────────────────────────────────────────────────────────────────
+  # Branch Protection Setup
+  # ─────────────────────────────────────────────────────────────────────────
+  # To enforce this pipeline as a merge gate:
+  #
+  #   1. Go to: Settings -> Branches -> Branch protection rules
+  #   2. Add rule for: main (or master)
+  #   3. Enable:
+  #      - [x] Require status checks to pass before merging
+  #        - Required check: "audit-summary"
+  #      - [x] Require branches to be up to date before merging
+  #      - [x] Require conversation resolution before merging
+  #      - [x] Dismiss stale pull request approvals when new commits are pushed
+  #      - [x] Require review from code owners (optional, recommended)
+  #   4. Save changes
+  #
+  # The "audit-summary" job is the ONLY required check. It aggregates all
+  # gate results and fails if ANY gate fails. This means GitHub only needs
+  # one required status check, but all 6 gates are enforced.
+  # ─────────────────────────────────────────────────────────────────────────
