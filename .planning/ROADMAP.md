@@ -2791,9 +2791,38 @@ Plans:
 
 ### Stage 5: Companion Apps (Phases 136-138)
 
-- [ ] **Phase 136: CLI & GUI — 100% Production Ready** — 12 plans | APP-01, APP-02, APP-03
-- [ ] **Phase 137: Dashboard — 100% Production Ready** — 6 plans | APP-04
-- [ ] **Phase 138: Launcher & Benchmarks — 100% Production Ready** — 5 plans | APP-05, APP-06
+- [ ] **Phase 136: CLI & GUI — 100% Production Ready** — 12 plans, 4 waves | APP-01, APP-02, APP-03
+  Goal: CLI and GUI fully synced to v6.0+ architecture with all command groups, DI migration, dynamic registry, NLP, parity verification, shell completions, accessibility, scripting, and error handling
+  Plans:
+  - [ ] 136-01-PLAN.md — CLI v6.0 command sync (policy/federation/authority/shard/device-raid/ai-advisor/crdt)
+  - [ ] 136-02-PLAN.md — CLI DI migration (ICommandHandler interface, handler implementations)
+  - [ ] 136-03-PLAN.md — CLI DynamicCommandRegistry wiring (commands appear/disappear with plugins)
+  - [ ] 136-04-PLAN.md — CLI NLP v6.0 update (vocabulary, KnowledgeLake integration)
+  - [ ] 136-05-PLAN.md — GUI v6.0 page sync (PolicyDashboard, AuthorityChain, ShardManager, AIAdvisorPanel, DeviceRaid, CrdtStatus, VdeDecorators)
+  - [ ] 136-06-PLAN.md — GUI DynamicCommandRegistry wiring (nav auto-updates on plugin load/unload)
+  - [ ] 136-07-PLAN.md — GUI service layer (IPolicyService, IFederationService, IShardService, IAIAdvisorService, IRaidService)
+  - [ ] 136-08-PLAN.md — CLI/GUI parity verification (automated test, zero parity gaps)
+  - [ ] 136-09-PLAN.md — Shell completions (bash/zsh/fish/PowerShell from DynamicCommandRegistry)
+  - [ ] 136-10-PLAN.md — Keyboard shortcuts & accessibility (keyboard nav, screen readers, high-contrast)
+  - [ ] 136-11-PLAN.md — CLI scripting engine (variables, conditionals, loops, batch operations)
+  - [ ] 136-12-PLAN.md — Error handling & UX polish (consistent errors, progress bars, cancellation, retry)
+- [ ] **Phase 137: Dashboard — 100% Production Ready** — 6 plans, 2 waves | APP-04
+  Goal: Dashboard fully synced with v6.0 REST API parity, SignalR real-time, Swagger, new pages, auth hardening, performance
+  Plans:
+  - [ ] 137-01-PLAN.md — New controllers (Policy/Federation/Authority/Shard/Raid/AI/VDE/Compliance/Performance)
+  - [ ] 137-02-PLAN.md — SignalR real-time channels (federation/RAID/shard/AI/policy streams)
+  - [ ] 137-03-PLAN.md — REST API parity (OpenAPI/Swagger, API versioning)
+  - [ ] 137-04-PLAN.md — New Razor pages (FederationOverview, PolicyManager, ShardDashboard, RaidHealth, AIInsights, VdeExplorer, ComplianceCenter)
+  - [ ] 137-05-PLAN.md — Dashboard auth hardening (JWT refresh, RBAC, MFA)
+  - [ ] 137-06-PLAN.md — Dashboard performance (caching, SignalR batching, lazy-load, pagination)
+- [ ] **Phase 138: Launcher & Benchmarks — 100% Production Ready** — 5 plans, 2 waves | APP-05, APP-06
+  Goal: Launcher federation-aware with health endpoints and policy startup; benchmarks expanded to all v6.0 subsystems with CI gate
+  Plans:
+  - [ ] 138-01-PLAN.md — Launcher federation support (--cluster-seed, topology-aware plugin loading)
+  - [ ] 138-02-PLAN.md — Launcher health endpoints (/health/live, /health/ready, /health/startup)
+  - [ ] 138-03-PLAN.md — Launcher policy-based startup (startup-policy.json, resource limits)
+  - [ ] 138-04-PLAN.md — Benchmark suite expansion (VDE/federation/policy/RAID/shard/WAL P50/P99/P999)
+  - [ ] 138-05-PLAN.md — Benchmark CI integration (auto-run on PR, baseline compare, >10% flag)
 
 ### Stage 6: Test Coverage (Phases 139-140)
 
@@ -2827,3 +2856,11 @@ Plans:
   - [ ] 141-02-PLAN.md -- DAST + Crypto pentest -- /pentest-dast, IV reuse, padding oracle, FIPS
   - [ ] 141-03-PLAN.md -- Data plane pentest + Fuzzing -- SQL injection, path traversal, zip bombs, /pentest-fuzz
   - [ ] 141-04-PLAN.md -- Supply chain & secrets -- TruffleHog, Snyk, SBOM, binary reproducibility
+
+### Stage 8: Final Production Certification (Phase 142)
+
+- [ ] **Phase 142: Final Production Certification** — 8 plans | CRT-01, CRT-02, CRT-03, CRT-04, CRT-05
+  - Semantic codebase analysis + missing test generation
+  - CI/CD audit.yml expansion with all gates
+  - Final audit, profile, and hardening round
+  - Production readiness certification report

@@ -78,6 +78,14 @@ Requirements for v8.0 release. Each maps to roadmap phases.
 - [ ] **PEN-04**: Data plane pentest confirms no SQL injection, path traversal, zip bomb, or plugin injection
 - [ ] **PEN-05**: Supply chain clean — no leaked secrets, no vulnerable dependencies, SBOM verified
 
+### Final Production Certification
+
+- [ ] **CRT-01**: Semantic codebase analysis identifies and closes ALL test coverage gaps — 100% public API coverage
+- [ ] **CRT-02**: CI/CD audit.yml includes all test projects, SAST/coverage/mutation/benchmark gates
+- [ ] **CRT-03**: Final audit round produces zero P0/P1 findings across all tools
+- [ ] **CRT-04**: Final hardening round — Coyote 10K, Stryker all survivors documented, 1-hour soak stable
+- [ ] **CRT-05**: All 10 v8.0 success criteria verified with evidence in certification report
+
 ## Out of Scope
 
 | Feature | Reason |
@@ -141,10 +149,15 @@ Requirements for v8.0 release. Each maps to roadmap phases.
 | PEN-03 | 141 | Pending |
 | PEN-04 | 141 | Pending |
 | PEN-05 | 141 | Pending |
+| CRT-01 | 142 | Pending |
+| CRT-02 | 142 | Pending |
+| CRT-03 | 142 | Pending |
+| CRT-04 | 142 | Pending |
+| CRT-05 | 142 | Pending |
 
 **Coverage:**
-- v8.0 requirements: 45 total
-- Mapped to phases: 45
+- v8.0 requirements: 50 total
+- Mapped to phases: 50
 - Unmapped: 0
 
 ---
