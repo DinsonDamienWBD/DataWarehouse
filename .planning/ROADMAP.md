@@ -2679,20 +2679,37 @@ Plans:
 ### Stage 2: Cryptographic & Security Hardening (Phases 118-122)
 
 - [ ] **Phase 118: FIPS 140-2/3 Enforcement Mode** — 4 plans | SEC-01
-- [ ] **Phase 119: NSA CNSA 2.0 Enforcement** — 3 plans | SEC-02
-- [ ] **Phase 120: Multi-Level Security (MLS)** — 4 plans | SEC-03
-- [ ] **Phase 121: Secure Erase & Data Remanence** — 3 plans | SEC-04
-- [ ] **Phase 122: TEMPEST Countermeasures** — 2 plans | SEC-05
+- [ ] **Phase 119: NSA CNSA 2.0 Enforcement** — 3 plans, 1 wave | SEC-02
+  Goal: NSA CNSA 2.0 algorithm suite enforced with PQ transition timeline
+  Plans:
+  - [ ] 119-01-PLAN.md — CnsaSuiteEnforcer (CNSA 2.0 algorithm list, Suite presets)
+  - [ ] 119-02-PLAN.md — Algorithm transition tracker (Phase 1/2 timeline)
+  - [ ] 119-03-PLAN.md — CNSA compliance documentation and cipher suite combinations
+- [ ] **Phase 120: Multi-Level Security (MLS)** — 4 plans, 2 waves | SEC-03
+  Goal: Bell-LaPadula + Biba enforced at VDE inode level
+  Plans:
+  - [ ] 120-01-PLAN.md — SecurityLabel per-inode (8-byte classification + compartments)
+  - [ ] 120-02-PLAN.md — BellLaPadulaEnforcer (no read up, no write down)
+  - [ ] 120-03-PLAN.md — BibaIntegrityEnforcer (no read down, no write up)
+  - [ ] 120-04-PLAN.md — MLS + Federation (cross-classification propagation)
+- [ ] **Phase 121: Secure Erase & Data Remanence** — 3 plans, 1 wave | SEC-04
+  Goal: Secure erase on block deallocation with configurable erase policies
+  Plans:
+  - [ ] 121-01-PLAN.md — SecureEraseManager (crypto-erase, DoD 5220.22-M, NVMe TRIM)
+  - [ ] 121-02-PLAN.md — Memory zeroization audit (IMemoryProtector RAII pattern)
+  - [ ] 121-03-PLAN.md — DisposeAsync hardening (SecureDispose extensions)
+- [ ] **Phase 122: TEMPEST Countermeasures** — 2 plans, 1 wave | SEC-05
+  Goal: TEMPEST side-channel mitigations and constant-time crypto paths
+  Plans:
+  - [ ] 122-01-PLAN.md — TempestMitigationAdvisor (constant-time, cache-oblivious, power leveling)
+  - [ ] 122-02-PLAN.md — Side-channel hardening audit (timing leak patterns, FixedTimeEquals)
 
 ### Stage 3: Scaling & Performance (Phases 123-129)
 
 - [ ] **Phase 123: Cloud Provider Full Implementation** — 4 plans | PER-01
 - [ ] **Phase 124: HA Clustering Out-of-Box** — 4 plans | PER-02
 - [ ] **Phase 125: Deterministic Latency & NUMA Pinning** — 3 plans | PER-03
-- [ ] **Phase 126: Microsecond-Level Benchmarks** — 3 plans | PER-04
-- [ ] **Phase 127: Petabyte-Scale Validation** — 3 plans | PER-05
-- [ ] **Phase 128: Erasure Coding at VDE Level** — 3 plans | PER-06
-- [ ] **Phase 129: BoundedDictionary Migration** — 4 plans | PER-07
+- [ ] **Phase 126: Microsecond-Level Benchmarks** — 3 plans, 1 wave | PER-04  Goal: Published P50/P90/P99/P999 microsecond-level benchmarks for all critical operations  Plans:  - [ ] 126-01-PLAN.md — Comprehensive benchmark suite (VDE, pipeline, federation, message bus)  - [ ] 126-02-PLAN.md — Published baseline numbers + CI regression gate (>10% blocks merge)  - [ ] 126-03-PLAN.md — Continuous performance dashboard + trend visualization- [ ] **Phase 127: Petabyte-Scale Validation** — 3 plans, 2 waves | PER-05  Goal: Petabyte-scale validation (1TB stress test + 1PB federation test)  Plans:  - [ ] 127-01-PLAN.md — TB-scale stress test (1TB VDE, 1B files, <10ms P99 reads)  - [ ] 127-02-PLAN.md — PB-scale federation test (100x10TB, cross-shard queries, rebalancing)  - [ ] 127-03-PLAN.md — Hyperscale simulation framework (compressed state + Coyote)- [ ] **Phase 128: Erasure Coding at VDE Level** — 3 plans, 1 wave | PER-06  Goal: Reed-Solomon erasure coding at VDE level for geo-distributed durability  Plans:  - [ ] 128-01-PLAN.md — ReedSolomonErasureCoder (GF(2^8), AVX-512/NEON SIMD, IErasureCoder)  - [ ] 128-02-PLAN.md — VDE erasure-coded extents (k+m shards across VDEs)  - [ ] 128-03-PLAN.md — Geo-distributed durability (policy placement, auto-repair)- [ ] **Phase 129: BoundedDictionary Migration** — 4 plans, 2 waves | PER-07  Goal: All BoundedDictionary(1000) instances migrated to auto-sized BoundedCache  Plans:  - [ ] 129-01-PLAN.md — Audit all instances (categorize by plugin/usage)  - [ ] 129-02-PLAN.md — Migration wave 1 (top 20 hot-path caches)  - [ ] 129-03-PLAN.md — Migration wave 2 (remaining caches)  - [ ] 129-04-PLAN.md — Deprecate BoundedDictionary ([Obsolete] + Roslyn analyzer)
 
 ### Stage 4: Advanced Capabilities (Phases 130-135)
 
