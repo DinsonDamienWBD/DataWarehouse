@@ -153,6 +153,15 @@ public sealed class LifecycleStressPlugin : PluginBase
     }
 
     /// <summary>
+    /// Simulates receiving a message (increments counter without async delay).
+    /// Used in tests to briefly exercise the plugin before unloading.
+    /// </summary>
+    public void SimulateMessageReceived()
+    {
+        Interlocked.Increment(ref _messagesReceived);
+    }
+
+    /// <summary>
     /// Begin unload: cancel in-flight operations and transition state.
     /// </summary>
     public void BeginUnload()
