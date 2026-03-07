@@ -2861,8 +2861,7 @@ Plans:
   | UltimateCompute | 143 | 4829-4976 |
   | UltimateConsensus | 61 | 5524-5589 |
   | UltimateDatabaseProtocol | 184 | 5590-5780 |
-  | UltimateDatabaseStorage | 104 | 5781-5889 |
-  | UltimateDataCatalog | 26 | 5890-5920 |
+  | UltimateDatabaseStorage | 104 | 1/2 | In Progress|  | 26 | 5890-5920 |
   | UltimateDataFormat | 58 | 5921-5983 |
   | UltimateDataGovernance | 64 | 5984-6052 |
   | UltimateDataIntegration | 78 | 6053-6135 |

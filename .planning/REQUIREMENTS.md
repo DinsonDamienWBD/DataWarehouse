@@ -833,7 +833,7 @@ Single source of truth: `Metadata/production-audit-2026-03-05/CONSOLIDATED-FINDI
 
 ### Mutation Testing (MUTN) — Phase 104
 
-- [ ] **MUTN-01**: Stryker.NET mutation score ≥ 95% across all hardening test projects
+- [x] **MUTN-01**: Stryker.NET mutation score ≥ 95% across all hardening test projects
 - [ ] **MUTN-02**: Surviving mutants documented with justification (equivalent mutants, etc.)
 
 ### Integration Profiling (SOAK) — Phases 105-106
