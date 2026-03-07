@@ -116,6 +116,21 @@ public sealed class VdeTestHarness : IAsyncDisposable
 
         try
         {
+            // -- Cache stage boundary --
+            CheckCrashPoint(DecoratorStage.Cache, blockNumber);
+
+            // -- Integrity stage boundary --
+            CheckCrashPoint(DecoratorStage.Integrity, blockNumber);
+
+            // -- Compression stage boundary --
+            CheckCrashPoint(DecoratorStage.Compression, blockNumber);
+
+            // -- Dedup stage boundary --
+            CheckCrashPoint(DecoratorStage.Dedup, blockNumber);
+
+            // -- Encryption stage boundary --
+            CheckCrashPoint(DecoratorStage.Encryption, blockNumber);
+
             // Read current data for before-image
             var beforeImage = new byte[TestBlockSize];
             await _dataDevice.ReadBlockAsync(blockNumber, beforeImage, ct);
@@ -123,13 +138,16 @@ public sealed class VdeTestHarness : IAsyncDisposable
             // Begin WAL transaction
             await using var txn = await _wal.BeginTransactionAsync(ct);
 
-            // Log the write to WAL
+            // Log the write to WAL (WAL stage crash is handled by _walDevice)
             await txn.LogBlockWriteAsync(blockNumber, beforeImage, data, ct);
 
             // Commit WAL (linearization point)
             await txn.CommitAsync(ct);
 
-            // Apply after-image to data device
+            // -- RAID stage boundary (between WAL commit and data write) --
+            CheckCrashPoint(DecoratorStage.Raid, blockNumber);
+
+            // Apply after-image to data device (File stage crash handled by _dataDevice)
             await _dataDevice.WriteBlockAsync(blockNumber, data, ct);
 
             // Checkpoint WAL (mark entries as applied)
@@ -248,6 +266,19 @@ public sealed class VdeTestHarness : IAsyncDisposable
             DataConsistent = isAtomic,
             CrashRecord = _simulator.LastCrashRecord
         };
+    }
+
+    /// <summary>
+    /// Checks if the crash simulator should fire at the given decorator stage.
+    /// Throws OperationCanceledException if a crash is triggered.
+    /// </summary>
+    private void CheckCrashPoint(DecoratorStage stage, long blockNumber)
+    {
+        if (_simulator.CheckAndTrigger(stage, blockNumber))
+        {
+            throw new OperationCanceledException(
+                $"Simulated crash at {stage} stage", _simulator.CrashToken);
+        }
     }
 
     /// <summary>
