@@ -2645,6 +2645,12 @@ Plans:
   - [ ] 115-02-PLAN.md — Pipeline integration with WalBlockWriterStage
   - [ ] 115-03-PLAN.md — Adaptive group sizing with backpressure
 - [ ] **Phase 116: Live Filesystem Resize** — 4 plans | SIO-05
+  Goal: VDE volumes can grow online and shrink offline without data loss
+  Plans:
+  - [ ] 116-01-PLAN.md — VdeResizeEngine online grow (bitmap extend, AG addition, OPJR journal)
+  - [ ] 116-02-PLAN.md — VdeShrinkEngine offline shrink (defrag compact, bitmap truncate)
+  - [ ] 116-03-PLAN.md — IResizableBlockDevice adapters (FileBlockDevice + RawPartitionBlockDevice)
+  - [ ] 116-04-PLAN.md — CLI/GUI integration (dw volume resize --grow/--shrink)
 - [ ] **Phase 117: Kernel Bypass Networking (DPDK/RDMA)** — 5 plans | SIO-06
 
 ### Stage 2: Cryptographic & Security Hardening (Phases 118-122)
