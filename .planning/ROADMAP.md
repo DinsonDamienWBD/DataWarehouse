@@ -2878,8 +2878,7 @@ Plans:
   | UltimateEncryption | 180 | 7144-7342 |
   | UltimateFilesystem | 101 | 7343-7448 |
   | UltimateInterface | 150 | 8016-8172 |
-  | UltimateIoTIntegration | 107 | 8173-8284 |
-  | UltimateMicroservices | 35 | 8672-8711 |
+  | UltimateIoTIntegration | 107 | 1/2 | In Progress|  | 35 | 8672-8711 |
   | UltimateMultiCloud | 86 | 8712-8802 |
   | UltimateReplication | 139 | 9220-9363 |
   | UltimateResilience | 91 | 9364-9459 |
