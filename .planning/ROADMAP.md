@@ -2633,6 +2633,11 @@ Plans:
 
 - [ ] **Phase 112: SPDK Full Implementation** — 8 plans | SIO-01
 - [ ] **Phase 113: BlockDeviceFactory Cascade Wiring** — 4 plans | SIO-02
+  Plans:
+  - [ ] 113-01-PLAN.md — IoUringBlockDevice relocation to IO/Linux namespace
+  - [ ] 113-02-PLAN.md — Windows block device TryCreate factory methods
+  - [ ] 113-03-PLAN.md — KqueueBlockDevice TryCreate factory method
+  - [ ] 113-04-PLAN.md — Factory cascade wiring (all implementations connected)
 - [ ] **Phase 114: S3 Epoch-Flush Block Device** — 5 plans | SIO-03
 - [ ] **Phase 115: WAL Group Commit Optimization** — 3 plans | SIO-04
   Plans:
