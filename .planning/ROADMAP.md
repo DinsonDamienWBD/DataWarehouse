@@ -2755,11 +2755,39 @@ Plans:
 ### Stage 4: Advanced Capabilities (Phases 130-135)
 
 - [ ] **Phase 130: HDF5/NetCDF Scientific Format Support** — 3 plans | ADV-01
+  Goal: HDF5/NetCDF scientific format strategies fully production-ready with chunked I/O and VDE extent mapping
+  Plans:
+  - [ ] 130-01-PLAN.md — Hdf5Strategy (HDF5-CSharp NuGet, dataset nav, chunked I/O, VDE extent mapping)
+  - [ ] 130-02-PLAN.md — NetCdfStrategy (NetCDF-3 classic + NetCDF-4 via HDF5)
+  - [ ] 130-03-PLAN.md — Scientific workload profile (FormatStorageProfile for delta encoding, SIMD layout)
 - [ ] **Phase 131: GPU-Accelerated Analytics** — 3 plans | ADV-02
+  Goal: GPU-accelerated analytics wired to VDE SQL OLAP query pipeline with auto-detection
+  Plans:
+  - [ ] 131-01-PLAN.md — GPU query engine bridge (predicate pushdown + parallel reduction aggregation)
+  - [ ] 131-02-PLAN.md — GPU-accelerated compression/encryption (AES batch + LZ4 batch + CPU fallback)
+  - [ ] 131-03-PLAN.md — GpuCapabilityDetector + GpuStrategySelector (CUDA > OpenCL > Vulkan > CPU)
 - [ ] **Phase 132: Formal Verification Documentation** — 2 plans | ADV-03
-- [ ] **Phase 133: Multi-Process Architecture** — 3 plans | ADV-04
+  Goal: TLA+ formal verification specs for WAL, RAID, Raft, federation + property-based invariant tests
+  Plans:
+  - [ ] 132-01-PLAN.md — TLA+ specifications (WAL consistency, RAID parity, Raft safety, federation catalog)
+  - [ ] 132-02-PLAN.md — Invariant test suite (Coyote + property-based tests, 10K iterations per invariant)
+- [ ] **Phase 133: Multi-Process Architecture** — 3 plans, 2 waves | ADV-04
+  Goal: Multi-process shared-nothing architecture with process-per-core I/O and supervisor restart
+  Plans:
+  - [ ] 133-01-PLAN.md — ProcessIsolationManager (IPC via Unix domain sockets / named pipes, worker processes)
+  - [ ] 133-02-PLAN.md — Process-per-core I/O (IoProcessManager, NVMe namespace mapping, CPU affinity)
+  - [ ] 133-03-PLAN.md — KernelSupervisor (100ms restart, WAL state reconstruction, graceful degradation)
 - [ ] **Phase 134: Custom Memory Allocator** — 3 plans | ADV-05
+  Goal: Zero-GC slab/arena allocators for I/O hot paths with <1ms GC pause target
+  Plans:
+  - [ ] 134-01-PLAN.md — SlabAllocator (4KB/64KB/1MB/4MB slabs, NativeMemory.AlignedAlloc, zero GC)
+  - [ ] 134-02-PLAN.md — Arena allocator for transactions (per-txn arena, O(1) free)
+  - [ ] 134-03-PLAN.md — GC pause mitigation (GC.TryStartNoGCRegion, MemoryPressureMonitor)
 - [ ] **Phase 135: Remaining TODO Cleanup** — 2 plans | ADV-06
+  Goal: All 36 TODOs resolved and strategy state stores audited for persistence classification
+  Plans:
+  - [ ] 135-01-PLAN.md — TODO resolution (BlockDeviceFactory 9, PreambleReader 4, TerraformProvider 4, rest)
+  - [ ] 135-02-PLAN.md — Strategy state store audit (persistent vs ephemeral, IPersistentBackingStore wiring)
 
 ### Stage 5: Companion Apps (Phases 136-138)
 
@@ -2770,8 +2798,32 @@ Plans:
 ### Stage 6: Test Coverage (Phases 139-140)
 
 - [ ] **Phase 139: 100% Test Coverage** — 10 plans | TST-01, TST-02, TST-03, TST-04, TST-05
+  Goal: 100% test coverage across SDK, Kernel, 52 plugins, and companion apps
+  Plans:
+  - [ ] 139-01-PLAN.md -- Coverage baseline -- dotCover full solution, per-project report
+  - [ ] 139-02-PLAN.md -- SDK unit tests -- 100% coverage for all base classes and utilities
+  - [ ] 139-03-PLAN.md -- Kernel unit tests -- MessageBus, KnowledgeLake, PipelineOrchestrator, PluginLoader
+  - [ ] 139-04-PLAN.md -- Plugin strategy tests wave 1 -- auto-gen contract compliance for 3,036 strategies
+  - [ ] 139-05-PLAN.md -- Plugin strategy tests wave 2 -- deeper functional tests for top 20 per plugin
+  - [ ] 139-06-PLAN.md -- Companion project tests -- CLI, GUI, Dashboard, Launcher
+  - [ ] 139-07-PLAN.md -- Integration tests -- message bus E2E, VDE chain, federation router
+  - [ ] 139-08-PLAN.md -- Negative/adversarial tests -- invalid inputs, corrupt data, unicode edge cases
+  - [ ] 139-09-PLAN.md -- Fuzz harnesses -- SharpFuzz for VDE/S3/SQL/compression/encryption parsers
+  - [ ] 139-10-PLAN.md -- Coverage gate -- CI: >=95% overall, >=90% per-project, Stryker >=90%
 - [ ] **Phase 140: Full Hardening** — 4 plans | TST-06, TST-07, TST-08
+  Goal: Concurrency, performance, memory, and mutation hardening for all v8.0 code
+  Plans:
+  - [ ] 140-01-PLAN.md -- Coyote concurrency testing -- SPDK, group commit, IPC, RDMA, cluster (10K iterations)
+  - [ ] 140-02-PLAN.md -- dotTrace profiling -- no method >5% CPU, call tree analysis
+  - [ ] 140-03-PLAN.md -- dotMemory profiling -- no leaks, 1-hour soak, LOH minimized, Gen2 <1/min
+  - [ ] 140-04-PLAN.md -- Stryker mutation testing -- 90%+ score, kill survivors
 
 ### Stage 7: Penetration Testing (Phase 141)
 
 - [ ] **Phase 141: Penetration Testing** — 4 plans | PEN-01, PEN-02, PEN-03, PEN-04, PEN-05
+  Goal: Full penetration testing with SAST, DAST, crypto, data plane, and supply chain
+  Plans:
+  - [ ] 141-01-PLAN.md -- SAST + Network & API pentest -- /pentest-sast, OWASP ZAP, nmap
+  - [ ] 141-02-PLAN.md -- DAST + Crypto pentest -- /pentest-dast, IV reuse, padding oracle, FIPS
+  - [ ] 141-03-PLAN.md -- Data plane pentest + Fuzzing -- SQL injection, path traversal, zip bombs, /pentest-fuzz
+  - [ ] 141-04-PLAN.md -- Supply chain & secrets -- TruffleHog, Snyk, SBOM, binary reproducibility
